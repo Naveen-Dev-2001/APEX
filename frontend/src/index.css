@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+@theme {
+    --color-primary: #24A1DD;
+    --color-primary-hover: #1D4ED8;
+    --color-primary-text: #303030;
+    --color-border-black: #E0E0E0;
+    --color-border-gray: #BBBBBB;
+    --color-bg-light: #9AD4EF;
+    --color-bg-gray: #F7F7F7;
+    --color-bg-main: #ffffff;
+    --color-text-main: #303030;
+    --color-bg-dark-header: #222222;
+    --color-bg-dark-main: #141414;
+}
+
+* {
+    font-family: "Creato Display", sans-serif !important;
+}
+
+.custom-font-jura {
+    font-family: "Jura", sans-serif !important;
+    font-weight: 700;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
