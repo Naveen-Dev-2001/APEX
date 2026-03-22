@@ -4,6 +4,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AppLayout from './layout/AppLayout';
 import RegisterPage from './features/auth/RegisterPage';
 import LoginPage from './features/auth/LoginPage';
+import SelectEntityPage from './features/entity/SelectEntityPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
 
@@ -18,11 +20,16 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
         </Route>
-        {/* <Route path="/sso" element={<SSO />} /> */}
 
-        <Route >
-          <Route element={<AppLayout />}>
-            {/* <Route path="/dashboard" element={<ChatPage />} /> */}
+        {/* Protected Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/select-entity" element={<SelectEntityPage />} />
+          {/* <Route path="/sso" element={<SSO />} /> */}
+
+          <Route >
+            <Route element={<AppLayout />}>
+              {/* <Route path="/dashboard" element={<ChatPage />} /> */}
+            </Route>
           </Route>
         </Route>
       </Routes>

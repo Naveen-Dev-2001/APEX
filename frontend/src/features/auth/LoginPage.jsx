@@ -4,9 +4,11 @@ import AuthLayout from '../../layout/AuthLayout';
 import CustomInput from '../../shared/components/CustomInput';
 import CustomButton from '../../shared/components/CustomButton';
 import API from '../services/api';
+import { useAuthStore } from '../../store/authStore';
 
 const LoginPage = () => {
     const navigate = useNavigate();
+    const setAuth = useAuthStore((state) => state.setAuth);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -30,14 +32,15 @@ const LoginPage = () => {
             const response = await API.post('/auth/login', { email, password });
 
             if (response.data && response.data.access_token) {
-                // Store the auth token locally
-                localStorage.setItem('access_token', response.data.access_token);
-                // Also store user info if needed
-                if (response.data.username) localStorage.setItem('username', response.data.username);
-                if (response.data.role) localStorage.setItem('role', response.data.role);
+                // Store the auth token and user via Zustand (uses sessionStorage under the hood)
+                const userObj = {
+                    username: response.data.username || null,
+                    role: response.data.role || null
+                };
+                setAuth(response.data.access_token, userObj);
 
                 // Navigate to dashboard upon successful login
-                navigate('/dashboard');
+                navigate('/select-entity');
             } else {
                 setError("Invalid response from server");
             }
