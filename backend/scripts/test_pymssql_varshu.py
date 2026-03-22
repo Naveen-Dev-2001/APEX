@@ -3,12 +3,12 @@ from pathlib import Path
 
 output_file = Path("backend/output/pymssql_test_varshu.txt")
 try:
-    # URL in vector_finder.py: mssql+pymssql://sa:varshu%4040067@localhost:1433/accounts_payable
+    # URL in vector_finder.py: mssql+pymssql://sa:varshu%4040067@localhost:1433/accounts_payable_db
     conn = pymssql.connect(
         server='localhost',
         user='sa',
         password='Loandna@2026',
-        database='accounts_payable',
+        database='accounts_payable_db',
         port=1433
     )
     cursor = conn.cursor()

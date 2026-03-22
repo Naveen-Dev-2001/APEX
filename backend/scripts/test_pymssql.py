@@ -3,13 +3,13 @@ from pathlib import Path
 
 output_file = Path("backend/output/pymssql_test.txt")
 try:
-    # URL was: mssql+pymssql://sa:Loandna%402026@localhost:1433/accounts_payable
+    # URL was: mssql+pymssql://sa:Loandna%402026@localhost:1433/accounts_payable_db
     # Decoded password: Loandna@2026
     conn = pymssql.connect(
         server='localhost',
         user='sa',
         password='Loandna@2026',
-        database='accounts_payable',
+        database='accounts_payable_db',
         port=1433
     )
     cursor = conn.cursor()

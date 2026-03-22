@@ -11,7 +11,7 @@ function App() {
       {/* <ToastProvider /> */}
       <Routes>
         <Route >
-          <Route path="/" element={<RegisterPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           {/* <Route path="/" element={<LoginPage />} /> */}
           {/* <Route path="/signup" element={<SignupForm />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
