@@ -32,19 +32,19 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
-app.include_router(invoices.router, prefix="/api/invoices", tags=["invoices"])
-app.include_router(coding.router, prefix="/api/coding", tags=["coding"])
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
-app.include_router(master_data.router, prefix="/api/master", tags=["master-data"])
-app.include_router(workflow.router, prefix="/api/workflow", tags=["workflow"])
+app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(invoices.router, prefix="/invoices", tags=["invoices"])
+app.include_router(coding.router, prefix="/coding", tags=["coding"])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+app.include_router(master_data.router, prefix="/master", tags=["master-data"])
+app.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
 
-app.include_router(approval.router, prefix="/api/approval", tags=["approval"])
-app.include_router(admin.router, prefix="/api/users", tags=["admin"])
-app.include_router(settings_route.router, prefix="/api/settings", tags=["Settings"])
-app.include_router(currency.router, prefix="/api/currency", tags=["Currencies"])
-app.include_router(workflow_config.router, prefix="/api/workflow-config", tags=["workflow-config"])
-app.include_router(delegation.router, prefix="/api/delegation", tags=["delegation"])
+app.include_router(approval.router, prefix="/approval", tags=["approval"])
+app.include_router(admin.router, prefix="/users", tags=["admin"])
+app.include_router(settings_route.router, prefix="/settings", tags=["Settings"])
+app.include_router(currency.router, prefix="/currency", tags=["Currencies"])
+app.include_router(workflow_config.router, prefix="/workflow-config", tags=["workflow-config"])
+app.include_router(delegation.router, prefix="/delegation", tags=["delegation"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 
 
