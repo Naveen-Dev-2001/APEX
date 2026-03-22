@@ -25,10 +25,10 @@ const LoginPage = () => {
         try {
             setLoading(true);
             setError("");
-            
+
             // Backend login route expects { email, password }
             const response = await API.post('/auth/login', { email, password });
-            
+
             if (response.data && response.data.access_token) {
                 // Store the auth token locally
                 localStorage.setItem('access_token', response.data.access_token);
@@ -62,11 +62,8 @@ const LoginPage = () => {
     );
 
     return (
-        <AuthLayout>
-            <div className="text-center mb-8">
-                <h3 className="text-xl font-medium text-gray-800">Welcome Back</h3>
-                <p className="text-sm text-gray-500 mt-1">Please enter your details to sign in.</p>
-            </div>
+        <AuthLayout title="Welcome Back">
+
 
             <form onSubmit={handleLogin} className="w-full">
                 <CustomInput
@@ -95,24 +92,24 @@ const LoginPage = () => {
                     rightIcon={showPassword ? EyeIcon : EyeSlashIcon}
                     onRightIconClick={toggleShowPassword}
                 />
-                
+
                 <div className="flex justify-end mb-6">
                     <a href="/forgot-password" className="text-sm text-blue-500 hover:underline">Forgot password?</a>
                 </div>
-                
+
                 <div className="mt-4">
-                    <CustomButton 
-                        type="submit" 
-                        variant="primary" 
+                    <CustomButton
+                        type="submit"
+                        variant="primary"
                         disabled={loading}
                         className="bg-blue-500 hover:bg-blue-600 !text-white !h-11 !rounded font-medium w-full"
                     >
                         {loading ? "Signing in..." : "Login →"}
                     </CustomButton>
                 </div>
-                
+
                 <div className="mt-6 text-center text-sm text-gray-500">
-                    Don't have an account? <a href="/" className="text-blue-500 hover:underline">Register</a>
+                    Don't have an account? <a href="/register" className="text-blue-500 hover:underline">Register</a>
                 </div>
             </form>
         </AuthLayout>

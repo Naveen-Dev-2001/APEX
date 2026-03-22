@@ -53,7 +53,8 @@ const RegisterPage = () => {
     };
 
     return (
-        <AuthLayout>
+        <AuthLayout title="Create Account">
+
             <Stepper steps={STEPS} currentStep={currentStep} />
 
             <div className="mt-8 transition-all duration-300">

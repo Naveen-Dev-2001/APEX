@@ -2,7 +2,7 @@ import React from 'react';
 import authBackground from '../assets/auth_background.png';
 import logo from '../assets/loandna_logo_dark.png';
 
-const AuthLayout = ({ children }) => {
+const AuthLayout = ({ children, title = "" }) => {
     return (
         <div
             className="min-h-screen w-full flex items-center justify-center bg-slate-50 relative overflow-hidden font-creato bg-cover bg-center"
@@ -14,7 +14,7 @@ const AuthLayout = ({ children }) => {
                     <div className="flex justify-center mb-6">
                         <img src={logo} alt="LoanDNA Logo" className="h-[48px] object-contain" />
                     </div>
-                    <h2 className="text-center text-xl font-medium text-gray-800 mb-6">Create Account</h2>
+                    <h2 className="text-center text-xl font-medium text-gray-800 mb-6">{title}</h2>
 
                     {children}
                 </div>
