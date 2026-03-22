@@ -27,14 +27,14 @@ for server in servers:
             )
             logging.info(f"SUCCESS! Connected to {server}")
             
-            # Check if accounts_payable_db db exists
+            # Check if accounts_payable db exists
             cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sys.databases WHERE name = 'accounts_payable_db'")
+            cursor.execute("SELECT name FROM sys.databases WHERE name = 'accounts_payable'")
             row = cursor.fetchone()
             if row:
-                logging.info("Database 'accounts_payable_db' exists.")
+                logging.info("Database 'accounts_payable' exists.")
             else:
-                logging.warning("Database 'accounts_payable_db' NOT found.")
+                logging.warning("Database 'accounts_payable' NOT found.")
             
             conn.close()
             success = True

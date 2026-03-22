@@ -24,7 +24,7 @@ const EmailStep = ({ email, setEmail, onNext }) => {
             await API.post('/auth/send-otp', { email, purpose: 'registration' });
             onNext();
         } catch (err) {
-            setError(err.message || "Failed to send OTP");
+            setError(err.response?.data?.detail || err.response?.data?.message || err.message || "Failed to send OTP");
         } finally {
             setLoading(false);
         }

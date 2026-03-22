@@ -3,6 +3,7 @@ import './App.css'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AppLayout from './layout/AppLayout';
 import RegisterPage from './features/auth/RegisterPage';
+import LoginPage from './features/auth/LoginPage';
 
 function App() {
 
@@ -12,7 +13,7 @@ function App() {
       <Routes>
         <Route >
           <Route path="/register" element={<RegisterPage />} />
-          {/* <Route path="/" element={<LoginPage />} /> */}
+          <Route path="/login" element={<LoginPage />} />
           {/* <Route path="/signup" element={<SignupForm />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
