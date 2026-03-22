@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.models.auth import LoginRequest, Token, CheckEmailRequest, ResetPasswordRequest, SendOTPRequest, VerifyOTPRequest
 from app.models.user import User as UserPydantic, UserResponse
@@ -48,7 +48,7 @@ async def verify_otp(request: VerifyOTPRequest, db: Session = Depends(get_db)):
     return {"message": "OTP verified successfully"}
 
 @router.post("/register", response_model=UserResponse)
-async def register(user: UserPydantic, db: Session = Depends(get_db)):
+async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # Check if OTP was verified
     if not otp_service.is_verified(db, user.email, "registration"):
         raise HTTPException(
@@ -88,17 +88,26 @@ async def register(user: UserPydantic, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     
-    # Notify all Admins and the user
+    # Notify all Admins and the user via background tasks
     admins = db.query(UserDB).filter(UserDB.role == "admin").all()
-    for admin in admins:
-        email_service.send_admin_new_user_notification(admin.email, new_user.email, new_user.username)
-    
-    # If no admins found in DB, fallback to settings default admin email
-    if not admins:
-        email_service.send_admin_new_user_notification(settings.ADMIN_EMAIL, new_user.email, new_user.username)
+    if admins:
+        for admin in admins:
+            background_tasks.add_task(
+                email_service.send_admin_new_user_notification,
+                admin.email, new_user.email, new_user.username
+            )
+    else:
+        # If no admins found in DB, fallback to settings default admin email
+        background_tasks.add_task(
+            email_service.send_admin_new_user_notification,
+            settings.ADMIN_EMAIL, new_user.email, new_user.username
+        )
 
-    # NEW: Send confirmation to the user that their account is pending approval
-    email_service.send_user_pending_approval(new_user.email, new_user.username)
+    # Send confirmation to the user that their account is pending approval
+    background_tasks.add_task(
+        email_service.send_user_pending_approval,
+        new_user.email, new_user.username
+    )
     
     return UserResponse(
         id=str(new_user.id),
