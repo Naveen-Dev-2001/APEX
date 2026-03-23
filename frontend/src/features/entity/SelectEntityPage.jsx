@@ -19,6 +19,9 @@ const SelectEntityPage = () => {
   ];
 
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
+  
+  const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
   const handleLogout = () => {
     logout();
@@ -79,7 +82,7 @@ const SelectEntityPage = () => {
             className="bg-[#1e9bd8] text-white w-[38px] h-[38px] rounded-full flex justify-center items-center text-[17px] font-semibold shadow-md"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
-            A
+            {userInitial}
           </div>
 
           {isDropdownOpen && (
