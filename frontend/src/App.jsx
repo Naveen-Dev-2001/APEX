@@ -6,6 +6,9 @@ import RegisterPage from './features/auth/RegisterPage';
 import LoginPage from './features/auth/LoginPage';
 import SelectEntityPage from './features/entity/SelectEntityPage';
 import DashboardPage from './features/dashboard/DashboardPage';
+import MasterDataPage from './features/masterData/MasterDataPage';
+import SettingsPage from './features/settings/SettingsPage';
+import AdminPage from './features/admin/AdminPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -31,6 +34,9 @@ function App() {
           <Route >
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/master-data" element={<MasterDataPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/admin" element={<AdminPage />} />
             </Route>
           </Route>
         </Route>
