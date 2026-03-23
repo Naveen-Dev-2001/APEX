@@ -5,6 +5,7 @@ import AppLayout from './layout/AppLayout';
 import RegisterPage from './features/auth/RegisterPage';
 import LoginPage from './features/auth/LoginPage';
 import SelectEntityPage from './features/entity/SelectEntityPage';
+import DashboardPage from './features/dashboard/DashboardPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -29,7 +30,7 @@ function App() {
 
           <Route >
             <Route element={<AppLayout />}>
-              {/* <Route path="/dashboard" element={<ChatPage />} /> */}
+              <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
           </Route>
         </Route>

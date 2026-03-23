@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { useUIStore } from '../../store/ui.store';
 import authBg from '../../assets/auth_background.png';
 import logo from '../../assets/loandna_logo_dark.png';
 
@@ -20,6 +21,7 @@ const SelectEntityPage = () => {
 
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const setActiveTab = useUIStore((state) => state.setActiveTab);
   
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
@@ -33,7 +35,8 @@ const SelectEntityPage = () => {
     setIsSelectOpen(false);
     // Add logic to save to session storage and context like old frontend
     // setEntity(entity.name)
-    // navigate("/dashboard")
+    setActiveTab('Dashboard');
+    navigate("/dashboard");
   };
 
   // Close dropdown if clicked outside
