@@ -13,6 +13,7 @@ const useAdminStore = create((set, get) => ({
     itemsPerPage: 15,
     sortColumn: 'username',
     sortDirection: 'asc',
+    isUpdating: false,
 
     setSearchQuery: (query) => set({ searchQuery: query }),
     setCurrentPage: (page) => set({ currentPage: page }),
@@ -47,13 +48,16 @@ const useAdminStore = create((set, get) => ({
     },
 
     addUser: async (userData) => {
+        set({ isUpdating: true });
         try {
             await API.post('/auth/register', userData);
-            get().fetchUsers();
+            await get().fetchUsers();
             return true;
         } catch (error) {
             console.error("Failed to add user", error);
             return false;
+        } finally {
+            set({ isUpdating: false });
         }
     },
 
@@ -69,13 +73,16 @@ const useAdminStore = create((set, get) => ({
     },
 
     updateUserRole: async (userId, role, status) => {
+        set({ isUpdating: true });
         try {
             await adminService.updateUserRole(userId, role, status);
-            get().fetchUsers();
+            await get().fetchUsers();
             return true;
         } catch (error) {
             console.error("Failed to update user", error);
             return false;
+        } finally {
+            set({ isUpdating: false });
         }
     },
 

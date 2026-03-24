@@ -8,24 +8,25 @@ const AdminPage = () => {
     const [editingUser, setEditingUser] = useState(null);
     const [editForm, setEditForm] = useState({ role: '', status: '' });
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'Approver' });
-    
-    const { 
+    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'approver' });
+
+    const {
         searchQuery, setSearchQuery, setCurrentPage,
-        updateUserRole, addUser
+        updateUserRole, addUser, isUpdating,
+        loading, fetchUsers, fetchSettings
     } = useAdminStore();
 
     // Requested Options
     const roleOptions = [
-        { label: 'Admin', value: 'Admin' },
-        { label: 'Coder', value: 'Coder' },
-        { label: 'Approver', value: 'Approver' }
+        { label: 'Admin', value: 'admin' },
+        { label: 'Coder', value: 'coder' },
+        { label: 'Approver', value: 'approver' }
     ];
 
     const statusOptions = [
-        { label: 'Active', value: 'Active' },
-        { label: 'Pending', value: 'Pending' },
-        { label: 'Rejected', value: 'Rejected' }
+        { label: 'Active', value: 'active' },
+        { label: 'Pending', value: 'pending' },
+        { label: 'Rejected', value: 'rejected' }
     ];
 
     const tabs = ['User Management', 'Global Config', 'Delegations'];
@@ -47,7 +48,7 @@ const AdminPage = () => {
         const success = await addUser(addForm);
         if (success) {
             setIsAddModalOpen(false);
-            setAddForm({ username: '', email: '', password: '', role: 'Approver' });
+            setAddForm({ username: '', email: '', password: '', role: 'approver' });
         }
     };
 
@@ -56,9 +57,9 @@ const AdminPage = () => {
             <h1 className="text-3xl font-light mb-5 text-[#333333] tracking-wide text-left">
                 Admin Dashboard
             </h1>
-            
+
             <div className="bg-white rounded-[4px] shadow-sm w-full p-5 border border-gray-200 min-h-[600px] flex flex-col relative text-left">
-                
+
                 {/* Edit Modal */}
                 {editingUser && (
                     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[3000] p-4">
@@ -68,13 +69,13 @@ const AdminPage = () => {
                                 <button onClick={() => setEditingUser(null)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
                             </div>
                             <div className="p-6 space-y-5">
-                                <Dropdown 
+                                <Dropdown
                                     label="Role"
                                     value={editForm.role}
                                     options={roleOptions}
                                     onChange={(val) => setEditForm({ ...editForm, role: val })}
                                 />
-                                <Dropdown 
+                                <Dropdown
                                     label="Status"
                                     value={editForm.status}
                                     options={statusOptions}
@@ -82,17 +83,19 @@ const AdminPage = () => {
                                 />
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
-                                <button 
+                                <button
                                     onClick={() => setEditingUser(null)}
                                     className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded transition-colors"
                                 >
                                     Cancel
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleSaveEdit}
-                                    className="px-5 py-2 text-sm font-medium bg-[#3b82f6] text-white hover:bg-blue-600 rounded shadow-sm transition-colors"
+                                    disabled={isUpdating}
+                                    className={`px-5 py-2 text-sm font-medium bg-[#3b82f6] text-white hover:bg-blue-600 rounded shadow-sm transition-colors flex items-center gap-2 ${isUpdating ? 'opacity-70 cursor-not-allowed' : ''}`}
                                 >
-                                    Save Changes
+                                    {isUpdating && <div className="loading-spinner"></div>}
+                                    {isUpdating ? 'Saving...' : 'Save Changes'}
                                 </button>
                             </div>
                         </div>
@@ -110,7 +113,7 @@ const AdminPage = () => {
                             <div className="p-6 space-y-4">
                                 <div className="space-y-1">
                                     <label className="text-[13px] font-medium text-gray-700">Username</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
                                         value={addForm.username}
@@ -120,7 +123,7 @@ const AdminPage = () => {
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[13px] font-medium text-gray-700">Email Address</label>
-                                    <input 
+                                    <input
                                         type="email"
                                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
                                         value={addForm.email}
@@ -130,7 +133,7 @@ const AdminPage = () => {
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[13px] font-medium text-gray-700">Password</label>
-                                    <input 
+                                    <input
                                         type="password"
                                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
                                         value={addForm.password}
@@ -138,7 +141,7 @@ const AdminPage = () => {
                                         placeholder="••••••••"
                                     />
                                 </div>
-                                <Dropdown 
+                                <Dropdown
                                     label="Initial Role"
                                     value={addForm.role}
                                     options={roleOptions}
@@ -146,17 +149,19 @@ const AdminPage = () => {
                                 />
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
-                                <button 
+                                <button
                                     onClick={() => setIsAddModalOpen(false)}
                                     className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded transition-colors"
                                 >
                                     Cancel
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleAddUser}
-                                    className="px-5 py-2 text-sm font-medium bg-[#24a0ed] text-white hover:bg-[#1c8ad1] rounded shadow-sm transition-colors"
+                                    disabled={isUpdating}
+                                    className={`px-5 py-2 text-sm font-medium bg-[#24a0ed] text-white hover:bg-[#1c8ad1] rounded shadow-sm transition-colors flex items-center gap-2 ${isUpdating ? 'opacity-70 cursor-not-allowed' : ''}`}
                                 >
-                                    Create User
+                                    {isUpdating && <div className="loading-spinner"></div>}
+                                    {isUpdating ? 'Creating...' : 'Create User'}
                                 </button>
                             </div>
                         </div>
@@ -165,18 +170,17 @@ const AdminPage = () => {
 
                 {/* Tabs & Top Actions */}
                 <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-5 gap-4">
-                    
+
                     {/* Tabs */}
                     <div className="flex border border-gray-200 rounded-md overflow-hidden h-[38px]">
                         {tabs.map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-5 py-0 text-[13px] font-medium transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center ${
-                                    activeTab === tab 
-                                    ? 'bg-[#8dc3e3] text-gray-800' 
+                                className={`px-5 py-0 text-[13px] font-medium transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center ${activeTab === tab
+                                    ? 'bg-[#8dc3e3] text-gray-800'
                                     : 'bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                }`}
+                                    }`}
                             >
                                 {tab}
                             </button>
@@ -191,9 +195,9 @@ const AdminPage = () => {
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 </span>
-                                <input 
-                                    type="text" 
-                                    placeholder="Search" 
+                                <input
+                                    type="text"
+                                    placeholder="Search"
                                     className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-[4px] text-[13px] outline-none focus:border-[#3b82f6] w-[260px] h-[34px]"
                                     value={searchQuery}
                                     onChange={(e) => {
@@ -202,14 +206,31 @@ const AdminPage = () => {
                                     }}
                                 />
                             </div>
-                            
+
+                            {/* Refresh Button */}
+                            <button
+                                onClick={() => { fetchUsers(); fetchSettings(); }}
+                                disabled={loading}
+                                title="Refresh data"
+                                className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-[4px] flex items-center gap-1.5 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? (
+                                    <div className="loading-spinner border-white/30 border-t-white"></div>
+                                ) : (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                )}
+                                <span>Refresh</span>
+                            </button>
+
                             {/* Add Button */}
-                            <button 
+                            {/* <button
                                 onClick={() => setIsAddModalOpen(true)}
                                 className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-[4px] flex items-center gap-1.5 text-[13px] font-medium transition-colors"
                             >
                                 <span className="text-base font-light leading-none mb-[2px]">+</span> Add
-                            </button>
+                            </button> */}
                         </div>
                     )}
                 </div>
