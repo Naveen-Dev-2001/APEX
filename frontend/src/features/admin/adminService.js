@@ -21,5 +21,21 @@ export const adminService = {
   async updateSettings(settings) {
     const response = await API.put('/settings/', settings);
     return response.data;
+  },
+
+  // Delegation methods
+  async getDelegations() {
+    const response = await API.get('/delegations/');
+    return response.data;
+  },
+
+  async createDelegation(payload) {
+    const response = await API.post('/delegations/', payload);
+    return response.data;
+  },
+
+  async deleteDelegation(id) {
+    const response = await API.delete(`/delegations/${id}`);
+    return response.data;
   }
 };

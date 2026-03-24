@@ -3,6 +3,7 @@ import UserManagementTab from './UserManagementTab';
 import useAdminStore from '../../store/useAdminStore';
 import Dropdown from '../../components/ui/Dropdown';
 import GlobalConfigTab from './GlobalConfigTab';
+import DelegationsTab from './DelegationsTab';
 
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
@@ -18,8 +19,8 @@ const AdminPage = () => {
     } = useAdminStore();
 
     // Use dynamic options from store
-    const roleOptions = roles.map(r => ({ label: r.charAt(0).toUpperCase() + r.slice(1), value: r }));
-    const statusOptions = statuses.map(s => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }));
+    const roleOptions = roles?.map(r => ({ label: r.charAt(0).toUpperCase() + r.slice(1), value: r }));
+    const statusOptions = statuses?.map(s => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }));
 
     const tabs = ['User Management', 'Global Config', 'Delegations'];
 
@@ -231,7 +232,7 @@ const AdminPage = () => {
                 <div className="flex-1 w-full">
                     {activeTab === 'User Management' && <UserManagementTab onEdit={handleEditClick} />}
                     {activeTab === 'Global Config' && <GlobalConfigTab />}
-                    {activeTab === 'Delegations' && <div className="p-4 text-gray-500 text-sm border rounded">Delegations Content</div>}
+                    {activeTab === 'Delegations' && <DelegationsTab />}
                 </div>
 
             </div>

@@ -14,6 +14,7 @@ const useAdminStore = create((set, get) => ({
     sortColumn: 'username',
     sortDirection: 'asc',
     isUpdating: false,
+    delegations: [],
 
     setSearchQuery: (query) => set({ searchQuery: query }),
     setCurrentPage: (page) => set({ currentPage: page }),
@@ -197,6 +198,41 @@ const useAdminStore = create((set, get) => ({
         } catch (error) {
             console.error("Failed to update status", error);
             get().fetchUsers();
+        }
+    },
+
+    fetchDelegations: async () => {
+        set({ loading: true, error: null });
+        try {
+            const data = await adminService.getDelegations();
+            set({ delegations: data, loading: false });
+        } catch (error) {
+            set({ error: error.message || 'Failed to fetch delegations', loading: false });
+        }
+    },
+
+    addDelegation: async (payload) => {
+        set({ isUpdating: true });
+        try {
+            await adminService.createDelegation(payload);
+            await get().fetchDelegations();
+            return true;
+        } catch (error) {
+            console.error("Failed to add delegation", error);
+            return false;
+        } finally {
+            set({ isUpdating: false });
+        }
+    },
+
+    removeDelegation: async (id) => {
+        try {
+            await adminService.deleteDelegation(id);
+            await get().fetchDelegations();
+            return true;
+        } catch (error) {
+            console.error("Failed to remove delegation", error);
+            return false;
         }
     }
 }));
