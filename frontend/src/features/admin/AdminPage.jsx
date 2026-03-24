@@ -51,8 +51,8 @@ const AdminPage = () => {
     };
 
     return (
-        <div className="pt-[100px] px-[30px] w-full h-full flex flex-col bg-[#f8f9fa] min-h-screen">
-            <h1 className="text-3xl font-light mb-5 text-[#333333] tracking-wide text-left">
+        <div className="p-4 flex flex-col gap-5 w-full bg-gray-50 min-h-0">
+            <h1 className="text-2xl font-semibold mb-2 text-[#333333] text-left">
                 Admin Dashboard
             </h1>
 
