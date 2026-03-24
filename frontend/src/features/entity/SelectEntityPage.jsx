@@ -33,8 +33,7 @@ const SelectEntityPage = () => {
   const handleSelectEntity = (entity) => {
     setSelectedEntity(entity.name);
     setIsSelectOpen(false);
-    // Add logic to save to session storage and context like old frontend
-    // setEntity(entity.name)
+    sessionStorage.setItem('selected_entity', entity.name);
     setActiveTab('Dashboard');
     navigate("/dashboard");
   };
