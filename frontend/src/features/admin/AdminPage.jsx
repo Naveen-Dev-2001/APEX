@@ -61,7 +61,7 @@ const AdminPage = () => {
                 {/* Edit Modal */}
                 {editingUser && (
                     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[3000] p-4">
-                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-scaleIn">
+                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-visible animate-scaleIn">
                             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                                 <h3 className="text-lg font-semibold text-gray-800">Edit User</h3>
                                 <button onClick={() => setEditingUser(null)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
@@ -103,7 +103,7 @@ const AdminPage = () => {
                 {/* Add Modal */}
                 {isAddModalOpen && (
                     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[3000] p-4">
-                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-scaleIn">
+                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-visible animate-scaleIn">
                             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                                 <h3 className="text-lg font-semibold text-gray-800">Add New User</h3>
                                 <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
