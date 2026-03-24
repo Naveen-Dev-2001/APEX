@@ -1,0 +1,55 @@
+import React from 'react';
+import addIcon from '../../../assets/admin-icons/add-icon.png';
+import useAdminStore from '../../../store/useAdminStore';
+
+const StatusManagement = ({ statuses, onAdd }) => {
+    const { removeStatus, isUpdating } = useAdminStore();
+
+    const handleRemove = async (status) => {
+        if (confirm(`Are you sure you want to remove the status "${status}"?`)) {
+            await removeStatus(status);
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden text-left">
+            <div className="px-6 py-4 flex justify-between items-center border-b border-gray-100">
+                <h3 className="text-[15px] font-medium text-[#444444]">Status Management</h3>
+                <button 
+                    onClick={onAdd}
+                    className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-1.5 rounded-[4px] flex items-center gap-1.5 text-xs font-semibold transition-colors"
+                >
+                    <img src={addIcon} alt="Add" className="w-[14px]" /> Add
+                </button>
+            </div>
+            
+            <div className="p-0">
+                <div className="bg-[#106fa4] text-white py-2 px-6 text-sm font-medium">
+                    User Name
+                </div>
+                <div className="p-6 flex flex-wrap gap-3">
+                    {statuses.map((status) => (
+                        <div 
+                            key={status} 
+                            className="flex items-center gap-2 px-3 py-1 rounded-full border border-[#e8c05d] bg-[#fdfaf1] text-[#7a6a3b] text-xs font-medium group transition-all"
+                        >
+                            <span>{status}</span>
+                            <button 
+                                onClick={() => handleRemove(status)}
+                                disabled={isUpdating}
+                                className="text-[#a1a1a1] hover:text-[#ef4444] transition-colors leading-none text-base"
+                            >
+                                &times;
+                            </button>
+                        </div>
+                    ))}
+                    {statuses.length === 0 && (
+                        <div className="text-gray-400 italic text-sm py-2">No statuses configured.</div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default StatusManagement;

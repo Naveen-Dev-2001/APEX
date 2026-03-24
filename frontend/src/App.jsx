@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import './App.css'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AppLayout from './layout/AppLayout';
@@ -10,38 +9,52 @@ import MasterDataPage from './features/masterData/MasterDataPage';
 import SettingsPage from './features/settings/SettingsPage';
 import AdminPage from './features/admin/AdminPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import TestDatePicker from './pages/TestDatePicker';
+import ToastProvider from './components/ToastProvider';
+
+import { ConfigProvider } from 'antd';
 
 function App() {
 
   return (
-    <Router>
-      {/* <ToastProvider /> */}
-      <Routes>
-        <Route >
-          <Route path="/" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          {/* <Route path="/signup" element={<SignupForm />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
-        </Route>
-
-        {/* Protected Routes */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/select-entity" element={<SelectEntityPage />} />
-          {/* <Route path="/sso" element={<SSO />} /> */}
-
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: '#24A1DD',
+          fontFamily: '"Creato Display", sans-serif',
+        },
+      }}
+    >
+      <Router>
+        <ToastProvider />
+        <Routes>
           <Route >
-            <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/master-data" element={<MasterDataPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/admin" element={<AdminPage />} />
+            <Route path="/" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/login" element={<LoginPage />} />
+          <Route path="/test-date-picker" element={<TestDatePicker />} />
+          {/* <Route path="/signup" element={<SignupForm />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
+          </Route>
+
+          {/* Protected Routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/select-entity" element={<SelectEntityPage />} />
+            {/* <Route path="/sso" element={<SSO />} /> */}
+
+            <Route >
+              <Route element={<AppLayout />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/master-data" element={<MasterDataPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/admin" element={<AdminPage />} />
+              </Route>
             </Route>
           </Route>
-        </Route>
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </ConfigProvider>
   );
 }
 

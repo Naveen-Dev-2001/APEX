@@ -44,7 +44,7 @@ app.include_router(admin.router, prefix="/users", tags=["admin"])
 app.include_router(settings_route.router, prefix="/settings", tags=["Settings"])
 app.include_router(currency.router, prefix="/currency", tags=["Currencies"])
 app.include_router(workflow_config.router, prefix="/workflow-config", tags=["workflow-config"])
-app.include_router(delegation.router, prefix="/delegation", tags=["delegation"])
+app.include_router(delegation.router, prefix="/delegations", tags=["delegation"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 
 

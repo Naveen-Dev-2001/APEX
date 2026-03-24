@@ -11,4 +11,25 @@ const API = axios.create({
     }
 });
 
+// Add token to requests
+API.interceptors.request.use(
+  (config) => {
+    const token = sessionStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Add Entity header if needed
+    const entity = sessionStorage.getItem('selected_entity');
+    if (entity) {
+      config.headers['X-Entity'] = entity;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export default API;

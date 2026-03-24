@@ -5,6 +5,7 @@ import CustomInput from '../../shared/components/CustomInput';
 import CustomButton from '../../shared/components/CustomButton';
 import API from '../services/api';
 import { useAuthStore } from '../../store/authStore';
+import toast from '../../utils/toast';
 
 const LoginPage = () => {
     const navigate = useNavigate();
@@ -45,7 +46,9 @@ const LoginPage = () => {
                 setError("Invalid response from server");
             }
         } catch (err) {
-            setError(err.response?.data?.detail || err.message || "Login failed");
+            const errMsg = err.response?.data?.detail || err.message || 'Login failed';
+            setError(errMsg);
+            toast.error(errMsg);
         } finally {
             setLoading(false);
         }

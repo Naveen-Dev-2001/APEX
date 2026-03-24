@@ -11,11 +11,15 @@
     "start": "npm run dev"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.5.1",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-query": "^5.95.1",
     "axios": "^1.13.6",
     "lucide-react": "^1.0.1",
     "plotly.js-dist-min": "^3.4.0",
+    "antd": "^5.24.1",
+    "dayjs": "^1.11.10",
+    "prop-types": "^15.8.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
