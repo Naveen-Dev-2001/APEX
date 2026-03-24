@@ -4,11 +4,13 @@ import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/ui.store';
 import authBg from '../../assets/auth_background.png';
 import logo from '../../assets/loandna_logo_dark.png';
+import { useCommonStore } from '../../store/common.store';
 
 const SelectEntityPage = () => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const setEntity = useCommonStore((state) => state.setEntity)
 
   // Mocked state for selected entity - will need to integrate with actual context later 
   const [selectedEntity, setSelectedEntity] = useState('Select Entity');
@@ -22,7 +24,7 @@ const SelectEntityPage = () => {
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
-  
+
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
   const handleLogout = () => {
@@ -33,6 +35,8 @@ const SelectEntityPage = () => {
   const handleSelectEntity = (entity) => {
     setSelectedEntity(entity.name);
     setIsSelectOpen(false);
+    setEntity(entity.name);
+    sessionStorage.setItem('selected_entity', entity.name); // Save selected entity to session storage
     // Add logic to save to session storage and context like old frontend
     // setEntity(entity.name)
     setActiveTab('Dashboard');

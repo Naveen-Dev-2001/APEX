@@ -1,3 +1,3 @@
 window._env_ = {
-    VITE_BACKEND_URL: "http://localhost:5000"
+    VITE_BACKEND_URL: "http://localhost:8014"
 };

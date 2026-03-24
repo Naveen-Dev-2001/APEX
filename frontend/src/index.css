@@ -14,6 +14,10 @@
     --color-bg-dark-main: #141414;
 }
 
+@theme {
+    --font-creato: "Creato Display", sans-serif;
+}
+
 * {
     font-family: "Creato Display", sans-serif !important;
 }
