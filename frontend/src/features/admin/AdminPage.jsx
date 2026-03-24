@@ -1,18 +1,32 @@
 import React, { useState } from 'react';
 import UserManagementTab from './UserManagementTab';
 import useAdminStore from '../../store/useAdminStore';
+import Dropdown from '../../components/ui/Dropdown';
 
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
     const [editingUser, setEditingUser] = useState(null);
     const [editForm, setEditForm] = useState({ role: '', status: '' });
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'approver' });
+    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'Approver' });
     
     const { 
         searchQuery, setSearchQuery, setCurrentPage,
-        roles, statuses, updateUserRole, addUser
+        updateUserRole, addUser
     } = useAdminStore();
+
+    // Requested Options
+    const roleOptions = [
+        { label: 'Admin', value: 'Admin' },
+        { label: 'Coder', value: 'Coder' },
+        { label: 'Approver', value: 'Approver' }
+    ];
+
+    const statusOptions = [
+        { label: 'Active', value: 'Active' },
+        { label: 'Pending', value: 'Pending' },
+        { label: 'Rejected', value: 'Rejected' }
+    ];
 
     const tabs = ['User Management', 'Global Config', 'Delegations'];
 
@@ -33,7 +47,7 @@ const AdminPage = () => {
         const success = await addUser(addForm);
         if (success) {
             setIsAddModalOpen(false);
-            setAddForm({ username: '', email: '', password: '', role: 'approver' });
+            setAddForm({ username: '', email: '', password: '', role: 'Approver' });
         }
     };
 
@@ -43,7 +57,7 @@ const AdminPage = () => {
                 Admin Dashboard
             </h1>
             
-            <div className="bg-white rounded-[4px] shadow-sm w-full p-5 border border-gray-200 min-h-[600px] flex flex-col relative">
+            <div className="bg-white rounded-[4px] shadow-sm w-full p-5 border border-gray-200 min-h-[600px] flex flex-col relative text-left">
                 
                 {/* Edit Modal */}
                 {editingUser && (
@@ -53,31 +67,19 @@ const AdminPage = () => {
                                 <h3 className="text-lg font-semibold text-gray-800">Edit User</h3>
                                 <button onClick={() => setEditingUser(null)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
                             </div>
-                            <div className="p-6 space-y-4 text-left">
-                                <div className="space-y-1">
-                                    <label className="text-[13px] font-medium text-gray-700">Role</label>
-                                    <select 
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
-                                        value={editForm.role}
-                                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                                    >
-                                        {roles.map(r => (
-                                            <option key={r} value={r}>{r.toUpperCase()}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[13px] font-medium text-gray-700">Status</label>
-                                    <select 
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
-                                        value={editForm.status}
-                                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                                    >
-                                        {statuses.map(s => (
-                                            <option key={s} value={s}>{s.toUpperCase()}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                            <div className="p-6 space-y-5">
+                                <Dropdown 
+                                    label="Role"
+                                    value={editForm.role}
+                                    options={roleOptions}
+                                    onChange={(val) => setEditForm({ ...editForm, role: val })}
+                                />
+                                <Dropdown 
+                                    label="Status"
+                                    value={editForm.status}
+                                    options={statusOptions}
+                                    onChange={(val) => setEditForm({ ...editForm, status: val })}
+                                />
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
                                 <button 
@@ -105,7 +107,7 @@ const AdminPage = () => {
                                 <h3 className="text-lg font-semibold text-gray-800">Add New User</h3>
                                 <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
                             </div>
-                            <div className="p-6 space-y-4 text-left">
+                            <div className="p-6 space-y-4">
                                 <div className="space-y-1">
                                     <label className="text-[13px] font-medium text-gray-700">Username</label>
                                     <input 
@@ -136,18 +138,12 @@ const AdminPage = () => {
                                         placeholder="••••••••"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[13px] font-medium text-gray-700">Initial Role</label>
-                                    <select 
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
-                                        value={addForm.role}
-                                        onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
-                                    >
-                                        {roles.map(r => (
-                                            <option key={r} value={r}>{r.toUpperCase()}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <Dropdown 
+                                    label="Initial Role"
+                                    value={addForm.role}
+                                    options={roleOptions}
+                                    onChange={(val) => setAddForm({ ...addForm, role: val })}
+                                />
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
                                 <button 

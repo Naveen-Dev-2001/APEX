@@ -76,18 +76,17 @@ const UserManagementTab = ({ onEdit }) => {
             accessor: 'status', 
             sortable: true,
             onClick: () => setSort('status'),
-            render: (status, row) => {
-                const isActive = status === 'active';
+            render: (status) => {
+                const s = status?.toLowerCase();
+                let colorClass = 'text-gray-500';
+                if (s === 'active') colorClass = 'text-[#4ade80]';
+                if (s === 'pending') colorClass = 'text-[#f59e0b]';
+                if (s === 'rejected') colorClass = 'text-[#ef4444]';
+                
                 return (
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => updateUserStatus(row.id, isActive ? 'inactive' : 'active')}
-                            className={`w-9 h-[20px] rounded-full relative transition-colors duration-200 ${isActive ? 'bg-[#3b82f6]' : 'bg-gray-300'}`}
-                        >
-                            <span className={`absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full transition-transform duration-200 ${isActive ? 'translate-x-[16px]' : ''}`} />
-                        </button>
-                        <span className="text-[13px] text-gray-500 capitalize">{status || 'inactive'}</span>
-                    </div>
+                    <span className={`text-[13px] font-semibold capitalize ${colorClass}`}>
+                        {status || 'Pending'}
+                    </span>
                 );
             }
         },
@@ -102,16 +101,7 @@ const UserManagementTab = ({ onEdit }) => {
                     >
                         <img src={editIcon} alt="Edit" className="w-[14px]" />
                     </button>
-                    <button 
-                        onClick={() => {
-                            if(window.confirm(`Are you sure you want to delete ${row.username}?`)) {
-                                deleteUser(row.id);
-                            }
-                        }}
-                        className="hover:opacity-70 transition-opacity"
-                    >
-                        <img src={deleteIcon} alt="Delete" className="w-[14px]" />
-                    </button>
+                    {/* Delete icon removed as per request */}
                 </div>
             )
         }
