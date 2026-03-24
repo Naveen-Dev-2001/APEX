@@ -11,5 +11,15 @@ export const adminService = {
   async updateUserRole(userId, role, status) {
     const response = await API.put(`/users/${userId}/role`, { role, status });
     return response.data;
+  },
+
+  async getSettings() {
+    const response = await API.get('/settings/');
+    return response.data;
+  },
+
+  async updateSettings(settings) {
+    const response = await API.put('/settings/', settings);
+    return response.data;
   }
 };

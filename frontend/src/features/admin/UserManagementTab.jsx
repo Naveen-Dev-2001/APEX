@@ -80,8 +80,9 @@ const UserManagementTab = ({ onEdit }) => {
                 const s = status?.toLowerCase();
                 let colorClass = 'text-gray-500';
                 if (s === 'active') colorClass = 'text-[#4ade80]';
-                if (s === 'pending') colorClass = 'text-[#f59e0b]';
-                if (s === 'rejected') colorClass = 'text-[#ef4444]';
+                else if (s === 'pending') colorClass = 'text-[#f59e0b]';
+                else if (s === 'rejected') colorClass = 'text-[#ef4444]';
+                else if (s) colorClass = 'text-[#3b82f6]'; // Default color for new statuses
 
                 return (
                     <span className={`text-[13px] font-semibold capitalize ${colorClass}`}>

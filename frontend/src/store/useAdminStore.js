@@ -4,7 +4,7 @@ import { adminService } from '../features/admin/adminService';
 const useAdminStore = create((set, get) => ({
     users: [],
     roles: [],
-    statuses: [],
+    navigation: [],
     loading: false,
     error: null,
     totalUsers: 0,
@@ -30,11 +30,108 @@ const useAdminStore = create((set, get) => ({
 
     fetchSettings: async () => {
         try {
-            const response = await API.get('/settings/');
-            set({ roles: response.data.roles, statuses: response.data.statuses });
+            const data = await adminService.getSettings();
+            set({ 
+                roles: data.roles || [], 
+                statuses: data.statuses || [],
+                navigation: data.navigation || []
+            });
         } catch (error) {
             console.error("Failed to fetch settings", error);
         }
+    },
+
+    updateSettings: async (newSettings) => {
+        set({ isUpdating: true });
+        try {
+            await adminService.updateSettings(newSettings);
+            set({ 
+                roles: newSettings.roles, 
+                statuses: newSettings.statuses,
+                navigation: newSettings.navigation 
+            });
+            return true;
+        } catch (error) {
+            console.error("Failed to update settings", error);
+            return false;
+        } finally {
+            set({ isUpdating: false });
+        }
+    },
+
+    addStatus: async (statusName) => {
+        const { statuses, roles, navigation } = get();
+        if (statuses.includes(statusName)) return false;
+        const newSettings = {
+            roles,
+            statuses: [...statuses, statusName],
+            navigation
+        };
+        return await get().updateSettings(newSettings);
+    },
+
+    removeStatus: async (statusName) => {
+        const { statuses, roles, navigation } = get();
+        const newSettings = {
+            roles,
+            statuses: statuses.filter(s => s !== statusName),
+            navigation
+        };
+        return await get().updateSettings(newSettings);
+    },
+
+    addRole: async (roleName) => {
+        const { statuses, roles, navigation } = get();
+        const lowerRole = roleName.toLowerCase();
+        if (roles.includes(lowerRole)) return false;
+        
+        const newSettings = {
+            roles: [...roles, lowerRole],
+            statuses,
+            navigation: [...navigation, { label: roleName, path: `/${lowerRole}`, roles: [lowerRole] }]
+        };
+        return await get().updateSettings(newSettings);
+    },
+
+    removeRole: async (roleName) => {
+        const { statuses, roles, navigation } = get();
+        const lowerRole = roleName.toLowerCase();
+        const newSettings = {
+            roles: roles.filter(r => r !== lowerRole),
+            statuses,
+            navigation: navigation.map(nav => ({
+                ...nav,
+                roles: nav.roles.filter(r => r !== lowerRole)
+            })).filter(nav => nav.roles.length > 0 || nav.roles.includes('all'))
+        };
+        return await get().updateSettings(newSettings);
+    },
+
+    updateRoleAccess: async (roleName, accessibleLabels) => {
+        const { statuses, roles, navigation } = get();
+        const lowerRole = roleName.toLowerCase();
+        
+        // Navigation in settings is Label -> Roles
+        // We need to update navigation to ensure for each label, roleName is in roles if label in accessibleLabels
+        const newNavigation = navigation.map(nav => {
+            const hasAccess = accessibleLabels.includes(nav.label);
+            let updatedRoles = [...nav.roles];
+            
+            if (hasAccess && !updatedRoles.includes(lowerRole)) {
+                updatedRoles.push(lowerRole);
+            } else if (!hasAccess && updatedRoles.includes(lowerRole)) {
+                updatedRoles = updatedRoles.filter(r => r !== lowerRole);
+            }
+            
+            return { ...nav, roles: updatedRoles };
+        });
+
+        const newSettings = {
+            roles,
+            statuses,
+            navigation: newNavigation
+        };
+        return await get().updateSettings(newSettings);
     },
 
     fetchUsers: async () => {

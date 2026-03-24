@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import UserManagementTab from './UserManagementTab';
 import useAdminStore from '../../store/useAdminStore';
 import Dropdown from '../../components/ui/Dropdown';
+import GlobalConfigTab from './GlobalConfigTab';
 
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
@@ -13,21 +14,12 @@ const AdminPage = () => {
     const {
         searchQuery, setSearchQuery, setCurrentPage,
         updateUserRole, addUser, isUpdating,
-        loading, fetchUsers, fetchSettings
+        loading, fetchUsers, fetchSettings, roles, statuses
     } = useAdminStore();
 
-    // Requested Options
-    const roleOptions = [
-        { label: 'Admin', value: 'admin' },
-        { label: 'Coder', value: 'coder' },
-        { label: 'Approver', value: 'approver' }
-    ];
-
-    const statusOptions = [
-        { label: 'Active', value: 'active' },
-        { label: 'Pending', value: 'pending' },
-        { label: 'Rejected', value: 'rejected' }
-    ];
+    // Use dynamic options from store
+    const roleOptions = roles.map(r => ({ label: r.charAt(0).toUpperCase() + r.slice(1), value: r }));
+    const statusOptions = statuses.map(s => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }));
 
     const tabs = ['User Management', 'Global Config', 'Delegations'];
 
@@ -238,7 +230,7 @@ const AdminPage = () => {
                 {/* Content Area */}
                 <div className="flex-1 w-full">
                     {activeTab === 'User Management' && <UserManagementTab onEdit={handleEditClick} />}
-                    {activeTab === 'Global Config' && <div className="p-4 text-gray-500 text-sm border rounded">Global Config Content</div>}
+                    {activeTab === 'Global Config' && <GlobalConfigTab />}
                     {activeTab === 'Delegations' && <div className="p-4 text-gray-500 text-sm border rounded">Delegations Content</div>}
                 </div>
 
