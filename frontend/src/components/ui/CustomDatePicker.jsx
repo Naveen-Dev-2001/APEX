@@ -32,11 +32,10 @@ const CustomDatePicker = ({
       format={format}
       placeholder={placeholder}
       className={`custom-datepicker ${className}`}
+      size="large"
       style={{
         width: '100%',
-        height: '40px',
         borderRadius: '8px',
-        border: '1px solid #E0E0E0',
         ...style
       }}
       value={dateValue}

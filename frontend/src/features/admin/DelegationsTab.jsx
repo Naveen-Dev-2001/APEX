@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import dayjs from 'dayjs';
 import useAdminStore from '../../store/useAdminStore';
 import Dropdown from '../../components/ui/Dropdown';
 import DataTable from '../../components/ui/DataTable';
+import CustomDatePicker from '../../components/ui/CustomDatePicker';
 
 const DelegationsTab = () => {
     const {
@@ -166,22 +168,24 @@ const DelegationsTab = () => {
                         onChange={(val) => setForm({ ...form, substitute_approver: val })}
                     />
                 </div>
-                <div className="flex flex-col gap-1.5 min-w-[150px]">
+                <div className="flex flex-col gap-1.5 min-w-[160px]">
                     <label className="text-[13px] font-medium text-gray-700">* Start Date</label>
-                    <input
-                        type="date"
-                        value={form.start_date}
-                        onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                        className="h-[38px] px-3 bg-white border border-gray-300 rounded-[4px] text-[13px] text-gray-700 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20 transition-all cursor-pointer"
+                    <CustomDatePicker
+                        value={form.start_date ? dayjs(form.start_date) : null}
+                        onChange={(_, dateString) => setForm({ ...form, start_date: dateString })}
+                        format="YYYY-MM-DD"
+                        placeholder="Start Date"
+                        disabledDate={(current) => current && current < dayjs().startOf('day')}
                     />
                 </div>
-                <div className="flex flex-col gap-1.5 min-w-[150px]">
+                <div className="flex flex-col gap-1.5 min-w-[160px]">
                     <label className="text-[13px] font-medium text-gray-700">* End Date</label>
-                    <input
-                        type="date"
-                        value={form.end_date}
-                        onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                        className="h-[38px] px-3 bg-white border border-gray-300 rounded-[4px] text-[13px] text-gray-700 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20 transition-all cursor-pointer"
+                    <CustomDatePicker
+                        value={form.end_date ? dayjs(form.end_date) : null}
+                        onChange={(_, dateString) => setForm({ ...form, end_date: dateString })}
+                        format="YYYY-MM-DD"
+                        placeholder="End Date"
+                        disabledDate={(current) => current && form.start_date ? current < dayjs(form.start_date).startOf('day') : current < dayjs().startOf('day')}
                     />
                 </div>
                 <button
