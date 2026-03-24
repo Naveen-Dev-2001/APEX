@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import useAdminStore from '../../../store/useAdminStore';
+import toast from '../../../utils/toast';
 
 const AddStatusModal = ({ onClose }) => {
     const [statusName, setStatusName] = useState('');
@@ -8,7 +9,11 @@ const AddStatusModal = ({ onClose }) => {
     const handleSubmit = async () => {
         if (!statusName.trim()) return;
         const success = await addStatus(statusName.trim());
-        if (success) onClose();
+        if (success) {
+            onClose();
+        } else {
+            toast.error('Status already exists or could not be added');
+        }
     };
 
     return (

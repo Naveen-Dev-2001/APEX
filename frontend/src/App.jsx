@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import './App.css'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AppLayout from './layout/AppLayout';
@@ -11,6 +10,7 @@ import SettingsPage from './features/settings/SettingsPage';
 import AdminPage from './features/admin/AdminPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import TestDatePicker from './pages/TestDatePicker';
+import ToastProvider from './components/ToastProvider';
 
 import { ConfigProvider } from 'antd';
 
@@ -26,7 +26,7 @@ function App() {
       }}
     >
       <Router>
-        {/* <ToastProvider /> */}
+        <ToastProvider />
         <Routes>
           <Route >
             <Route path="/" element={<LoginPage />} />

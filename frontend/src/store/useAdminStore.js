@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { adminService } from '../features/admin/adminService';
+import toast from '../utils/toast';
 
 const useAdminStore = create((set, get) => ({
     users: [],
@@ -51,9 +52,11 @@ const useAdminStore = create((set, get) => ({
                 statuses: newSettings.statuses,
                 navigation: newSettings.navigation 
             });
+            toast.success('Settings saved successfully');
             return true;
         } catch (error) {
             console.error("Failed to update settings", error);
+            toast.error(error.response?.data?.detail || 'Failed to save settings');
             return false;
         } finally {
             set({ isUpdating: false });
@@ -141,7 +144,9 @@ const useAdminStore = create((set, get) => ({
             const data = await adminService.getAllUsers();
             set({ users: data, totalUsers: data.length, loading: false });
         } catch (error) {
-            set({ error: error.message || 'Failed to fetch users', loading: false });
+            const msg = error.message || 'Failed to fetch users';
+            set({ error: msg, loading: false });
+            toast.error(msg);
         }
     },
 
@@ -175,9 +180,11 @@ const useAdminStore = create((set, get) => ({
         try {
             await adminService.updateUserRole(userId, role, status);
             await get().fetchUsers();
+            toast.success('User updated successfully');
             return true;
         } catch (error) {
             console.error("Failed to update user", error);
+            toast.error(error.response?.data?.detail || 'Failed to update user');
             return false;
         } finally {
             set({ isUpdating: false });
@@ -194,9 +201,11 @@ const useAdminStore = create((set, get) => ({
                     users: oldUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u) 
                 });
                 await adminService.updateUserRole(userId, user.role, newStatus);
+                toast.success('User status updated');
             }
         } catch (error) {
             console.error("Failed to update status", error);
+            toast.error('Failed to update user status');
             get().fetchUsers();
         }
     },
@@ -207,7 +216,9 @@ const useAdminStore = create((set, get) => ({
             const data = await adminService.getDelegations();
             set({ delegations: data, loading: false });
         } catch (error) {
-            set({ error: error.message || 'Failed to fetch delegations', loading: false });
+            const msg = error.message || 'Failed to fetch delegations';
+            set({ error: msg, loading: false });
+            toast.error(msg);
         }
     },
 
@@ -216,9 +227,11 @@ const useAdminStore = create((set, get) => ({
         try {
             await adminService.createDelegation(payload);
             await get().fetchDelegations();
+            toast.success('Delegation added successfully');
             return true;
         } catch (error) {
             console.error("Failed to add delegation", error);
+            toast.error(error.response?.data?.detail || 'Failed to add delegation');
             return false;
         } finally {
             set({ isUpdating: false });
@@ -229,9 +242,11 @@ const useAdminStore = create((set, get) => ({
         try {
             await adminService.deleteDelegation(id);
             await get().fetchDelegations();
+            toast.success('Delegation removed');
             return true;
         } catch (error) {
             console.error("Failed to remove delegation", error);
+            toast.error(error.response?.data?.detail || 'Failed to remove delegation');
             return false;
         }
     }

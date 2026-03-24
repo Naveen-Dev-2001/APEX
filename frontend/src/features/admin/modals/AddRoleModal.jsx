@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import useAdminStore from '../../../store/useAdminStore';
+import toast from '../../../utils/toast';
 
 const AddRoleModal = ({ onClose }) => {
     const [roleName, setRoleName] = useState('');
@@ -8,7 +9,11 @@ const AddRoleModal = ({ onClose }) => {
     const handleSubmit = async () => {
         if (!roleName.trim()) return;
         const success = await addRole(roleName.trim());
-        if (success) onClose();
+        if (success) {
+            onClose();
+        } else {
+            toast.error('Role already exists or could not be added');
+        }
     };
 
     return (

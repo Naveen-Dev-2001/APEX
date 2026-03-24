@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 import useAdminStore from '../../store/useAdminStore';
+import useToastStore from '../../store/useToastStore';
+import toast from '../../utils/toast';
 import Dropdown from '../../components/ui/Dropdown';
 import DataTable from '../../components/ui/DataTable';
 import CustomDatePicker from '../../components/ui/CustomDatePicker';
@@ -10,6 +12,7 @@ const DelegationsTab = () => {
         users, delegations, loading, isUpdating,
         fetchUsers, fetchDelegations, addDelegation, removeDelegation
     } = useAdminStore();
+    const { showConfirm } = useToastStore();
 
     const [form, setForm] = useState({
         original_approver: '',
@@ -39,11 +42,11 @@ const DelegationsTab = () => {
 
     const handleAdd = async () => {
         if (!form.original_approver || !form.substitute_approver || !form.start_date || !form.end_date) {
-            alert('Please fill all required fields');
+            toast.warning('Please fill all required fields');
             return;
         }
         if (form.original_approver === form.substitute_approver) {
-            alert('Original approver and substitute cannot be the same');
+            toast.warning('Original approver and substitute cannot be the same');
             return;
         }
         const success = await addDelegation(form);
@@ -134,9 +137,16 @@ const DelegationsTab = () => {
         {
             header: 'Action',
             accessor: 'id',
-            render: (id) => (
+            render: (id, row) => (
                 <button 
-                    onClick={() => removeDelegation(id)}
+                    onClick={() => showConfirm({
+                        message: 'Revert Delegation?',
+                        subMessage: `This will remove the delegation from ${getUsernameByEmail(row.original_approver)} to ${getUsernameByEmail(row.substitute_approver)}.`,
+                        confirmLabel: 'Revert',
+                        cancelLabel: 'Keep',
+                        variant: 'danger',
+                        onConfirm: () => removeDelegation(id),
+                    })}
                     className="text-[#ef4444] hover:text-[#dc2626] text-[13px] font-medium transition-colors"
                 >
                     Revert

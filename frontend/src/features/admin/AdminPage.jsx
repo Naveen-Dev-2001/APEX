@@ -4,6 +4,7 @@ import useAdminStore from '../../store/useAdminStore';
 import Dropdown from '../../components/ui/Dropdown';
 import GlobalConfigTab from './GlobalConfigTab';
 import DelegationsTab from './DelegationsTab';
+import toast from '../../utils/toast';
 
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
@@ -34,6 +35,8 @@ const AdminPage = () => {
         const success = await updateUserRole(editingUser.id, editForm.role, editForm.status);
         if (success) {
             setEditingUser(null);
+        } else {
+            toast.error('Failed to update user. Please try again.');
         }
     };
 
@@ -42,6 +45,8 @@ const AdminPage = () => {
         if (success) {
             setIsAddModalOpen(false);
             setAddForm({ username: '', email: '', password: '', role: 'approver' });
+        } else {
+            toast.error('Failed to create user. Please try again.');
         }
     };
 
