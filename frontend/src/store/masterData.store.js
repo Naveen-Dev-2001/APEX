@@ -23,6 +23,10 @@ const useMasterDataStore = create((set, get) => ({
     glLoading: false,
     glError: null,
 
+    // Loading / error state for LOB Master
+    lobLoading: false,
+    lobError: null,
+
     // Master data for all tabs
     masters: {
         'Entity Master': {
@@ -81,15 +85,12 @@ const useMasterDataStore = create((set, get) => ({
         },
         'LOB Master': {
             columns: [
-                { header: 'LOB Code', accessor: 'lobCode', sortable: true },
-                { header: 'LOB Name', accessor: 'lobName', sortable: true },
-                { header: 'Manager', accessor: 'manager', sortable: true },
+                { header: 'LOB ID', accessor: 'lob_id', sortable: true },
+                { header: 'Name', accessor: 'name', sortable: true },
+                { header: 'Parent ID', accessor: 'parent_id', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
-            data: [
-                { id: 1, lobCode: 'LOB-01', lobName: 'Retail Banking', manager: 'John Doe' },
-                { id: 2, lobCode: 'LOB-02', lobName: 'Investment Banking', manager: 'Jane Smith' },
-            ],
+            data: [],
         },
         'Department Master': {
             columns: [
@@ -270,6 +271,38 @@ const useMasterDataStore = create((set, get) => ({
             await get().fetchGLMasterData();
         } catch (err) {
             set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    // ─── LOB Master: Load from backend ────────────────────────────────────────
+    fetchLOBMasterData: async () => {
+        set({ lobLoading: true, lobError: null });
+        try {
+            const rows = await masterDataService.getLOBMasterData();
+            set((state) => ({
+                lobLoading: false,
+                masters: {
+                    ...state.masters,
+                    'LOB Master': {
+                        ...state.masters['LOB Master'],
+                        data: rows,
+                    },
+                },
+            }));
+        } catch (err) {
+            console.error('[LOBMaster] fetch failed', err);
+            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    uploadLOBMaster: async (file) => {
+        set({ lobLoading: true, lobError: null });
+        try {
+            await masterDataService.uploadLOBMaster(file);
+            await get().fetchLOBMasterData();
+        } catch (err) {
+            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
             throw err;
         }
     },
@@ -528,12 +561,58 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
+    // ─── LOB Master: CRUD ─────────────────────────────────────────────────────
+    addLOBRow: async (formData) => {
+        set({ lobLoading: true, lobError: null });
+        try {
+            const payload = {
+                lob_id: formData.lob_id,
+                name: formData.name,
+                parent_id: formData.parent_id,
+            };
+            await masterDataService.addLOBRow(payload);
+            await get().fetchLOBMasterData();
+        } catch (err) {
+            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    updateLOBRow: async (formData, rowIndex) => {
+        set({ lobLoading: true, lobError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                lob_id: formData.lob_id,
+                name: formData.name,
+                parent_id: formData.parent_id,
+            };
+            await masterDataService.editLOBRow(rowIndex, payload);
+            await get().fetchLOBMasterData();
+        } catch (err) {
+            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    deleteLOBRow: async (rowIndex) => {
+        set({ lobLoading: true, lobError: null });
+        try {
+            await masterDataService.deleteLOBRow(rowIndex);
+            await get().fetchLOBMasterData();
+        } catch (err) {
+            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
     clearMasterData: async (tabIdentifier) => {
         await masterDataService.deleteTabData(tabIdentifier);
         if (tabIdentifier === 'Entity Master') await get().fetchEntityMasterData();
         else if (tabIdentifier === 'Vendor Master') await get().fetchVendorMasterData();
         else if (tabIdentifier === 'TDS Rates') await get().fetchTDSRatesData();
         else if (tabIdentifier === 'GL Master') await get().fetchGLMasterData();
+        else if (tabIdentifier === 'LOB Master') await get().fetchLOBMasterData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────
