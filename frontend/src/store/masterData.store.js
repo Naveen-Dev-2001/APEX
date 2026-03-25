@@ -35,6 +35,10 @@ const useMasterDataStore = create((set, get) => ({
     customerLoading: false,
     customerError: null,
 
+    // Loading / error state for Item Master
+    itemLoading: false,
+    itemError: null,
+
     // Master data for all tabs
     masters: {
         'Entity Master': {
@@ -118,14 +122,13 @@ const useMasterDataStore = create((set, get) => ({
         },
         'Item Master': {
             columns: [
-                { header: 'Item Code', accessor: 'itemCode', sortable: true },
-                { header: 'Item Name', accessor: 'itemName', sortable: true },
-                { header: 'UOM', accessor: 'uom', sortable: true },
+                { header: 'Item ID', accessor: 'item_id', sortable: true },
+                { header: 'Name', accessor: 'name', sortable: true },
+                { header: 'Product Line ID', accessor: 'product_line_id', sortable: true },
+                { header: 'GL Group', accessor: 'gl_group', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
-            data: [
-                { id: 1, itemCode: 'ITM-01', itemName: 'Laptop L340', uom: 'PCS' },
-            ],
+            data: [],
         },
         'Currency': {
             columns: [
@@ -368,6 +371,38 @@ const useMasterDataStore = create((set, get) => ({
             await get().fetchCustomerMasterData();
         } catch (err) {
             set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    // ─── Item Master: Load from backend ─────────────────────────────────
+    fetchItemMasterData: async () => {
+        set({ itemLoading: true, itemError: null });
+        try {
+            const rows = await masterDataService.getItemMasterData();
+            set((state) => ({
+                itemLoading: false,
+                masters: {
+                    ...state.masters,
+                    'Item Master': {
+                        ...state.masters['Item Master'],
+                        data: rows,
+                    },
+                },
+            }));
+        } catch (err) {
+            console.error('[ItemMaster] fetch failed', err);
+            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    uploadItemMaster: async (file) => {
+        set({ itemLoading: true, itemError: null });
+        try {
+            await masterDataService.uploadItemMaster(file);
+            await get().fetchItemMasterData();
+        } catch (err) {
+            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
             throw err;
         }
     },
@@ -757,6 +792,53 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
+    // ─── Item Master: CRUD ────────────────────────────────────────────────
+    addItemRow: async (formData) => {
+        set({ itemLoading: true, itemError: null });
+        try {
+            const payload = {
+                item_id: formData.item_id,
+                name: formData.name,
+                product_line_id: formData.product_line_id,
+                gl_group: formData.gl_group,
+            };
+            await masterDataService.addItemRow(payload);
+            await get().fetchItemMasterData();
+        } catch (err) {
+            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    updateItemRow: async (formData, rowIndex) => {
+        set({ itemLoading: true, itemError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                item_id: formData.item_id,
+                name: formData.name,
+                product_line_id: formData.product_line_id,
+                gl_group: formData.gl_group,
+            };
+            await masterDataService.editItemRow(rowIndex, payload);
+            await get().fetchItemMasterData();
+        } catch (err) {
+            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    deleteItemRow: async (rowIndex) => {
+        set({ itemLoading: true, itemError: null });
+        try {
+            await masterDataService.deleteItemRow(rowIndex);
+            await get().fetchItemMasterData();
+        } catch (err) {
+            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
     clearMasterData: async (tabIdentifier) => {
         await masterDataService.deleteTabData(tabIdentifier);
         if (tabIdentifier === 'Entity Master') await get().fetchEntityMasterData();
@@ -766,6 +848,7 @@ const useMasterDataStore = create((set, get) => ({
         else if (tabIdentifier === 'LOB Master') await get().fetchLOBMasterData();
         else if (tabIdentifier === 'Department Master') await get().fetchDepartmentMasterData();
         else if (tabIdentifier === 'Customer Master') await get().fetchCustomerMasterData();
+        else if (tabIdentifier === 'Item Master') await get().fetchItemMasterData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────

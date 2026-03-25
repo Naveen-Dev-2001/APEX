@@ -7,6 +7,7 @@ const GL_IDENTIFIER = 'GL';
 const LOB_IDENTIFIER = 'LOB';
 const DEPARTMENT_IDENTIFIER = 'Department';
 const CUSTOMER_IDENTIFIER = 'Customer';
+const ITEM_IDENTIFIER = 'Item';
 
 export const masterDataService = {
     /** Fetch all entity master rows from DB */
@@ -295,6 +296,47 @@ export const masterDataService = {
         return res.data;
     },
 
+    // ─── Item Master ────────────────────────────────────────────────────────
+    /** Fetch all Item master rows from DB */
+    async getItemMasterData() {
+        const res = await API.get(`/master/sheet/${ITEM_IDENTIFIER}`);
+        return res.data;
+    },
+
+    /** Add a new Item master row */
+    async addItemRow(newRow) {
+        const res = await API.post(`/master/sheet/${ITEM_IDENTIFIER}/add`, { new_row: newRow });
+        return res.data;
+    },
+
+    /** Edit an existing Item master row */
+    async editItemRow(rowIndex, updatedRow) {
+        const res = await API.patch(`/master/sheet/${ITEM_IDENTIFIER}/edit`, {
+            row_index: rowIndex,
+            updated_row: updatedRow,
+        });
+        return res.data;
+    },
+
+    /** Delete an Item row */
+    async deleteItemRow(rowIndex) {
+        const res = await API.delete(`/master/sheet/${ITEM_IDENTIFIER}/delete`, {
+            params: { row_index: rowIndex },
+        });
+        return res.data;
+    },
+
+    /** Upload an Item master file */
+    async uploadItemMaster(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await API.post(`/master/upload`, formData, {
+            params: { tab_name: ITEM_IDENTIFIER },
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return res.data;
+    },
+
     /** Delete all data for a specific tab */
     async deleteTabData(tabName) {
         const identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER 
@@ -303,7 +345,8 @@ export const masterDataService = {
                         : tabName === 'GL Master' ? GL_IDENTIFIER 
                         : tabName === 'LOB Master' ? LOB_IDENTIFIER 
                         : tabName === 'Department Master' ? DEPARTMENT_IDENTIFIER 
-                        : tabName === 'Customer Master' ? CUSTOMER_IDENTIFIER : tabName;
+                        : tabName === 'Customer Master' ? CUSTOMER_IDENTIFIER 
+                        : tabName === 'Item Master' ? ITEM_IDENTIFIER : tabName;
         const res = await API.delete(`/master/files/${identifier}`);
         return res.data;
     },
