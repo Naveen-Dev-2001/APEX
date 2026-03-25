@@ -54,19 +54,6 @@ const useMasterDataStore = create((set, get) => ({
             ],
             data: [],
         },
-        'Line Items': {
-            columns: [
-                { header: 'Item Code', accessor: 'itemCode', sortable: true },
-                { header: 'Description', accessor: 'description', sortable: true },
-                { header: 'Unit Price', accessor: 'unitPrice', sortable: true },
-                { header: 'Category', accessor: 'category', sortable: true },
-                { header: 'Actions', accessor: 'actions', sortable: false },
-            ],
-            data: [
-                { id: 1, itemCode: 'LI-001', description: 'Office Chair', unitPrice: '150.00', category: 'Furniture' },
-                { id: 2, itemCode: 'LI-002', description: 'Desk Lamp', unitPrice: '45.00', category: 'Electronics' },
-            ],
-        },
         'TDS Rates': {
             columns: [
                 { header: 'Section', accessor: 'section', sortable: true },

@@ -26,7 +26,6 @@ router = APIRouter(tags=["Master Data"])
 TAB_MODEL_MAP = {
     "Entity_Master": EntityMaster,
     "Vendor_Master": VendorMaster,
-    "Line_Items": ItemMaster,
     "TDS_Rates": TdsRate,
     "GL": GLMaster,
     "LOB": LOBMaster,
@@ -39,7 +38,6 @@ TAB_MODEL_MAP = {
     # Frontend fallback aliases
     "master_data_Entity_Master": EntityMaster,
     "master_data_Vendor_Master": VendorMaster,
-    "master_data_Line_Items": ItemMaster,
     "master_data_TDS_Rates": TdsRate,
     "master_data_GL": GLMaster,
     "master_data_LOB": LOBMaster,
