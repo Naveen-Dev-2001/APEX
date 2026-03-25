@@ -203,7 +203,6 @@ const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             id="vendor_id"
                             value={form.vendor_id}
                             onChange={handleChange('vendor_id')}
-                            readOnly={isEdit}
                         />
                         <FormField
                             label="Vendor Name"
