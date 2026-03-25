@@ -78,6 +78,17 @@ const MasterDataPage = () => {
 
     // Prepare columns for DataTable
     const columns = (currentMaster?.columns || []).map((col) => {
+        if (col.accessor === 'gst_applicable') {
+            return {
+                ...col,
+                render: (val) => (
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
+                        ${val ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500'}`}>
+                        {val ? 'Yes' : 'No'}
+                    </span>
+                )
+            };
+        }
         if (col.accessor === 'actions') {
             return {
                 ...col,

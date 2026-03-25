@@ -13,6 +13,7 @@ const EMPTY_FORM = {
     state_or_territory: '',
     zip_or_postal_code: '',
     country_code: '',
+    gst_applicable: false,
 };
 
 const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '' }) => (
@@ -52,6 +53,7 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                 state_or_territory: rowData.state_or_territory ?? '',
                 zip_or_postal_code: rowData.zip_or_postal_code ?? '',
                 country_code: rowData.country_code ?? '',
+                gst_applicable: rowData.gst_applicable ?? false,
             });
         } else {
             setForm(EMPTY_FORM);
@@ -60,6 +62,9 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
 
     const handleChange = (field) => (e) =>
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+    const handleGstChange = (val) =>
+        setForm((prev) => ({ ...prev, gst_applicable: val }));
 
     const handleSave = () => {
         onSave(form);
@@ -171,6 +176,46 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             value={form.country_code}
                             onChange={handleChange('country_code')}
                         />
+                    </div>
+
+                    {/* GST Applicable — Radio Buttons */}
+                    <div className="flex flex-col gap-2 mt-2">
+                        <label className="text-[13px] font-medium text-[#333333]">GST Applicable</label>
+                        <div className="flex items-center gap-6 mt-1">
+                            <button
+                                type="button"
+                                onClick={() => handleGstChange(true)}
+                                className="flex items-center gap-2 group cursor-pointer"
+                            >
+                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all
+                                    ${form.gst_applicable 
+                                        ? 'border-[#1D71AB] bg-[#1D71AB]' 
+                                        : 'border-[#D9D9D9] bg-white group-hover:border-[#1D71AB]'}`}
+                                >
+                                    {form.gst_applicable && (
+                                        <div className="w-2 h-2 rounded-full bg-white shadow-sm" />
+                                    )}
+                                </div>
+                                <span className="text-[14px] text-gray-700">Yes</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleGstChange(false)}
+                                className="flex items-center gap-2 group cursor-pointer"
+                            >
+                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all
+                                    ${!form.gst_applicable 
+                                        ? 'border-[#1D71AB] bg-[#1D71AB]' 
+                                        : 'border-[#D9D9D9] bg-white group-hover:border-[#1D71AB]'}`}
+                                >
+                                    {!form.gst_applicable && (
+                                        <div className="w-2 h-2 rounded-full bg-white shadow-sm" />
+                                    )}
+                                </div>
+                                <span className="text-[14px] text-gray-700">No</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 

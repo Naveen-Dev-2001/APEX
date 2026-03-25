@@ -22,6 +22,11 @@ const useMasterDataStore = create((set, get) => ({
                 { header: 'State / Territory', accessor: 'state_or_territory', sortable: true },
                 { header: 'Zip / Postal Code', accessor: 'zip_or_postal_code', sortable: true },
                 { header: 'Country Code', accessor: 'country_code', sortable: true },
+                { 
+                    header: 'GST Applicable', 
+                    accessor: 'gst_applicable', 
+                    sortable: true
+                },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
             data: [],
@@ -189,6 +194,7 @@ const useMasterDataStore = create((set, get) => ({
             state_or_territory: formData.state_or_territory,
             zip_or_postal_code: formData.zip_or_postal_code,
             country_code: formData.country_code,
+            gst_applicable: formData.gst_applicable,
         };
         await masterDataService.addEntityRow(payload);
         // Refresh from backend to get assigned DB id
@@ -209,6 +215,7 @@ const useMasterDataStore = create((set, get) => ({
             state_or_territory: formData.state_or_territory,
             zip_or_postal_code: formData.zip_or_postal_code,
             country_code: formData.country_code,
+            gst_applicable: formData.gst_applicable,
         };
         await masterDataService.editEntityRow(rowIndex, payload);
         await get().fetchEntityMasterData();

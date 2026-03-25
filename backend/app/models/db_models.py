@@ -369,6 +369,7 @@ class EntityMaster(Base):
     state_or_territory = Column(String(100), nullable=True)
     zip_or_postal_code = Column(String(20), nullable=True)
     country_code = Column(String(10), nullable=True)
+    gst_applicable = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

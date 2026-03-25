@@ -53,10 +53,28 @@ def create_database_if_not_exists():
 
 
 def create_tables():
-    """Create all database tables"""
+    """Create all database tables and sync schema"""
     print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
-    print("✓ All tables created successfully")
+    
+    # Custom Migration: Ensure 'gst_applicable' exists in 'entity_master'
+    # Base.metadata.create_all doesn't add new columns to existing tables in SQL Server.
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT COUNT(*) FROM sys.columns 
+                WHERE object_id = OBJECT_ID(N'[dbo].[entity_master]') 
+                AND name = 'gst_applicable'
+            """))
+            if result.scalar() == 0:
+                print("Adding missing column 'gst_applicable' to 'entity_master'...")
+                conn.execute(text("ALTER TABLE entity_master ADD gst_applicable BIT DEFAULT 0 NOT NULL"))
+                conn.commit()
+                print("✓ Column 'gst_applicable' added successfully")
+    except Exception as e:
+        print(f"⚠ Warning during schema sync: {e}")
+        
+    print("✓ All tables synchronized successfully")
 
 
 def create_admin_user(db):
