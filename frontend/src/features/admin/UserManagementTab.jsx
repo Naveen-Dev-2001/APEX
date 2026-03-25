@@ -122,6 +122,8 @@ const UserManagementTab = ({ onEdit }) => {
                 onItemsPerPageChange={setItemsPerPage}
                 sortColumn={sortColumn}
                 sortDirection={sortDirection}
+                maxHeight="calc(100vh - 280px)"
+                stickyHeader={true}
             />
         </div>
     );

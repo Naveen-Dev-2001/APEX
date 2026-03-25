@@ -52,11 +52,11 @@ const AdminPage = () => {
 
     return (
         <div className="p-4 flex flex-col gap-5 w-full bg-gray-50 min-h-0">
-            <h1 className="text-2xl font-semibold mb-2 text-[#333333] text-left">
+            {/* <h1 className="text-2xl font-semibold mb-2 text-[#333333] text-left">
                 Admin Dashboard
-            </h1>
+            </h1> */}
 
-            <div className="bg-white rounded-[4px] shadow-sm w-full p-5 border border-gray-200 min-h-[600px] flex flex-col relative text-left">
+            <div className="bg-white rounded-[4px] shadow-sm w-full p-5 border border-gray-200 min-h-[200px] flex flex-col relative text-left">
 
                 {/* Edit Modal */}
                 {editingUser && (

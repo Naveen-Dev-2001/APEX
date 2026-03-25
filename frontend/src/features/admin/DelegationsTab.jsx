@@ -219,6 +219,8 @@ const DelegationsTab = () => {
                     itemsPerPage={itemsPerPage}
                     onPageChange={setCurrentPage}
                     onItemsPerPageChange={setItemsPerPage}
+                    maxHeight="calc(100vh - 420px)"
+                    stickyHeader={true}
                 />
             </div>
         </div>

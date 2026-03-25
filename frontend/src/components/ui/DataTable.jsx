@@ -13,7 +13,9 @@ const DataTable = ({
   currentPage = 1,
   itemsPerPage = 15,
   sortColumn,
-  sortDirection
+  sortDirection,
+  maxHeight,
+  stickyHeader = false
 }) => {
     if (loading) {
         return <TableSkeleton rowCount={skeletonRows} columnCount={columns.length} />;
@@ -57,9 +59,12 @@ const DataTable = ({
 
     return (
         <div className="w-full flex flex-col bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
-            <div className="w-full overflow-x-auto">
-                <table className="w-full text-left text-[13px] text-gray-700">
-                    <thead className="bg-[#1D71AB] text-white">
+            <div 
+                className="w-full overflow-x-auto overflow-y-auto"
+                style={maxHeight ? { maxHeight } : {}}
+            >
+                <table className="w-full text-left text-[13px] text-gray-700 border-separate border-spacing-0">
+                    <thead className={`${stickyHeader ? 'sticky top-0 z-20' : ''} bg-[#1D71AB] text-white`}>
                         <tr>
                             {columns.map((col, idx) => {
                                 const isSortedColumn = sortColumn === col.accessor;
@@ -69,7 +74,7 @@ const DataTable = ({
                                         key={idx} 
                                         className={`px-5 py-3 font-medium whitespace-nowrap border-b border-gray-200 
                                             ${col.sortable ? 'cursor-pointer select-none hover:bg-[#1a669a]' : ''}
-                                            ${isLastColumn ? 'sticky right-0 bg-[#1D71AB] z-10 shadow-[-12px_1px_12px_-8px_rgba(0,0,0,0.3)]' : ''}`}
+                                            ${isLastColumn ? 'sticky right-0 bg-[#1D71AB] z-30 shadow-[-12px_1px_12px_-8px_rgba(0,0,0,0.3)]' : ''}`}
                                         onClick={() => col.sortable && col.onClick ? col.onClick() : null}
                                     >
                                         <div className="flex items-center gap-2">
@@ -115,7 +120,7 @@ const DataTable = ({
             </div>
 
             {/* Pagination Footer */}
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-white">
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-white z-10">
                 <div className="flex items-center gap-4 text-[13px] text-gray-600">
                     <div className="flex items-center gap-2">
                         <span>Items per page:</span>
@@ -153,5 +158,6 @@ const DataTable = ({
         </div>
     );
 };
+
 
 export default DataTable;

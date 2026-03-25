@@ -83,19 +83,19 @@ const MasterDataPage = () => {
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
-    
+
     const openEdit = (row, indexInPage) => {
         const absoluteIndex = (currentPage - 1) * itemsPerPage + indexInPage;
         // If sorting or filtering is active, absolute index might be tricky.
         // Best to find index in the original data array for the current master
         const masterData = masters[activeTab].data;
         const realIndex = masterData.findIndex(r => r.id === row.id);
-        
-        setModalState({ 
-            open: true, 
-            mode: 'edit', 
-            rowData: row, 
-            rowIndex: realIndex !== -1 ? realIndex : absoluteIndex 
+
+        setModalState({
+            open: true,
+            mode: 'edit',
+            rowData: row,
+            rowIndex: realIndex !== -1 ? realIndex : absoluteIndex
         });
     };
 
@@ -184,7 +184,7 @@ const MasterDataPage = () => {
 
     const handleDelete = (row, indexInPage) => {
         const itemName = row.entity_name || row.entityName || row.vendor_name || row.vendorName || 'this item';
-        
+
         showConfirm({
             message: `Delete ${activeTab}?`,
             subMessage: `Are you sure you want to delete "${itemName}"? This action cannot be undone.`,
@@ -276,21 +276,21 @@ const MasterDataPage = () => {
         }
         return col;
     });
-    
+
     // Vendor Upload View Component
     const VendorUploadView = () => {
         const [isDragging, setIsDragging] = useState(false);
         const fileInputRef = React.useRef(null);
-        
+
         const handleDragOver = (e) => {
             e.preventDefault();
             setIsDragging(true);
         };
-        
+
         const handleDragLeave = () => {
             setIsDragging(false);
         };
-        
+
         const handleDrop = async (e) => {
             e.preventDefault();
             setIsDragging(false);
@@ -299,7 +299,7 @@ const MasterDataPage = () => {
                 await onUpload(files[0]);
             }
         };
-        
+
         const onUpload = async (file) => {
             try {
                 await uploadVendorMaster(file);
@@ -308,46 +308,46 @@ const MasterDataPage = () => {
                 toast.error('Upload failed: ' + (err.response?.data?.detail || err.message));
             }
         };
-        
+
         const handleFileSelect = async (e) => {
             const files = e.target.files;
             if (files && files.length > 0) {
                 await onUpload(files[0]);
             }
         };
-        
+
         return (
             <div className="flex flex-col items-center justify-center p-12 h-full min-h-[400px]">
-                <div 
+                <div
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     className={`w-full max-w-2xl border-2 border-dashed rounded-xl p-12 transition-all duration-200 flex flex-col items-center gap-6
-                        ${isDragging 
-                            ? 'border-[#24A1DD] bg-[#F0F9FF]' 
+                        ${isDragging
+                            ? 'border-[#24A1DD] bg-[#F0F9FF]'
                             : 'border-gray-200 bg-[#FAFAFA] hover:border-[#24A1DD] hover:bg-white'}`}
                 >
                     <div className="w-20 h-20 rounded-full bg-[#EBF8FE] flex items-center justify-center">
                         <Upload className="text-[#24A1DD]" size={36} />
                     </div>
-                    
+
                     <div className="text-center">
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Vendor Master</h3>
                         <p className="text-gray-500 max-w-md mx-auto">
-                            To start, please upload your Excel or CSV file containing vendor information. 
+                            To start, please upload your Excel or CSV file containing vendor information.
                             The system will automatically extract and process the data.
                         </p>
                     </div>
-                    
+
                     <div className="flex flex-col items-center gap-3 w-full">
-                        <input 
-                            type="file" 
+                        <input
+                            type="file"
                             ref={fileInputRef}
                             onChange={handleFileSelect}
                             style={{ display: 'none' }}
                             accept=".xls,.xlsx,.csv"
                         />
-                        <button 
+                        <button
                             onClick={() => fileInputRef.current?.click()}
                             className="bg-[#24A1DD] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#1D71AB] transition-all shadow-md flex items-center gap-2"
                         >
@@ -357,7 +357,7 @@ const MasterDataPage = () => {
                         <span className="text-sm text-gray-400">Supported formats: .xls, .xlsx, .csv</span>
                     </div>
                 </div>
-                
+
                 <div className="mt-8 flex items-center gap-8">
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-[#24A1DD]" />
@@ -440,12 +440,12 @@ const MasterDataPage = () => {
     return (
         <div className="p-6 flex flex-col gap-6 w-full bg-[#FBFBFB] min-h-screen">
             {/* Header */}
-            <div className="flex items-center gap-3">
+            {/* <div className="flex items-center gap-3">
                 <h1 className="text-[28px] font-semibold text-[#333333]">Master Data Management</h1>
                 <span className="bg-[#E5E5E5] text-[#666666] px-2 py-0.5 rounded-full text-sm font-medium">
                     {filteredData.length}
                 </span>
-            </div>
+            </div> */}
 
             {/* Controls Row */}
             <div className="flex items-center gap-3 flex-wrap">
@@ -470,8 +470,8 @@ const MasterDataPage = () => {
                 <div className="flex-1" />
 
                 {/* Hidden Input for Reupload */}
-                <input 
-                    type="file" 
+                <input
+                    type="file"
                     ref={reuploadInputRef}
                     onChange={handleReuploadSelect}
                     style={{ display: 'none' }}
@@ -493,14 +493,14 @@ const MasterDataPage = () => {
                 {/* Actions */}
                 {!isCurrencyTab && (
                     <>
-                        <button 
+                        <button
                             onClick={handleClearTab}
                             className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-red-300 rounded-[4px] hover:bg-red-50 transition-all whitespace-nowrap"
                         >
                             <Trash2 size={15} className="text-red-500" />
                             <span>Clear Tab</span>
                         </button>
-                        <button 
+                        <button
                             onClick={() => reuploadInputRef.current?.click()}
                             className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-[#24A1DD] rounded-[4px] hover:bg-[#F0F9FF] transition-all whitespace-nowrap"
                         >
@@ -519,7 +519,7 @@ const MasterDataPage = () => {
             </div>
 
             {/* Table Area */}
-            <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative min-h-[400px]">
+            <div className="flex-1 relative">
                 {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) || (currencyError && isCurrencyTab) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
@@ -563,6 +563,8 @@ const MasterDataPage = () => {
                                 itemsPerPage={itemsPerPage}
                                 onPageChange={setCurrentPage}
                                 onItemsPerPageChange={setItemsPerPage}
+                                maxHeight="calc(100vh - 280px)"
+                                stickyHeader={true}
                             />
                         )}
                     </>
