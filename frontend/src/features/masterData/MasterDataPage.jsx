@@ -418,7 +418,7 @@ const MasterDataPage = () => {
                     </div>
                 ) : (
                     <>
-                        {isVendorTab && currentMaster?.data?.length === 0 && !vendorLoading ? (
+                        {false ? (
                             <VendorUploadView />
                         ) : (
                             <DataTable
