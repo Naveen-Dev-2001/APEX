@@ -10,6 +10,7 @@ import TDSRatesModal from './TDSRatesModal';
 import GLMasterModal from './GLMasterModal';
 import LOBMasterModal from './LOBMasterModal';
 import DepartmentMasterModal from './DepartmentMasterModal';
+import CustomerMasterModal from './CustomerMasterModal';
 
 const MasterDataPage = () => {
     const {
@@ -24,6 +25,7 @@ const MasterDataPage = () => {
         fetchGLMasterData, glLoading, glError, uploadGLMaster,
         fetchLOBMasterData, lobLoading, lobError, uploadLOBMaster,
         fetchDepartmentMasterData, departmentLoading, departmentError, uploadDepartmentMaster,
+        fetchCustomerMasterData, customerLoading, customerError, uploadCustomerMaster,
         clearMasterData,
         addEntityRow, updateEntityRow, deleteEntityRow,
         addVendorRow, updateVendorRow, deleteVendorRow,
@@ -31,6 +33,7 @@ const MasterDataPage = () => {
         addGLRow, updateGLRow, deleteGLRow,
         addLOBRow, updateLOBRow, deleteLOBRow,
         addDepartmentRow, updateDepartmentRow, deleteDepartmentRow,
+        addCustomerRow, updateCustomerRow, deleteCustomerRow,
     } = useMasterDataStore();
     const { showConfirm } = useToastStore();
 
@@ -45,6 +48,7 @@ const MasterDataPage = () => {
     const isGLTab = activeTab === 'GL Master';
     const isLOBTab = activeTab === 'LOB Master';
     const isDepartmentTab = activeTab === 'Department Master';
+    const isCustomerTab = activeTab === 'Customer Master';
 
     // Fetch data on mount or tab change
     useEffect(() => {
@@ -60,8 +64,10 @@ const MasterDataPage = () => {
             fetchLOBMasterData();
         } else if (isDepartmentTab) {
             fetchDepartmentMasterData();
+        } else if (isCustomerTab) {
+            fetchCustomerMasterData();
         }
-    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, fetchGLMasterData, fetchLOBMasterData, fetchDepartmentMasterData, isEntityTab, isVendorTab, isTDSTab, isGLTab, isLOBTab, isDepartmentTab]);
+    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, fetchGLMasterData, fetchLOBMasterData, fetchDepartmentMasterData, fetchCustomerMasterData, isEntityTab, isVendorTab, isTDSTab, isGLTab, isLOBTab, isDepartmentTab, isCustomerTab]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
@@ -133,6 +139,14 @@ const MasterDataPage = () => {
                     await addDepartmentRow(formData);
                     toast.success('Department added successfully');
                 }
+            } else if (isCustomerTab) {
+                if (modalState.mode === 'edit') {
+                    await updateCustomerRow(formData, modalState.rowIndex);
+                    toast.success('Customer updated successfully');
+                } else {
+                    await addCustomerRow(formData);
+                    toast.success('Customer added successfully');
+                }
             }
             closeModal();
         } catch (err) {
@@ -168,6 +182,8 @@ const MasterDataPage = () => {
                         await deleteLOBRow(indexToDelete);
                     } else if (isDepartmentTab) {
                         await deleteDepartmentRow(indexToDelete);
+                    } else if (isCustomerTab) {
+                        await deleteCustomerRow(indexToDelete);
                     }
                     toast.dismiss(loadingToast);
                     toast.success(`${activeTab} deleted successfully`);
@@ -209,14 +225,14 @@ const MasterDataPage = () => {
                 render: (_, row, index) => (
                     <div className="flex items-center gap-4">
                         <button
-                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab) && openEdit(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab) && openEdit(row, index)}
                             className="text-gray-500 hover:text-gray-700 transition-colors p-1"
                             title="Edit"
                         >
                             <Pencil size={18} />
                         </button>
                         <button
-                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab) && handleDelete(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab) && handleDelete(row, index)}
                             className="text-[#ff4d4f] hover:text-[#d32f2f] transition-colors p-1"
                             title="Delete"
                         >
@@ -374,6 +390,9 @@ const MasterDataPage = () => {
                 } else if (isDepartmentTab) {
                     await uploadDepartmentMaster(files[0]);
                     toast.success('Department Master reuploaded successfully');
+                } else if (isCustomerTab) {
+                    await uploadCustomerMaster(files[0]);
+                    toast.success('Customer Master reuploaded successfully');
                 } else {
                     toast.info('Reupload not supported for this tab yet.');
                 }
@@ -452,7 +471,7 @@ const MasterDataPage = () => {
                     <span>Reupload</span>
                 </button>
                 <button
-                    onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab) ? openAdd : undefined}
+                    onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab) ? openAdd : undefined}
                     className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
                 >
                     <Plus size={16} />
@@ -462,7 +481,7 @@ const MasterDataPage = () => {
 
             {/* Table Area */}
             <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative min-h-[400px]">
-                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (departmentError && isDepartmentTab) ? (
+                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -470,7 +489,7 @@ const MasterDataPage = () => {
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900">Failed to load data</h3>
-                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError || tdsError || glError || lobError || departmentError}</p>
+                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError || tdsError || glError || lobError || departmentError || customerError}</p>
                             </div>
                             <button
                                 onClick={() => {
@@ -480,6 +499,7 @@ const MasterDataPage = () => {
                                     else if (isGLTab) fetchGLMasterData();
                                     else if (isLOBTab) fetchLOBMasterData();
                                     else if (isDepartmentTab) fetchDepartmentMasterData();
+                                    else if (isCustomerTab) fetchCustomerMasterData();
                                 }}
                                 className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-all"
                             >
@@ -495,7 +515,7 @@ const MasterDataPage = () => {
                             <DataTable
                                 columns={columns}
                                 data={filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
-                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : departmentLoading}
+                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : customerLoading}
                                 skeletonRows={itemsPerPage}
                                 totalItems={filteredData.length}
                                 currentPage={currentPage}
@@ -558,6 +578,15 @@ const MasterDataPage = () => {
             {/* Department Master Modal */}
             {modalState.open && isDepartmentTab && (
                 <DepartmentMasterModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSave={handleSave}
+                />
+            )}
+            {/* Customer Master Modal */}
+            {modalState.open && isCustomerTab && (
+                <CustomerMasterModal
                     mode={modalState.mode}
                     rowData={modalState.rowData}
                     onClose={closeModal}

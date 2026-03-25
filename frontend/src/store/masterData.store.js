@@ -31,6 +31,10 @@ const useMasterDataStore = create((set, get) => ({
     departmentLoading: false,
     departmentError: null,
 
+    // Loading / error state for Customer Master
+    customerLoading: false,
+    customerError: null,
+
     // Master data for all tabs
     masters: {
         'Entity Master': {
@@ -106,14 +110,11 @@ const useMasterDataStore = create((set, get) => ({
         },
         'Customer Master': {
             columns: [
-                { header: 'Customer ID', accessor: 'customerId', sortable: true },
-                { header: 'Customer Name', accessor: 'customerName', sortable: true },
-                { header: 'City', accessor: 'city', sortable: true },
+                { header: 'Customer ID', accessor: 'customer_id', sortable: true },
+                { header: 'Customer Name', accessor: 'customer_name', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
-            data: [
-                { id: 1, customerId: 'CUS-001', customerName: 'Global Corp', city: 'New York' },
-            ],
+            data: [],
         },
         'Item Master': {
             columns: [
@@ -335,6 +336,38 @@ const useMasterDataStore = create((set, get) => ({
             await get().fetchDepartmentMasterData();
         } catch (err) {
             set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    // ─── Customer Master: Load from backend ─────────────────────────────────
+    fetchCustomerMasterData: async () => {
+        set({ customerLoading: true, customerError: null });
+        try {
+            const rows = await masterDataService.getCustomerMasterData();
+            set((state) => ({
+                customerLoading: false,
+                masters: {
+                    ...state.masters,
+                    'Customer Master': {
+                        ...state.masters['Customer Master'],
+                        data: rows,
+                    },
+                },
+            }));
+        } catch (err) {
+            console.error('[CustomerMaster] fetch failed', err);
+            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    uploadCustomerMaster: async (file) => {
+        set({ customerLoading: true, customerError: null });
+        try {
+            await masterDataService.uploadCustomerMaster(file);
+            await get().fetchCustomerMasterData();
+        } catch (err) {
+            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
             throw err;
         }
     },
@@ -681,6 +714,49 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
+    // ─── Customer Master: CRUD ──────────────────────────────────────────────
+    addCustomerRow: async (formData) => {
+        set({ customerLoading: true, customerError: null });
+        try {
+            const payload = {
+                customer_id: formData.customer_id,
+                customer_name: formData.customer_name,
+            };
+            await masterDataService.addCustomerRow(payload);
+            await get().fetchCustomerMasterData();
+        } catch (err) {
+            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    updateCustomerRow: async (formData, rowIndex) => {
+        set({ customerLoading: true, customerError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                customer_id: formData.customer_id,
+                customer_name: formData.customer_name,
+            };
+            await masterDataService.editCustomerRow(rowIndex, payload);
+            await get().fetchCustomerMasterData();
+        } catch (err) {
+            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    deleteCustomerRow: async (rowIndex) => {
+        set({ customerLoading: true, customerError: null });
+        try {
+            await masterDataService.deleteCustomerRow(rowIndex);
+            await get().fetchCustomerMasterData();
+        } catch (err) {
+            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
     clearMasterData: async (tabIdentifier) => {
         await masterDataService.deleteTabData(tabIdentifier);
         if (tabIdentifier === 'Entity Master') await get().fetchEntityMasterData();
@@ -689,6 +765,7 @@ const useMasterDataStore = create((set, get) => ({
         else if (tabIdentifier === 'GL Master') await get().fetchGLMasterData();
         else if (tabIdentifier === 'LOB Master') await get().fetchLOBMasterData();
         else if (tabIdentifier === 'Department Master') await get().fetchDepartmentMasterData();
+        else if (tabIdentifier === 'Customer Master') await get().fetchCustomerMasterData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────
