@@ -13,6 +13,7 @@ import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
 
 import { ConfigProvider } from 'antd';
+import Invoice from './features/invoices/Invoice';
 
 function App() {
 
@@ -32,8 +33,8 @@ function App() {
             <Route path="/" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/login" element={<LoginPage />} />
-          <Route path="/test-date-picker" element={<TestDatePicker />} />
-          {/* <Route path="/signup" element={<SignupForm />} />
+            <Route path="/test-date-picker" element={<TestDatePicker />} />
+            {/* <Route path="/signup" element={<SignupForm />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
           </Route>
@@ -46,6 +47,7 @@ function App() {
             <Route >
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/invoices" element={<Invoice />} />
                 <Route path="/master-data" element={<MasterDataPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/admin" element={<AdminPage />} />

@@ -123,7 +123,7 @@ const DashboardPage = React.memo(() => {
 
             {/* Charts Row 1 — Aging + Status */}
             <div className="flex gap-4">
-                <div className="w-[60%]">
+                <div className="w-[50%]">
                     {isLoading ? (
                         <Skeleton height={300} borderRadius={16} />
                     ) : (
@@ -136,7 +136,7 @@ const DashboardPage = React.memo(() => {
                         />
                     )}
                 </div>
-                <div className="w-[40%]">
+                <div className="w-[50%]">
                     {isLoading ? (
                         <Skeleton height={300} borderRadius={16} />
                     ) : (
@@ -153,7 +153,7 @@ const DashboardPage = React.memo(() => {
 
             {/* Charts Row 2 — Vendors */}
             <div className="flex gap-4">
-                <div className="w-[60%]">
+                <div className="w-[50%]">
                     {isLoading ? (
                         <Skeleton height={300} borderRadius={16} />
                     ) : (
@@ -167,7 +167,7 @@ const DashboardPage = React.memo(() => {
                         />
                     )}
                 </div>
-                <div className="w-[40%]">
+                <div className="w-[50%]">
                     {isLoading ? (
                         <Skeleton height={300} borderRadius={16} />
                     ) : (

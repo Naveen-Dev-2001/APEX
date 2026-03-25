@@ -2,7 +2,21 @@ import { create } from "zustand";
 
 export const useInvoiceStore = create((set) => ({
 
-    rightPanelWidth: 500,
+    invoiceSection: 1,
+    setInvoiceSection: (section) => set({ invoiceSection: section }),
 
-    setRightPanelWidth: (width) => set({ rightPanelWidth: width }),
+    entityList: [],
+    setEntityList: (entities) => set({ entityList: entities }),
+
+    selectedEntity: null,
+    setSelectedEntity: (entity) => set({ selectedEntity: entity }),
+
+    skip: 0,
+    setSkip: (skip) => set({ skip }),
+
+    limit: 10,
+    setLimit: (limit) => set({ limit }),
+
+    view: "condensed",
+    setView: (view) => set({ view }),
 }))
