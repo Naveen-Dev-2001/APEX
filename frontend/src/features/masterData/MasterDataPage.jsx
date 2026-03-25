@@ -3,6 +3,7 @@ import { Search, Trash2, Upload, Plus, Pencil, Loader2, AlertCircle } from 'luci
 import useMasterDataStore from '../../store/masterData.store';
 import DataTable from '../../components/ui/DataTable';
 import EntityMasterModal from './EntityMasterModal';
+import VendorMasterModal from './VendorMasterModal';
 
 const MasterDataPage = () => {
     const {
@@ -15,6 +16,7 @@ const MasterDataPage = () => {
         fetchVendorMasterData, vendorLoading, vendorError, uploadVendorMaster,
         clearMasterData,
         addEntityRow, updateEntityRow, deleteEntityRow,
+        addVendorRow, updateVendorRow, deleteVendorRow,
     } = useMasterDataStore();
 
     const [modalState, setModalState] = useState({ open: false, mode: 'add', rowData: null, rowIndex: null });
@@ -56,10 +58,18 @@ const MasterDataPage = () => {
 
     const handleSave = async (formData) => {
         try {
-            if (modalState.mode === 'edit') {
-                await updateEntityRow(formData, modalState.rowIndex);
-            } else {
-                await addEntityRow(formData);
+            if (isEntityTab) {
+                if (modalState.mode === 'edit') {
+                    await updateEntityRow(formData, modalState.rowIndex);
+                } else {
+                    await addEntityRow(formData);
+                }
+            } else if (isVendorTab) {
+                if (modalState.mode === 'edit') {
+                    await updateVendorRow(formData, modalState.rowIndex);
+                } else {
+                    await addVendorRow(formData);
+                }
             }
             closeModal();
         } catch (err) {
@@ -68,13 +78,19 @@ const MasterDataPage = () => {
     };
 
     const handleDelete = async (row, indexInPage) => {
-        if (window.confirm(`Are you sure you want to delete entity "${row.entity_name || row.entityName}"?`)) {
+        const itemName = row.entity_name || row.entityName || row.vendor_name || row.vendorName || 'this item';
+        if (window.confirm(`Are you sure you want to delete "${itemName}"?`)) {
             try {
                 const masterData = masters[activeTab].data;
                 const realIndex = masterData.findIndex(r => r.id === row.id);
                 const absoluteIndex = (currentPage - 1) * itemsPerPage + indexInPage;
-                
-                await deleteEntityRow(realIndex !== -1 ? realIndex : absoluteIndex);
+                const indexToDelete = realIndex !== -1 ? realIndex : absoluteIndex;
+
+                if (isEntityTab) {
+                    await deleteEntityRow(indexToDelete);
+                } else if (isVendorTab) {
+                    await deleteVendorRow(indexToDelete);
+                }
             } catch (err) {
                 alert('Failed to delete: ' + (err.response?.data?.detail || err.message));
             }
@@ -101,14 +117,14 @@ const MasterDataPage = () => {
                     <div className="flex items-center gap-3">
                         <button
                             title="Edit"
-                            onClick={() => isEntityTab && openEdit(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab) && openEdit(row, index)}
                             className="text-gray-400 hover:text-blue-500 transition-colors"
                         >
                             <Pencil size={18} />
                         </button>
                         <button
                             title="Delete"
-                            onClick={() => isEntityTab && handleDelete(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab) && handleDelete(row, index)}
                             className="text-gray-400 hover:text-red-500 transition-colors"
                         >
                             <Trash2 size={18} />
@@ -317,7 +333,7 @@ const MasterDataPage = () => {
                     <span>Reupload</span>
                 </button>
                 <button
-                    onClick={isEntityTab ? openAdd : undefined}
+                    onClick={(isEntityTab || isVendorTab) ? openAdd : undefined}
                     className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
                 >
                     <Plus size={16} />
@@ -376,6 +392,16 @@ const MasterDataPage = () => {
             {/* Entity Master Modal */}
             {modalState.open && isEntityTab && (
                 <EntityMasterModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSave={handleSave}
+                />
+            )}
+
+            {/* Vendor Master Modal */}
+            {modalState.open && isVendorTab && (
+                <VendorMasterModal
                     mode={modalState.mode}
                     rowData={modalState.rowData}
                     onClose={closeModal}

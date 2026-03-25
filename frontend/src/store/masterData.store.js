@@ -39,14 +39,13 @@ const useMasterDataStore = create((set, get) => ({
             columns: [
                 { header: 'Vendor ID', accessor: 'vendor_id', sortable: true },
                 { header: 'Vendor Name', accessor: 'vendor_name', sortable: true },
-                { header: 'Remit-to Vendor ID', accessor: 'remit_to_vendor_id', sortable: true },
-                { header: 'Street 1', accessor: 'street_1', sortable: true },
+                { header: 'Address Line 1', accessor: 'address_line1', sortable: true },
                 { header: 'City', accessor: 'city', sortable: true },
-                { header: 'State/Province', accessor: 'state_province', sortable: true },
-                { header: 'Zip/Postal Code', accessor: 'zip_postal_code', sortable: true },
+                { header: 'State / Territory', accessor: 'state_or_territory', sortable: true },
+                { header: 'Zip Code', accessor: 'zip_or_postal_code', sortable: true },
                 { header: 'Country', accessor: 'country', sortable: true },
-                { header: 'Email ID', accessor: 'email_id', sortable: true },
-                { header: 'TDS Rate', accessor: 'TDS Rate', sortable: true },
+                { header: 'Primary Email', accessor: 'primary_email_address', sortable: true },
+                { header: 'TDS %', accessor: 'tds_percentage', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
             data: [],
@@ -257,6 +256,71 @@ const useMasterDataStore = create((set, get) => ({
     deleteEntityRow: async (rowIndex) => {
         await masterDataService.deleteEntityRow(rowIndex);
         await get().fetchEntityMasterData();
+    },
+
+    updateVendorRow: async (formData, rowIndex) => {
+        const payload = {
+            id: formData.id,
+            vendor_id: formData.vendor_id,
+            vendor_name: formData.vendor_name,
+            vendor_is_an_individual_person: formData.vendor_is_an_individual_person,
+            address_line1: formData.address_line1,
+            address_line2: formData.address_line2,
+            address_line3: formData.address_line3,
+            city: formData.city,
+            state_or_territory: formData.state_or_territory,
+            zip_or_postal_code: formData.zip_or_postal_code,
+            country_code: formData.country_code,
+            country: formData.country,
+            primary_phone: formData.primary_phone,
+            secondary_phone_no: formData.secondary_phone_no,
+            mobile_phone: formData.mobile_phone,
+            primary_email_address: formData.primary_email_address,
+            secondary_email_address: formData.secondary_email_address,
+            pay_terms: formData.pay_terms,
+            tax_id: formData.tax_id,
+            gst_eligibility: formData.gst_eligibility,
+            tds_applicability: formData.tds_applicability,
+            tds_percentage: formData.tds_percentage,
+            tds_section_code: formData.tds_section_code,
+            workflow_applicable: formData.workflow_applicable,
+            line_grouping: formData.line_grouping,
+            entity_id: formData.entity_id,
+        };
+        await masterDataService.editVendorRow(rowIndex, payload);
+        await get().fetchVendorMasterData();
+    },
+
+    addVendorRow: async (formData) => {
+        const payload = {
+            vendor_id: formData.vendor_id,
+            vendor_name: formData.vendor_name,
+            vendor_is_an_individual_person: formData.vendor_is_an_individual_person,
+            address_line1: formData.address_line1,
+            address_line2: formData.address_line2,
+            address_line3: formData.address_line3,
+            city: formData.city,
+            state_or_territory: formData.state_or_territory,
+            zip_or_postal_code: formData.zip_or_postal_code,
+            country_code: formData.country_code,
+            country: formData.country,
+            primary_phone: formData.primary_phone,
+            secondary_phone_no: formData.secondary_phone_no,
+            mobile_phone: formData.mobile_phone,
+            primary_email_address: formData.primary_email_address,
+            secondary_email_address: formData.secondary_email_address,
+            pay_terms: formData.pay_terms,
+            tax_id: formData.tax_id,
+            gst_eligibility: formData.gst_eligibility,
+            tds_applicability: formData.tds_applicability,
+            tds_percentage: formData.tds_percentage,
+            tds_section_code: formData.tds_section_code,
+            workflow_applicable: formData.workflow_applicable,
+            line_grouping: formData.line_grouping,
+            entity_id: formData.entity_id,
+        };
+        await masterDataService.addVendorRow(payload);
+        await get().fetchVendorMasterData();
     },
 
     // ─── Vendor Master: Delete ────────────────────────────────────────────────
