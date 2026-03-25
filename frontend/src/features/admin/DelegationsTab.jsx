@@ -10,7 +10,8 @@ import CustomDatePicker from '../../components/ui/CustomDatePicker';
 const DelegationsTab = () => {
     const {
         users, delegations, loading, isUpdating,
-        fetchUsers, fetchDelegations, addDelegation, removeDelegation
+        fetchUsers, fetchDelegations, addDelegation, removeDelegation,
+        sortColumn, sortDirection, setSort
     } = useAdminStore();
     const { showConfirm } = useToastStore();
 
@@ -69,6 +70,8 @@ const DelegationsTab = () => {
         {
             header: 'Original Approver',
             accessor: 'original_approver',
+            sortable: true,
+            onClick: () => setSort('original_approver'),
             render: (email) => (
                 <span className="text-gray-700 font-medium whitespace-nowrap">
                     {getUsernameByEmail(email)}
@@ -78,6 +81,8 @@ const DelegationsTab = () => {
         {
             header: 'Substitute',
             accessor: 'substitute_approver',
+            sortable: true,
+            onClick: () => setSort('substitute_approver'),
             render: (email) => (
                 <span className="text-gray-700 font-medium whitespace-nowrap">
                     {getUsernameByEmail(email)}
@@ -87,6 +92,8 @@ const DelegationsTab = () => {
         {
             header: 'Start Date',
             accessor: 'start_date',
+            sortable: true,
+            onClick: () => setSort('start_date'),
             render: (date) => (
                 <span className="text-gray-500 whitespace-nowrap">
                     {date ? new Date(date).toISOString().split('T')[0] : '-'}
@@ -96,6 +103,8 @@ const DelegationsTab = () => {
         {
             header: 'End Date',
             accessor: 'end_date',
+            sortable: true,
+            onClick: () => setSort('end_date'),
             render: (date) => (
                 <span className="text-gray-500 whitespace-nowrap">
                     {date ? new Date(date).toISOString().split('T')[0] : '-'}
@@ -155,7 +164,21 @@ const DelegationsTab = () => {
         }
     ];
 
-    const displayDelegations = delegations || [];
+    const displayDelegations = [...(delegations || [])].sort((a, b) => {
+        if (!sortColumn) return 0;
+        let valA = a[sortColumn];
+        let valB = b[sortColumn];
+
+        if (valA === null || valA === undefined) valA = '';
+        if (valB === null || valB === undefined) valB = '';
+
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
     const paginatedDelegations = displayDelegations.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     return (
@@ -219,6 +242,8 @@ const DelegationsTab = () => {
                     itemsPerPage={itemsPerPage}
                     onPageChange={setCurrentPage}
                     onItemsPerPageChange={setItemsPerPage}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
                     maxHeight="calc(100vh - 420px)"
                     stickyHeader={true}
                 />

@@ -20,6 +20,7 @@ const MasterDataPage = () => {
         searchQuery, setSearchQuery,
         currentPage, setCurrentPage,
         itemsPerPage, setItemsPerPage,
+        sortColumn, sortDirection, setSort,
         masters, getFilteredData,
         fetchEntityMasterData, entityLoading, entityError, uploadEntityMaster,
         fetchVendorMasterData, vendorLoading, vendorError, uploadVendorMaster,
@@ -274,7 +275,10 @@ const MasterDataPage = () => {
                 ),
             };
         }
-        return col;
+        return {
+            ...col,
+            onClick: col.sortable ? () => setSort(col.accessor) : undefined
+        };
     });
 
     // Vendor Upload View Component
@@ -563,6 +567,8 @@ const MasterDataPage = () => {
                                 itemsPerPage={itemsPerPage}
                                 onPageChange={setCurrentPage}
                                 onItemsPerPageChange={setItemsPerPage}
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
                                 maxHeight="calc(100vh - 280px)"
                                 stickyHeader={true}
                             />

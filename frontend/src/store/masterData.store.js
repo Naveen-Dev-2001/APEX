@@ -6,6 +6,8 @@ const useMasterDataStore = create((set, get) => ({
     searchQuery: '',
     currentPage: 1,
     itemsPerPage: 15,
+    sortColumn: '',
+    sortDirection: 'asc',
 
     // Loading / error state for Entity Master
     entityLoading: false,
@@ -150,6 +152,14 @@ const useMasterDataStore = create((set, get) => ({
     setSearchQuery: (query) => set({ searchQuery: query, currentPage: 1 }),
     setCurrentPage: (page) => set({ currentPage: page }),
     setItemsPerPage: (items) => set({ itemsPerPage: items, currentPage: 1 }),
+    setSort: (column) => {
+        const { sortColumn, sortDirection } = get();
+        if (sortColumn === column) {
+            set({ sortDirection: sortDirection === 'asc' ? 'desc' : 'asc' });
+        } else {
+            set({ sortColumn: column, sortDirection: 'asc' });
+        }
+    },
 
     // ─── Entity Master: Load from backend ────────────────────────────────────
     fetchEntityMasterData: async () => {
@@ -919,16 +929,43 @@ const useMasterDataStore = create((set, get) => ({
 
     // ─── Filtered data getter ─────────────────────────────────────────────────
     getFilteredData: () => {
-        const { activeTab, searchQuery, masters } = get();
+        const { activeTab, searchQuery, masters, sortColumn, sortDirection } = get();
         const master = masters[activeTab];
         if (!master) return [];
-        if (!searchQuery) return master.data;
-        const lowerQuery = searchQuery.toLowerCase();
-        return master.data.filter((item) =>
-            Object.values(item).some((val) =>
-                String(val).toLowerCase().includes(lowerQuery)
-            )
-        );
+        
+        let processed = [...master.data];
+
+        // Filter
+        if (searchQuery) {
+            const lowerQuery = searchQuery.toLowerCase();
+            processed = processed.filter((item) =>
+                Object.values(item).some((val) =>
+                    String(val).toLowerCase().includes(lowerQuery)
+                )
+            );
+        }
+
+        // Sort
+        if (sortColumn) {
+            processed.sort((a, b) => {
+                let valA = a[sortColumn];
+                let valB = b[sortColumn];
+
+                // Handle nulls/undefined
+                if (valA === null || valA === undefined) valA = '';
+                if (valB === null || valB === undefined) valB = '';
+
+                // Case insensitive string comparison
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return processed;
     },
 }));
 
