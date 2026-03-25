@@ -232,147 +232,199 @@ const useMasterDataStore = create((set, get) => ({
 
     // ─── Entity Master: Add ───────────────────────────────────────────────────
     addEntityRow: async (formData) => {
-        // formData already uses snake_case from the EntityMasterModal
-        const payload = {
-            entity_id: formData.entity_id,
-            entity_name: formData.entity_name,
-            registered_address: formData.registered_address,
-            address_line1: formData.address_line1,
-            address_line2: formData.address_line2,
-            address_line3: formData.address_line3,
-            city: formData.city,
-            state_or_territory: formData.state_or_territory,
-            zip_or_postal_code: formData.zip_or_postal_code,
-            country_code: formData.country_code,
-            gst_applicable: formData.gst_applicable,
-        };
-        await masterDataService.addEntityRow(payload);
-        // Refresh from backend to get assigned DB id
-        await get().fetchEntityMasterData();
+        set({ entityLoading: true, entityError: null });
+        try {
+            const payload = {
+                entity_id: formData.entity_id,
+                entity_name: formData.entity_name,
+                registered_address: formData.registered_address,
+                address_line1: formData.address_line1,
+                address_line2: formData.address_line2,
+                address_line3: formData.address_line3,
+                city: formData.city,
+                state_or_territory: formData.state_or_territory,
+                zip_or_postal_code: formData.zip_or_postal_code,
+                country_code: formData.country_code,
+                gst_applicable: formData.gst_applicable,
+            };
+            await masterDataService.addEntityRow(payload);
+            await get().fetchEntityMasterData();
+        } catch (err) {
+            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     // ─── Entity Master: Edit ──────────────────────────────────────────────────
     updateEntityRow: async (formData, rowIndex) => {
-        const payload = {
-            id: formData.id,
-            entity_id: formData.entity_id,
-            entity_name: formData.entity_name,
-            registered_address: formData.registered_address,
-            address_line1: formData.address_line1,
-            address_line2: formData.address_line2,
-            address_line3: formData.address_line3,
-            city: formData.city,
-            state_or_territory: formData.state_or_territory,
-            zip_or_postal_code: formData.zip_or_postal_code,
-            country_code: formData.country_code,
-            gst_applicable: formData.gst_applicable,
-        };
-        await masterDataService.editEntityRow(rowIndex, payload);
-        await get().fetchEntityMasterData();
+        set({ entityLoading: true, entityError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                entity_id: formData.entity_id,
+                entity_name: formData.entity_name,
+                registered_address: formData.registered_address,
+                address_line1: formData.address_line1,
+                address_line2: formData.address_line2,
+                address_line3: formData.address_line3,
+                city: formData.city,
+                state_or_territory: formData.state_or_territory,
+                zip_or_postal_code: formData.zip_or_postal_code,
+                country_code: formData.country_code,
+                gst_applicable: formData.gst_applicable,
+            };
+            await masterDataService.editEntityRow(rowIndex, payload);
+            await get().fetchEntityMasterData();
+        } catch (err) {
+            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     // ─── Entity Master: Delete ────────────────────────────────────────────────
     deleteEntityRow: async (rowIndex) => {
-        await masterDataService.deleteEntityRow(rowIndex);
-        await get().fetchEntityMasterData();
+        set({ entityLoading: true, entityError: null });
+        try {
+            await masterDataService.deleteEntityRow(rowIndex);
+            await get().fetchEntityMasterData();
+        } catch (err) {
+            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     updateVendorRow: async (formData, rowIndex) => {
-        const payload = {
-            id: formData.id,
-            vendor_id: formData.vendor_id,
-            vendor_name: formData.vendor_name,
-            vendor_is_an_individual_person: formData.vendor_is_an_individual_person,
-            address_line1: formData.address_line1,
-            address_line2: formData.address_line2,
-            address_line3: formData.address_line3,
-            city: formData.city,
-            state_or_territory: formData.state_or_territory,
-            zip_or_postal_code: formData.zip_or_postal_code,
-            country_code: formData.country_code,
-            country: formData.country,
-            primary_phone: formData.primary_phone,
-            secondary_phone_no: formData.secondary_phone_no,
-            mobile_phone: formData.mobile_phone,
-            primary_email_address: formData.primary_email_address,
-            secondary_email_address: formData.secondary_email_address,
-            pay_terms: formData.pay_terms,
-            tax_id: formData.tax_id,
-            gst_eligibility: formData.gst_eligibility,
-            tds_applicability: formData.tds_applicability,
-            tds_percentage: formData.tds_percentage,
-            tds_section_code: formData.tds_section_code,
-            workflow_applicable: formData.workflow_applicable,
-            line_grouping: formData.line_grouping,
-            entity_id: formData.entity_id,
-        };
-        await masterDataService.editVendorRow(rowIndex, payload);
-        await get().fetchVendorMasterData();
+        set({ vendorLoading: true, vendorError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                vendor_id: formData.vendor_id,
+                vendor_name: formData.vendor_name,
+                vendor_is_an_individual_person: formData.vendor_is_an_individual_person,
+                address_line1: formData.address_line1,
+                address_line2: formData.address_line2,
+                address_line3: formData.address_line3,
+                city: formData.city,
+                state_or_territory: formData.state_or_territory,
+                zip_or_postal_code: formData.zip_or_postal_code,
+                country_code: formData.country_code,
+                country: formData.country,
+                primary_phone: formData.primary_phone,
+                secondary_phone_no: formData.secondary_phone_no,
+                mobile_phone: formData.mobile_phone,
+                primary_email_address: formData.primary_email_address,
+                secondary_email_address: formData.secondary_email_address,
+                pay_terms: formData.pay_terms,
+                tax_id: formData.tax_id,
+                gst_eligibility: formData.gst_eligibility,
+                tds_applicability: formData.tds_applicability,
+                tds_percentage: formData.tds_percentage,
+                tds_section_code: formData.tds_section_code,
+                workflow_applicable: formData.workflow_applicable,
+                line_grouping: formData.line_grouping,
+                entity_id: formData.entity_id,
+            };
+            await masterDataService.editVendorRow(rowIndex, payload);
+            await get().fetchVendorMasterData();
+        } catch (err) {
+            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     addVendorRow: async (formData) => {
-        const payload = {
-            vendor_id: formData.vendor_id,
-            vendor_name: formData.vendor_name,
-            vendor_is_an_individual_person: formData.vendor_is_an_individual_person,
-            address_line1: formData.address_line1,
-            address_line2: formData.address_line2,
-            address_line3: formData.address_line3,
-            city: formData.city,
-            state_or_territory: formData.state_or_territory,
-            zip_or_postal_code: formData.zip_or_postal_code,
-            country_code: formData.country_code,
-            country: formData.country,
-            primary_phone: formData.primary_phone,
-            secondary_phone_no: formData.secondary_phone_no,
-            mobile_phone: formData.mobile_phone,
-            primary_email_address: formData.primary_email_address,
-            secondary_email_address: formData.secondary_email_address,
-            pay_terms: formData.pay_terms,
-            tax_id: formData.tax_id,
-            gst_eligibility: formData.gst_eligibility,
-            tds_applicability: formData.tds_applicability,
-            tds_percentage: formData.tds_percentage,
-            tds_section_code: formData.tds_section_code,
-            workflow_applicable: formData.workflow_applicable,
-            line_grouping: formData.line_grouping,
-            entity_id: formData.entity_id,
-        };
-        await masterDataService.addVendorRow(payload);
-        await get().fetchVendorMasterData();
+        set({ vendorLoading: true, vendorError: null });
+        try {
+            const payload = {
+                vendor_id: formData.vendor_id,
+                vendor_name: formData.vendor_name,
+                vendor_is_an_individual_person: formData.vendor_is_an_individual_person,
+                address_line1: formData.address_line1,
+                address_line2: formData.address_line2,
+                address_line3: formData.address_line3,
+                city: formData.city,
+                state_or_territory: formData.state_or_territory,
+                zip_or_postal_code: formData.zip_or_postal_code,
+                country_code: formData.country_code,
+                country: formData.country,
+                primary_phone: formData.primary_phone,
+                secondary_phone_no: formData.secondary_phone_no,
+                mobile_phone: formData.mobile_phone,
+                primary_email_address: formData.primary_email_address,
+                secondary_email_address: formData.secondary_email_address,
+                pay_terms: formData.pay_terms,
+                tax_id: formData.tax_id,
+                gst_eligibility: formData.gst_eligibility,
+                tds_applicability: formData.tds_applicability,
+                tds_percentage: formData.tds_percentage,
+                tds_section_code: formData.tds_section_code,
+                workflow_applicable: formData.workflow_applicable,
+                line_grouping: formData.line_grouping,
+                entity_id: formData.entity_id,
+            };
+            await masterDataService.addVendorRow(payload);
+            await get().fetchVendorMasterData();
+        } catch (err) {
+            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     // ─── Vendor Master: Delete ────────────────────────────────────────────────
     deleteVendorRow: async (rowIndex) => {
-        await masterDataService.deleteVendorRow(rowIndex);
-        await get().fetchVendorMasterData();
+        set({ vendorLoading: true, vendorError: null });
+        try {
+            await masterDataService.deleteVendorRow(rowIndex);
+            await get().fetchVendorMasterData();
+        } catch (err) {
+            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     // ─── TDS Rates: CRUD ─────────────────────────────────────────────────────
     addTDSRateRow: async (formData) => {
-        const payload = {
-            section: formData.section,
-            nature_of_payment: formData.nature_of_payment,
-            tds_rate: formData.tds_rate,
-        };
-        await masterDataService.addTDSRateRow(payload);
-        await get().fetchTDSRatesData();
+        set({ tdsLoading: true, tdsError: null });
+        try {
+            const payload = {
+                section: formData.section,
+                nature_of_payment: formData.nature_of_payment,
+                tds_rate: formData.tds_rate,
+            };
+            await masterDataService.addTDSRateRow(payload);
+            await get().fetchTDSRatesData();
+        } catch (err) {
+            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     updateTDSRateRow: async (formData, rowIndex) => {
-        const payload = {
-            id: formData.id,
-            section: formData.section,
-            nature_of_payment: formData.nature_of_payment,
-            tds_rate: formData.tds_rate,
-        };
-        await masterDataService.editTDSRateRow(rowIndex, payload);
-        await get().fetchTDSRatesData();
+        set({ tdsLoading: true, tdsError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                section: formData.section,
+                nature_of_payment: formData.nature_of_payment,
+                tds_rate: formData.tds_rate,
+            };
+            await masterDataService.editTDSRateRow(rowIndex, payload);
+            await get().fetchTDSRatesData();
+        } catch (err) {
+            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     deleteTDSRateRow: async (rowIndex) => {
-        await masterDataService.deleteTDSRateRow(rowIndex);
-        await get().fetchTDSRatesData();
+        set({ tdsLoading: true, tdsError: null });
+        try {
+            await masterDataService.deleteTDSRateRow(rowIndex);
+            await get().fetchTDSRatesData();
+        } catch (err) {
+            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
     },
 
     clearMasterData: async (tabIdentifier) => {
