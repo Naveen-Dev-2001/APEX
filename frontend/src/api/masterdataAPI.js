@@ -8,6 +8,7 @@ const LOB_IDENTIFIER = 'LOB';
 const DEPARTMENT_IDENTIFIER = 'Department';
 const CUSTOMER_IDENTIFIER = 'Customer';
 const ITEM_IDENTIFIER = 'Item';
+const CURRENCY_IDENTIFIER = 'Currency';
 
 export const masterDataService = {
     /** Fetch all entity master rows from DB */
@@ -348,6 +349,31 @@ export const masterDataService = {
                         : tabName === 'Customer Master' ? CUSTOMER_IDENTIFIER 
                         : tabName === 'Item Master' ? ITEM_IDENTIFIER : tabName;
         const res = await API.delete(`/master/files/${identifier}`);
+        return res.data;
+    },
+
+    // ─── Currency ──────────────────────────────────────────────────────────
+    /** Fetch all currencies from DB */
+    async getCurrencyData() {
+        const res = await API.get(`/currency/`);
+        return res.data;
+    },
+
+    /** Add a new currency row */
+    async addCurrencyRow(newRow) {
+        const res = await API.post(`/currency/`, newRow);
+        return res.data;
+    },
+
+    /** Edit an existing currency row */
+    async editCurrencyRow(currencyId, updatedRow) {
+        const res = await API.put(`/currency/${currencyId}`, updatedRow);
+        return res.data;
+    },
+
+    /** Delete a currency row */
+    async deleteCurrencyRow(currencyId) {
+        const res = await API.delete(`/currency/${currencyId}`);
         return res.data;
     },
 };

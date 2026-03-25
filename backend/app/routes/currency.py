@@ -17,6 +17,18 @@ async def get_currencies(
 ):
     currencies = db.query(Currency).all()
     
+    # Check for '?' symbols in INR (common conversion issue)
+    was_fixed = False
+    for curr in currencies:
+        if curr.code == 'INR' and curr.symbol == '?':
+            curr.symbol = '₹'
+            was_fixed = True
+    
+    if was_fixed:
+        db.commit()
+        db.refresh(curr) # refresh the last updated one just in case, or just re-query
+        currencies = db.query(Currency).all()
+
     # Seed default currencies if none exist
     if not currencies:
         default_currencies = [

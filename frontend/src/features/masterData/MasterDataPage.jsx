@@ -12,6 +12,7 @@ import LOBMasterModal from './LOBMasterModal';
 import DepartmentMasterModal from './DepartmentMasterModal';
 import CustomerMasterModal from './CustomerMasterModal';
 import ItemMasterModal from './ItemMasterModal';
+import CurrencyMasterModal from './CurrencyMasterModal';
 
 const MasterDataPage = () => {
     const {
@@ -28,6 +29,7 @@ const MasterDataPage = () => {
         fetchDepartmentMasterData, departmentLoading, departmentError, uploadDepartmentMaster,
         fetchCustomerMasterData, customerLoading, customerError, uploadCustomerMaster,
         fetchItemMasterData, itemLoading, itemError, uploadItemMaster,
+        fetchCurrencyData, currencyLoading, currencyError,
         clearMasterData,
         addEntityRow, updateEntityRow, deleteEntityRow,
         addVendorRow, updateVendorRow, deleteVendorRow,
@@ -37,6 +39,7 @@ const MasterDataPage = () => {
         addDepartmentRow, updateDepartmentRow, deleteDepartmentRow,
         addCustomerRow, updateCustomerRow, deleteCustomerRow,
         addItemRow, updateItemRow, deleteItemRow,
+        addCurrencyRow, updateCurrencyRow, deleteCurrencyRow,
     } = useMasterDataStore();
     const { showConfirm } = useToastStore();
 
@@ -53,6 +56,7 @@ const MasterDataPage = () => {
     const isDepartmentTab = activeTab === 'Department Master';
     const isCustomerTab = activeTab === 'Customer Master';
     const isItemTab = activeTab === 'Item Master';
+    const isCurrencyTab = activeTab === 'Currency';
 
     // Fetch data on mount or tab change
     useEffect(() => {
@@ -72,8 +76,10 @@ const MasterDataPage = () => {
             fetchCustomerMasterData();
         } else if (isItemTab) {
             fetchItemMasterData();
+        } else if (isCurrencyTab) {
+            fetchCurrencyData();
         }
-    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, fetchGLMasterData, fetchLOBMasterData, fetchDepartmentMasterData, fetchCustomerMasterData, fetchItemMasterData, isEntityTab, isVendorTab, isTDSTab, isGLTab, isLOBTab, isDepartmentTab, isCustomerTab, isItemTab]);
+    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, fetchGLMasterData, fetchLOBMasterData, fetchDepartmentMasterData, fetchCustomerMasterData, fetchItemMasterData, fetchCurrencyData, isEntityTab, isVendorTab, isTDSTab, isGLTab, isLOBTab, isDepartmentTab, isCustomerTab, isItemTab, isCurrencyTab]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
@@ -161,6 +167,14 @@ const MasterDataPage = () => {
                     await addItemRow(formData);
                     toast.success('Item added successfully');
                 }
+            } else if (isCurrencyTab) {
+                if (modalState.mode === 'edit') {
+                    await updateCurrencyRow(formData, modalState.rowData.id);
+                    toast.success('Currency updated successfully');
+                } else {
+                    await addCurrencyRow(formData);
+                    toast.success('Currency added successfully');
+                }
             }
             closeModal();
         } catch (err) {
@@ -200,6 +214,8 @@ const MasterDataPage = () => {
                         await deleteCustomerRow(indexToDelete);
                     } else if (isItemTab) {
                         await deleteItemRow(indexToDelete);
+                    } else if (isCurrencyTab) {
+                        await deleteCurrencyRow(row.id);
                     }
                     toast.dismiss(loadingToast);
                     toast.success(`${activeTab} deleted successfully`);
@@ -241,14 +257,14 @@ const MasterDataPage = () => {
                 render: (_, row, index) => (
                     <div className="flex items-center gap-4">
                         <button
-                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab) && openEdit(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && openEdit(row, index)}
                             className="text-gray-500 hover:text-gray-700 transition-colors p-1"
                             title="Edit"
                         >
                             <Pencil size={18} />
                         </button>
                         <button
-                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab) && handleDelete(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && handleDelete(row, index)}
                             className="text-[#ff4d4f] hover:text-[#d32f2f] transition-colors p-1"
                             title="Delete"
                         >
@@ -475,32 +491,36 @@ const MasterDataPage = () => {
                 </div>
 
                 {/* Actions */}
-                <button 
-                    onClick={handleClearTab}
-                    className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-red-300 rounded-[4px] hover:bg-red-50 transition-all whitespace-nowrap"
-                >
-                    <Trash2 size={15} className="text-red-500" />
-                    <span>Clear Tab</span>
-                </button>
-                <button 
-                    onClick={() => reuploadInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-[#24A1DD] rounded-[4px] hover:bg-[#F0F9FF] transition-all whitespace-nowrap"
-                >
-                    <Upload size={15} className="text-[#24A1DD]" />
-                    <span>Reupload</span>
-                </button>
+                {!isCurrencyTab && (
+                    <>
+                        <button 
+                            onClick={handleClearTab}
+                            className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-red-300 rounded-[4px] hover:bg-red-50 transition-all whitespace-nowrap"
+                        >
+                            <Trash2 size={15} className="text-red-500" />
+                            <span>Clear Tab</span>
+                        </button>
+                        <button 
+                            onClick={() => reuploadInputRef.current?.click()}
+                            className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-[#24A1DD] rounded-[4px] hover:bg-[#F0F9FF] transition-all whitespace-nowrap"
+                        >
+                            <Upload size={15} className="text-[#24A1DD]" />
+                            <span>Reupload</span>
+                        </button>
+                    </>
+                )}
                 <button
-                    onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab) ? openAdd : undefined}
+                    onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) ? openAdd : undefined}
                     className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
                 >
                     <Plus size={16} />
-                    <span>Add New</span>
+                    <span>{isCurrencyTab ? 'Add Currency' : 'Add New'}</span>
                 </button>
             </div>
 
             {/* Table Area */}
             <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative min-h-[400px]">
-                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) ? (
+                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) || (currencyError && isCurrencyTab) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -508,7 +528,7 @@ const MasterDataPage = () => {
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900">Failed to load data</h3>
-                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError || tdsError || glError || lobError || departmentError || customerError || itemError}</p>
+                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError || tdsError || glError || lobError || departmentError || customerError || itemError || currencyError}</p>
                             </div>
                             <button
                                 onClick={() => {
@@ -520,6 +540,7 @@ const MasterDataPage = () => {
                                     else if (isDepartmentTab) fetchDepartmentMasterData();
                                     else if (isCustomerTab) fetchCustomerMasterData();
                                     else if (isItemTab) fetchItemMasterData();
+                                    else if (isCurrencyTab) fetchCurrencyData();
                                 }}
                                 className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-all"
                             >
@@ -535,7 +556,7 @@ const MasterDataPage = () => {
                             <DataTable
                                 columns={columns}
                                 data={filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
-                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : itemLoading}
+                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : currencyLoading}
                                 skeletonRows={itemsPerPage}
                                 totalItems={filteredData.length}
                                 currentPage={currentPage}
@@ -616,6 +637,15 @@ const MasterDataPage = () => {
             {/* Item Master Modal */}
             {modalState.open && isItemTab && (
                 <ItemMasterModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSave={handleSave}
+                />
+            )}
+            {/* Currency Master Modal */}
+            {modalState.open && isCurrencyTab && (
+                <CurrencyMasterModal
                     mode={modalState.mode}
                     rowData={modalState.rowData}
                     onClose={closeModal}

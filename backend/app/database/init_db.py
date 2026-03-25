@@ -75,6 +75,23 @@ def create_tables():
         print(f"⚠ Warning during schema sync: {e}")
         
     print("✓ All tables synchronized successfully")
+    
+    # Custom Migration: Ensure 'symbol' in 'currencies' is NVARCHAR and fix '?' symbols
+    try:
+        with engine.connect() as conn:
+            # Check column type or just try to ALTER it (it's safe if it's already NVARCHAR)
+            print("Ensuring 'currencies.symbol' is NVARCHAR and fixing '?' symbols...")
+            conn.execute(text("ALTER TABLE currencies ALTER COLUMN symbol NVARCHAR(10)"))
+            
+            # Fix symbols that are '?' or other incorrect characters
+            conn.execute(text("UPDATE currencies SET symbol = N'₹' WHERE code = 'INR' AND symbol = '?'"))
+            conn.execute(text("UPDATE currencies SET symbol = N'€' WHERE code = 'EUR' AND symbol = '?'"))
+            conn.execute(text("UPDATE currencies SET symbol = N'£' WHERE code = 'GBP' AND symbol = '?'"))
+            
+            conn.commit()
+            print("✓ Currency symbols fixed")
+    except Exception as e:
+        print(f"⚠ Warning during currency fix: {e}")
 
 
 def create_admin_user(db):

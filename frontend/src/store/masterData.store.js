@@ -39,6 +39,10 @@ const useMasterDataStore = create((set, get) => ({
     itemLoading: false,
     itemError: null,
 
+    // Loading / error state for Currency
+    currencyLoading: false,
+    currencyError: null,
+
     // Master data for all tabs
     masters: {
         'Entity Master': {
@@ -133,15 +137,11 @@ const useMasterDataStore = create((set, get) => ({
         'Currency': {
             columns: [
                 { header: 'Currency Code', accessor: 'code', sortable: true },
+                { header: 'Currency Name', accessor: 'name', sortable: true },
                 { header: 'Symbol', accessor: 'symbol', sortable: true },
-                { header: 'Exchange Rate (USD)', accessor: 'rate', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
-            data: [
-                { id: 1, code: 'USD', symbol: '$', rate: '1.00' },
-                { id: 2, code: 'INR', symbol: '₹', rate: '0.012' },
-                { id: 3, code: 'EUR', symbol: '€', rate: '1.09' },
-            ],
+            data: [],
         },
     },
 
@@ -404,6 +404,27 @@ const useMasterDataStore = create((set, get) => ({
         } catch (err) {
             set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
             throw err;
+        }
+    },
+
+    // ─── Currency: Load from backend ─────────────────────────────────────────
+    fetchCurrencyData: async () => {
+        set({ currencyLoading: true, currencyError: null });
+        try {
+            const rows = await masterDataService.getCurrencyData();
+            set((state) => ({
+                currencyLoading: false,
+                masters: {
+                    ...state.masters,
+                    'Currency': {
+                        ...state.masters['Currency'],
+                        data: rows.map(r => ({ ...r, id: r.id })), // backend returns id
+                    },
+                },
+            }));
+        } catch (err) {
+            console.error('[Currency] fetch failed', err);
+            set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
         }
     },
 
@@ -839,6 +860,50 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
+    // ─── Currency: CRUD ──────────────────────────────────────────────────────
+    addCurrencyRow: async (formData) => {
+        set({ currencyLoading: true, currencyError: null });
+        try {
+            const payload = {
+                code: formData.code,
+                name: formData.name,
+                symbol: formData.symbol,
+            };
+            await masterDataService.addCurrencyRow(payload);
+            await get().fetchCurrencyData();
+        } catch (err) {
+            set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    updateCurrencyRow: async (formData, currencyId) => {
+        set({ currencyLoading: true, currencyError: null });
+        try {
+            const payload = {
+                code: formData.code,
+                name: formData.name,
+                symbol: formData.symbol,
+            };
+            await masterDataService.editCurrencyRow(currencyId, payload);
+            await get().fetchCurrencyData();
+        } catch (err) {
+            set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    deleteCurrencyRow: async (currencyId) => {
+        set({ currencyLoading: true, currencyError: null });
+        try {
+            await masterDataService.deleteCurrencyRow(currencyId);
+            await get().fetchCurrencyData();
+        } catch (err) {
+            set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
     clearMasterData: async (tabIdentifier) => {
         await masterDataService.deleteTabData(tabIdentifier);
         if (tabIdentifier === 'Entity Master') await get().fetchEntityMasterData();
@@ -849,6 +914,7 @@ const useMasterDataStore = create((set, get) => ({
         else if (tabIdentifier === 'Department Master') await get().fetchDepartmentMasterData();
         else if (tabIdentifier === 'Customer Master') await get().fetchCustomerMasterData();
         else if (tabIdentifier === 'Item Master') await get().fetchItemMasterData();
+        else if (tabIdentifier === 'Currency') await get().fetchCurrencyData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────
