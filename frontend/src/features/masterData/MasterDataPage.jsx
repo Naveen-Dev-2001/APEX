@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Trash2, Upload, Plus, Pencil, Loader2, AlertCircle } from 'lucide-react';
 import useMasterDataStore from '../../store/masterData.store';
+import useToastStore from '../../store/useToastStore';
+import toast from '../../utils/toast';
 import DataTable from '../../components/ui/DataTable';
 import EntityMasterModal from './EntityMasterModal';
 import VendorMasterModal from './VendorMasterModal';
@@ -21,6 +23,7 @@ const MasterDataPage = () => {
         addVendorRow, updateVendorRow, deleteVendorRow,
         addTDSRateRow, updateTDSRateRow, deleteTDSRateRow,
     } = useMasterDataStore();
+    const { showConfirm } = useToastStore();
 
     const [modalState, setModalState] = useState({ open: false, mode: 'add', rowData: null, rowIndex: null });
 
@@ -67,48 +70,65 @@ const MasterDataPage = () => {
             if (isEntityTab) {
                 if (modalState.mode === 'edit') {
                     await updateEntityRow(formData, modalState.rowIndex);
+                    toast.success('Entity updated successfully');
                 } else {
                     await addEntityRow(formData);
+                    toast.success('Entity added successfully');
                 }
             } else if (isVendorTab) {
                 if (modalState.mode === 'edit') {
                     await updateVendorRow(formData, modalState.rowIndex);
+                    toast.success('Vendor updated successfully');
                 } else {
                     await addVendorRow(formData);
+                    toast.success('Vendor added successfully');
                 }
             } else if (isTDSTab) {
                 if (modalState.mode === 'edit') {
                     await updateTDSRateRow(formData, modalState.rowIndex);
+                    toast.success('TDS Rate updated successfully');
                 } else {
                     await addTDSRateRow(formData);
+                    toast.success('TDS Rate added successfully');
                 }
             }
             closeModal();
         } catch (err) {
-            alert('Failed to save: ' + (err.response?.data?.detail || err.message));
+            toast.error('Failed to save: ' + (err.response?.data?.detail || err.message));
         }
     };
 
-    const handleDelete = async (row, indexInPage) => {
+    const handleDelete = (row, indexInPage) => {
         const itemName = row.entity_name || row.entityName || row.vendor_name || row.vendorName || 'this item';
-        if (window.confirm(`Are you sure you want to delete "${itemName}"?`)) {
-            try {
-                const masterData = masters[activeTab].data;
-                const realIndex = masterData.findIndex(r => r.id === row.id);
-                const absoluteIndex = (currentPage - 1) * itemsPerPage + indexInPage;
-                const indexToDelete = realIndex !== -1 ? realIndex : absoluteIndex;
+        
+        showConfirm({
+            message: `Delete ${activeTab}?`,
+            subMessage: `Are you sure you want to delete "${itemName}"? This action cannot be undone.`,
+            confirmLabel: 'Delete',
+            variant: 'danger',
+            onConfirm: async () => {
+                const loadingToast = toast.loading(`Deleting ${itemName}...`);
+                try {
+                    const masterData = masters[activeTab].data;
+                    const realIndex = masterData.findIndex(r => r.id === row.id);
+                    const absoluteIndex = (currentPage - 1) * itemsPerPage + indexInPage;
+                    const indexToDelete = realIndex !== -1 ? realIndex : absoluteIndex;
 
-                if (isEntityTab) {
-                    await deleteEntityRow(indexToDelete);
-                } else if (isVendorTab) {
-                    await deleteVendorRow(indexToDelete);
-                } else if (isTDSTab) {
-                    await deleteTDSRateRow(indexToDelete);
+                    if (isEntityTab) {
+                        await deleteEntityRow(indexToDelete);
+                    } else if (isVendorTab) {
+                        await deleteVendorRow(indexToDelete);
+                    } else if (isTDSTab) {
+                        await deleteTDSRateRow(indexToDelete);
+                    }
+                    toast.dismiss(loadingToast);
+                    toast.success(`${activeTab} deleted successfully`);
+                } catch (err) {
+                    toast.dismiss(loadingToast);
+                    toast.error('Failed to delete: ' + (err.response?.data?.detail || err.message));
                 }
-            } catch (err) {
-                alert('Failed to delete: ' + (err.response?.data?.detail || err.message));
             }
-        }
+        });
     };
 
     // Prepare columns for DataTable
@@ -128,20 +148,20 @@ const MasterDataPage = () => {
             return {
                 ...col,
                 render: (_, row, index) => (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                         <button
                             onClick={() => (isEntityTab || isVendorTab || isTDSTab) && openEdit(row, index)}
-                            className="flex items-center gap-1.5 text-[#24a0ed] hover:text-[#1D71AB] transition-colors font-medium text-[13px]"
+                            className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                            title="Edit"
                         >
-                            <Pencil size={15} />
-                            <span>Edit</span>
+                            <Pencil size={18} />
                         </button>
                         <button
                             onClick={() => (isEntityTab || isVendorTab || isTDSTab) && handleDelete(row, index)}
-                            className="flex items-center gap-1.5 text-[#ff4d4f] hover:text-[#d32f2f] transition-colors font-medium text-[13px]"
+                            className="text-[#ff4d4f] hover:text-[#d32f2f] transition-colors p-1"
+                            title="Delete"
                         >
-                            <Trash2 size={15} />
-                            <span>Delete</span>
+                            <Trash2 size={18} />
                         </button>
                     </div>
                 ),
@@ -178,7 +198,7 @@ const MasterDataPage = () => {
                 await uploadVendorMaster(file);
                 // Success - fetchVendorMasterData will be called by store
             } catch (err) {
-                alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                toast.error('Upload failed: ' + (err.response?.data?.detail || err.message));
             }
         };
         
@@ -253,14 +273,24 @@ const MasterDataPage = () => {
 
     const reuploadInputRef = React.useRef(null);
 
-    const handleClearTab = async () => {
-        if (window.confirm(`Are you sure you want to clear all data in "${activeTab}"?`)) {
-            try {
-                await clearMasterData(activeTab);
-            } catch (err) {
-                alert('Failed to clear: ' + (err.response?.data?.detail || err.message));
+    const handleClearTab = () => {
+        showConfirm({
+            message: `Clear ${activeTab}?`,
+            subMessage: 'This will remove all data from this tab permanently. Are you sure?',
+            confirmLabel: 'Clear All',
+            variant: 'danger',
+            onConfirm: async () => {
+                const loadingToast = toast.loading(`Clearing ${activeTab}...`);
+                try {
+                    await clearMasterData(activeTab);
+                    toast.dismiss(loadingToast);
+                    toast.success(`${activeTab} cleared successfully`);
+                } catch (err) {
+                    toast.dismiss(loadingToast);
+                    toast.error('Failed to clear: ' + (err.response?.data?.detail || err.message));
+                }
             }
-        }
+        });
     };
 
     const handleReuploadSelect = async (e) => {
@@ -270,12 +300,12 @@ const MasterDataPage = () => {
                 if (isVendorTab) {
                     await uploadVendorMaster(files[0]);
                 } else if (isTDSTab) {
-                    alert('Reupload not yet supported for TDS Rates.');
+                    toast.warning('Reupload not yet supported for TDS Rates.');
                 } else {
-                    alert('Reupload only supported for Vendor Master currently.');
+                    toast.info('Reupload only supported for Vendor Master currently.');
                 }
             } catch (err) {
-                alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                toast.error('Upload failed: ' + (err.response?.data?.detail || err.message));
             }
         }
     };

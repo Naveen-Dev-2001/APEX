@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
+import { Pencil } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import useAdminStore from '../../store/useAdminStore';
 
 // Assuming we have these in assets
-import editIcon from '../../assets/admin-icons/edit-icon.png';
 import deleteIcon from '../../assets/admin-icons/delete-icon.png';
 
 const UserManagementTab = ({ onEdit }) => {
@@ -98,9 +98,10 @@ const UserManagementTab = ({ onEdit }) => {
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => onEdit && onEdit(row)}
-                        className="hover:opacity-70 transition-opacity"
+                        className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                        title="Edit"
                     >
-                        <img src={editIcon} alt="Edit" className="w-[25px]" />
+                        <Pencil size={18} />
                     </button>
                     {/* Delete icon removed as per request */}
                 </div>

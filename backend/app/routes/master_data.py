@@ -261,7 +261,7 @@ async def get_sheet_data(
     if not model:
         raise HTTPException(404, "Table not found")
         
-    rows = db.query(model).all()
+    rows = db.query(model).order_by(model.id).all()
     
     # Convert SQLAlchemy objects to dicts
     result = []
@@ -377,7 +377,7 @@ def edit_row(
     
     if not record and row_index is not None:
         # Fallback to offset
-        record = db.query(model).offset(row_index).limit(1).first()
+        record = db.query(model).order_by(model.id).offset(row_index).limit(1).first()
 
     if not record:
         raise HTTPException(404, "Record not found")
@@ -435,7 +435,7 @@ def delete_row(
     # If row_index is actually the ID, use it directly. 
     # But usually frontend 'key' is index.
     # Let's try to find the ID from the offset if possible, or assume it's ID if large
-    record = db.query(model).offset(row_index).limit(1).first()
+    record = db.query(model).order_by(model.id).offset(row_index).limit(1).first()
     if record:
         db.delete(record)
         db.commit()

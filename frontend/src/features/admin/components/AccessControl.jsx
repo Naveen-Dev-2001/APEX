@@ -1,7 +1,6 @@
 import React from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
 import addIcon from '../../../assets/admin-icons/add-icon.png';
-import editIcon from '../../../assets/admin-icons/edit-icon.png';
-import deleteIcon from '../../../assets/admin-icons/delete-icon.png';
 import useAdminStore from '../../../store/useAdminStore';
 import TableSkeleton from '../../../components/ui/TableSkeleton';
 
@@ -89,18 +88,18 @@ const AccessControl = ({ roles, navigation, onAdd, onEdit, loading = false }) =>
                                 <div className="flex items-center justify-center gap-4">
                                     <button 
                                         onClick={() => onEdit(role)}
-                                        className="hover:opacity-70 transition-opacity"
+                                        className="text-gray-500 hover:text-gray-700 transition-colors p-1"
                                         title="Edit access"
                                     >
-                                        <img src={editIcon} alt="Edit" className="w-[18px]" />
+                                        <Pencil size={18} />
                                     </button>
                                     <button 
                                         onClick={() => handleRemove(role)}
                                         disabled={isUpdating || role === 'admin'}
-                                        className={`hover:opacity-70 transition-opacity ${role === 'admin' ? 'opacity-30 cursor-not-allowed grayscale' : ''}`}
+                                        className={`transition-colors p-1 ${role === 'admin' ? 'text-gray-300 cursor-not-allowed' : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
                                         title="Delete role"
                                     >
-                                        <img src={deleteIcon} alt="Delete" className="w-[18px]" />
+                                        <Trash2 size={18} />
                                     </button>
                                 </div>
                             </td>

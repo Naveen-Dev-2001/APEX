@@ -104,7 +104,6 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             id="entity_id"
                             value={form.entity_id}
                             onChange={handleChange('entity_id')}
-                            readOnly={isEdit}
                         />
                         <FormField
                             label="Entity Name"
