@@ -34,6 +34,17 @@ export const masterDataService = {
         return res.data;
     },
 
+    /** Upload an entity master file */
+    async uploadEntityMaster(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await API.post(`/master/upload`, formData, {
+            params: { tab_name: ENTITY_IDENTIFIER },
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return res.data;
+    },
+
     // ─── Vendor Master ───────────────────────────────────────────────────────
     /** Fetch all vendor master rows from DB */
     async getVendorMasterData() {
@@ -101,6 +112,17 @@ export const masterDataService = {
     async deleteTDSRateRow(rowIndex) {
         const res = await API.delete(`/master/sheet/${TDS_IDENTIFIER}/delete`, {
             params: { row_index: rowIndex },
+        });
+        return res.data;
+    },
+
+    /** Upload a TDS rates file */
+    async uploadTDSRatesData(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await API.post(`/master/upload`, formData, {
+            params: { tab_name: TDS_IDENTIFIER },
+            headers: { 'Content-Type': 'multipart/form-data' },
         });
         return res.data;
     },

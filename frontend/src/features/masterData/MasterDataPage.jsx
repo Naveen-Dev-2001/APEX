@@ -15,9 +15,9 @@ const MasterDataPage = () => {
         currentPage, setCurrentPage,
         itemsPerPage, setItemsPerPage,
         masters, getFilteredData,
-        fetchEntityMasterData, entityLoading, entityError,
+        fetchEntityMasterData, entityLoading, entityError, uploadEntityMaster,
         fetchVendorMasterData, vendorLoading, vendorError, uploadVendorMaster,
-        fetchTDSRatesData, tdsLoading, tdsError,
+        fetchTDSRatesData, tdsLoading, tdsError, uploadTDSRatesData,
         clearMasterData,
         addEntityRow, updateEntityRow, deleteEntityRow,
         addVendorRow, updateVendorRow, deleteVendorRow,
@@ -297,12 +297,17 @@ const MasterDataPage = () => {
         const files = e.target.files;
         if (files && files.length > 0) {
             try {
-                if (isVendorTab) {
+                if (isEntityTab) {
+                    await uploadEntityMaster(files[0]);
+                    toast.success('Entity Master reuploaded successfully');
+                } else if (isVendorTab) {
                     await uploadVendorMaster(files[0]);
+                    toast.success('Vendor Master reuploaded successfully');
                 } else if (isTDSTab) {
-                    toast.warning('Reupload not yet supported for TDS Rates.');
+                    await uploadTDSRatesData(files[0]);
+                    toast.success('TDS Rates reuploaded successfully');
                 } else {
-                    toast.info('Reupload only supported for Vendor Master currently.');
+                    toast.info('Reupload not supported for this tab yet.');
                 }
             } catch (err) {
                 toast.error('Upload failed: ' + (err.response?.data?.detail || err.message));

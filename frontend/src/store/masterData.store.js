@@ -177,6 +177,17 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
+    uploadEntityMaster: async (file) => {
+        set({ entityLoading: true, entityError: null });
+        try {
+            await masterDataService.uploadEntityMaster(file);
+            await get().fetchEntityMasterData();
+        } catch (err) {
+            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
     // ─── Vendor Master: Load from backend ────────────────────────────────────
     fetchVendorMasterData: async () => {
         set({ vendorLoading: true, vendorError: null });
@@ -216,6 +227,17 @@ const useMasterDataStore = create((set, get) => ({
         } catch (err) {
             console.error('[TDSRates] fetch failed', err);
             set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    uploadTDSRatesData: async (file) => {
+        set({ tdsLoading: true, tdsError: null });
+        try {
+            await masterDataService.uploadTDSRatesData(file);
+            await get().fetchTDSRatesData();
+        } catch (err) {
+            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+            throw err;
         }
     },
 
