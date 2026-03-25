@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/ui.store';
+import { useCommonStore } from '../store/common.store';
 import logo from '../assets/loandna_logo_dark.png';
 
 // Tab Icons
@@ -26,6 +27,8 @@ const Header = () => {
     const { activeTab, setActiveTab } = useUIStore();
     const logout = useAuthStore((state) => state.logout);
     const user = useAuthStore((state) => state.user);
+    const entity = useCommonStore((state) => state.entity);
+    const selectedEntityName = entity || sessionStorage.getItem('selected_entity') || 'consolidated analytics';
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -143,7 +146,9 @@ const Header = () => {
                             <div className="relative z-10 p-4">
                                 {/* Dropdown Header */}
                                 <div className="flex justify-between items-center mb-4">
-                                    <span className="text-[11px] font-bold text-[#333] tracking-tighter uppercase opacity-60 truncate mr-2">consolidated analytics</span>
+                                    <span className="text-[11px] font-bold text-[#333] tracking-tighter uppercase opacity-60 truncate mr-2">
+                                        {selectedEntityName}
+                                    </span>
                                     <button 
                                         onClick={handleLogout}
                                         className="text-[13px] text-[#ff5a5f] hover:text-red-600 font-semibold transition-colors shrink-0"

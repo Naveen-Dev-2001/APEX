@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/ui.store';
 import authBg from '../../assets/auth_background.png';
 import logo from '../../assets/loandna_logo_dark.png';
 import { useCommonStore } from '../../store/common.store';
+import useMasterDataStore from '../../store/masterData.store';
 
 const SelectEntityPage = () => {
   const navigate = useNavigate();
@@ -12,14 +13,25 @@ const SelectEntityPage = () => {
   const dropdownRef = useRef(null);
   const setEntity = useCommonStore((state) => state.setEntity)
 
-  // Mocked state for selected entity - will need to integrate with actual context later 
+  // State for selected entity display and dropdown visibility
   const [selectedEntity, setSelectedEntity] = useState('Select Entity');
   const [isSelectOpen, setIsSelectOpen] = useState(false);
 
-  const entities = [
-    { id: 1, name: 'consolidated analytics' },
-    // more entities can be added here
-  ];
+  const { masters, fetchEntityMasterData, entityLoading } = useMasterDataStore();
+  
+  // Get entities from store and format them
+  const entityData = masters['Entity Master']?.data || [];
+  const entities = entityData.map((entity, index) => ({
+    id: entity.id || index,
+    name: entity.entity_name,
+    displayName: entity.entity_name
+  }));
+
+  useEffect(() => {
+    if (entityData.length === 0) {
+      fetchEntityMasterData();
+    }
+  }, []);
 
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
@@ -33,7 +45,7 @@ const SelectEntityPage = () => {
   };
 
   const handleSelectEntity = (entity) => {
-    setSelectedEntity(entity.name);
+    setSelectedEntity(entity.displayName);
     setIsSelectOpen(false);
     setEntity(entity.name);
     sessionStorage.setItem('selected_entity', entity.name); // Save selected entity to session storage
@@ -140,7 +152,7 @@ const SelectEntityPage = () => {
                         className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
                         onClick={() => handleSelectEntity(entity)}
                       >
-                        {entity.name}
+                        {entity.displayName}
                       </button>
                     </li>
                   ))}
