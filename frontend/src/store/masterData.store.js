@@ -27,6 +27,10 @@ const useMasterDataStore = create((set, get) => ({
     lobLoading: false,
     lobError: null,
 
+    // Loading / error state for Department Master
+    departmentLoading: false,
+    departmentError: null,
+
     // Master data for all tabs
     masters: {
         'Entity Master': {
@@ -94,15 +98,11 @@ const useMasterDataStore = create((set, get) => ({
         },
         'Department Master': {
             columns: [
-                { header: 'Dept Code', accessor: 'deptCode', sortable: true },
-                { header: 'Dept Name', accessor: 'deptName', sortable: true },
-                { header: 'Head', accessor: 'head', sortable: true },
+                { header: 'Department ID', accessor: 'department_id', sortable: true },
+                { header: 'Department Name', accessor: 'department_name', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
-            data: [
-                { id: 1, deptCode: 'FIN', deptName: 'Finance', head: 'Robert Brown' },
-                { id: 2, deptCode: 'HR', deptName: 'Human Resources', head: 'Emily Davis' },
-            ],
+            data: [],
         },
         'Customer Master': {
             columns: [
@@ -303,6 +303,38 @@ const useMasterDataStore = create((set, get) => ({
             await get().fetchLOBMasterData();
         } catch (err) {
             set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    // ─── Department Master: Load from backend ─────────────────────────────────
+    fetchDepartmentMasterData: async () => {
+        set({ departmentLoading: true, departmentError: null });
+        try {
+            const rows = await masterDataService.getDepartmentMasterData();
+            set((state) => ({
+                departmentLoading: false,
+                masters: {
+                    ...state.masters,
+                    'Department Master': {
+                        ...state.masters['Department Master'],
+                        data: rows,
+                    },
+                },
+            }));
+        } catch (err) {
+            console.error('[DepartmentMaster] fetch failed', err);
+            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    uploadDepartmentMaster: async (file) => {
+        set({ departmentLoading: true, departmentError: null });
+        try {
+            await masterDataService.uploadDepartmentMaster(file);
+            await get().fetchDepartmentMasterData();
+        } catch (err) {
+            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
             throw err;
         }
     },
@@ -606,6 +638,49 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
+    // ─── Department Master: CRUD ──────────────────────────────────────────────
+    addDepartmentRow: async (formData) => {
+        set({ departmentLoading: true, departmentError: null });
+        try {
+            const payload = {
+                department_id: formData.department_id,
+                department_name: formData.department_name,
+            };
+            await masterDataService.addDepartmentRow(payload);
+            await get().fetchDepartmentMasterData();
+        } catch (err) {
+            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    updateDepartmentRow: async (formData, rowIndex) => {
+        set({ departmentLoading: true, departmentError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                department_id: formData.department_id,
+                department_name: formData.department_name,
+            };
+            await masterDataService.editDepartmentRow(rowIndex, payload);
+            await get().fetchDepartmentMasterData();
+        } catch (err) {
+            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    deleteDepartmentRow: async (rowIndex) => {
+        set({ departmentLoading: true, departmentError: null });
+        try {
+            await masterDataService.deleteDepartmentRow(rowIndex);
+            await get().fetchDepartmentMasterData();
+        } catch (err) {
+            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
     clearMasterData: async (tabIdentifier) => {
         await masterDataService.deleteTabData(tabIdentifier);
         if (tabIdentifier === 'Entity Master') await get().fetchEntityMasterData();
@@ -613,6 +688,7 @@ const useMasterDataStore = create((set, get) => ({
         else if (tabIdentifier === 'TDS Rates') await get().fetchTDSRatesData();
         else if (tabIdentifier === 'GL Master') await get().fetchGLMasterData();
         else if (tabIdentifier === 'LOB Master') await get().fetchLOBMasterData();
+        else if (tabIdentifier === 'Department Master') await get().fetchDepartmentMasterData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────

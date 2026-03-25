@@ -5,6 +5,7 @@ const VENDOR_IDENTIFIER = 'Vendor_Master';
 const TDS_IDENTIFIER = 'TDS_Rates';
 const GL_IDENTIFIER = 'GL';
 const LOB_IDENTIFIER = 'LOB';
+const DEPARTMENT_IDENTIFIER = 'Department';
 
 export const masterDataService = {
     /** Fetch all entity master rows from DB */
@@ -211,13 +212,55 @@ export const masterDataService = {
         return res.data;
     },
 
+    // ─── Department Master ──────────────────────────────────────────────────
+    /** Fetch all Department master rows from DB */
+    async getDepartmentMasterData() {
+        const res = await API.get(`/master/sheet/${DEPARTMENT_IDENTIFIER}`);
+        return res.data;
+    },
+
+    /** Add a new Department master row */
+    async addDepartmentRow(newRow) {
+        const res = await API.post(`/master/sheet/${DEPARTMENT_IDENTIFIER}/add`, { new_row: newRow });
+        return res.data;
+    },
+
+    /** Edit an existing Department master row */
+    async editDepartmentRow(rowIndex, updatedRow) {
+        const res = await API.patch(`/master/sheet/${DEPARTMENT_IDENTIFIER}/edit`, {
+            row_index: rowIndex,
+            updated_row: updatedRow,
+        });
+        return res.data;
+    },
+
+    /** Delete a Department row */
+    async deleteDepartmentRow(rowIndex) {
+        const res = await API.delete(`/master/sheet/${DEPARTMENT_IDENTIFIER}/delete`, {
+            params: { row_index: rowIndex },
+        });
+        return res.data;
+    },
+
+    /** Upload a Department master file */
+    async uploadDepartmentMaster(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await API.post(`/master/upload`, formData, {
+            params: { tab_name: DEPARTMENT_IDENTIFIER },
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return res.data;
+    },
+
     /** Delete all data for a specific tab */
     async deleteTabData(tabName) {
         const identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER 
                         : tabName === 'Vendor Master' ? VENDOR_IDENTIFIER 
                         : tabName === 'TDS Rates' ? TDS_IDENTIFIER 
                         : tabName === 'GL Master' ? GL_IDENTIFIER 
-                        : tabName === 'LOB Master' ? LOB_IDENTIFIER : tabName;
+                        : tabName === 'LOB Master' ? LOB_IDENTIFIER 
+                        : tabName === 'Department Master' ? DEPARTMENT_IDENTIFIER : tabName;
         const res = await API.delete(`/master/files/${identifier}`);
         return res.data;
     },
