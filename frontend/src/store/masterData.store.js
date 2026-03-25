@@ -158,6 +158,46 @@ const useMasterDataStore = create((set, get) => ({
     setCurrentPage: (page) => set({ currentPage: page }),
     setItemsPerPage: (items) => set({ itemsPerPage: items, currentPage: 1 }),
 
+    // Entity Master CRUD
+    addEntityRow: (row) => set((state) => {
+        const existing = state.masters['Entity Master'];
+        return {
+            masters: {
+                ...state.masters,
+                'Entity Master': {
+                    ...existing,
+                    data: [...existing.data, { ...row, id: Date.now() }]
+                }
+            }
+        };
+    }),
+
+    updateEntityRow: (updatedRow) => set((state) => {
+        const existing = state.masters['Entity Master'];
+        return {
+            masters: {
+                ...state.masters,
+                'Entity Master': {
+                    ...existing,
+                    data: existing.data.map((r) => r.id === updatedRow.id ? { ...r, ...updatedRow } : r)
+                }
+            }
+        };
+    }),
+
+    deleteEntityRow: (id) => set((state) => {
+        const existing = state.masters['Entity Master'];
+        return {
+            masters: {
+                ...state.masters,
+                'Entity Master': {
+                    ...existing,
+                    data: existing.data.filter((r) => r.id !== id)
+                }
+            }
+        };
+    }),
+
     getFilteredData: () => {
         const { activeTab, searchQuery, masters } = get();
         const master = masters[activeTab];

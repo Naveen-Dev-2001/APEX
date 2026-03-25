@@ -32,8 +32,8 @@ function App() {
             <Route path="/" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/login" element={<LoginPage />} />
-          <Route path="/test-date-picker" element={<TestDatePicker />} />
-          {/* <Route path="/signup" element={<SignupForm />} />
+            <Route path="/test-date-picker" element={<TestDatePicker />} />
+            {/* <Route path="/signup" element={<SignupForm />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
           </Route>

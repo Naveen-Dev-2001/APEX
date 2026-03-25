@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Search, Trash2, Upload, Plus, Pencil } from 'lucide-react';
 import useMasterDataStore from '../../store/masterData.store';
 import DataTable from '../../components/ui/DataTable';
+import EntityMasterModal from './EntityMasterModal';
 
 const MasterDataPage = () => {
     const {
@@ -9,28 +10,60 @@ const MasterDataPage = () => {
         searchQuery, setSearchQuery,
         currentPage, setCurrentPage,
         itemsPerPage, setItemsPerPage,
-        masters, getFilteredData
+        masters, getFilteredData,
+        addEntityRow, updateEntityRow, deleteEntityRow,
     } = useMasterDataStore();
+
+    const [modalState, setModalState] = useState({ open: false, mode: 'add', rowData: null });
 
     const filteredData = getFilteredData();
     const currentMaster = masters[activeTab];
     const tabs = Object.keys(masters);
 
+    const isEntityTab = activeTab === 'Entity Master';
+
+    // Open modal helpers
+    const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null });
+    const openEdit = (row) => setModalState({ open: true, mode: 'edit', rowData: row });
+    const closeModal = () => setModalState({ open: false, mode: 'add', rowData: null });
+
+    const handleSave = (formData) => {
+        if (modalState.mode === 'edit') {
+            updateEntityRow(formData);
+        } else {
+            addEntityRow(formData);
+        }
+    };
+
+    const handleDelete = (row) => {
+        if (window.confirm(`Delete entity "${row.entityName}"?`)) {
+            deleteEntityRow(row.id);
+        }
+    };
+
     // Prepare columns for DataTable
-    const columns = (currentMaster?.columns || []).map(col => {
+    const columns = (currentMaster?.columns || []).map((col) => {
         if (col.accessor === 'actions') {
             return {
                 ...col,
                 render: (_, row) => (
                     <div className="flex items-center gap-3">
-                        <button className="text-gray-400 hover:text-blue-500 transition-colors">
-                            <Pencil size={18} />
+                        <button
+                            title="Edit"
+                            onClick={() => isEntityTab && openEdit(row)}
+                            className="text-gray-400 hover:text-blue-500 transition-colors"
+                        >
+                            <Pencil size={16} />
                         </button>
-                        <button className="text-gray-400 hover:text-red-500 transition-colors">
-                            <Trash2 size={18} />
+                        <button
+                            title="Delete"
+                            onClick={() => isEntityTab && handleDelete(row)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                            <Trash2 size={16} />
                         </button>
                     </div>
-                )
+                ),
             };
         }
         return col;
@@ -91,7 +124,10 @@ const MasterDataPage = () => {
                     <Upload size={15} className="text-[#24A1DD]" />
                     <span>Reupload</span>
                 </button>
-                <button className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap">
+                <button
+                    onClick={isEntityTab ? openAdd : undefined}
+                    className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
+                >
                     <Plus size={16} />
                     <span>Add New</span>
                 </button>
@@ -109,9 +145,18 @@ const MasterDataPage = () => {
                     onItemsPerPageChange={setItemsPerPage}
                 />
             </div>
+
+            {/* Entity Master Modal */}
+            {modalState.open && isEntityTab && (
+                <EntityMasterModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSave={handleSave}
+                />
+            )}
         </div>
     );
 };
 
 export default MasterDataPage;
-
