@@ -15,6 +15,10 @@ const useMasterDataStore = create((set, get) => ({
     vendorLoading: false,
     vendorError: null,
 
+    // Loading / error state for TDS Rates
+    tdsLoading: false,
+    tdsError: null,
+
     // Master data for all tabs
     masters: {
         'Entity Master': {
@@ -66,17 +70,11 @@ const useMasterDataStore = create((set, get) => ({
         'TDS Rates': {
             columns: [
                 { header: 'Section', accessor: 'section', sortable: true },
-                { header: 'Nature of Payment', accessor: 'nature', sortable: true },
-                { header: 'Threshold', accessor: 'threshold', sortable: true },
-                { header: 'Individual Rate (%)', accessor: 'individualRate', sortable: true },
-                { header: 'Company Rate (%)', accessor: 'companyRate', sortable: true },
+                { header: 'Nature Of Payment', accessor: 'nature_of_payment', sortable: true },
+                { header: 'TDS Rate', accessor: 'tds_rate', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
-            data: [
-                { id: 1, section: '192', nature: 'Salary', threshold: '2.5L', individualRate: 'Slab', companyRate: 'N/A' },
-                { id: 2, section: '194C', nature: 'Contractor', threshold: '30K/1L', individualRate: '1', companyRate: '2' },
-                { id: 3, section: '194J', nature: 'Professional Fees', threshold: '30K', individualRate: '10', companyRate: '10' },
-            ],
+            data: [],
         },
         'GL Master': {
             columns: [
@@ -197,6 +195,27 @@ const useMasterDataStore = create((set, get) => ({
         } catch (err) {
             console.error('[VendorMaster] fetch failed', err);
             set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    // ─── TDS Rates: Load from backend ────────────────────────────────────────
+    fetchTDSRatesData: async () => {
+        set({ tdsLoading: true, tdsError: null });
+        try {
+            const rows = await masterDataService.getTDSRatesData();
+            set((state) => ({
+                tdsLoading: false,
+                masters: {
+                    ...state.masters,
+                    'TDS Rates': {
+                        ...state.masters['TDS Rates'],
+                        data: rows,
+                    },
+                },
+            }));
+        } catch (err) {
+            console.error('[TDSRates] fetch failed', err);
+            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
         }
     },
 
@@ -329,11 +348,38 @@ const useMasterDataStore = create((set, get) => ({
         await get().fetchVendorMasterData();
     },
 
+    // ─── TDS Rates: CRUD ─────────────────────────────────────────────────────
+    addTDSRateRow: async (formData) => {
+        const payload = {
+            section: formData.section,
+            nature_of_payment: formData.nature_of_payment,
+            tds_rate: formData.tds_rate,
+        };
+        await masterDataService.addTDSRateRow(payload);
+        await get().fetchTDSRatesData();
+    },
+
+    updateTDSRateRow: async (formData, rowIndex) => {
+        const payload = {
+            id: formData.id,
+            section: formData.section,
+            nature_of_payment: formData.nature_of_payment,
+            tds_rate: formData.tds_rate,
+        };
+        await masterDataService.editTDSRateRow(rowIndex, payload);
+        await get().fetchTDSRatesData();
+    },
+
+    deleteTDSRateRow: async (rowIndex) => {
+        await masterDataService.deleteTDSRateRow(rowIndex);
+        await get().fetchTDSRatesData();
+    },
+
     clearMasterData: async (tabIdentifier) => {
-        const identifier = tabIdentifier === 'Entity Master' ? 'Entity_Master' : 'Vendor_Master';
-        await masterDataService.deleteTabData(identifier);
+        await masterDataService.deleteTabData(tabIdentifier);
         if (tabIdentifier === 'Entity Master') await get().fetchEntityMasterData();
-        else await get().fetchVendorMasterData();
+        else if (tabIdentifier === 'Vendor Master') await get().fetchVendorMasterData();
+        else if (tabIdentifier === 'TDS Rates') await get().fetchTDSRatesData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────

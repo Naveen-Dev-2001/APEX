@@ -4,6 +4,7 @@ import useMasterDataStore from '../../store/masterData.store';
 import DataTable from '../../components/ui/DataTable';
 import EntityMasterModal from './EntityMasterModal';
 import VendorMasterModal from './VendorMasterModal';
+import TDSRatesModal from './TDSRatesModal';
 
 const MasterDataPage = () => {
     const {
@@ -14,9 +15,11 @@ const MasterDataPage = () => {
         masters, getFilteredData,
         fetchEntityMasterData, entityLoading, entityError,
         fetchVendorMasterData, vendorLoading, vendorError, uploadVendorMaster,
+        fetchTDSRatesData, tdsLoading, tdsError,
         clearMasterData,
         addEntityRow, updateEntityRow, deleteEntityRow,
         addVendorRow, updateVendorRow, deleteVendorRow,
+        addTDSRateRow, updateTDSRateRow, deleteTDSRateRow,
     } = useMasterDataStore();
 
     const [modalState, setModalState] = useState({ open: false, mode: 'add', rowData: null, rowIndex: null });
@@ -26,6 +29,7 @@ const MasterDataPage = () => {
     const tabs = Object.keys(masters);
     const isEntityTab = activeTab === 'Entity Master';
     const isVendorTab = activeTab === 'Vendor Master';
+    const isTDSTab = activeTab === 'TDS Rates';
 
     // Fetch data on mount or tab change
     useEffect(() => {
@@ -33,8 +37,10 @@ const MasterDataPage = () => {
             fetchEntityMasterData();
         } else if (isVendorTab) {
             fetchVendorMasterData();
+        } else if (isTDSTab) {
+            fetchTDSRatesData();
         }
-    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, isEntityTab, isVendorTab]);
+    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, isEntityTab, isVendorTab, isTDSTab]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
@@ -70,6 +76,12 @@ const MasterDataPage = () => {
                 } else {
                     await addVendorRow(formData);
                 }
+            } else if (isTDSTab) {
+                if (modalState.mode === 'edit') {
+                    await updateTDSRateRow(formData, modalState.rowIndex);
+                } else {
+                    await addTDSRateRow(formData);
+                }
             }
             closeModal();
         } catch (err) {
@@ -90,6 +102,8 @@ const MasterDataPage = () => {
                     await deleteEntityRow(indexToDelete);
                 } else if (isVendorTab) {
                     await deleteVendorRow(indexToDelete);
+                } else if (isTDSTab) {
+                    await deleteTDSRateRow(indexToDelete);
                 }
             } catch (err) {
                 alert('Failed to delete: ' + (err.response?.data?.detail || err.message));
@@ -116,14 +130,14 @@ const MasterDataPage = () => {
                 render: (_, row, index) => (
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={() => (isEntityTab || isVendorTab) && openEdit(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab || isTDSTab) && openEdit(row, index)}
                             className="flex items-center gap-1.5 text-[#24a0ed] hover:text-[#1D71AB] transition-colors font-medium text-[13px]"
                         >
                             <Pencil size={15} />
                             <span>Edit</span>
                         </button>
                         <button
-                            onClick={() => (isEntityTab || isVendorTab) && handleDelete(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab || isTDSTab) && handleDelete(row, index)}
                             className="flex items-center gap-1.5 text-[#ff4d4f] hover:text-[#d32f2f] transition-colors font-medium text-[13px]"
                         >
                             <Trash2 size={15} />
@@ -255,6 +269,8 @@ const MasterDataPage = () => {
             try {
                 if (isVendorTab) {
                     await uploadVendorMaster(files[0]);
+                } else if (isTDSTab) {
+                    alert('Reupload not yet supported for TDS Rates.');
                 } else {
                     alert('Reupload only supported for Vendor Master currently.');
                 }
@@ -333,7 +349,7 @@ const MasterDataPage = () => {
                     <span>Reupload</span>
                 </button>
                 <button
-                    onClick={(isEntityTab || isVendorTab) ? openAdd : undefined}
+                    onClick={(isEntityTab || isVendorTab || isTDSTab) ? openAdd : undefined}
                     className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
                 >
                     <Plus size={16} />
@@ -343,7 +359,7 @@ const MasterDataPage = () => {
 
             {/* Table Area */}
             <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative min-h-[400px]">
-                {(entityError && isEntityTab) || (vendorError && isVendorTab) ? (
+                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -351,10 +367,14 @@ const MasterDataPage = () => {
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900">Failed to load data</h3>
-                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError}</p>
+                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError || tdsError}</p>
                             </div>
                             <button
-                                onClick={() => isEntityTab ? fetchEntityMasterData() : fetchVendorMasterData()}
+                                onClick={() => {
+                                    if (isEntityTab) fetchEntityMasterData();
+                                    else if (isVendorTab) fetchVendorMasterData();
+                                    else if (isTDSTab) fetchTDSRatesData();
+                                }}
                                 className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-all"
                             >
                                 Try Again
@@ -369,7 +389,7 @@ const MasterDataPage = () => {
                             <DataTable
                                 columns={columns}
                                 data={filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
-                                loading={isEntityTab ? entityLoading : vendorLoading}
+                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : tdsLoading}
                                 skeletonRows={itemsPerPage}
                                 totalItems={filteredData.length}
                                 currentPage={currentPage}
@@ -395,6 +415,16 @@ const MasterDataPage = () => {
             {/* Vendor Master Modal */}
             {modalState.open && isVendorTab && (
                 <VendorMasterModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSave={handleSave}
+                />
+            )}
+
+            {/* TDS Rates Modal */}
+            {modalState.open && isTDSTab && (
+                <TDSRatesModal
                     mode={modalState.mode}
                     rowData={modalState.rowData}
                     onClose={closeModal}

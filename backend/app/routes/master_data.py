@@ -296,16 +296,6 @@ async def get_sheet_data(
                     row_dict[pretty_map[column.name]] = pretty_val
                     continue
 
-            if identifier == "TDS_Rates" or identifier == "tds_rates":
-                pretty_map = {
-                    "section": "Section",
-                    "nature_of_payment": "Nature of Payment",
-                    "tds_rate": "TDS Rate"
-                }
-                if column.name in pretty_map:
-                    row_dict[pretty_map[column.name]] = val
-                    continue
-
             row_dict[column.name] = val
         result.append(row_dict)
         
@@ -337,6 +327,13 @@ def add_row(
             "TDS Section Code and Description": "tds_section_code",
             "Workflow Applicability Configuration": "workflow_applicable",
             "Line Grouping": "line_grouping"
+        }
+    elif identifier in ["TDS_Rates", "tds_rates"]:
+        reverse_map = {
+            "Section": "section",
+            "Nature Of Payment": "nature_of_payment",
+            "Nature of Payment": "nature_of_payment",
+            "TDS Rate": "tds_rate"
         }
     
     final_data = {}
@@ -395,6 +392,13 @@ def edit_row(
             "TDS Section Code and Description": "tds_section_code",
             "Workflow Applicability Configuration": "workflow_applicable",
             "Line Grouping": "line_grouping"
+        }
+    elif identifier in ["TDS_Rates", "tds_rates"]:
+        reverse_map = {
+            "Section": "section",
+            "Nature Of Payment": "nature_of_payment",
+            "Nature of Payment": "nature_of_payment",
+            "TDS Rate": "tds_rate"
         }
         
     for k, v in updated_data.items():

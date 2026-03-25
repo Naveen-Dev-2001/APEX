@@ -2,6 +2,7 @@ import API from "./api";
 
 const ENTITY_IDENTIFIER = 'Entity_Master';
 const VENDOR_IDENTIFIER = 'Vendor_Master';
+const TDS_IDENTIFIER = 'TDS_Rates';
 
 export const masterDataService = {
     /** Fetch all entity master rows from DB */
@@ -74,9 +75,42 @@ export const masterDataService = {
         return res.data;
     },
 
+    // ─── TDS Rates ──────────────────────────────────────────────────────────
+    /** Fetch all TDS rates from DB */
+    async getTDSRatesData() {
+        const res = await API.get(`/master/sheet/${TDS_IDENTIFIER}`);
+        return res.data;
+    },
+
+    /** Add a new TDS rate row */
+    async addTDSRateRow(newRow) {
+        const res = await API.post(`/master/sheet/${TDS_IDENTIFIER}/add`, { new_row: newRow });
+        return res.data;
+    },
+
+    /** Edit an existing TDS rate row */
+    async editTDSRateRow(rowIndex, updatedRow) {
+        const res = await API.patch(`/master/sheet/${TDS_IDENTIFIER}/edit`, {
+            row_index: rowIndex,
+            updated_row: updatedRow,
+        });
+        return res.data;
+    },
+
+    /** Delete a TDS rate row */
+    async deleteTDSRateRow(rowIndex) {
+        const res = await API.delete(`/master/sheet/${TDS_IDENTIFIER}/delete`, {
+            params: { row_index: rowIndex },
+        });
+        return res.data;
+    },
+
     /** Delete all data for a specific tab */
     async deleteTabData(tabName) {
-        const res = await API.delete(`/master/files/${tabName}`);
+        const identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER 
+                        : tabName === 'Vendor Master' ? VENDOR_IDENTIFIER 
+                        : tabName === 'TDS Rates' ? TDS_IDENTIFIER : tabName;
+        const res = await API.delete(`/master/files/${identifier}`);
         return res.data;
     },
 };
