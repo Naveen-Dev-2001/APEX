@@ -7,6 +7,7 @@ import DataTable from '../../components/ui/DataTable';
 import EntityMasterModal from './EntityMasterModal';
 import VendorMasterModal from './VendorMasterModal';
 import TDSRatesModal from './TDSRatesModal';
+import GLMasterModal from './GLMasterModal';
 
 const MasterDataPage = () => {
     const {
@@ -18,10 +19,12 @@ const MasterDataPage = () => {
         fetchEntityMasterData, entityLoading, entityError, uploadEntityMaster,
         fetchVendorMasterData, vendorLoading, vendorError, uploadVendorMaster,
         fetchTDSRatesData, tdsLoading, tdsError, uploadTDSRatesData,
+        fetchGLMasterData, glLoading, glError, uploadGLMaster,
         clearMasterData,
         addEntityRow, updateEntityRow, deleteEntityRow,
         addVendorRow, updateVendorRow, deleteVendorRow,
         addTDSRateRow, updateTDSRateRow, deleteTDSRateRow,
+        addGLRow, updateGLRow, deleteGLRow,
     } = useMasterDataStore();
     const { showConfirm } = useToastStore();
 
@@ -33,6 +36,7 @@ const MasterDataPage = () => {
     const isEntityTab = activeTab === 'Entity Master';
     const isVendorTab = activeTab === 'Vendor Master';
     const isTDSTab = activeTab === 'TDS Rates';
+    const isGLTab = activeTab === 'GL Master';
 
     // Fetch data on mount or tab change
     useEffect(() => {
@@ -42,8 +46,10 @@ const MasterDataPage = () => {
             fetchVendorMasterData();
         } else if (isTDSTab) {
             fetchTDSRatesData();
+        } else if (isGLTab) {
+            fetchGLMasterData();
         }
-    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, isEntityTab, isVendorTab, isTDSTab]);
+    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, fetchGLMasterData, isEntityTab, isVendorTab, isTDSTab, isGLTab]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
@@ -91,6 +97,14 @@ const MasterDataPage = () => {
                     await addTDSRateRow(formData);
                     toast.success('TDS Rate added successfully');
                 }
+            } else if (isGLTab) {
+                if (modalState.mode === 'edit') {
+                    await updateGLRow(formData, modalState.rowIndex);
+                    toast.success('GL Account updated successfully');
+                } else {
+                    await addGLRow(formData);
+                    toast.success('GL Account added successfully');
+                }
             }
             closeModal();
         } catch (err) {
@@ -120,6 +134,8 @@ const MasterDataPage = () => {
                         await deleteVendorRow(indexToDelete);
                     } else if (isTDSTab) {
                         await deleteTDSRateRow(indexToDelete);
+                    } else if (isGLTab) {
+                        await deleteGLRow(indexToDelete);
                     }
                     toast.dismiss(loadingToast);
                     toast.success(`${activeTab} deleted successfully`);
@@ -144,20 +160,31 @@ const MasterDataPage = () => {
                 )
             };
         }
+        if (col.accessor === 'require_department' || col.accessor === 'require_location') {
+            return {
+                ...col,
+                render: (val) => (
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
+                        ${val ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500'}`}>
+                        {val ? 'Yes' : 'No'}
+                    </span>
+                )
+            };
+        }
         if (col.accessor === 'actions') {
             return {
                 ...col,
                 render: (_, row, index) => (
                     <div className="flex items-center gap-4">
                         <button
-                            onClick={() => (isEntityTab || isVendorTab || isTDSTab) && openEdit(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab) && openEdit(row, index)}
                             className="text-gray-500 hover:text-gray-700 transition-colors p-1"
                             title="Edit"
                         >
                             <Pencil size={18} />
                         </button>
                         <button
-                            onClick={() => (isEntityTab || isVendorTab || isTDSTab) && handleDelete(row, index)}
+                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab) && handleDelete(row, index)}
                             className="text-[#ff4d4f] hover:text-[#d32f2f] transition-colors p-1"
                             title="Delete"
                         >
@@ -306,6 +333,9 @@ const MasterDataPage = () => {
                 } else if (isTDSTab) {
                     await uploadTDSRatesData(files[0]);
                     toast.success('TDS Rates reuploaded successfully');
+                } else if (isGLTab) {
+                    await uploadGLMaster(files[0]);
+                    toast.success('GL Master reuploaded successfully');
                 } else {
                     toast.info('Reupload not supported for this tab yet.');
                 }
@@ -384,7 +414,7 @@ const MasterDataPage = () => {
                     <span>Reupload</span>
                 </button>
                 <button
-                    onClick={(isEntityTab || isVendorTab || isTDSTab) ? openAdd : undefined}
+                    onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab) ? openAdd : undefined}
                     className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
                 >
                     <Plus size={16} />
@@ -394,7 +424,7 @@ const MasterDataPage = () => {
 
             {/* Table Area */}
             <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative min-h-[400px]">
-                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) ? (
+                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -402,13 +432,14 @@ const MasterDataPage = () => {
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900">Failed to load data</h3>
-                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError || tdsError}</p>
+                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError || tdsError || glError}</p>
                             </div>
                             <button
                                 onClick={() => {
                                     if (isEntityTab) fetchEntityMasterData();
                                     else if (isVendorTab) fetchVendorMasterData();
                                     else if (isTDSTab) fetchTDSRatesData();
+                                    else if (isGLTab) fetchGLMasterData();
                                 }}
                                 className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-all"
                             >
@@ -424,7 +455,7 @@ const MasterDataPage = () => {
                             <DataTable
                                 columns={columns}
                                 data={filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
-                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : tdsLoading}
+                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : glLoading}
                                 skeletonRows={itemsPerPage}
                                 totalItems={filteredData.length}
                                 currentPage={currentPage}
@@ -460,6 +491,15 @@ const MasterDataPage = () => {
             {/* TDS Rates Modal */}
             {modalState.open && isTDSTab && (
                 <TDSRatesModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSave={handleSave}
+                />
+            )}
+            {/* GL Master Modal */}
+            {modalState.open && isGLTab && (
+                <GLMasterModal
                     mode={modalState.mode}
                     rowData={modalState.rowData}
                     onClose={closeModal}

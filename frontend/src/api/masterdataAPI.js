@@ -3,6 +3,7 @@ import API from "./api";
 const ENTITY_IDENTIFIER = 'Entity_Master';
 const VENDOR_IDENTIFIER = 'Vendor_Master';
 const TDS_IDENTIFIER = 'TDS_Rates';
+const GL_IDENTIFIER = 'GL';
 
 export const masterDataService = {
     /** Fetch all entity master rows from DB */
@@ -127,11 +128,53 @@ export const masterDataService = {
         return res.data;
     },
 
+    // ─── GL Master ──────────────────────────────────────────────────────────
+    /** Fetch all GL master rows from DB */
+    async getGLMasterData() {
+        const res = await API.get(`/master/sheet/${GL_IDENTIFIER}`);
+        return res.data;
+    },
+
+    /** Add a new GL master row */
+    async addGLRow(newRow) {
+        const res = await API.post(`/master/sheet/${GL_IDENTIFIER}/add`, { new_row: newRow });
+        return res.data;
+    },
+
+    /** Edit an existing GL master row */
+    async editGLRow(rowIndex, updatedRow) {
+        const res = await API.patch(`/master/sheet/${GL_IDENTIFIER}/edit`, {
+            row_index: rowIndex,
+            updated_row: updatedRow,
+        });
+        return res.data;
+    },
+
+    /** Delete a GL row */
+    async deleteGLRow(rowIndex) {
+        const res = await API.delete(`/master/sheet/${GL_IDENTIFIER}/delete`, {
+            params: { row_index: rowIndex },
+        });
+        return res.data;
+    },
+
+    /** Upload a GL master file */
+    async uploadGLMaster(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await API.post(`/master/upload`, formData, {
+            params: { tab_name: GL_IDENTIFIER },
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return res.data;
+    },
+
     /** Delete all data for a specific tab */
     async deleteTabData(tabName) {
         const identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER 
                         : tabName === 'Vendor Master' ? VENDOR_IDENTIFIER 
-                        : tabName === 'TDS Rates' ? TDS_IDENTIFIER : tabName;
+                        : tabName === 'TDS Rates' ? TDS_IDENTIFIER 
+                        : tabName === 'GL Master' ? GL_IDENTIFIER : tabName;
         const res = await API.delete(`/master/files/${identifier}`);
         return res.data;
     },

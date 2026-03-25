@@ -19,6 +19,10 @@ const useMasterDataStore = create((set, get) => ({
     tdsLoading: false,
     tdsError: null,
 
+    // Loading / error state for GL Master
+    glLoading: false,
+    glError: null,
+
     // Master data for all tabs
     masters: {
         'Entity Master': {
@@ -65,16 +69,15 @@ const useMasterDataStore = create((set, get) => ({
         },
         'GL Master': {
             columns: [
-                { header: 'GL Code', accessor: 'glCode', sortable: true },
-                { header: 'GL Name', accessor: 'glName', sortable: true },
-                { header: 'Type', accessor: 'type', sortable: true },
-                { header: 'Sub-Type', accessor: 'subType', sortable: true },
+                { header: 'Account Number', accessor: 'account_number', sortable: true },
+                { header: 'Title', accessor: 'title', sortable: true },
+                { header: 'Normal Balance', accessor: 'normal_balance', sortable: true },
+                { header: 'Require Dept', accessor: 'require_department', sortable: true },
+                { header: 'Require Loc', accessor: 'require_location', sortable: true },
+                { header: 'Closing Type', accessor: 'period_end_closing_type', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
-            data: [
-                { id: 1, glCode: '400010', glName: 'Travel Expenses', type: 'Expense', subType: 'Operating' },
-                { id: 2, glCode: '400020', glName: 'Office Rent', type: 'Expense', subType: 'Fixed' },
-            ],
+            data: [],
         },
         'LOB Master': {
             columns: [
@@ -235,6 +238,38 @@ const useMasterDataStore = create((set, get) => ({
             await get().fetchVendorMasterData();
         } catch (err) {
             set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    // ─── GL Master: Load from backend ────────────────────────────────────────
+    fetchGLMasterData: async () => {
+        set({ glLoading: true, glError: null });
+        try {
+            const rows = await masterDataService.getGLMasterData();
+            set((state) => ({
+                glLoading: false,
+                masters: {
+                    ...state.masters,
+                    'GL Master': {
+                        ...state.masters['GL Master'],
+                        data: rows,
+                    },
+                },
+            }));
+        } catch (err) {
+            console.error('[GLMaster] fetch failed', err);
+            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    uploadGLMaster: async (file) => {
+        set({ glLoading: true, glError: null });
+        try {
+            await masterDataService.uploadGLMaster(file);
+            await get().fetchGLMasterData();
+        } catch (err) {
+            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
             throw err;
         }
     },
@@ -436,11 +471,69 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
+    // ─── GL Master: CRUD ─────────────────────────────────────────────────────
+    addGLRow: async (formData) => {
+        set({ glLoading: true, glError: null });
+        try {
+            const payload = {
+                account_number: formData.account_number,
+                title: formData.title,
+                normal_balance: formData.normal_balance,
+                require_department: formData.require_department,
+                require_location: formData.require_location,
+                period_end_closing_type: formData.period_end_closing_type,
+                close_into_account: formData.close_into_account,
+                disallow_direct_posting: formData.disallow_direct_posting,
+                internal_rate: formData.internal_rate,
+            };
+            await masterDataService.addGLRow(payload);
+            await get().fetchGLMasterData();
+        } catch (err) {
+            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    updateGLRow: async (formData, rowIndex) => {
+        set({ glLoading: true, glError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                account_number: formData.account_number,
+                title: formData.title,
+                normal_balance: formData.normal_balance,
+                require_department: formData.require_department,
+                require_location: formData.require_location,
+                period_end_closing_type: formData.period_end_closing_type,
+                close_into_account: formData.close_into_account,
+                disallow_direct_posting: formData.disallow_direct_posting,
+                internal_rate: formData.internal_rate,
+            };
+            await masterDataService.editGLRow(rowIndex, payload);
+            await get().fetchGLMasterData();
+        } catch (err) {
+            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    deleteGLRow: async (rowIndex) => {
+        set({ glLoading: true, glError: null });
+        try {
+            await masterDataService.deleteGLRow(rowIndex);
+            await get().fetchGLMasterData();
+        } catch (err) {
+            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
     clearMasterData: async (tabIdentifier) => {
         await masterDataService.deleteTabData(tabIdentifier);
         if (tabIdentifier === 'Entity Master') await get().fetchEntityMasterData();
         else if (tabIdentifier === 'Vendor Master') await get().fetchVendorMasterData();
         else if (tabIdentifier === 'TDS Rates') await get().fetchTDSRatesData();
+        else if (tabIdentifier === 'GL Master') await get().fetchGLMasterData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────
