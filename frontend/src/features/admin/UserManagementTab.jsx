@@ -113,6 +113,7 @@ const UserManagementTab = ({ onEdit }) => {
             <DataTable
                 columns={columns}
                 data={paginatedUsers}
+                loading={loading}
                 totalItems={displayUsers.length}
                 currentPage={currentPage}
                 itemsPerPage={itemsPerPage}

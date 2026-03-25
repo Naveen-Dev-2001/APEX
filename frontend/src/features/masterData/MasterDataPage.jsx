@@ -116,18 +116,18 @@ const MasterDataPage = () => {
                 render: (_, row, index) => (
                     <div className="flex items-center gap-3">
                         <button
-                            title="Edit"
                             onClick={() => (isEntityTab || isVendorTab) && openEdit(row, index)}
-                            className="text-gray-400 hover:text-blue-500 transition-colors"
+                            className="flex items-center gap-1.5 text-[#24a0ed] hover:text-[#1D71AB] transition-colors font-medium text-[13px]"
                         >
-                            <Pencil size={18} />
+                            <Pencil size={15} />
+                            <span>Edit</span>
                         </button>
                         <button
-                            title="Delete"
                             onClick={() => (isEntityTab || isVendorTab) && handleDelete(row, index)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            className="flex items-center gap-1.5 text-[#ff4d4f] hover:text-[#d32f2f] transition-colors font-medium text-[13px]"
                         >
-                            <Trash2 size={18} />
+                            <Trash2 size={15} />
+                            <span>Delete</span>
                         </button>
                     </div>
                 ),
@@ -343,16 +343,7 @@ const MasterDataPage = () => {
 
             {/* Table Area */}
             <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative min-h-[400px]">
-                {((entityLoading && isEntityTab) || (vendorLoading && isVendorTab)) ? (
-                    <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center backdrop-blur-[1px]">
-                        <div className="flex flex-col items-center gap-3">
-                            <Loader2 className="w-8 h-8 text-[#1D71AB] animate-spin" />
-                            <span className="text-sm font-medium text-gray-500">Loading master data...</span>
-                        </div>
-                    </div>
-                ) : null}
-
-                {((entityError && isEntityTab) || (vendorError && isVendorTab)) ? (
+                {(entityError && isEntityTab) || (vendorError && isVendorTab) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -372,12 +363,14 @@ const MasterDataPage = () => {
                     </div>
                 ) : (
                     <>
-                        {isVendorTab && currentMaster?.data?.length === 0 ? (
+                        {isVendorTab && currentMaster?.data?.length === 0 && !vendorLoading ? (
                             <VendorUploadView />
                         ) : (
                             <DataTable
                                 columns={columns}
                                 data={filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+                                loading={isEntityTab ? entityLoading : vendorLoading}
+                                skeletonRows={itemsPerPage}
                                 totalItems={filteredData.length}
                                 currentPage={currentPage}
                                 itemsPerPage={itemsPerPage}

@@ -213,6 +213,7 @@ const DelegationsTab = () => {
                 <DataTable
                     columns={columns}
                     data={paginatedDelegations}
+                    loading={loading}
                     totalItems={displayDelegations.length}
                     currentPage={currentPage}
                     itemsPerPage={itemsPerPage}

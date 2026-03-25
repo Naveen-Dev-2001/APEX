@@ -1,8 +1,11 @@
 import React from 'react';
+import TableSkeleton from './TableSkeleton';
 
 const DataTable = ({ 
   columns, 
   data, 
+  loading = false,
+  skeletonRows = 8,
   totalItems, 
   itemsPerPageOptions = [15, 30, 50],
   onPageChange,
@@ -12,6 +15,9 @@ const DataTable = ({
   sortColumn,
   sortDirection
 }) => {
+    if (loading) {
+        return <TableSkeleton rowCount={skeletonRows} columnCount={columns.length} />;
+    }
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
     const endItem = Math.min(currentPage * itemsPerPage, totalItems);
@@ -57,10 +63,13 @@ const DataTable = ({
                         <tr>
                             {columns.map((col, idx) => {
                                 const isSortedColumn = sortColumn === col.accessor;
+                                const isLastColumn = idx === columns.length - 1;
                                 return (
                                     <th 
                                         key={idx} 
-                                        className={`px-5 py-3 font-medium whitespace-nowrap border-b border-gray-200 ${col.sortable ? 'cursor-pointer select-none hover:bg-[#1a669a]' : ''}`}
+                                        className={`px-5 py-3 font-medium whitespace-nowrap border-b border-gray-200 
+                                            ${col.sortable ? 'cursor-pointer select-none hover:bg-[#1a669a]' : ''}
+                                            ${isLastColumn ? 'sticky right-0 bg-[#1D71AB] z-10 shadow-[-12px_1px_12px_-8px_rgba(0,0,0,0.3)]' : ''}`}
                                         onClick={() => col.sortable && col.onClick ? col.onClick() : null}
                                     >
                                         <div className="flex items-center gap-2">
@@ -79,12 +88,19 @@ const DataTable = ({
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {data.map((row, rowIdx) => (
-                            <tr key={rowIdx} className="hover:bg-gray-50 transition-colors">
-                                {columns.map((col, colIdx) => (
-                                    <td key={colIdx} className="px-5 py-3.5 whitespace-nowrap border-r border-transparent last:border-none">
-                                        {col.render ? col.render(row[col.accessor], row) : row[col.accessor] || '-'}
-                                    </td>
-                                ))}
+                            <tr key={rowIdx} className="hover:bg-gray-50 transition-colors group">
+                                {columns.map((col, colIdx) => {
+                                    const isLastColumn = colIdx === columns.length - 1;
+                                    return (
+                                        <td 
+                                            key={colIdx} 
+                                            className={`px-5 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
+                                                ${isLastColumn ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}`}
+                                        >
+                                            {col.render ? col.render(row[col.accessor], row) : row[col.accessor] || '-'}
+                                        </td>
+                                    );
+                                })}
                             </tr>
                         ))}
                         {data.length === 0 && (

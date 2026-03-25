@@ -31,15 +31,18 @@ const useAdminStore = create((set, get) => ({
     },
 
     fetchSettings: async () => {
+        set({ loading: true });
         try {
             const data = await adminService.getSettings();
             set({ 
                 roles: data.roles || [], 
                 statuses: data.statuses || [],
-                navigation: data.navigation || []
+                navigation: data.navigation || [],
+                loading: false
             });
         } catch (error) {
             console.error("Failed to fetch settings", error);
+            set({ loading: false });
         }
     },
 

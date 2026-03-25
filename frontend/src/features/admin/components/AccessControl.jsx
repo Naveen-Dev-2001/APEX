@@ -3,9 +3,21 @@ import addIcon from '../../../assets/admin-icons/add-icon.png';
 import editIcon from '../../../assets/admin-icons/edit-icon.png';
 import deleteIcon from '../../../assets/admin-icons/delete-icon.png';
 import useAdminStore from '../../../store/useAdminStore';
+import TableSkeleton from '../../../components/ui/TableSkeleton';
 
-const AccessControl = ({ roles, navigation, onAdd, onEdit }) => {
+const AccessControl = ({ roles, navigation, onAdd, onEdit, loading = false }) => {
     const { removeRole, isUpdating } = useAdminStore();
+
+    if (loading) {
+        return (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden text-left">
+                <div className="px-6 py-4 flex justify-between items-center border-b border-gray-100">
+                    <div className="h-5 w-48 bg-gray-100 animate-pulse rounded"></div>
+                </div>
+                <TableSkeleton rowCount={3} columnCount={3} />
+            </div>
+        );
+    }
 
     const handleRemove = async (role) => {
         if (role === 'admin') {

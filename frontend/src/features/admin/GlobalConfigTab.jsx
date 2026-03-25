@@ -7,7 +7,7 @@ import AddRoleModal from './modals/AddRoleModal';
 import EditAccessModal from './modals/EditAccessModal';
 
 const GlobalConfigTab = () => {
-    const { fetchSettings, statuses, roles, navigation, isUpdating } = useAdminStore();
+    const { fetchSettings, statuses, roles, navigation, isUpdating, loading } = useAdminStore();
     const [modals, setModals] = useState({
         addStatus: false,
         addRole: false,
@@ -27,6 +27,7 @@ const GlobalConfigTab = () => {
             {/* Status Management Section */}
             <StatusManagement 
                 statuses={statuses} 
+                loading={loading}
                 onAdd={() => toggleModal('addStatus')} 
             />
 
@@ -34,6 +35,7 @@ const GlobalConfigTab = () => {
             <AccessControl 
                 roles={roles} 
                 navigation={navigation} 
+                loading={loading}
                 onAdd={() => toggleModal('addRole')}
                 onEdit={(role) => toggleModal('editAccess', role)}
             />

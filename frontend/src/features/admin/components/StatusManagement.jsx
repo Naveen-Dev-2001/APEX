@@ -1,9 +1,28 @@
 import React from 'react';
 import addIcon from '../../../assets/admin-icons/add-icon.png';
 import useAdminStore from '../../../store/useAdminStore';
+import Skeleton from '../../../components/ui/Skeleton';
 
-const StatusManagement = ({ statuses, onAdd }) => {
+const StatusManagement = ({ statuses, onAdd, loading = false }) => {
     const { removeStatus, isUpdating } = useAdminStore();
+
+    if (loading) {
+        return (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden text-left">
+                <div className="px-6 py-4 flex justify-between items-center border-b border-gray-100">
+                    <Skeleton variant="text" width="150px" className="h-5" />
+                </div>
+                <div className="bg-[#106fa4] py-2 px-6">
+                    <Skeleton variant="text" width="100px" className="bg-white/20" />
+                </div>
+                <div className="p-6 flex flex-wrap gap-3">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} variant="rect" width="80px" height="28px" className="rounded-full" />
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     const handleRemove = async (status) => {
         if (confirm(`Are you sure you want to remove the status "${status}"?`)) {
