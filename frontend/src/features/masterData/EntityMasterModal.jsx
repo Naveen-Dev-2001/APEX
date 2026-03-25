@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 const EMPTY_FORM = {
-    entityId: '',
-    entityName: '',
-    registeredAddress: '',
-    addressLine1: '',
-    addressLine2: '',
-    addressLine3: '',
+    id: null,
+    entity_id: '',
+    entity_name: '',
+    registered_address: '',
+    address_line1: '',
+    address_line2: '',
+    address_line3: '',
     city: '',
-    state: '',
-    zipCode: '',
-    countryCode: '',
-    gstApplicable: false,
+    state_or_territory: '',
+    zip_or_postal_code: '',
+    country_code: '',
 };
 
 const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '' }) => (
@@ -23,7 +23,7 @@ const FormField = ({ label, id, value, onChange, readOnly = false, placeholder =
         <input
             id={id}
             type="text"
-            value={value}
+            value={value || ''}
             onChange={onChange}
             readOnly={readOnly}
             placeholder={placeholder}
@@ -41,17 +41,17 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
     useEffect(() => {
         if (isEdit && rowData) {
             setForm({
-                entityId: rowData.entityId ?? '',
-                entityName: rowData.entityName ?? '',
-                registeredAddress: rowData.registeredAddress ?? rowData.address ?? '',
-                addressLine1: rowData.addressLine1 ?? '',
-                addressLine2: rowData.addressLine2 ?? '',
-                addressLine3: rowData.addressLine3 ?? '',
+                id: rowData.id ?? null,
+                entity_id: rowData.entity_id ?? '',
+                entity_name: rowData.entity_name ?? '',
+                registered_address: rowData.registered_address ?? '',
+                address_line1: rowData.address_line1 ?? '',
+                address_line2: rowData.address_line2 ?? '',
+                address_line3: rowData.address_line3 ?? '',
                 city: rowData.city ?? '',
-                state: rowData.state ?? '',
-                zipCode: rowData.zipCode ?? '',
-                countryCode: rowData.countryCode ?? '',
-                gstApplicable: rowData.gstApplicable ?? false,
+                state_or_territory: rowData.state_or_territory ?? '',
+                zip_or_postal_code: rowData.zip_or_postal_code ?? '',
+                country_code: rowData.country_code ?? '',
             });
         } else {
             setForm(EMPTY_FORM);
@@ -61,11 +61,8 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const handleChange = (field) => (e) =>
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-    const handleToggle = () =>
-        setForm((prev) => ({ ...prev, gstApplicable: !prev.gstApplicable }));
-
     const handleSave = () => {
-        onSave({ ...form, id: rowData?.id ?? Date.now() });
+        onSave(form);
         onClose();
     };
 
@@ -99,16 +96,16 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <FormField
                             label="Entity Id"
-                            id="entityId"
-                            value={form.entityId}
-                            onChange={handleChange('entityId')}
+                            id="entity_id"
+                            value={form.entity_id}
+                            onChange={handleChange('entity_id')}
                             readOnly={isEdit}
                         />
                         <FormField
                             label="Entity Name"
-                            id="entityName"
-                            value={form.entityName}
-                            onChange={handleChange('entityName')}
+                            id="entity_name"
+                            value={form.entity_name}
+                            onChange={handleChange('entity_name')}
                         />
                     </div>
 
@@ -116,15 +113,15 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <FormField
                             label="Registered Address"
-                            id="registeredAddress"
-                            value={form.registeredAddress}
-                            onChange={handleChange('registeredAddress')}
+                            id="registered_address"
+                            value={form.registered_address}
+                            onChange={handleChange('registered_address')}
                         />
                         <FormField
                             label="Address Line1"
-                            id="addressLine1"
-                            value={form.addressLine1}
-                            onChange={handleChange('addressLine1')}
+                            id="address_line1"
+                            value={form.address_line1}
+                            onChange={handleChange('address_line1')}
                         />
                     </div>
 
@@ -132,15 +129,15 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <FormField
                             label="Address Line2"
-                            id="addressLine2"
-                            value={form.addressLine2}
-                            onChange={handleChange('addressLine2')}
+                            id="address_line2"
+                            value={form.address_line2}
+                            onChange={handleChange('address_line2')}
                         />
                         <FormField
                             label="Address Line3"
-                            id="addressLine3"
-                            value={form.addressLine3}
-                            onChange={handleChange('addressLine3')}
+                            id="address_line3"
+                            value={form.address_line3}
+                            onChange={handleChange('address_line3')}
                         />
                     </div>
 
@@ -154,9 +151,9 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                         />
                         <FormField
                             label="State Or Territory"
-                            id="state"
-                            value={form.state}
-                            onChange={handleChange('state')}
+                            id="state_or_territory"
+                            value={form.state_or_territory}
+                            onChange={handleChange('state_or_territory')}
                         />
                     </div>
 
@@ -164,38 +161,16 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <FormField
                             label="Zip Or Postal Code"
-                            id="zipCode"
-                            value={form.zipCode}
-                            onChange={handleChange('zipCode')}
+                            id="zip_or_postal_code"
+                            value={form.zip_or_postal_code}
+                            onChange={handleChange('zip_or_postal_code')}
                         />
                         <FormField
                             label="Country Code"
-                            id="countryCode"
-                            value={form.countryCode}
-                            onChange={handleChange('countryCode')}
+                            id="country_code"
+                            value={form.country_code}
+                            onChange={handleChange('country_code')}
                         />
-                    </div>
-
-                    {/* GST Toggle */}
-                    <div className="flex flex-col gap-2">
-                        <label className="text-[13px] font-medium text-[#333333]">GST Applicable</label>
-                        <button
-                            type="button"
-                            onClick={handleToggle}
-                            className={`relative inline-flex items-center w-[56px] h-[26px] rounded-full transition-colors duration-200 focus:outline-none
-                                ${form.gstApplicable ? 'bg-[#1D71AB]' : 'bg-gray-300'}`}
-                        >
-                            <span
-                                className={`absolute left-[3px] top-[3px] w-5 h-5 bg-white rounded-full shadow transition-transform duration-200
-                                    ${form.gstApplicable ? 'translate-x-[30px]' : 'translate-x-0'}`}
-                            />
-                            <span
-                                className={`absolute text-[10px] font-semibold text-white transition-all duration-200
-                                    ${form.gstApplicable ? 'left-[6px]' : 'left-auto right-[5px] text-gray-100'}`}
-                            >
-                                {form.gstApplicable ? 'Yes' : 'No'}
-                            </span>
-                        </button>
                     </div>
                 </div>
 
