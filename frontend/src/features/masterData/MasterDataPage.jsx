@@ -12,6 +12,8 @@ const MasterDataPage = () => {
         itemsPerPage, setItemsPerPage,
         masters, getFilteredData,
         fetchEntityMasterData, entityLoading, entityError,
+        fetchVendorMasterData, vendorLoading, vendorError, uploadVendorMaster,
+        clearMasterData,
         addEntityRow, updateEntityRow, deleteEntityRow,
     } = useMasterDataStore();
 
@@ -21,13 +23,16 @@ const MasterDataPage = () => {
     const currentMaster = masters[activeTab];
     const tabs = Object.keys(masters);
     const isEntityTab = activeTab === 'Entity Master';
+    const isVendorTab = activeTab === 'Vendor Master';
 
     // Fetch data on mount or tab change
     useEffect(() => {
         if (isEntityTab) {
             fetchEntityMasterData();
+        } else if (isVendorTab) {
+            fetchVendorMasterData();
         }
-    }, [activeTab, fetchEntityMasterData, isEntityTab]);
+    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, isEntityTab, isVendorTab]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
@@ -114,6 +119,134 @@ const MasterDataPage = () => {
         }
         return col;
     });
+    
+    // Vendor Upload View Component
+    const VendorUploadView = () => {
+        const [isDragging, setIsDragging] = useState(false);
+        const fileInputRef = React.useRef(null);
+        
+        const handleDragOver = (e) => {
+            e.preventDefault();
+            setIsDragging(true);
+        };
+        
+        const handleDragLeave = () => {
+            setIsDragging(false);
+        };
+        
+        const handleDrop = async (e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                await onUpload(files[0]);
+            }
+        };
+        
+        const onUpload = async (file) => {
+            try {
+                await uploadVendorMaster(file);
+                // Success - fetchVendorMasterData will be called by store
+            } catch (err) {
+                alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+            }
+        };
+        
+        const handleFileSelect = async (e) => {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                await onUpload(files[0]);
+            }
+        };
+        
+        return (
+            <div className="flex flex-col items-center justify-center p-12 h-full min-h-[400px]">
+                <div 
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`w-full max-w-2xl border-2 border-dashed rounded-xl p-12 transition-all duration-200 flex flex-col items-center gap-6
+                        ${isDragging 
+                            ? 'border-[#24A1DD] bg-[#F0F9FF]' 
+                            : 'border-gray-200 bg-[#FAFAFA] hover:border-[#24A1DD] hover:bg-white'}`}
+                >
+                    <div className="w-20 h-20 rounded-full bg-[#EBF8FE] flex items-center justify-center">
+                        <Upload className="text-[#24A1DD]" size={36} />
+                    </div>
+                    
+                    <div className="text-center">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Vendor Master</h3>
+                        <p className="text-gray-500 max-w-md mx-auto">
+                            To start, please upload your Excel or CSV file containing vendor information. 
+                            The system will automatically extract and process the data.
+                        </p>
+                    </div>
+                    
+                    <div className="flex flex-col items-center gap-3 w-full">
+                        <input 
+                            type="file" 
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                            style={{ display: 'none' }}
+                            accept=".xls,.xlsx,.csv"
+                        />
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="bg-[#24A1DD] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#1D71AB] transition-all shadow-md flex items-center gap-2"
+                        >
+                            <Plus size={20} />
+                            Select File
+                        </button>
+                        <span className="text-sm text-gray-400">Supported formats: .xls, .xlsx, .csv</span>
+                    </div>
+                </div>
+                
+                <div className="mt-8 flex items-center gap-8">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[#24A1DD]" />
+                        <span className="text-xs font-medium text-gray-400 tracking-wider uppercase">1. Upload</span>
+                    </div>
+                    <div className="w-8 h-px bg-gray-200" />
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gray-200" />
+                        <span className="text-xs font-medium text-gray-400 tracking-wider uppercase">2. Validate</span>
+                    </div>
+                    <div className="w-8 h-px bg-gray-200" />
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gray-200" />
+                        <span className="text-xs font-medium text-gray-400 tracking-wider uppercase">3. Activate</span>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const reuploadInputRef = React.useRef(null);
+
+    const handleClearTab = async () => {
+        if (window.confirm(`Are you sure you want to clear all data in "${activeTab}"?`)) {
+            try {
+                await clearMasterData(activeTab);
+            } catch (err) {
+                alert('Failed to clear: ' + (err.response?.data?.detail || err.message));
+            }
+        }
+    };
+
+    const handleReuploadSelect = async (e) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            try {
+                if (isVendorTab) {
+                    await uploadVendorMaster(files[0]);
+                } else {
+                    alert('Reupload only supported for Vendor Master currently.');
+                }
+            } catch (err) {
+                alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+            }
+        }
+    };
 
     return (
         <div className="p-6 flex flex-col gap-6 w-full bg-[#FBFBFB] min-h-screen">
@@ -147,6 +280,15 @@ const MasterDataPage = () => {
 
                 <div className="flex-1" />
 
+                {/* Hidden Input for Reupload */}
+                <input 
+                    type="file" 
+                    ref={reuploadInputRef}
+                    onChange={handleReuploadSelect}
+                    style={{ display: 'none' }}
+                    accept=".xls,.xlsx,.csv"
+                />
+
                 {/* Search */}
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
@@ -160,11 +302,17 @@ const MasterDataPage = () => {
                 </div>
 
                 {/* Actions */}
-                <button className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-red-300 rounded-[4px] hover:bg-red-50 transition-all whitespace-nowrap">
+                <button 
+                    onClick={handleClearTab}
+                    className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-red-300 rounded-[4px] hover:bg-red-50 transition-all whitespace-nowrap"
+                >
                     <Trash2 size={15} className="text-red-500" />
                     <span>Clear Tab</span>
                 </button>
-                <button className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-[#24A1DD] rounded-[4px] hover:bg-[#F0F9FF] transition-all whitespace-nowrap">
+                <button 
+                    onClick={() => reuploadInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-[#24A1DD] rounded-[4px] hover:bg-[#F0F9FF] transition-all whitespace-nowrap"
+                >
                     <Upload size={15} className="text-[#24A1DD]" />
                     <span>Reupload</span>
                 </button>
@@ -179,7 +327,7 @@ const MasterDataPage = () => {
 
             {/* Table Area */}
             <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative min-h-[400px]">
-                {entityLoading && isEntityTab ? (
+                {((entityLoading && isEntityTab) || (vendorLoading && isVendorTab)) ? (
                     <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center backdrop-blur-[1px]">
                         <div className="flex flex-col items-center gap-3">
                             <Loader2 className="w-8 h-8 text-[#1D71AB] animate-spin" />
@@ -188,7 +336,7 @@ const MasterDataPage = () => {
                     </div>
                 ) : null}
 
-                {entityError && isEntityTab ? (
+                {((entityError && isEntityTab) || (vendorError && isVendorTab)) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -196,10 +344,10 @@ const MasterDataPage = () => {
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900">Failed to load data</h3>
-                                <p className="text-sm text-gray-500 mt-1">{entityError}</p>
+                                <p className="text-sm text-gray-500 mt-1">{entityError || vendorError}</p>
                             </div>
                             <button
-                                onClick={() => fetchEntityMasterData()}
+                                onClick={() => isEntityTab ? fetchEntityMasterData() : fetchVendorMasterData()}
                                 className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-all"
                             >
                                 Try Again
@@ -207,15 +355,21 @@ const MasterDataPage = () => {
                         </div>
                     </div>
                 ) : (
-                    <DataTable
-                        columns={columns}
-                        data={filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
-                        totalItems={filteredData.length}
-                        currentPage={currentPage}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={setCurrentPage}
-                        onItemsPerPageChange={setItemsPerPage}
-                    />
+                    <>
+                        {isVendorTab && currentMaster?.data?.length === 0 ? (
+                            <VendorUploadView />
+                        ) : (
+                            <DataTable
+                                columns={columns}
+                                data={filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+                                totalItems={filteredData.length}
+                                currentPage={currentPage}
+                                itemsPerPage={itemsPerPage}
+                                onPageChange={setCurrentPage}
+                                onItemsPerPageChange={setItemsPerPage}
+                            />
+                        )}
+                    </>
                 )}
             </div>
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { masterDataService } from '../api/api';
+import { masterDataService } from '../api/masterdataAPI';
 
 const useMasterDataStore = create((set, get) => ({
     activeTab: 'Entity Master',
@@ -10,6 +10,10 @@ const useMasterDataStore = create((set, get) => ({
     // Loading / error state for Entity Master
     entityLoading: false,
     entityError: null,
+
+    // Loading / error state for Vendor Master
+    vendorLoading: false,
+    vendorError: null,
 
     // Master data for all tabs
     masters: {
@@ -33,23 +37,19 @@ const useMasterDataStore = create((set, get) => ({
         },
         'Vendor Master': {
             columns: [
-                { header: 'Vendor ID', accessor: 'vendorId', sortable: true },
-                { header: 'Vendor Name', accessor: 'vendorName', sortable: true },
-                { header: 'Category', accessor: 'category', sortable: true },
-                { header: 'Email', accessor: 'email', sortable: true },
-                { header: 'Phone', accessor: 'phone', sortable: true },
-                { header: 'Status', accessor: 'status', sortable: true },
+                { header: 'Vendor ID', accessor: 'vendor_id', sortable: true },
+                { header: 'Vendor Name', accessor: 'vendor_name', sortable: true },
+                { header: 'Remit-to Vendor ID', accessor: 'remit_to_vendor_id', sortable: true },
+                { header: 'Street 1', accessor: 'street_1', sortable: true },
+                { header: 'City', accessor: 'city', sortable: true },
+                { header: 'State/Province', accessor: 'state_province', sortable: true },
+                { header: 'Zip/Postal Code', accessor: 'zip_postal_code', sortable: true },
+                { header: 'Country', accessor: 'country', sortable: true },
+                { header: 'Email ID', accessor: 'email_id', sortable: true },
+                { header: 'TDS Rate', accessor: 'TDS Rate', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
-            data: Array.from({ length: 30 }, (_, i) => ({
-                id: i + 1,
-                vendorId: `VEN-${500 + i}`,
-                vendorName: `Vendor ${i + 1}`,
-                category: i % 2 === 0 ? 'Supplies' : 'Services',
-                email: `vendor${i + 1}@example.com`,
-                phone: `+1-555-010${i}`,
-                status: i % 4 === 0 ? 'Inactive' : 'Active',
-            })),
+            data: [],
         },
         'Line Items': {
             columns: [
@@ -180,6 +180,38 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
+    // ─── Vendor Master: Load from backend ────────────────────────────────────
+    fetchVendorMasterData: async () => {
+        set({ vendorLoading: true, vendorError: null });
+        try {
+            const rows = await masterDataService.getVendorMasterData();
+            set((state) => ({
+                vendorLoading: false,
+                masters: {
+                    ...state.masters,
+                    'Vendor Master': {
+                        ...state.masters['Vendor Master'],
+                        data: rows,
+                    },
+                },
+            }));
+        } catch (err) {
+            console.error('[VendorMaster] fetch failed', err);
+            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    uploadVendorMaster: async (file) => {
+        set({ vendorLoading: true, vendorError: null });
+        try {
+            await masterDataService.uploadVendorMaster(file);
+            await get().fetchVendorMasterData();
+        } catch (err) {
+            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
     // ─── Entity Master: Add ───────────────────────────────────────────────────
     addEntityRow: async (formData) => {
         // formData already uses snake_case from the EntityMasterModal
@@ -225,6 +257,19 @@ const useMasterDataStore = create((set, get) => ({
     deleteEntityRow: async (rowIndex) => {
         await masterDataService.deleteEntityRow(rowIndex);
         await get().fetchEntityMasterData();
+    },
+
+    // ─── Vendor Master: Delete ────────────────────────────────────────────────
+    deleteVendorRow: async (rowIndex) => {
+        await masterDataService.deleteVendorRow(rowIndex);
+        await get().fetchVendorMasterData();
+    },
+
+    clearMasterData: async (tabIdentifier) => {
+        const identifier = tabIdentifier === 'Entity Master' ? 'Entity_Master' : 'Vendor_Master';
+        await masterDataService.deleteTabData(identifier);
+        if (tabIdentifier === 'Entity Master') await get().fetchEntityMasterData();
+        else await get().fetchVendorMasterData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────
