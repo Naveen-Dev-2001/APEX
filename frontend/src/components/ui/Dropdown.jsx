@@ -10,6 +10,7 @@ const Dropdown = ({ label, value, options, onChange, className = '', error = '',
                 </label>
             )}
             <Select
+                showSearch
                 value={value}
                 onChange={onChange}
                 options={options}
@@ -17,6 +18,10 @@ const Dropdown = ({ label, value, options, onChange, className = '', error = '',
                 className="w-full h-[40px]"
                 status={error ? 'error' : ''}
                 size="large"
+                optionFilterProp="label"
+                filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
                 style={{ width: '100%', borderRadius: '8px' }}
                 getPopupContainer={getPopupContainer ?? (triggerNode => triggerNode.parentNode)}
                 dropdownStyle={{ zIndex: 9999 }}
