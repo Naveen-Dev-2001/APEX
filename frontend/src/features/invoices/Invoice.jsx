@@ -58,7 +58,7 @@ const Invoice = () => {
             setUploadLoading(true);
             setUploadProgress(0);
 
-            const taskId = crypto.randomUUID();
+            const taskId = uuidv4();
             const startTime = Date.now();
             const totalFiles = files.length;
 

@@ -181,3 +181,20 @@
         transform: scale(0.75);
     }
 }
+
+/* Split gutter (resizer) */
+.gutter {
+    background-color: #E0E0E0;
+    position: relative;
+    z-index: 10;
+}
+
+.gutter:hover {
+    background-color: #22B4E6;
+}
+
+/* Horizontal split (vertical divider) */
+.gutter.gutter-horizontal {
+    cursor: col-resize;
+    width: 6px;
+}

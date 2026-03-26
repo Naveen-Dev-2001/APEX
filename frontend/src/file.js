@@ -3,6 +3,7 @@ import Vector_pending from './images/Vector_pending.svg';
 import Vector_approved from './images/Vector_approved.svg';
 import Vector_overdue from './images/Vector_overdue.svg';
 import Frame from './images/Frame 1166.svg';
+import arrow_left from './images/arrow-left.svg';
 
 
 
@@ -14,5 +15,6 @@ export const icons = {
     pending: Vector_pending,
     approved: Vector_approved,
     overdue: Vector_overdue,
-    cardFrame: Frame
+    cardFrame: Frame,
+    arrowLeft: arrow_left
 }

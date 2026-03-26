@@ -96,7 +96,7 @@ const DashboardPage = React.memo(() => {
     // ─── Render ──────────────────────────────────────────────────────────────────
 
     return (
-        <div className="bg-[#F7F7F7] p-4 space-y-4">
+        <div className="bg-[#F7F7F7] p-2 space-y-2 overflow-y-auto h-[calc(90vh-5px)]">
 
             {/* Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
