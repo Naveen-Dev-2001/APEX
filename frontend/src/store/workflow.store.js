@@ -131,6 +131,42 @@ const useWorkflowStore = create((set, get) => ({
         }
     },
 
+    // CRUD Codification Workflow
+    addCodificationWorkflow: async (data) => {
+        try {
+            const newWorkflow = await workflowAPI.createCodificationWorkflow(data);
+            set((state) => ({
+                codificationWorkflows: [...state.codificationWorkflows, newWorkflow]
+            }));
+            return newWorkflow;
+        } catch (err) {
+            throw err;
+        }
+    },
+
+    updateCodificationWorkflow: async (id, data) => {
+        try {
+            const updated = await workflowAPI.updateCodificationWorkflow(id, data);
+            set((state) => ({
+                codificationWorkflows: state.codificationWorkflows.map((w) => (w.id === id ? updated : w))
+            }));
+            return updated;
+        } catch (err) {
+            throw err;
+        }
+    },
+
+    deleteCodificationWorkflow: async (id) => {
+        try {
+            await workflowAPI.deleteCodificationWorkflow(id);
+            set((state) => ({
+                codificationWorkflows: state.codificationWorkflows.filter((w) => w.id !== id)
+            }));
+        } catch (err) {
+            throw err;
+        }
+    },
+
     // Filter Logic
     getFilteredData: () => {
         const { activeTab, vendorWorkflows, codificationWorkflows, searchQuery } = get();
