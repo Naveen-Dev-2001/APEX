@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/ui.store';
 import { useCommonStore } from '../store/common.store';
@@ -24,6 +24,7 @@ const tabs = [
 
 const Header = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { activeTab, setActiveTab } = useUIStore();
     const logout = useAuthStore((state) => state.logout);
     const user = useAuthStore((state) => state.user);
@@ -34,6 +35,15 @@ const Header = () => {
     const dropdownRef = useRef(null);
 
     const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
+
+    // Sync active tab with route on path change or refresh
+    useEffect(() => {
+        const currentPath = location.pathname;
+        const matchingTab = tabs.find(tab => currentPath.startsWith(tab.route));
+        if (matchingTab && activeTab !== matchingTab.name) {
+            setActiveTab(matchingTab.name);
+        }
+    }, [location.pathname, activeTab, setActiveTab]);
 
     const handleLogout = () => {
         logout();
