@@ -84,12 +84,12 @@ const DashboardPage = React.memo(() => {
     // ─── Memoized Colors ─────────────────────────────────────────────────────────
 
     const vendorColors = useMemo(
-        () => Array(vendorY.length).fill("#3B82F6"),
+        () => Array(vendorY.length).fill("#24A1DD"),
         [vendorY.length]
     );
 
     const topVendorColors = useMemo(
-        () => Array(topVendorY.length).fill("#3B82F6"),
+        () => Array(topVendorY.length).fill("#24A1DD"),
         [topVendorY.length]
     );
 

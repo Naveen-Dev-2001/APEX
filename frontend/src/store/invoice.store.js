@@ -19,4 +19,7 @@ export const useInvoiceStore = create((set) => ({
 
     view: "condensed",
     setView: (view) => set({ view }),
+
+    isModalOpen: false,
+    setIsModalOpen: (open) => set({ isModalOpen: open }),
 }))

@@ -142,3 +142,42 @@
 .ag-theme-alpine .ag-cell {
     font-size: 13px !important;
 }
+
+.ant-modal {
+    margin: 0;
+    padding: 0;
+}
+
+.ant-modal-content {
+    padding: 0 !important;
+}
+
+.ant-modal-body {
+    padding: 0 !important;
+}
+
+/* progress bar loader */
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.4;
+        transform: scale(0.75);
+    }
+}
