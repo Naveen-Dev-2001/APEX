@@ -137,8 +137,23 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
             }
             onClose();
         } catch (err) {
-            toast.error('Failed to save: ' + (err.response?.data?.detail || err.message));
+            let errorMsg = err.message;
+            if (err.response?.data?.detail) {
+                const detail = err.response.data.detail;
+                if (Array.isArray(detail)) {
+                    errorMsg = detail.map(d => {
+                        const field = d.loc ? d.loc[d.loc.length - 1] : 'Error';
+                        return `${field}: ${d.msg}`;
+                    }).join(', ');
+                } else if (typeof detail === 'string') {
+                    errorMsg = detail;
+                } else {
+                    errorMsg = JSON.stringify(detail);
+                }
+            }
+            toast.error('Failed to save: ' + errorMsg);
         } finally {
+
             setIsSubmitting(false);
         }
     };
@@ -171,7 +186,7 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
             onClick={handleBackdrop}
         >
-            <div className="bg-white rounded-[12px] shadow-2xl w-full max-w-[550px] mx-4 flex flex-col max-h-[92vh]">
+            <div className="bg-white rounded-[12px] shadow-2xl w-full max-w-[650px] mx-4 flex flex-col max-h-[92vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100">
                     <h2 className="text-[19px] font-bold text-[#1a2235]">
