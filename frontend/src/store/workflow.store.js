@@ -114,12 +114,12 @@ const useWorkflowStore = create((set, get) => ({
             ]);
             set({ 
                 lobsList: (lobs || []).map(l => ({ 
-                    value: typeof l === 'string' ? l : (l.lob_id || l.id), 
-                    label: typeof l === 'string' ? l : (l.lob_name || l.name || (l.lob_id || l.id))
+                    value: typeof l === 'string' ? l : (l.value || l.lob_id || l.id), 
+                    label: typeof l === 'string' ? l : (l.label || l.lob_name || l.name || (l.value || l.lob_id || l.id))
                 })), 
                 departmentsList: (depts || []).map(d => ({ 
-                    value: typeof d === 'string' ? d : (d.dept_id || d.id), 
-                    label: typeof d === 'string' ? d : (d.dept_name || d.name || (d.dept_id || d.id))
+                    value: typeof d === 'string' ? d : (d.value || d.dept_id || d.id), 
+                    label: typeof d === 'string' ? d : (d.label || d.dept_name || d.name || (d.value || d.dept_id || d.id))
                 })), 
                 approversList: (approvers || []).map(a => ({ 
                     value: a.value, 

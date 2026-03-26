@@ -14,7 +14,7 @@ const EMPTY_FORM = {
     mandatory_approver_5: '',
     threshold_approver: '',
     amount_threshold: '',
-    approver_count: 2,
+    approver_count: 1,
     enableThreshold: 'No'
 };
 
@@ -67,10 +67,10 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
-    const { 
-        lobsList, departmentsList, approversList, 
-        addCodificationWorkflow, updateCodificationWorkflow 
+
+    const {
+        lobsList, departmentsList, approversList,
+        addCodificationWorkflow, updateCodificationWorkflow
     } = useWorkflowStore();
 
     useEffect(() => {
@@ -237,7 +237,7 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose }) => {
                             onChange={(val) => setForm(prev => ({ ...prev, approver_count: val }))}
                         />
 
-                        <RadioGroup 
+                        <RadioGroup
                             label="Enable Threshold Approver"
                             value={form.enableThreshold}
                             options={['Yes', 'No']}

@@ -55,14 +55,25 @@ def normalize_column(col_name: str) -> str:
     if 'terittory' in name:
         name = name.replace('terittory', 'territory')
     
-    # Explicit mappings for Vendor Master Config fields
+    # Explicit mappings for various master data fields
     mapping = {
+        # Vendor Master Config
         "gst_use_tax_eligibility_configuration": "gst_eligibility",
         "tdswithhold_tax_applicability_configuration": "tds_applicability",
         "tds_percentage": "tds_percentage",
         "tds_section_code_and_description": "tds_section_code",
         "workflow_applicability_configuration": "workflow_applicable",
-        "line_grouping": "line_grouping"
+        "line_grouping": "line_grouping",
+        
+        # LOB Master
+        "lob": "lob_id",
+        "lob_name": "name",
+        "line_of_business": "name",
+        
+        # Department Master
+        "dept_id": "department_id",
+        "dept_name": "department_name",
+        "department": "department_name"
     }
     return mapping.get(name, name)
 
