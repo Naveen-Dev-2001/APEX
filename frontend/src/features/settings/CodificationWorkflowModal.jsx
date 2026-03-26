@@ -113,9 +113,20 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose }) => {
 
         const payload = {
             ...form,
-            threshold_approver: form.enableThreshold === 'Yes' ? form.threshold_approver : null,
+            threshold_approver: form.enableThreshold === 'Yes' ? (form.threshold_approver || null) : null,
             amount_threshold: form.enableThreshold === 'Yes' ? parseFloat(form.amount_threshold) : null,
         };
+
+        // Clean up mandatory approvers that are not needed
+        for (let i = 1; i <= 5; i++) {
+            if (i > form.approver_count) {
+                payload[`mandatory_approver_${i}`] = null;
+            } else if (payload[`mandatory_approver_${i}`] === "") {
+                payload[`mandatory_approver_${i}`] = null;
+            }
+        }
+        if (payload.optional_approver === "") payload.optional_approver = null;
+
 
         setIsSubmitting(true);
         try {

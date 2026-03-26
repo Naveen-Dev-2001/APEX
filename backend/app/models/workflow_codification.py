@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
+from pydantic import BaseModel, EmailStr, field_validator
+
 
 class CodificationWorkflow(BaseModel):
     lob: str  # Line of Business
@@ -18,6 +19,19 @@ class CodificationWorkflow(BaseModel):
     entity: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    @field_validator(
+        'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3', 
+        'mandatory_approver_4', 'mandatory_approver_5',
+        'threshold_approver', 'optional_approver', 
+        mode='before'
+    )
+    @classmethod
+    def empty_to_none(cls, v):
+        if v == "":
+            return None
+        return v
+
 
 class CodificationWorkflowInDB(CodificationWorkflow):
     id: str
