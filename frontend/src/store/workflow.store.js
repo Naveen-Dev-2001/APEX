@@ -44,8 +44,8 @@ const useWorkflowStore = create((set, get) => ({
             ]);
             set({
                 workflowVendors: (vendors || []).map(v => ({
-                    value: `${v.vendor_id}|${v.vendor_name}`,
-                    label: `${v.vendor_id} - ${v.vendor_name}`
+                    value: v.value,
+                    label: v.label
                 })),
                 approversList: approvers
             });

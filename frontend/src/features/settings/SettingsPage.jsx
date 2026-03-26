@@ -26,7 +26,12 @@ const SettingsPage = () => {
     const { showConfirm } = useToastStore();
     const [modalState, setModalState] = useState({ open: false, mode: 'add', rowData: null });
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(15);
+
     useEffect(() => {
+        setCurrentPage(1); // Reset page on tab change
         if (activeTab === 'Vendor Based Workflow') {
             fetchVendorWorkflows();
             fetchVendorMetadata();
@@ -35,6 +40,10 @@ const SettingsPage = () => {
             fetchCodificationMetadata();
         }
     }, [activeTab, fetchVendorWorkflows, fetchVendorMetadata, fetchCodificationWorkflows, fetchCodificationMetadata]);
+
+    useEffect(() => {
+        setCurrentPage(1); // Reset page on search
+    }, [searchQuery]);
 
     const filteredData = getFilteredData();
 
@@ -209,9 +218,14 @@ const SettingsPage = () => {
         return (
             <DataTable
                 columns={columns}
-                data={data}
+                data={data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
                 loading={loading}
-                skeletonRows={10}
+                skeletonRows={itemsPerPage}
+                totalItems={data.length}
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
                 maxHeight="calc(100vh - 280px)"
                 stickyHeader={true}
             />
@@ -219,7 +233,7 @@ const SettingsPage = () => {
     };
 
     return (
-        <div className="p-6 flex flex-col gap-6 w-full bg-[#FBFBFB] min-h-screen">
+        <div className="p-4 flex flex-col gap-4 w-full bg-gray-50 min-h-0 h-full">
             {/* Header Area */}
             {/* <div className="flex flex-col gap-1">
                 <h1 className="text-[28px] font-semibold text-[#333333]">Approval Workflow Settings</h1>
@@ -279,7 +293,7 @@ const SettingsPage = () => {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 relative bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm w-full p-4 border border-gray-200">
                 {renderTabContent()}
             </div>
 
