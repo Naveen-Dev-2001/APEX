@@ -47,7 +47,10 @@ const useWorkflowStore = create((set, get) => ({
                     value: v.value,
                     label: v.label
                 })),
-                approversList: approvers
+                approversList: (approvers || []).map(a => ({ 
+                    value: a.value, 
+                    label: a.label 
+                }))
             });
         } catch (err) {
             console.error('Failed to fetch vendor metadata', err);
@@ -119,8 +122,8 @@ const useWorkflowStore = create((set, get) => ({
                     label: typeof d === 'string' ? d : (d.dept_name || d.name || (d.dept_id || d.id))
                 })), 
                 approversList: (approvers || []).map(a => ({ 
-                    value: a.email, 
-                    label: `${a.first_name} ${a.last_name} (${a.email})` 
+                    value: a.value, 
+                    label: a.label 
                 })) 
             });
         } catch (err) {

@@ -17,7 +17,7 @@ const SettingsPage = () => {
         fetchVendorWorkflows, fetchVendorMetadata,
         fetchCodificationWorkflows, fetchCodificationMetadata,
         deleteVendorWorkflow, deleteCodificationWorkflow,
-        getFilteredData
+        getFilteredData, approversList
     } = useWorkflowStore();
 
     const { user } = useAuthStore();
@@ -50,6 +50,16 @@ const SettingsPage = () => {
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null });
     const openEdit = (row) => setModalState({ open: true, mode: 'edit', rowData: row });
     const closeModal = () => setModalState({ open: false, mode: 'add', rowData: null });
+    
+    const getApproverName = (email) => {
+        if (!email) return <span className="text-gray-400">-</span>;
+        const approver = (approversList || []).find(a => a.value === email);
+        if (approver) {
+            // Extract name from "Name (Email)"
+            return approver.label.split(' (')[0];
+        }
+        return email;
+    };
 
     const handleDelete = (row) => {
         showConfirm({
@@ -74,23 +84,35 @@ const SettingsPage = () => {
 
     const vendorColumns = [
         { header: 'Vendor Name', accessor: 'vendor_name', sortable: true },
-        { header: 'Approver 1', accessor: 'mandatory_approver_1' },
-        { header: 'Approver 2', accessor: 'mandatory_approver_2' },
-        { header: 'Approver 3', accessor: 'mandatory_approver_3' },
+        { 
+            header: 'Approver 1', 
+            accessor: 'mandatory_approver_1',
+            render: (val) => getApproverName(val)
+        },
+        { 
+            header: 'Approver 2', 
+            accessor: 'mandatory_approver_2',
+            render: (val) => getApproverName(val)
+        },
+        { 
+            header: 'Approver 3', 
+            accessor: 'mandatory_approver_3',
+            render: (val) => getApproverName(val)
+        },
         { 
             header: 'Approver 4', 
             accessor: 'mandatory_approver_4',
-            render: (val) => val || <span className="text-gray-400">-</span>
+            render: (val) => getApproverName(val)
         },
         { 
             header: 'Approver 5', 
             accessor: 'mandatory_approver_5',
-            render: (val) => val || <span className="text-gray-400">-</span>
+            render: (val) => getApproverName(val)
         },
         { 
             header: 'Threshold Approver', 
             accessor: 'threshold_approver',
-            render: (val) => val || <span className="text-gray-400">-</span>
+            render: (val) => getApproverName(val)
         },
         { 
             header: 'Amount Threshold', 
@@ -138,23 +160,35 @@ const SettingsPage = () => {
                 return opt ? opt.label : val;
             }
         },
-        { header: 'Approver 1', accessor: 'mandatory_approver_1' },
-        { header: 'Approver 2', accessor: 'mandatory_approver_2' },
-        { header: 'Approver 3', accessor: 'mandatory_approver_3' },
+        { 
+            header: 'Approver 1', 
+            accessor: 'mandatory_approver_1',
+            render: (val) => getApproverName(val)
+        },
+        { 
+            header: 'Approver 2', 
+            accessor: 'mandatory_approver_2',
+            render: (val) => getApproverName(val)
+        },
+        { 
+            header: 'Approver 3', 
+            accessor: 'mandatory_approver_3',
+            render: (val) => getApproverName(val)
+        },
         { 
             header: 'Approver 4', 
             accessor: 'mandatory_approver_4',
-            render: (val) => val || <span className="text-gray-400">-</span>
+            render: (val) => getApproverName(val)
         },
         { 
             header: 'Approver 5', 
             accessor: 'mandatory_approver_5',
-            render: (val) => val || <span className="text-gray-400">-</span>
+            render: (val) => getApproverName(val)
         },
         { 
             header: 'Threshold Approver', 
             accessor: 'threshold_approver',
-            render: (val) => val || <span className="text-gray-400">-</span>
+            render: (val) => getApproverName(val)
         },
         { 
             header: 'Amount Threshold', 
