@@ -1,0 +1,225 @@
+import { useCallback, useMemo, useState } from "react";
+import CustomInput from "../../shared/components/CustomInput";
+import { SearchOutlined, CloseCircleOutlined } from "@ant-design/icons";
+import Dropdown from "../../components/ui/Dropdown";
+import CustomButton from "../../shared/components/CustomButton";
+import ReusableDataTable from "../../shared/components/ReusableDataTable";
+import { useInvoiceData } from "../hooks/useInvoiceData";
+import { getCondensedColumns, getFullColumns, VIEW_OPTIONS } from "./invoiceColumns";
+import { useInvoiceStore } from "../../store/invoice.store";
+import { Skeleton } from "antd";
+import { v4 as uuidv4 } from 'uuid';
+import AddInvoiceModal from "./AddInvoiceModel";
+import { uploadInvoices } from "../../api/invoiceApi";
+import { message } from "antd";
+import API from "../../api/api";
+import ViewInvoicePage from "./ViewInvoicePage";
+
+const Invoice = () => {
+    const [search, setSearch] = useState("");
+    const { invoiceSection, skip, limit, view, setView, setInvoiceSection, setIsModalOpen, isModalOpen } = useInvoiceStore();
+    const { invoices, isLoading, refetch } = useInvoiceData({ skip, limit });
+    const [messageApi, contextHolder] = message.useMessage();
+    const [uploadLoading, setUploadLoading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+
+    console.log('invoices', invoices);
+
+
+    const handleView = useCallback((data) => {
+        console.log("View", data);
+        setInvoiceSection(2);
+    }, []);
+
+    const handleDelete = useCallback((data) => {
+        console.log("Delete", data);
+    }, []);
+
+    const columnDefs = useMemo(
+        () => view === "condensed"
+            ? getCondensedColumns(handleView, handleDelete)
+            : getFullColumns(handleView, handleDelete),
+        [view]   // ← recompute only when view changes 
+    );
+
+    const handleCreateInvoice = () => {
+        setIsModalOpen(true)
+    }
+
+    const handleUpload = async (files) => {
+        if (!files || files.length === 0) {
+            messageApi.warning("Please select at least one file");
+            return;
+        }
+
+        let eventSource = null;
+
+        try {
+            setUploadLoading(true);
+            setUploadProgress(0);
+
+            const taskId = uuidv4();
+            const startTime = Date.now();
+            const totalFiles = files.length;
+
+            const formData = new FormData();
+            files.forEach((f) => formData.append("files", f));
+
+            const progressUrl = `${API.defaults.baseURL}/invoices/upload-progress/${taskId}`;
+            eventSource = new EventSource(progressUrl);
+
+            // Track completed files count to compute true cumulative progress
+            let completedFiles = 0;
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.progress !== undefined) {
+                        if (data.progress >= 100) {
+                            // One more file fully processed
+                            completedFiles += 1;
+                        }
+
+                        // Cumulative: how far through ALL files are we?
+                        // e.g. 3 files, file 2 at 50% → (1 + 0.5) / 3 = 50% of processing
+                        const processingRatio =
+                            (completedFiles + data.progress / 100) / totalFiles;
+
+                        // Map server processing phase to 50%–99% range
+                        const mapped = 50 + Math.round(processingRatio * 49);
+                        setUploadProgress(Math.min(mapped, 99));
+                    }
+                } catch (e) {
+                    console.warn("SSE parse error", e);
+                }
+            };
+
+            eventSource.onerror = () => {
+                console.warn("SSE connection error");
+            };
+
+            const response = await uploadInvoices(formData, taskId, (progressEvent) => {
+                if (progressEvent.total) {
+                    // Network upload phase: 0% → 50%
+                    const percent = Math.round(
+                        (progressEvent.loaded / progressEvent.total) * 50
+                    );
+                    setUploadProgress(percent);
+                }
+            });
+
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            setUploadProgress(100);
+
+            messageApi.success(
+                `${response?.data?.count ?? files.length} file(s) processed successfully! (${duration}s)`
+            );
+
+            await refetch();
+
+            await new Promise((res) => setTimeout(res, 700));
+
+            files.length === 1 ? setInvoiceSection(2) : setInvoiceSection(1);
+            setIsModalOpen(false);
+
+        } catch (error) {
+            const err = error?.response?.data?.detail || "Upload failed";
+            messageApi.error(err);
+            setUploadProgress(0);
+        } finally {
+            if (eventSource) eventSource.close();
+            setUploadLoading(false);
+            setTimeout(() => setUploadProgress(0), 400);
+        }
+    };
+
+    return (
+        <>
+            {contextHolder}
+            {
+                invoiceSection === 1 && (<>
+                    <div className="p-4 bg-[#F7F7F7]">
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="text-3xl font-bold custom-font-jura">
+                                Invoices <span className="text-base font-normal  px-2 py-1 rounded-3xl shadow-sm bg-[#E0E0E0] inline-block">
+                                    {invoices?.length || 0}
+                                </span>
+                            </span>
+
+                            <div className="flex items-center gap-3">
+                                <div className="w-[300px]">
+                                    <CustomInput
+                                        placeholder="Search invoices..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        icon={<SearchOutlined />}
+                                        rightIcon={search && <CloseCircleOutlined />}
+                                        onRightIconClick={() => setSearch("")}
+                                        className="mb-0"
+                                    />
+                                </div>
+                                <div className="w-[250px]">
+                                    <Dropdown
+                                        options={VIEW_OPTIONS}
+                                        placeholder="Select View"
+                                        value={view}
+                                        onChange={(val) => setView(val)}
+                                    />
+                                </div>
+
+                                <div className="w-[200px]">
+                                    <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
+                                        Create Invoice
+                                    </CustomButton>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto w-full">
+                        {isLoading ? (
+                            <Skeleton height={400} borderRadius={16} />
+                        ) : (
+                            <ReusableDataTable
+                                columnDefs={columnDefs}
+                                data={invoices ?? []}
+                                searchText={search}
+                                tableHeader={false}
+                                tableSearch={false}
+                                defaultPageSize={10}
+                                shouldUseFlex={false}
+
+                            />
+                        )}
+                    </div>
+                </>)
+            }
+            {
+                (invoiceSection === 1 || isModalOpen) && (<>
+                    <AddInvoiceModal
+                        open={isModalOpen}
+                        onCancel={() => {
+                            setIsModalOpen(false)
+                            setInvoiceSection(1);
+                        }}
+                        onUpload={handleUpload}
+                        uploadProgress={uploadProgress}
+                        confirmLoading={uploadLoading}
+                    />
+                </>)
+
+            }
+            {
+                invoiceSection === 2 && (<>
+
+                    <ViewInvoicePage />
+
+                </>)
+            }
+        </>
+
+    );
+};
+
+export default Invoice;

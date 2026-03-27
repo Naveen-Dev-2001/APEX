@@ -8,7 +8,7 @@ const AppLayout = () => {
             <Header />
 
             {/* Scrollable Content */}
-            <main className="flex-1 overflow-y-auto px-2 py-6 pt-[60px]">
+            <main className="flex-1  px-2 py-6 pt-[60px]">
                 <Outlet />
             </main>
         </div>

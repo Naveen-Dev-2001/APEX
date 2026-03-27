@@ -13,6 +13,7 @@ import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
 
 import { ConfigProvider } from 'antd';
+import Invoice from './features/invoices/Invoice';
 
 function App() {
 
@@ -46,6 +47,7 @@ function App() {
             <Route >
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/invoices" element={<Invoice />} />
                 <Route path="/master-data" element={<MasterDataPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/admin" element={<AdminPage />} />

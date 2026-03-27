@@ -84,19 +84,19 @@ const DashboardPage = React.memo(() => {
     // ─── Memoized Colors ─────────────────────────────────────────────────────────
 
     const vendorColors = useMemo(
-        () => Array(vendorY.length).fill("#3B82F6"),
+        () => Array(vendorY.length).fill("#24A1DD"),
         [vendorY.length]
     );
 
     const topVendorColors = useMemo(
-        () => Array(topVendorY.length).fill("#3B82F6"),
+        () => Array(topVendorY.length).fill("#24A1DD"),
         [topVendorY.length]
     );
 
     // ─── Render ──────────────────────────────────────────────────────────────────
 
     return (
-        <div className="bg-[#F7F7F7] p-4 space-y-4">
+        <div className="bg-[#F7F7F7] p-2 space-y-2 overflow-y-auto h-[calc(90vh-5px)]">
 
             {/* Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -123,7 +123,7 @@ const DashboardPage = React.memo(() => {
 
             {/* Charts Row 1 — Aging + Status */}
             <div className="flex gap-4">
-                <div className="w-[60%]">
+                <div className="w-[50%]">
                     {isLoading ? (
                         <Skeleton height={300} borderRadius={16} />
                     ) : (
@@ -136,7 +136,7 @@ const DashboardPage = React.memo(() => {
                         />
                     )}
                 </div>
-                <div className="w-[40%]">
+                <div className="w-[50%]">
                     {isLoading ? (
                         <Skeleton height={300} borderRadius={16} />
                     ) : (
@@ -153,7 +153,7 @@ const DashboardPage = React.memo(() => {
 
             {/* Charts Row 2 — Vendors */}
             <div className="flex gap-4">
-                <div className="w-[60%]">
+                <div className="w-[50%]">
                     {isLoading ? (
                         <Skeleton height={300} borderRadius={16} />
                     ) : (
@@ -167,7 +167,7 @@ const DashboardPage = React.memo(() => {
                         />
                     )}
                 </div>
-                <div className="w-[40%]">
+                <div className="w-[50%]">
                     {isLoading ? (
                         <Skeleton height={300} borderRadius={16} />
                     ) : (

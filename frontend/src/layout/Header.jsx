@@ -17,6 +17,7 @@ import adminUnselectIcon from '../assets/header-icons/admin-icon-unselect.png';
 
 const tabs = [
     { name: 'Dashboard', route: '/dashboard', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
+    { name: 'Invoices', route: '/invoices', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
     { name: 'Master Data', route: '/master-data', selectIcon: masterDataSelectIcon, unselectIcon: masterDataUnselectIcon },
     { name: 'Settings', route: '/settings', selectIcon: settingsSelectIcon, unselectIcon: settingsUnselectIcon },
     { name: 'Admin', route: '/admin', selectIcon: adminSelectIcon, unselectIcon: adminUnselectIcon },
