@@ -12,9 +12,7 @@ const StatusManagement = ({ statuses, onAdd, loading = false }) => {
                 <div className="px-6 py-4 flex justify-between items-center border-b border-gray-100">
                     <Skeleton variant="text" width="150px" className="h-5" />
                 </div>
-                <div className="bg-[#106fa4] py-2 px-6">
-                    <Skeleton variant="text" width="100px" className="bg-white/20" />
-                </div>
+
                 <div className="p-6 flex flex-wrap gap-3">
                     {Array.from({ length: 4 }).map((_, i) => (
                         <Skeleton key={i} variant="rect" width="80px" height="28px" className="rounded-full" />
@@ -34,26 +32,24 @@ const StatusManagement = ({ statuses, onAdd, loading = false }) => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden text-left">
             <div className="px-6 py-4 flex justify-between items-center border-b border-gray-100">
                 <h3 className="text-[15px] font-medium text-[#444444]">Status Management</h3>
-                <button 
+                <button
                     onClick={onAdd}
                     className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-1.5 rounded-[4px] flex items-center gap-1.5 text-xs font-semibold transition-colors"
                 >
                     <img src={addIcon} alt="Add" className="w-[14px]" /> Add
                 </button>
             </div>
-            
+
             <div className="p-0">
-                <div className="bg-[#106fa4] text-white py-2 px-6 text-sm font-medium">
-                    User Name
-                </div>
+
                 <div className="p-6 flex flex-wrap gap-3">
-                    {statuses.map((status) => (
-                        <div 
-                            key={status} 
+                    {statuses?.map((status) => (
+                        <div
+                            key={status}
                             className="flex items-center gap-2 px-3 py-1 rounded-full border border-[#e8c05d] bg-[#fdfaf1] text-[#7a6a3b] text-xs font-medium group transition-all"
                         >
                             <span>{status}</span>
-                            <button 
+                            <button
                                 onClick={() => handleRemove(status)}
                                 disabled={isUpdating}
                                 className="text-[#a1a1a1] hover:text-[#ef4444] transition-colors leading-none text-base"
