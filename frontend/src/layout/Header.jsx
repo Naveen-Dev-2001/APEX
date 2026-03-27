@@ -14,6 +14,8 @@ import settingsSelectIcon from '../assets/header-icons/settings-icon-select.png'
 import settingsUnselectIcon from '../assets/header-icons/settings-icon-unselect.png';
 import adminSelectIcon from '../assets/header-icons/admin-icon-select.png';
 import adminUnselectIcon from '../assets/header-icons/admin-icon-unselect.png';
+import codingSelectIcon from '../assets/header-icons/coding-icon-select.png';
+import codingUnselectIcon from '../assets/header-icons/coding-icon-unselect.png';
 import useAdminStore from '../store/useAdminStore';
 
 const tabs = [
@@ -30,6 +32,7 @@ const iconMap = {
     'Master Data': { select: masterDataSelectIcon, unselect: masterDataUnselectIcon },
     'Settings': { select: settingsSelectIcon, unselect: settingsUnselectIcon },
     'Admin': { select: adminSelectIcon, unselect: adminUnselectIcon },
+    'Coding': { select: codingSelectIcon, unselect: codingUnselectIcon },
     // Default icons for others if not found
     'default': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon }
 };

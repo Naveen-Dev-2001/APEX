@@ -9,6 +9,7 @@ DEFAULT_SETTINGS = {
     "navigation": [
         {"label": "Dashboard", "path": "/dashboard", "roles": ["all"]},
         {"label": "Invoices", "path": "/invoices", "roles": ["coder"]},
+        {"label": "Coding", "path": "/coding", "roles": ["coder", "admin"]},
         {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
         {"label": "Settings", "path": "/settings", "roles": ["admin"]},
         {"label": "Admin", "path": "/admin", "roles": ["admin"]}

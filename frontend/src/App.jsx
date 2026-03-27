@@ -14,6 +14,7 @@ import ToastProvider from './components/ToastProvider';
 
 import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
+import CodingPage from './features/invoices/CodingPage';
 
 function App() {
 
@@ -48,6 +49,7 @@ function App() {
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/invoices" element={<Invoice />} />
+                <Route path="/coding" element={<CodingPage />} />
                 <Route path="/master-data" element={<MasterDataPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/admin" element={<AdminPage />} />

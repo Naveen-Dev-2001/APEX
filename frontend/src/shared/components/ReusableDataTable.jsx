@@ -98,13 +98,13 @@ export default function ReusableDataTable({
 
                     {/* Search */}
                     {tableSearch && (
-                        <div className="relative w-[360px]">
+                        <div className="relative w-[360px] ml-auto">
                             <SearchOutlined className="absolute left-[14px] top-1/2 -translate-y-1/2" />
                             <input
                                 value={internalSearchText}
                                 onChange={(e) => setInternalSearchText(e.target.value)}
                                 placeholder={searchPlaceholder}
-                                className="w-full rounded-lg border border-[#E0E0E0] pt-[10px] pr-[14px] pb-[10px] pl-[42px]"
+                                className="w-full rounded-lg border border-[#E0E0E0] pt-[10px] pr-[14px] pb-[10px] pl-[42px] focus:outline-none focus:border-[#1e9bd8] transition-colors"
                             />
                         </div>
                     )}
