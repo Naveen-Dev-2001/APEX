@@ -120,10 +120,10 @@ const DataTable = ({
             </div>
 
             {/* Pagination Footer */}
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-white z-10">
-                <div className="flex items-center gap-4 text-[13px] text-gray-600">
+            <div className="flex flex-col sm:flex-row items-center justify-between px-4 sm:px-5 py-3 border-t border-gray-200 bg-white z-10 gap-4 sm:gap-0">
+                <div className="flex items-center justify-between sm:justify-start gap-4 w-full sm:w-auto text-[13px] text-gray-600">
                     <div className="flex items-center gap-2">
-                        <span>Items per page:</span>
+                        <span>Items:</span>
                         <select 
                             className="border border-gray-300 rounded px-2 py-1 bg-white outline-none focus:border-blue-500 cursor-pointer text-gray-700"
                             value={itemsPerPage}
@@ -134,15 +134,15 @@ const DataTable = ({
                             ))}
                         </select>
                     </div>
-                    <span>{startItem} - {endItem} of {totalItems} items</span>
+                    <span>{startItem}-{endItem} of {totalItems}</span>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center justify-center gap-1 w-full sm:w-auto">
                     {renderPaginationNumbers()}
                     <button 
                         onClick={() => handlePageClick(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed ml-2 font-bold"
+                        className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed ml-1 sm:ml-2 font-bold"
                     >
                         &lt;
                     </button>

@@ -56,57 +56,59 @@ const AccessControl = ({ roles, navigation, onAdd, onEdit, loading = false }) =>
                 </button>
             </div>
             
-            <table className="w-full text-left">
-                <thead className="bg-[#106fa4] text-white text-[13px] font-medium">
-                    <tr>
-                        <th className="px-6 py-2.5 w-[20%] border-r border-white/20">Role</th>
-                        <th className="px-6 py-2.5 w-[65%] border-r border-white/20">Accessible Labels</th>
-                        <th className="px-6 py-2.5 w-[15%] text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    {roles.map((role) => (
-                        <tr key={status} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-4 align-top">
-                                <span className={`px-3 py-1 rounded-full border text-[11px] font-medium capitalize ${getRoleStyles(role)}`}>
-                                    {role}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 align-top">
-                                <div className="flex flex-wrap gap-2">
-                                    {getRoleAccess(role).map(label => (
-                                        <span key={label} className="px-3 py-0.5 rounded-full border border-[#8dc3e3] bg-[#f0f9ff] text-[#0070ad] text-[11px] font-medium">
-                                            {label}
-                                        </span>
-                                    ))}
-                                    {getRoleAccess(role).length === 0 && (
-                                        <span className="text-gray-400 italic text-[11px]">No access configured</span>
-                                    )}
-                                </div>
-                            </td>
-                            <td className="px-6 py-4 align-top">
-                                <div className="flex items-center justify-center gap-4">
-                                    <button 
-                                        onClick={() => onEdit(role)}
-                                        className="text-gray-500 hover:text-gray-700 transition-colors p-1"
-                                        title="Edit access"
-                                    >
-                                        <Pencil size={18} />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleRemove(role)}
-                                        disabled={isUpdating || role === 'admin'}
-                                        className={`transition-colors p-1 ${role === 'admin' ? 'text-gray-300 cursor-not-allowed' : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
-                                        title="Delete role"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                            </td>
+            <div className="overflow-x-auto w-full">
+                <table className="w-full text-left">
+                    <thead className="bg-[#106fa4] text-white text-[13px] font-medium">
+                        <tr>
+                            <th className="px-6 py-2.5 w-[20%] border-r border-white/20">Role</th>
+                            <th className="px-6 py-2.5 w-[65%] border-r border-white/20">Accessible Labels</th>
+                            <th className="px-6 py-2.5 w-[15%] text-center">Actions</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {roles.map((role) => (
+                            <tr key={role} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 align-top">
+                                    <span className={`px-3 py-1 rounded-full border text-[11px] font-medium capitalize ${getRoleStyles(role)}`}>
+                                        {role}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 align-top">
+                                    <div className="flex flex-wrap gap-2">
+                                        {getRoleAccess(role).map(label => (
+                                            <span key={label} className="px-3 py-0.5 rounded-full border border-[#8dc3e3] bg-[#f0f9ff] text-[#0070ad] text-[11px] font-medium">
+                                                {label}
+                                            </span>
+                                        ))}
+                                        {getRoleAccess(role).length === 0 && (
+                                            <span className="text-gray-400 italic text-[11px]">No access configured</span>
+                                        )}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 align-top">
+                                    <div className="flex items-center justify-center gap-4">
+                                        <button 
+                                            onClick={() => onEdit(role)}
+                                            className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                                            title="Edit access"
+                                        >
+                                            <Pencil size={18} />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleRemove(role)}
+                                            disabled={isUpdating || role === 'admin'}
+                                            className={`transition-colors p-1 ${role === 'admin' ? 'text-gray-300 cursor-not-allowed' : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
+                                            title="Delete role"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };
