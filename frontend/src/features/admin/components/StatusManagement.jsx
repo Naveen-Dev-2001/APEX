@@ -1,10 +1,12 @@
 import React from 'react';
 import addIcon from '../../../assets/admin-icons/add-icon.png';
 import useAdminStore from '../../../store/useAdminStore';
+import useToastStore from '../../../store/useToastStore';
 import Skeleton from '../../../components/ui/Skeleton';
 
 const StatusManagement = ({ statuses, onAdd, loading = false }) => {
     const { removeStatus, isUpdating } = useAdminStore();
+    const { showConfirm } = useToastStore();
 
     if (loading) {
         return (
@@ -23,9 +25,13 @@ const StatusManagement = ({ statuses, onAdd, loading = false }) => {
     }
 
     const handleRemove = async (status) => {
-        if (confirm(`Are you sure you want to remove the status "${status}"?`)) {
-            await removeStatus(status);
-        }
+        showConfirm({
+            message: 'Remove Status?',
+            subMessage: `Are you sure you want to remove the status "${status}"?`,
+            confirmLabel: 'Remove',
+            variant: 'danger',
+            onConfirm: () => removeStatus(status)
+        });
     };
 
     return (

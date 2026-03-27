@@ -80,12 +80,14 @@ const ConfirmDialog = () => {
                 </div>
 
                 <div className="px-6 pb-5 flex justify-end gap-2.5">
-                    <button
-                        onClick={handleCancel}
-                        className="px-5 py-2 text-[13px] font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                        {confirm.cancelLabel}
-                    </button>
+                    {confirm.showCancel && (
+                        <button
+                            onClick={handleCancel}
+                            className="px-5 py-2 text-[13px] font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            {confirm.cancelLabel}
+                        </button>
+                    )}
                     <button
                         onClick={handleConfirm}
                         className={`px-5 py-2 text-[13px] font-medium rounded-lg transition-colors shadow-sm ${styles.confirmBtn}`}
