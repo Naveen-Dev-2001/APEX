@@ -32,7 +32,10 @@ const Header = () => {
     const selectedEntityName = entity || sessionStorage.getItem('selected_entity') || 'consolidated analytics';
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const dropdownRef = useRef(null);
+    const mobileMenuRef = useRef(null);
+    const hamburgerRef = useRef(null);
 
     const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
@@ -55,11 +58,16 @@ const Header = () => {
         navigate(tab.route);
     };
 
-    // Close dropdown if clicked outside
+    // Close dropdowns if clicked outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsDropdownOpen(false);
+            }
+            if (mobileMenuRef.current && 
+                !mobileMenuRef.current.contains(event.target) && 
+                !hamburgerRef.current?.contains(event.target)) {
+                setIsMobileMenuOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -91,8 +99,24 @@ const Header = () => {
                 />
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex-1 flex h-full">
+            {/* Hamburger Menu Icon (Mobile Only) */}
+            <div className="md:hidden flex items-center" ref={hamburgerRef}>
+                <button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="text-gray-500 hover:text-[#1e9bd8] focus:outline-none p-2"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {isMobileMenuOpen ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                        )}
+                    </svg>
+                </button>
+            </div>
+
+            {/* Navigation Tabs (Desktop) */}
+            <div className="hidden md:flex flex-1 h-full">
                 {tabs.map((tab) => {
                     const isActive = activeTab === tab.name;
                     return (
@@ -117,6 +141,39 @@ const Header = () => {
                     );
                 })}
             </div>
+
+            {/* Mobile Navigation Menu */}
+            {isMobileMenuOpen && (
+                <div 
+                    ref={mobileMenuRef}
+                    className="absolute top-[60px] left-0 w-full bg-white border-b border-gray-100 shadow-lg md:hidden z-40 transition-all duration-300 ease-in-out"
+                >
+                    <div className="flex flex-col p-4 space-y-2">
+                        {tabs.map((tab) => {
+                            const isActive = activeTab === tab.name;
+                            return (
+                                <div
+                                    key={tab.name}
+                                    onClick={() => {
+                                        handleTabClick(tab);
+                                        setIsMobileMenuOpen(false);
+                                    }}
+                                    className={`flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-colors ${isActive ? 'bg-blue-50 text-[#1e9bd8]' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    <img
+                                        src={isActive ? tab.selectIcon : tab.unselectIcon}
+                                        alt={`${tab.name} icon`}
+                                        className="w-5 h-5 object-contain"
+                                    />
+                                    <span className={`text-[15px] ${isActive ? 'font-bold' : 'font-medium'}`}>
+                                        {tab.name}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Right side controls */}
             <div className="flex items-center space-x-5">
