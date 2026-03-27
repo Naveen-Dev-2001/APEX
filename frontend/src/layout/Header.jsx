@@ -26,6 +26,7 @@ const tabs = [
 // Map of names/labels to icons
 const iconMap = {
     'Dashboard': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon },
+    'Invoices': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon },
     'Master Data': { select: masterDataSelectIcon, unselect: masterDataUnselectIcon },
     'Settings': { select: settingsSelectIcon, unselect: settingsUnselectIcon },
     'Admin': { select: adminSelectIcon, unselect: adminUnselectIcon },
