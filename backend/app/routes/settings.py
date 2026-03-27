@@ -33,6 +33,18 @@ async def update_settings(payload: dict, user=Depends(get_current_user), db: Ses
                 detail=f"Cannot delete status '{status}' because it is explicitly assigned to one or more users."
             )
 
+    # Check if any removed role is currently assigned to users
+    old_roles = current_settings.get("roles", [])
+    new_roles = payload.get("roles", [])
+    removed_roles = [r for r in old_roles if r not in new_roles]
+    for role in removed_roles:
+        user_in_use_role = db.query(User).filter(User.role == role).first()
+        if user_in_use_role:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot delete role '{role}' because it is explicitly assigned to one or more users."
+            )
+
     # Find or create the settings record
     setting = db.query(GlobalSetting).filter(GlobalSetting.setting_key == "app_settings").first()
     
