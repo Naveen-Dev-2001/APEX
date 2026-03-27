@@ -135,7 +135,7 @@ const CodingPage = () => {
     ], [navigate]);
 
     return (
-        <div className="p-6 bg-[#f8fafc] min-h-screen pt-[84px]">
+        <div className="p-6 bg-[#f8fafc] min-h-screen pt-[5px]">
             <ReusableDataTable
                 title="Coding"
                 columnDefs={columnDefs}
