@@ -14,6 +14,7 @@ import settingsSelectIcon from '../assets/header-icons/settings-icon-select.png'
 import settingsUnselectIcon from '../assets/header-icons/settings-icon-unselect.png';
 import adminSelectIcon from '../assets/header-icons/admin-icon-select.png';
 import adminUnselectIcon from '../assets/header-icons/admin-icon-unselect.png';
+import useAdminStore from '../store/useAdminStore';
 
 const tabs = [
     { name: 'Dashboard', route: '/dashboard', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
@@ -22,6 +23,18 @@ const tabs = [
     { name: 'Settings', route: '/settings', selectIcon: settingsSelectIcon, unselectIcon: settingsUnselectIcon },
     { name: 'Admin', route: '/admin', selectIcon: adminSelectIcon, unselectIcon: adminUnselectIcon },
 ];
+// Map of names/labels to icons
+const iconMap = {
+    'Dashboard': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon },
+    'Master Data': { select: masterDataSelectIcon, unselect: masterDataUnselectIcon },
+    'Settings': { select: settingsSelectIcon, unselect: settingsUnselectIcon },
+    'Admin': { select: adminSelectIcon, unselect: adminUnselectIcon },
+    // Default icons for others if not found
+    'default': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon }
+};
+
+// Remove hardcoded tabs as we will use dynamic navigation
+// const tabs = [ ... ];
 
 const Header = () => {
     const navigate = useNavigate();
@@ -40,14 +53,47 @@ const Header = () => {
 
     const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
+    const { navigation, fetchSettings } = useAdminStore();
+    const [filteredTabs, setFilteredTabs] = useState([]);
+
+    // Fetch settings on mount to ensure we have navigation
+    useEffect(() => {
+        fetchSettings();
+    }, [fetchSettings]);
+
+    // Filter navigation based on user role
+    useEffect(() => {
+        if (!navigation || navigation.length === 0) {
+            setFilteredTabs([]);
+            return;
+        }
+
+        const userRole = user?.role?.toLowerCase() || '';
+        
+        const filtered = navigation
+            .filter(nav => {
+                // Check if role has access
+                const roles = nav.roles || [];
+                return roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === userRole);
+            })
+            .map(nav => ({
+                name: nav.label,
+                route: nav.path,
+                selectIcon: iconMap[nav.label]?.select || iconMap.default.select,
+                unselectIcon: iconMap[nav.label]?.unselect || iconMap.default.unselect
+            }));
+            
+        setFilteredTabs(filtered);
+    }, [navigation, user]);
+
     // Sync active tab with route on path change or refresh
     useEffect(() => {
         const currentPath = location.pathname;
-        const matchingTab = tabs.find(tab => currentPath.startsWith(tab.route));
+        const matchingTab = filteredTabs.find(tab => currentPath.startsWith(tab.route));
         if (matchingTab && activeTab !== matchingTab.name) {
             setActiveTab(matchingTab.name);
         }
-    }, [location.pathname, activeTab, setActiveTab]);
+    }, [location.pathname, activeTab, setActiveTab, filteredTabs]);
 
     const handleLogout = () => {
         logout();
@@ -118,7 +164,7 @@ const Header = () => {
 
             {/* Navigation Tabs (Desktop) */}
             <div className="hidden md:flex flex-1 h-full">
-                {tabs.map((tab) => {
+                {filteredTabs.map((tab) => {
                     const isActive = activeTab === tab.name;
                     return (
                         <div
@@ -150,7 +196,7 @@ const Header = () => {
                     className="absolute top-[60px] left-0 w-full bg-white border-b border-gray-100 shadow-lg md:hidden z-40 transition-all duration-300 ease-in-out"
                 >
                     <div className="flex flex-col p-4 space-y-2">
-                        {tabs.map((tab) => {
+                        {filteredTabs.map((tab) => {
                             const isActive = activeTab === tab.name;
                             return (
                                 <div

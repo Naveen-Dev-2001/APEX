@@ -2,10 +2,12 @@ import React from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import addIcon from '../../../assets/admin-icons/add-icon.png';
 import useAdminStore from '../../../store/useAdminStore';
+import useToastStore from '../../../store/useToastStore';
 import TableSkeleton from '../../../components/ui/TableSkeleton';
 
 const AccessControl = ({ roles, navigation, onAdd, onEdit, loading = false }) => {
     const { removeRole, isUpdating } = useAdminStore();
+    const { showConfirm } = useToastStore();
 
     if (loading) {
         return (
@@ -20,12 +22,23 @@ const AccessControl = ({ roles, navigation, onAdd, onEdit, loading = false }) =>
 
     const handleRemove = async (role) => {
         if (role === 'admin') {
-            alert("Admin role cannot be removed.");
+            showConfirm({
+                message: 'Action Not Allowed',
+                subMessage: 'Admin role cannot be removed.',
+                confirmLabel: 'OK',
+                showCancel: false,
+                variant: 'warning'
+            });
             return;
         }
-        if (confirm(`Are you sure you want to remove the role "${role}"?`)) {
-            await removeRole(role);
-        }
+        
+        showConfirm({
+            message: 'Remove Role?',
+            subMessage: `Are you sure you want to remove the role "${role}"?`,
+            confirmLabel: 'Remove',
+            variant: 'danger',
+            onConfirm: () => removeRole(role)
+        });
     };
 
     const getRoleAccess = (roleName) => {
