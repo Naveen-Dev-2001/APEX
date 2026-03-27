@@ -8,9 +8,7 @@ DEFAULT_SETTINGS = {
     "statuses": ["active", "pending", "rejected"],
     "navigation": [
         {"label": "Dashboard", "path": "/dashboard", "roles": ["all"]},
-        {"label": "Invoice", "path": "/invoice", "roles": ["coder"]},
-        {"label": "Coding", "path": "/coding", "roles": ["coder"]},
-        {"label": "Approvals", "path": "/approvals", "roles": ["approver"]},
+        {"label": "Invoices", "path": "/invoices", "roles": ["coder"]},
         {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
         {"label": "Settings", "path": "/settings", "roles": ["admin"]},
         {"label": "Admin", "path": "/admin", "roles": ["admin"]}
@@ -43,7 +41,23 @@ def get_app_settings(db: Session = None):
         
         # Merge with defaults to ensure all keys exist
         merged_settings = DEFAULT_SETTINGS.copy()
-        merged_settings.update(settings_data)
+        
+        # Special handling for navigation: merge lists by label to ensure defaults are always present
+        if "navigation" in settings_data:
+            db_nav = settings_data["navigation"]
+            default_nav = DEFAULT_SETTINGS["navigation"]
+            
+            nav_dict = {item.get("label"): item for item in default_nav if isinstance(item, dict) and "label" in item}
+            for item in db_nav:
+                # DB item wins if there is a conflict, but defaults fill the gaps
+                if isinstance(item, dict) and "label" in item:
+                    nav_dict[item["label"]] = item
+                
+            merged_settings["navigation"] = list(nav_dict.values())
+        
+        # Update other keys (roles, statuses, etc.)
+        other_settings = {k: v for k, v in settings_data.items() if k != "navigation"}
+        merged_settings.update(other_settings)
         
         return merged_settings
     finally:

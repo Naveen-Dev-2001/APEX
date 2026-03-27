@@ -184,8 +184,8 @@ const DelegationsTab = () => {
     return (
         <div className="flex flex-col gap-6 animate-fadeIn p-1">
             {/* Form Section */}
-            <div className="flex flex-wrap items-end gap-5 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div className="w-[260px]">
+            <div className="flex flex-wrap items-end gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+                <div className="flex-1 min-w-[240px]">
                     <Dropdown
                         label="* From Approver"
                         value={form.original_approver}
@@ -193,7 +193,7 @@ const DelegationsTab = () => {
                         onChange={(val) => setForm({ ...form, original_approver: val })}
                     />
                 </div>
-                <div className="w-[260px]">
+                <div className="flex-1 min-w-[240px]">
                     <Dropdown
                         label="* To Substitute"
                         value={form.substitute_approver}
@@ -201,7 +201,7 @@ const DelegationsTab = () => {
                         onChange={(val) => setForm({ ...form, substitute_approver: val })}
                     />
                 </div>
-                <div className="flex flex-col gap-1.5 min-w-[160px]">
+                <div className="flex flex-col gap-1.5 w-full sm:w-[180px]">
                     <label className="text-[13px] font-medium text-gray-700">* Start Date</label>
                     <CustomDatePicker
                         value={form.start_date ? dayjs(form.start_date) : null}
@@ -211,7 +211,7 @@ const DelegationsTab = () => {
                         disabledDate={(current) => current && current < dayjs().startOf('day')}
                     />
                 </div>
-                <div className="flex flex-col gap-1.5 min-w-[160px]">
+                <div className="flex flex-col gap-1.5 w-full sm:w-[180px]">
                     <label className="text-[13px] font-medium text-gray-700">* End Date</label>
                     <CustomDatePicker
                         value={form.end_date ? dayjs(form.end_date) : null}
@@ -224,7 +224,7 @@ const DelegationsTab = () => {
                 <button
                     onClick={handleAdd}
                     disabled={isUpdating}
-                    className="h-[38px] px-6 bg-[#24a0ed] hover:bg-[#1c8ad1] text-white rounded-[4px] text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 mb-[1px]"
+                    className="h-[40px] px-6 bg-[#24a0ed] hover:bg-[#1c8ad1] text-white rounded-[4px] text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                     {isUpdating && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
                     {isUpdating ? 'Adding...' : 'Add Delegation'}

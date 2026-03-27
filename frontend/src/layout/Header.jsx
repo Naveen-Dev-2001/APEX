@@ -14,13 +14,28 @@ import settingsSelectIcon from '../assets/header-icons/settings-icon-select.png'
 import settingsUnselectIcon from '../assets/header-icons/settings-icon-unselect.png';
 import adminSelectIcon from '../assets/header-icons/admin-icon-select.png';
 import adminUnselectIcon from '../assets/header-icons/admin-icon-unselect.png';
+import useAdminStore from '../store/useAdminStore';
 
 const tabs = [
     { name: 'Dashboard', route: '/dashboard', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
+    { name: 'Invoices', route: '/invoices', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
     { name: 'Master Data', route: '/master-data', selectIcon: masterDataSelectIcon, unselectIcon: masterDataUnselectIcon },
     { name: 'Settings', route: '/settings', selectIcon: settingsSelectIcon, unselectIcon: settingsUnselectIcon },
     { name: 'Admin', route: '/admin', selectIcon: adminSelectIcon, unselectIcon: adminUnselectIcon },
 ];
+// Map of names/labels to icons
+const iconMap = {
+    'Dashboard': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon },
+    'Invoices': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon },
+    'Master Data': { select: masterDataSelectIcon, unselect: masterDataUnselectIcon },
+    'Settings': { select: settingsSelectIcon, unselect: settingsUnselectIcon },
+    'Admin': { select: adminSelectIcon, unselect: adminUnselectIcon },
+    // Default icons for others if not found
+    'default': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon }
+};
+
+// Remove hardcoded tabs as we will use dynamic navigation
+// const tabs = [ ... ];
 
 const Header = () => {
     const navigate = useNavigate();
@@ -32,18 +47,54 @@ const Header = () => {
     const selectedEntityName = entity || sessionStorage.getItem('selected_entity') || 'consolidated analytics';
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const dropdownRef = useRef(null);
+    const mobileMenuRef = useRef(null);
+    const hamburgerRef = useRef(null);
 
     const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
+
+    const { navigation, fetchSettings } = useAdminStore();
+    const [filteredTabs, setFilteredTabs] = useState([]);
+
+    // Fetch settings on mount to ensure we have navigation
+    useEffect(() => {
+        fetchSettings();
+    }, [fetchSettings]);
+
+    // Filter navigation based on user role
+    useEffect(() => {
+        if (!navigation || navigation.length === 0) {
+            setFilteredTabs([]);
+            return;
+        }
+
+        const userRole = user?.role?.toLowerCase() || '';
+        
+        const filtered = navigation
+            .filter(nav => {
+                // Check if role has access
+                const roles = nav.roles || [];
+                return roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === userRole);
+            })
+            .map(nav => ({
+                name: nav.label,
+                route: nav.path,
+                selectIcon: iconMap[nav.label]?.select || iconMap.default.select,
+                unselectIcon: iconMap[nav.label]?.unselect || iconMap.default.unselect
+            }));
+            
+        setFilteredTabs(filtered);
+    }, [navigation, user]);
 
     // Sync active tab with route on path change or refresh
     useEffect(() => {
         const currentPath = location.pathname;
-        const matchingTab = tabs.find(tab => currentPath.startsWith(tab.route));
+        const matchingTab = filteredTabs.find(tab => currentPath.startsWith(tab.route));
         if (matchingTab && activeTab !== matchingTab.name) {
             setActiveTab(matchingTab.name);
         }
-    }, [location.pathname, activeTab, setActiveTab]);
+    }, [location.pathname, activeTab, setActiveTab, filteredTabs]);
 
     const handleLogout = () => {
         logout();
@@ -55,11 +106,16 @@ const Header = () => {
         navigate(tab.route);
     };
 
-    // Close dropdown if clicked outside
+    // Close dropdowns if clicked outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsDropdownOpen(false);
+            }
+            if (mobileMenuRef.current && 
+                !mobileMenuRef.current.contains(event.target) && 
+                !hamburgerRef.current?.contains(event.target)) {
+                setIsMobileMenuOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -91,9 +147,25 @@ const Header = () => {
                 />
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex-1 flex h-full">
-                {tabs.map((tab) => {
+            {/* Hamburger Menu Icon (Mobile Only) */}
+            <div className="md:hidden flex items-center" ref={hamburgerRef}>
+                <button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="text-gray-500 hover:text-[#1e9bd8] focus:outline-none p-2"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {isMobileMenuOpen ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                        )}
+                    </svg>
+                </button>
+            </div>
+
+            {/* Navigation Tabs (Desktop) */}
+            <div className="hidden md:flex flex-1 h-full">
+                {filteredTabs.map((tab) => {
                     const isActive = activeTab === tab.name;
                     return (
                         <div
@@ -117,6 +189,39 @@ const Header = () => {
                     );
                 })}
             </div>
+
+            {/* Mobile Navigation Menu */}
+            {isMobileMenuOpen && (
+                <div 
+                    ref={mobileMenuRef}
+                    className="absolute top-[60px] left-0 w-full bg-white border-b border-gray-100 shadow-lg md:hidden z-40 transition-all duration-300 ease-in-out"
+                >
+                    <div className="flex flex-col p-4 space-y-2">
+                        {filteredTabs.map((tab) => {
+                            const isActive = activeTab === tab.name;
+                            return (
+                                <div
+                                    key={tab.name}
+                                    onClick={() => {
+                                        handleTabClick(tab);
+                                        setIsMobileMenuOpen(false);
+                                    }}
+                                    className={`flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-colors ${isActive ? 'bg-blue-50 text-[#1e9bd8]' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    <img
+                                        src={isActive ? tab.selectIcon : tab.unselectIcon}
+                                        alt={`${tab.name} icon`}
+                                        className="w-5 h-5 object-contain"
+                                    />
+                                    <span className={`text-[15px] ${isActive ? 'font-bold' : 'font-medium'}`}>
+                                        {tab.name}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Right side controls */}
             <div className="flex items-center space-x-5">

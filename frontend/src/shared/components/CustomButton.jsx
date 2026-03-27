@@ -39,7 +39,12 @@ export default function CustomButton({
       font-creato
       justify-center
       h-auto py-1 cursor-pointer
-    `
+    `,
+        success: `
+            bg-green-500
+            text-white cursor-pointer
+            hover:bg-green-600
+        `,
     };
 
     const iconColorClass = {

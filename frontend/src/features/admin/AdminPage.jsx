@@ -51,7 +51,7 @@ const AdminPage = () => {
     };
 
     return (
-        <div className="p-4 flex flex-col gap-5 w-full bg-gray-50 min-h-0">
+        <div className="p-2 sm:p-4 flex flex-col gap-4 sm:gap-5 w-full bg-gray-50 min-h-0">
             {/* <h1 className="text-2xl font-semibold mb-2 text-[#333333] text-left">
                 Admin Dashboard
             </h1> */}
@@ -170,12 +170,12 @@ const AdminPage = () => {
                 <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-5 gap-4">
 
                     {/* Tabs */}
-                    <div className="flex border border-gray-200 rounded-md overflow-hidden h-[38px]">
+                    <div className="flex border border-gray-200 rounded-md overflow-x-auto h-[38px] w-full sm:w-auto no-scrollbar">
                         {tabs.map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-5 py-0 text-[13px] font-medium transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center ${activeTab === tab
+                                className={`px-5 py-0 text-[13px] font-medium transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center whitespace-nowrap ${activeTab === tab
                                     ? 'bg-[#8dc3e3] text-gray-800'
                                     : 'bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                                     }`}
@@ -187,16 +187,16 @@ const AdminPage = () => {
 
                     {/* Right side actions - conditional on activeTab */}
                     {activeTab === 'User Management' && (
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                             {/* Search Input */}
-                            <div className="relative">
+                            <div className="relative w-full sm:w-auto">
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 </span>
                                 <input
                                     type="text"
                                     placeholder="Search"
-                                    className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-[4px] text-[13px] outline-none focus:border-[#3b82f6] w-[260px] h-[34px]"
+                                    className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-[4px] text-[13px] outline-none focus:border-[#3b82f6] w-full sm:w-[260px] h-[34px]"
                                     value={searchQuery}
                                     onChange={(e) => {
                                         setSearchQuery(e.target.value);
@@ -205,30 +205,25 @@ const AdminPage = () => {
                                 />
                             </div>
 
-                            {/* Refresh Button */}
-                            <button
-                                onClick={() => { fetchUsers(); fetchSettings(); }}
-                                disabled={loading}
-                                title="Refresh data"
-                                className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-[4px] flex items-center gap-1.5 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {loading ? (
-                                    <div className="loading-spinner border-white/30 border-t-white"></div>
-                                ) : (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                )}
-                                <span>Refresh</span>
-                            </button>
-
-                            {/* Add Button */}
-                            {/* <button
-                                onClick={() => setIsAddModalOpen(true)}
-                                className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-[4px] flex items-center gap-1.5 text-[13px] font-medium transition-colors"
-                            >
-                                <span className="text-base font-light leading-none mb-[2px]">+</span> Add
-                            </button> */}
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                {/* Refresh Button */}
+                                <button
+                                    onClick={() => { fetchUsers(); fetchSettings(); }}
+                                    disabled={loading}
+                                    title="Refresh data"
+                                    className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-[4px] flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? (
+                                        <div className="loading-spinner border-white/30 border-t-white"></div>
+                                    ) : (
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                    )}
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

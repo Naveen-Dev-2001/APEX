@@ -17,12 +17,13 @@ const useToastStore = create((set) => ({
         subMessage: '',
         confirmLabel: 'Confirm',
         cancelLabel: 'Cancel',
+        showCancel: true,
         variant: 'danger', // 'danger' | 'warning' | 'info'
         onConfirm: null,
         onCancel: null,
     },
 
-    showConfirm: ({ message, subMessage = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', variant = 'danger', onConfirm, onCancel }) =>
+    showConfirm: ({ message, subMessage = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', showCancel = true, variant = 'danger', onConfirm, onCancel }) =>
         set({
             confirm: {
                 open: true,
@@ -30,6 +31,7 @@ const useToastStore = create((set) => ({
                 subMessage,
                 confirmLabel,
                 cancelLabel,
+                showCancel,
                 variant,
                 onConfirm: onConfirm || null,
                 onCancel: onCancel || null,

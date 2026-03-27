@@ -13,12 +13,13 @@ const CustomInput = memo(({
     icon,
     rightIcon,
     onRightIconClick,
+    className = "mb-4 w-full",
     ...props
 }) => {
     const InputComponent = type === "password" ? Input.Password : Input;
 
     return (
-        <div className="w-full mb-4">
+        <div className={`${className}`}>
             {label && (
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
                     {required && <span className="text-red-500 mr-1">*</span>}
@@ -33,8 +34,8 @@ const CustomInput = memo(({
                 placeholder={placeholder}
                 prefix={icon}
                 suffix={rightIcon && (
-                    <div 
-                        onClick={onRightIconClick} 
+                    <div
+                        onClick={onRightIconClick}
                         className="cursor-pointer text-gray-400 hover:text-gray-600 flex items-center"
                     >
                         {rightIcon}

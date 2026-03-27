@@ -95,7 +95,7 @@ const useAdminStore = create((set, get) => ({
         const newSettings = {
             roles: [...roles, lowerRole],
             statuses,
-            navigation: [...navigation, { label: roleName, path: `/${lowerRole}`, roles: [lowerRole] }]
+            navigation
         };
         return await get().updateSettings(newSettings);
     },
