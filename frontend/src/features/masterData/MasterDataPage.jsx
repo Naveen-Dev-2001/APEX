@@ -257,7 +257,13 @@ const MasterDataPage = () => {
                 ...col,
                 render: (_, row, index) => {
                     const isTopLevelEntity = isEntityTab && (row.entity_name === 'Top Level' || row.entity_name === 'Default Entity');
+                    const hasInvoices = isEntityTab && row.invoice_count > 0;
+                    const isDeleteDisabled = isTopLevelEntity || hasInvoices;
                     
+                    let deleteTooltip = "Delete";
+                    if (isTopLevelEntity) deleteTooltip = "Top Level Entity cannot be deleted";
+                    else if (hasInvoices) deleteTooltip = "Entity has associated invoices and cannot be deleted";
+
                     return (
                         <div className="flex items-center gap-4">
                             <button
@@ -268,12 +274,12 @@ const MasterDataPage = () => {
                                 <Pencil size={18} />
                             </button>
                             <button
-                                onClick={() => !isTopLevelEntity && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && handleDelete(row, index)}
-                                disabled={isTopLevelEntity}
-                                className={`transition-colors p-1 ${isTopLevelEntity 
+                                onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && handleDelete(row, index)}
+                                disabled={isDeleteDisabled}
+                                className={`transition-colors p-1 ${isDeleteDisabled 
                                     ? 'text-gray-300 cursor-not-allowed' 
                                     : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
-                                title={isTopLevelEntity ? "Top Level Entity cannot be deleted" : "Delete"}
+                                title={deleteTooltip}
                             >
                                 <Trash2 size={18} />
                             </button>

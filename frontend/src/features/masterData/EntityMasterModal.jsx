@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 
 const EMPTY_FORM = {
     id: null,
@@ -100,25 +100,38 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                     {/* Row 1 */}
                     {(() => {
                         const isTopLevel = form.entity_name === 'Top Level' || form.entity_name === 'Default Entity';
-                        const isFieldReadOnly = isEdit && isTopLevel;
+                        const hasInvoices = rowData?.invoice_count > 0;
+                        const isFieldReadOnly = isEdit && (isTopLevel || hasInvoices);
                         
                         return (
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                    label="Entity Id"
-                                    id="entity_id"
-                                    value={form.entity_id}
-                                    onChange={handleChange('entity_id')}
-                                    readOnly={isFieldReadOnly}
-                                />
-                                <FormField
-                                    label="Entity Name"
-                                    id="entity_name"
-                                    value={form.entity_name}
-                                    onChange={handleChange('entity_name')}
-                                    readOnly={isFieldReadOnly}
-                                />
-                            </div>
+                            <>
+                                {isFieldReadOnly && (
+                                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 mb-2">
+                                        <AlertCircle size={18} className="flex-shrink-0" />
+                                        <span className="text-[13px] leading-tight">
+                                            {isTopLevel 
+                                                ? "Top Level Entity ID and Name cannot be edited." 
+                                                : "Entity ID and Name cannot be edited because this entity has associated invoices."}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                        label="Entity Id"
+                                        id="entity_id"
+                                        value={form.entity_id}
+                                        onChange={handleChange('entity_id')}
+                                        readOnly={isFieldReadOnly}
+                                    />
+                                    <FormField
+                                        label="Entity Name"
+                                        id="entity_name"
+                                        value={form.entity_name}
+                                        onChange={handleChange('entity_name')}
+                                        readOnly={isFieldReadOnly}
+                                    />
+                                </div>
+                            </>
                         );
                     })()}
 

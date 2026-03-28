@@ -14,7 +14,8 @@ from typing import Dict, Any, List, Union
 from app.database.database import get_db
 from app.models.db_models import (
     EntityMaster, VendorMaster, TdsRate, GLMaster, 
-    LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster
+    LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster,
+    Invoice
 )
 from app.auth.jwt import get_current_user
 from app.models.user import UserResponse
@@ -270,8 +271,12 @@ async def get_sheet_data(
     if not model:
         raise HTTPException(404, "Table not found")
         
-    rows = db.query(model).order_by(model.id).all()
-    
+    # Pre-fetch invoice counts if this is Entity Master to avoid N+1 queries
+    invoice_counts = {}
+    if identifier in ["Entity_Master", "entity_master"]:
+        counts_query = db.query(Invoice.entity, func.count(Invoice.id)).group_by(Invoice.entity).all()
+        invoice_counts = {entity_name: count for entity_name, count in counts_query if entity_name}
+
     # Convert SQLAlchemy objects to dicts
     result = []
     for row in rows:
@@ -304,8 +309,12 @@ async def get_sheet_data(
                     
                     row_dict[pretty_map[column.name]] = pretty_val
                     continue
-
             row_dict[column.name] = val
+        
+        # Add invoice count for Entity Master
+        if identifier in ["Entity_Master", "entity_master"]:
+            row_dict['invoice_count'] = invoice_counts.get(row.entity_name, 0)
+
         result.append(row_dict)
         
     return result
