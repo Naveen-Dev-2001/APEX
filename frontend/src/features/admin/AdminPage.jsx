@@ -16,7 +16,7 @@ const AdminPage = () => {
     const {
         searchQuery, setSearchQuery, setCurrentPage,
         updateUserRole, addUser, isUpdating,
-        loading, fetchUsers, fetchSettings, roles, statuses
+        loading, fetchUsers, fetchSettings, roles, statuses, fetchDelegations
     } = useAdminStore();
 
     // Use dynamic options from store
@@ -186,7 +186,7 @@ const AdminPage = () => {
                     </div>
 
                     {/* Right side actions - conditional on activeTab */}
-                    {activeTab === 'User Management' && (
+                    {(activeTab === 'User Management' || activeTab === 'Delegations') && (
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                             {/* Search Input */}
                             <div className="relative w-full sm:w-auto">
@@ -209,7 +209,14 @@ const AdminPage = () => {
                             <div className="flex items-center gap-2 w-full sm:w-auto">
                                 {/* Refresh Button */}
                                 <button
-                                    onClick={() => { fetchUsers(); fetchSettings(); }}
+                                    onClick={() => { 
+                                        if (activeTab === 'User Management') {
+                                            fetchUsers(); 
+                                            fetchSettings(); 
+                                        } else if (activeTab === 'Delegations') {
+                                            fetchDelegations();
+                                        }
+                                    }}
                                     disabled={loading}
                                     title="Refresh data"
                                     className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-[4px] flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

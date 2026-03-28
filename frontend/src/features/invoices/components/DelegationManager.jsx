@@ -1,273 +1,325 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Form, Select, DatePicker, Button } from 'antd';
-import { createDelegation, getDelegations, deleteDelegation } from '../../../api/delegationApi';
+import React, { useState, useEffect } from 'react';
+import dayjs from 'dayjs';
+import useAdminStore from '../../../store/useAdminStore';
+import useToastStore from '../../../store/useToastStore';
 import { useAuthStore } from '../../../store/authStore';
 import toast from '../../../utils/toast';
+import Dropdown from '../../../components/ui/Dropdown';
 import DataTable from '../../../components/ui/DataTable';
+import CustomDatePicker from '../../../components/ui/CustomDatePicker';
+import Skeleton from '../../../components/ui/Skeleton';
+import { ReloadOutlined } from '@ant-design/icons';
 
-const { Option } = Select;
-
-const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
-    const [form] = Form.useForm();
-    const [loading, setLoading] = useState(false);
-    const [tableLoading, setTableLoading] = useState(false);
-    const [delegations, setDelegations] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(15);
-    const [sortColumn, setSortColumn] = useState(null);
-    const [sortDirection, setSortDirection] = useState('asc');
+const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = false, approvers: approversProp = [] }) => {
+    const {
+        users, delegations, loading: storeLoading, isUpdating,
+        fetchUsers, fetchDelegations, addDelegation, removeDelegation,
+        sortColumn, sortDirection, setSort
+    } = useAdminStore();
+    const { showConfirm } = useToastStore();
     const user = useAuthStore((state) => state.user);
 
-    const fetchDelegations = async () => {
-        setTableLoading(true);
-        try {
-            const data = await getDelegations();
-            // Transform data for the data table
-            setDelegations(data.map((d, index) => ({ ...d, s_no: index + 1 })));
-        } catch (error) {
-            console.error('Failed to fetch delegations:', error);
-            toast.error('Failed to fetch delegations');
-        } finally {
-            setTableLoading(false);
-        }
-    };
+    const [form, setForm] = useState({
+        original_approver: '',
+        substitute_approver: '',
+        start_date: '',
+        end_date: ''
+    });
+
+    // Pagination state (local for this tab)
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(15);
 
     useEffect(() => {
+        if (isAdmin) {
+            fetchUsers();
+        }
         fetchDelegations();
-        if (user?.email) {
-            form.setFieldsValue({ original_approver: user.email });
+    }, [isAdmin, fetchUsers, fetchDelegations]);
+
+    // Handle pre-filling for non-admins
+    useEffect(() => {
+        if (!isAdmin && user?.email) {
+            setForm(prev => ({ ...prev, original_approver: user.email.toLowerCase() }));
         }
-    }, [user?.email, form]);
+    }, [isAdmin, user?.email]);
 
-    const handleCreate = async (values) => {
-        setLoading(true);
-        try {
-            const startDate = values.start_date.format('YYYY-MM-DD');
-            const endDate = values.end_date.format('YYYY-MM-DD');
+    const approverOptions = isAdmin 
+        ? [
+            { label: 'Select Approver', value: '' },
+            ...((users || []).filter(u => u.role?.toLowerCase() === 'approver')).map(u => ({
+                label: `${u.username} (${u.email})`,
+                value: u.email.toLowerCase()
+            }))
+        ]
+        : [
+            { label: 'Select Approver', value: '' },
+            ...(approversProp || [])
+        ];
 
-            if (new Date(startDate) > new Date(endDate)) {
-                toast.error('End date cannot be before start date');
-                setLoading(false);
-                return;
-            }
-
-            const payload = {
-                original_approver: values.original_approver,
-                substitute_approver: values.substitute_approver,
-                start_date: startDate,
-                end_date: endDate,
-            };
-            await createDelegation(payload);
-            toast.success('Delegation created successfully');
-            form.resetFields();
-            if (!isAdmin && user?.email) {
-                form.setFieldsValue({ original_approver: user.email });
-            }
-            fetchDelegations();
+    const handleAdd = async () => {
+        if (!form.original_approver || !form.substitute_approver || !form.start_date || !form.end_date) {
+            toast.warning('Please fill all required fields');
+            return;
+        }
+        if (form.original_approver.toLowerCase() === form.substitute_approver.toLowerCase()) {
+            toast.warning('Original approver and substitute cannot be the same');
+            return;
+        }
+        const success = await addDelegation(form);
+        if (success) {
+            setForm({
+                original_approver: isAdmin ? '' : (user?.email?.toLowerCase() || ''),
+                substitute_approver: '',
+                start_date: '',
+                end_date: ''
+            });
             if (onUpdate) onUpdate();
-        } catch (error) {
-            toast.error(error.response?.data?.detail || 'Failed to create delegation');
-        } finally {
-            setLoading(false);
         }
     };
 
-    const handleRevert = async (id) => {
-        try {
-            await deleteDelegation(id);
-            toast.success('Delegation reverted');
-            fetchDelegations();
-            if (onUpdate) onUpdate();
-        } catch (error) {
-            toast.error('Failed to revert delegation');
-        }
-    };
-
-    const handleSort = (column) => {
-        if (sortColumn === column) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    const getUsernameByEmail = (email) => {
+        if (isAdmin) {
+            const found = (users || []).find(u => u.email?.toLowerCase() === email?.toLowerCase());
+            return found ? found.username : email;
         } else {
-            setSortColumn(column);
-            setSortDirection('asc');
+            const found = (approversProp || []).find(a => a.value?.toLowerCase() === email?.toLowerCase());
+            if (found) {
+                // Label format is "Username (email)", extract Username
+                return found.label.split(' (')[0];
+            }
+            return email;
         }
     };
 
-    const columnDefs = useMemo(() => [
+    const columns = [
         {
             header: 'Original Approver',
             accessor: 'original_approver',
             sortable: true,
-            onClick: () => handleSort('original_approver')
+            onClick: () => setSort('original_approver'),
+            render: (email) => (
+                <span className="text-gray-700 font-medium whitespace-nowrap">
+                    {getUsernameByEmail(email)}
+                </span>
+            )
         },
         {
             header: 'Substitute',
             accessor: 'substitute_approver',
             sortable: true,
-            onClick: () => handleSort('substitute_approver')
+            onClick: () => setSort('substitute_approver'),
+            render: (email) => (
+                <span className="text-gray-700 font-medium whitespace-nowrap">
+                    {getUsernameByEmail(email)}
+                </span>
+            )
         },
         {
             header: 'Start Date',
             accessor: 'start_date',
             sortable: true,
-            onClick: () => handleSort('start_date'),
-            render: (val) => val ? val.split('T')[0] : '-'
+            onClick: () => setSort('start_date'),
+            render: (date) => (
+                <span className="text-gray-500 whitespace-nowrap">
+                    {date ? new Date(date).toISOString().split('T')[0] : '-'}
+                </span>
+            )
         },
         {
             header: 'End Date',
             accessor: 'end_date',
             sortable: true,
-            onClick: () => handleSort('end_date'),
-            render: (val) => val ? val.split('T')[0] : '-'
+            onClick: () => setSort('end_date'),
+            render: (date) => (
+                <span className="text-gray-500 whitespace-nowrap">
+                    {date ? new Date(date).toISOString().split('T')[0] : '-'}
+                </span>
+            )
         },
         {
             header: 'Status',
-            accessor: 'status',
-            render: (val, row) => {
+            accessor: 'id',
+            render: (_, row) => {
                 const now = new Date();
                 now.setHours(0, 0, 0, 0);
                 const start = new Date(row.start_date);
                 start.setHours(0, 0, 0, 0);
                 const end = new Date(row.end_date);
-                end.setHours(0, 0, 0, 0);
-
-                let color = 'bg-green-50 text-green-500 border-green-100';
-                let label = 'Active';
-
-                if (now.getTime() < start.getTime()) {
-                    color = 'bg-blue-50 text-blue-500 border-blue-100';
-                    label = 'Scheduled';
-                } else if (now.getTime() > end.getTime()) {
-                    color = 'bg-gray-50 text-gray-400 border-gray-100';
-                    label = 'Expired';
+                end.setHours(23, 59, 59, 999);
+                
+                if (now >= start && now <= end) {
+                    return (
+                        <span className="px-2.5 py-0.5 rounded-[4px] bg-[#f0fdf4] text-[#22c55e] text-[12px] font-medium border border-[#dcfce7]">
+                            Active
+                        </span>
+                    );
                 }
-
+                if (now < start) {
+                    return (
+                        <span className="px-2.5 py-0.5 rounded-[4px] bg-[#eff6ff] text-[#3b82f6] text-[12px] font-medium border border-[#dbeafe]">
+                            Scheduled
+                        </span>
+                    );
+                }
                 return (
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${color}`}>
-                        {label}
+                    <span className="px-2.5 py-0.5 rounded-[4px] bg-gray-50 text-gray-400 text-[12px] font-medium border border-gray-100">
+                        Expired
                     </span>
                 );
             }
         },
         {
             header: 'Action',
-            accessor: 'action',
-            render: (val, row) => (
-                <button
-                    onClick={() => handleRevert(row.id)}
-                    className="text-red-500 hover:text-red-700 font-medium transition-colors cursor-pointer text-[13px]"
+            accessor: 'id',
+            render: (id, row) => (
+                <button 
+                    onClick={() => showConfirm({
+                        message: 'Revert Delegation?',
+                        subMessage: `This will remove the delegation from ${getUsernameByEmail(row.original_approver)} to ${getUsernameByEmail(row.substitute_approver)}.`,
+                        confirmLabel: 'Revert',
+                        cancelLabel: 'Keep',
+                        variant: 'danger',
+                        onConfirm: async () => {
+                            const success = await removeDelegation(id);
+                            if (success && onUpdate) onUpdate();
+                        },
+                    })}
+                    className="text-[#ef4444] hover:text-[#dc2626] text-[13px] font-medium transition-colors cursor-pointer"
                 >
                     Revert
                 </button>
             )
         }
-    ], [sortColumn, sortDirection]);
+    ];
 
-    const sortedAndPaginatedDelegations = useMemo(() => {
-        let result = [...delegations];
-        
-        // Sort
-        if (sortColumn) {
-            result.sort((a, b) => {
-                const valA = a[sortColumn] || '';
-                const valB = b[sortColumn] || '';
-                if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-                if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
-        }
+    const displayDelegations = [...(delegations || [])].sort((a, b) => {
+        if (!sortColumn) return 0;
+        let valA = a[sortColumn];
+        let valB = b[sortColumn];
 
-        // Paginate
-        const start = (currentPage - 1) * itemsPerPage;
-        return result.slice(start, start + itemsPerPage);
-    }, [delegations, currentPage, itemsPerPage, sortColumn, sortDirection]);
+        if (valA === null || valA === undefined) valA = '';
+        if (valB === null || valB === undefined) valB = '';
+
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    const paginatedDelegations = displayDelegations.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const isLoading = storeLoading || pageLoading;
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-            <Form 
-                form={form} 
-                layout="vertical" 
-                onFinish={handleCreate} 
-                className="mb-8"
-                requiredMark={false} 
-            >
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <Form.Item
-                        name="original_approver"
-                        label={<span className="font-creato">* From Approver</span>}
-                        rules={[{ required: true }]}
-                        className="mb-0"
-                    >
-                        <Select disabled={true} placeholder="Select Approver" className="w-full font-creato custom-input-height">
-                            {[
-                                ...approvers,
-                                // Add current user to options if not present so it shows the label instead of email
-                                ...(!approvers.some(a => a.value === user?.email) && user?.email ? [{
-                                    value: user.email, 
-                                    label: `${user.username || user.email.split('@')[0]} (${user.email})` 
-                                }] : [])
-                            ].map(a => (
-                                <Option key={a.value} value={a.value}>{a.label}</Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
-                    <Form.Item
-                        name="substitute_approver"
-                        label={<span className="font-creato">* To Substitute</span>}
-                        rules={[{ required: true }]}
-                        className="mb-0"
-                    >
-                        <Select 
-                            showSearch 
-                            optionFilterProp="children" 
-                            placeholder="Select Approver" 
-                            className="w-full font-creato custom-input-height"
-                        >
-                            {approvers.map(a => (
-                                <Option key={a.value} value={a.value}>{a.label}</Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
-                    <Form.Item
-                        name="start_date"
-                        label={<span className="font-creato">* Start Date</span>}
-                        rules={[{ required: true }]}
-                        className="mb-0"
-                    >
-                        <DatePicker placeholder="Start Date" className="w-full font-creato custom-input-height" />
-                    </Form.Item>
-                    <Form.Item
-                        name="end_date"
-                        label={<span className="font-creato">* End Date</span>}
-                        rules={[{ required: true }]}
-                        className="mb-0"
-                    >
-                        <DatePicker placeholder="End Date" className="w-full font-creato custom-input-height" />
-                    </Form.Item>
-                    <Form.Item label=" " className="mb-0">
-                        <Button 
-                            type="primary" 
-                            htmlType="submit" 
-                            loading={loading} 
-                            className="w-full custom-input-height bg-[#1e9bd8] hover:bg-[#1589c3] rounded-lg font-medium font-creato border-none flex items-center justify-center text-[14px]"
-                        >
-                            Add Delegation
-                        </Button>
-                    </Form.Item>
+        <div className="flex flex-col gap-6 animate-fadeIn p-1">
+            {/* Form Section */}
+            <div className="flex flex-wrap items-end gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+                <div className="flex-1 min-w-[240px]">
+                    {isLoading ? (
+                        <div className="flex flex-col gap-1.5">
+                            <Skeleton variant="text" width="100px" className="mb-1" />
+                            <Skeleton variant="rect" height="38px" className="w-full rounded-[4px]" />
+                        </div>
+                    ) : (
+                        <Dropdown
+                            label="* From Approver"
+                            value={form.original_approver}
+                            options={approverOptions}
+                            onChange={(val) => setForm({ ...form, original_approver: val })}
+                            disabled={!isAdmin}
+                        />
+                    )}
                 </div>
-            </Form>
+                <div className="flex-1 min-w-[240px]">
+                    {isLoading ? (
+                        <div className="flex flex-col gap-1.5">
+                            <Skeleton variant="text" width="100px" className="mb-1" />
+                            <Skeleton variant="rect" height="38px" className="w-full rounded-[4px]" />
+                        </div>
+                    ) : (
+                        <Dropdown
+                            label="* To Substitute"
+                            value={form.substitute_approver}
+                            options={approverOptions}
+                            onChange={(val) => setForm({ ...form, substitute_approver: val })}
+                        />
+                    )}
+                </div>
+                <div className="flex flex-col gap-1.5 w-full sm:w-[180px]">
+                    <label className="text-[13px] font-medium text-gray-700">* Start Date</label>
+                    {isLoading ? (
+                        <Skeleton variant="rect" height="38px" className="w-full rounded-[4px]" />
+                    ) : (
+                        <CustomDatePicker
+                            value={form.start_date ? dayjs(form.start_date) : null}
+                            onChange={(_, dateString) => setForm({ ...form, start_date: dateString })}
+                            format="YYYY-MM-DD"
+                            placeholder="Start Date"
+                            disabledDate={(current) => current && current < dayjs().startOf('day')}
+                        />
+                    )}
+                </div>
+                <div className="flex flex-col gap-1.5 w-full sm:w-[180px]">
+                    <label className="text-[13px] font-medium text-gray-700">* End Date</label>
+                    {isLoading ? (
+                        <Skeleton variant="rect" height="38px" className="w-full rounded-[4px]" />
+                    ) : (
+                        <CustomDatePicker
+                            value={form.end_date ? dayjs(form.end_date) : null}
+                            onChange={(_, dateString) => setForm({ ...form, end_date: dateString })}
+                            format="YYYY-MM-DD"
+                            placeholder="End Date"
+                            disabledDate={(current) => current && form.start_date ? current < dayjs(form.start_date).startOf('day') : current < dayjs().startOf('day')}
+                        />
+                    )}
+                </div>
+                <div className="w-full sm:w-auto">
+                    {isLoading ? (
+                        <Skeleton variant="rect" height="40px" width="140px" className="rounded-[4px]" />
+                    ) : (
+                        <button
+                            onClick={handleAdd}
+                            disabled={isUpdating}
+                            className="h-[40px] px-6 bg-[#24a0ed] hover:bg-[#1c8ad1] text-white rounded-[4px] text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"
+                        >
+                            {isUpdating && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
+                            {isUpdating ? 'Adding...' : 'Add Delegation'}
+                        </button>
+                    )}
+                </div>
+            </div>
 
-            <div className="mt-6">
+            {/* Table Section */}
+            <div className="w-full flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-gray-800">Delegations</h3>
+                    <button 
+                        onClick={() => {
+                            fetchDelegations();
+                            if (onUpdate) onUpdate();
+                        }}
+                        disabled={isLoading}
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-md bg-white hover:bg-gray-50 transition-colors text-sm text-gray-600 disabled:opacity-50 cursor-pointer"
+                    >
+                        <ReloadOutlined spin={isLoading && storeLoading} />
+                        <span>Refresh</span>
+                    </button>
+                </div>
                 <DataTable
-                    columns={columnDefs}
-                    data={sortedAndPaginatedDelegations}
-                    loading={tableLoading}
-                    totalItems={delegations.length}
+                    columns={columns}
+                    data={paginatedDelegations}
+                    loading={isLoading}
+                    totalItems={displayDelegations.length}
                     currentPage={currentPage}
                     itemsPerPage={itemsPerPage}
                     onPageChange={setCurrentPage}
                     onItemsPerPageChange={setItemsPerPage}
                     sortColumn={sortColumn}
                     sortDirection={sortDirection}
+                    maxHeight="calc(100vh - 420px)"
+                    stickyHeader={true}
                 />
             </div>
         </div>

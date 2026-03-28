@@ -62,13 +62,14 @@ async def get_delegations(
 ):
     query = db.query(DBDelegation).filter(DBDelegation.entity == entity)
     
-    if current_user.role != "admin":
-        email = current_user.email.lower()
-        query = query.filter(or_(
-            DBDelegation.original_approver == email,
-            DBDelegation.substitute_approver == email,
-            DBDelegation.created_by == current_user.email
-        ))
+    # No longer filtering by user - returning all delegations for the entity as requested
+    # if current_user.role != "admin":
+    #     email = current_user.email.lower()
+    #     query = query.filter(or_(
+    #         DBDelegation.original_approver == email,
+    #         DBDelegation.substitute_approver == email,
+    #         DBDelegation.created_by == current_user.email
+    #     ))
         
     delegations = query.order_by(DBDelegation.created_at.desc()).all()
     return delegations

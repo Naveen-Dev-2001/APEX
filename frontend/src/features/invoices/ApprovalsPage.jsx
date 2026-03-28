@@ -19,7 +19,7 @@ const ApprovalsPage = () => {
     const [loading, setLoading] = useState(false);
     const [activeDelegations, setActiveDelegations] = useState([]);
     const [approvers, setApprovers] = useState([]);
-    
+
     // Pagination and Sorting State
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(15);
@@ -58,7 +58,7 @@ const ApprovalsPage = () => {
                 const currentLevel = inv.current_approver_level || 1;
                 const assignedApprovers = inv.assigned_approvers || [];
                 const currentLevelEmail = (assignedApprovers[currentLevel - 1] || '').toLowerCase();
-                
+
                 const userEmail = (user?.email || '').toLowerCase();
                 const isDesignatedApprover = userEmail === currentLevelEmail;
                 const isActiveDelegate = active.includes(currentLevelEmail);
@@ -70,8 +70,8 @@ const ApprovalsPage = () => {
                 vendor_name: inv.vendor_name || inv.extracted_data?.vendor_info?.name?.value || "N/A",
                 invoice_number: inv.invoice_number || inv.extracted_data?.invoice_details?.invoice_number?.value || "N/A",
                 total_amount: inv.extracted_data?.amounts?.total_invoice_amount?.value || "0.00",
-                approver_name: (inv.assigned_approvers?.[inv.current_approver_level - 1] || 'Pending') + 
-                               (active.includes((inv.assigned_approvers?.[inv.current_approver_level - 1] || '').toLowerCase()) ? ' (Delegated)' : '')
+                approver_name: (inv.assigned_approvers?.[inv.current_approver_level - 1] || 'Pending') +
+                    (active.includes((inv.assigned_approvers?.[inv.current_approver_level - 1] || '').toLowerCase()) ? ' (Delegated)' : '')
             }));
 
             setInvoices(filtered);
@@ -196,7 +196,7 @@ const ApprovalsPage = () => {
 
     const sortedAndPaginatedInvoices = useMemo(() => {
         let result = [...invoices];
-        
+
         // Sort
         if (sortColumn) {
             result.sort((a, b) => {
@@ -244,10 +244,11 @@ const ApprovalsPage = () => {
             label: 'Change Approver (Delegation)',
             children: (
                 <div className="pt-4">
-                    <DelegationManager 
-                        isAdmin={user?.role === 'admin'} 
-                        onUpdate={fetchData} 
+                    <DelegationManager
+                        isAdmin={user?.role === 'admin'}
+                        onUpdate={fetchData}
                         approvers={approvers}
+                        loading={loading}
                     />
                 </div>
             ),
@@ -255,14 +256,14 @@ const ApprovalsPage = () => {
     ];
 
     return (
-        <div className="p-6 bg-[#f8fafc] min-h-screen pt-[5px]">
-            <div className="mb-6">
+        <div className="p-6 bg-[#f8fafc] min-h-screen pt-[10px]">
+            {/* <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">Approvals</h1>
-            </div>
+            </div> */}
             <div className="bg-white rounded-xl shadow-sm p-2">
-                <Tabs 
-                    defaultActiveKey="1" 
-                    items={items} 
+                <Tabs
+                    defaultActiveKey="1"
+                    items={items}
                     className="approvals-tabs"
                     tabBarStyle={{ marginBottom: 0, paddingLeft: '1rem' }}
                 />
