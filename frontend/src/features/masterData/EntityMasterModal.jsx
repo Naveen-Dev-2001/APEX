@@ -44,7 +44,7 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
             setForm({
                 id: rowData.id ?? null,
                 entity_id: rowData.entity_id ?? '',
-                entity_name: rowData.entity_name ?? '',
+                entity_name: (rowData.entity_name === 'Default Entity' ? 'Top Level' : rowData.entity_name) ?? '',
                 registered_address: rowData.registered_address ?? '',
                 address_line1: rowData.address_line1 ?? '',
                 address_line2: rowData.address_line2 ?? '',
@@ -98,20 +98,29 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                 {/* Body */}
                 <div className="overflow-y-auto px-6 py-5 flex flex-col gap-4">
                     {/* Row 1 */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                            label="Entity Id"
-                            id="entity_id"
-                            value={form.entity_id}
-                            onChange={handleChange('entity_id')}
-                        />
-                        <FormField
-                            label="Entity Name"
-                            id="entity_name"
-                            value={form.entity_name}
-                            onChange={handleChange('entity_name')}
-                        />
-                    </div>
+                    {(() => {
+                        const isTopLevel = form.entity_name === 'Top Level' || form.entity_name === 'Default Entity';
+                        const isFieldReadOnly = isEdit && isTopLevel;
+                        
+                        return (
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                    label="Entity Id"
+                                    id="entity_id"
+                                    value={form.entity_id}
+                                    onChange={handleChange('entity_id')}
+                                    readOnly={isFieldReadOnly}
+                                />
+                                <FormField
+                                    label="Entity Name"
+                                    id="entity_name"
+                                    value={form.entity_name}
+                                    onChange={handleChange('entity_name')}
+                                    readOnly={isFieldReadOnly}
+                                />
+                            </div>
+                        );
+                    })()}
 
                     {/* Row 2 */}
                     <div className="grid grid-cols-2 gap-4">

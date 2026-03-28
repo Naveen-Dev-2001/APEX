@@ -935,6 +935,14 @@ const useMasterDataStore = create((set, get) => ({
         
         let processed = [...master.data];
 
+        // Map "Default Entity" to "Top Level" for Entity Master tab
+        if (activeTab === 'Entity Master') {
+            processed = processed.map(item => ({
+                ...item,
+                entity_name: item.entity_name === 'Default Entity' ? 'Top Level' : item.entity_name
+            }));
+        }
+
         // Filter
         if (searchQuery) {
             const lowerQuery = searchQuery.toLowerCase();

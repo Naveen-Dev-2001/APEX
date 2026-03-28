@@ -255,24 +255,31 @@ const MasterDataPage = () => {
         if (col.accessor === 'actions') {
             return {
                 ...col,
-                render: (_, row, index) => (
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && openEdit(row, index)}
-                            className="text-gray-500 hover:text-gray-700 transition-colors p-1"
-                            title="Edit"
-                        >
-                            <Pencil size={18} />
-                        </button>
-                        <button
-                            onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && handleDelete(row, index)}
-                            className="text-[#ff4d4f] hover:text-[#d32f2f] transition-colors p-1"
-                            title="Delete"
-                        >
-                            <Trash2 size={18} />
-                        </button>
-                    </div>
-                ),
+                render: (_, row, index) => {
+                    const isTopLevelEntity = isEntityTab && (row.entity_name === 'Top Level' || row.entity_name === 'Default Entity');
+                    
+                    return (
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && openEdit(row, index)}
+                                className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                                title="Edit"
+                            >
+                                <Pencil size={18} />
+                            </button>
+                            <button
+                                onClick={() => !isTopLevelEntity && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && handleDelete(row, index)}
+                                disabled={isTopLevelEntity}
+                                className={`transition-colors p-1 ${isTopLevelEntity 
+                                    ? 'text-gray-300 cursor-not-allowed' 
+                                    : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
+                                title={isTopLevelEntity ? "Top Level Entity cannot be deleted" : "Delete"}
+                            >
+                                <Trash2 size={18} />
+                            </button>
+                        </div>
+                    );
+                },
             };
         }
         return {
