@@ -210,14 +210,20 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
     });
     
     const paginatedDelegations = displayDelegations.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    
     const isLoading = storeLoading || pageLoading;
+    // Form fields should only show skeletons on absolute initial load (when data is missing)
+    const isInitialLoading = isLoading && (
+        (isAdmin && (!users || users.length === 0)) || 
+        (!isAdmin && (!user))
+    );
 
     return (
         <div className="flex flex-col gap-6 animate-fadeIn p-1">
             {/* Form Section */}
             <div className="flex flex-wrap items-end gap-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
                 <div className="flex-1 min-w-[240px]">
-                    {isLoading ? (
+                    {isInitialLoading ? (
                         <div className="flex flex-col gap-1.5">
                             <Skeleton variant="text" width="100px" className="mb-1" />
                             <Skeleton variant="rect" height="38px" className="w-full rounded-[4px]" />
@@ -233,7 +239,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                     )}
                 </div>
                 <div className="flex-1 min-w-[240px]">
-                    {isLoading ? (
+                    {isInitialLoading ? (
                         <div className="flex flex-col gap-1.5">
                             <Skeleton variant="text" width="100px" className="mb-1" />
                             <Skeleton variant="rect" height="38px" className="w-full rounded-[4px]" />
@@ -249,7 +255,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                 </div>
                 <div className="flex flex-col gap-1.5 w-full sm:w-[180px]">
                     <label className="text-[13px] font-medium text-gray-700">* Start Date</label>
-                    {isLoading ? (
+                    {isInitialLoading ? (
                         <Skeleton variant="rect" height="38px" className="w-full rounded-[4px]" />
                     ) : (
                         <CustomDatePicker
@@ -263,7 +269,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                 </div>
                 <div className="flex flex-col gap-1.5 w-full sm:w-[180px]">
                     <label className="text-[13px] font-medium text-gray-700">* End Date</label>
-                    {isLoading ? (
+                    {isInitialLoading ? (
                         <Skeleton variant="rect" height="38px" className="w-full rounded-[4px]" />
                     ) : (
                         <CustomDatePicker
@@ -276,7 +282,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                     )}
                 </div>
                 <div className="w-full sm:w-auto">
-                    {isLoading ? (
+                    {isInitialLoading ? (
                         <Skeleton variant="rect" height="40px" width="140px" className="rounded-[4px]" />
                     ) : (
                         <button
@@ -298,7 +304,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                     <button 
                         onClick={() => {
                             fetchDelegations();
-                            if (onUpdate) onUpdate();
+                            // Removed global onUpdate() to prevent full page re-render and flickering
                         }}
                         disabled={isLoading}
                         className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-md bg-white hover:bg-gray-50 transition-colors text-sm text-gray-600 disabled:opacity-50 cursor-pointer"
