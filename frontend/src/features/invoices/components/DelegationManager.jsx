@@ -24,10 +24,10 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
 
     useEffect(() => {
         fetchDelegations();
-        if (!isAdmin && user?.email) {
+        if (user?.email) {
             form.setFieldsValue({ original_approver: user.email });
         }
-    }, [isAdmin, user?.email, form]);
+    }, [user?.email, form]);
 
     const handleCreate = async (values) => {
         setLoading(true);
@@ -139,8 +139,15 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
                         rules={[{ required: true }]}
                         className="mb-0"
                     >
-                        <Select disabled={!isAdmin} placeholder="Select Approver" className="w-full">
-                            {approvers.map(a => (
+                        <Select disabled={true} placeholder="Select Approver" className="w-full">
+                            {[
+                                ...approvers,
+                                // Add current user to options if not present so it shows the label instead of email
+                                ...(!approvers.some(a => a.value === user?.email) && user?.email ? [{
+                                    value: user.email, 
+                                    label: `${user.username || user.email.split('@')[0]} (${user.email})` 
+                                }] : [])
+                            ].map(a => (
                                 <Option key={a.value} value={a.value}>{a.label}</Option>
                             ))}
                         </Select>
