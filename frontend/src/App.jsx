@@ -15,6 +15,7 @@ import ToastProvider from './components/ToastProvider';
 import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
 import CodingPage from './features/invoices/CodingPage';
+import ApprovalsPage from './features/invoices/ApprovalsPage';
 
 function App() {
 
@@ -50,6 +51,7 @@ function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/invoices" element={<Invoice />} />
                 <Route path="/coding" element={<CodingPage />} />
+                <Route path="/approvals" element={<ApprovalsPage />} />
                 <Route path="/master-data" element={<MasterDataPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/admin" element={<AdminPage />} />
