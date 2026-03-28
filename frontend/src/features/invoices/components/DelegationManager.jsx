@@ -307,7 +307,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                             // Removed global onUpdate() to prevent full page re-render and flickering
                         }}
                         disabled={isLoading}
-                        className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-md bg-white hover:bg-gray-50 transition-colors text-sm text-gray-600 disabled:opacity-50 cursor-pointer"
+                        className="h-[40px] px-6 bg-[#24a0ed] hover:bg-[#1c8ad1] text-white rounded-[4px] text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                     >
                         <ReloadOutlined spin={isLoading && storeLoading} />
                         <span>Refresh</span>
