@@ -141,7 +141,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
                     >
                         <Select disabled={!isAdmin} placeholder="Select Approver" className="w-full">
                             {approvers.map(a => (
-                                <Option key={a.email} value={a.email}>{a.username || a.email}</Option>
+                                <Option key={a.value} value={a.value}>{a.label}</Option>
                             ))}
                         </Select>
                     </Form.Item>
@@ -153,7 +153,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
                     >
                         <Select showSearch optionFilterProp="children" placeholder="Select Substitute" className="w-full">
                             {approvers.map(a => (
-                                <Option key={a.email} value={a.email}>{a.username || a.email}</Option>
+                                <Option key={a.value} value={a.value}>{a.label}</Option>
                             ))}
                         </Select>
                     </Form.Item>
