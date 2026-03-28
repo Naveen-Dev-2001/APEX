@@ -277,6 +277,9 @@ async def get_sheet_data(
         counts_query = db.query(Invoice.entity, func.count(Invoice.id)).group_by(Invoice.entity).all()
         invoice_counts = {entity_name: count for entity_name, count in counts_query if entity_name}
 
+    # Fetch all records for the model
+    rows = db.query(model).all()
+
     # Convert SQLAlchemy objects to dicts
     result = []
     for row in rows:
