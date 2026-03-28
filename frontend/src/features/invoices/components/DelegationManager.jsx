@@ -109,13 +109,15 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
             header: 'Start Date',
             accessor: 'start_date',
             sortable: true,
-            onClick: () => handleSort('start_date')
+            onClick: () => handleSort('start_date'),
+            render: (val) => val ? val.split('T')[0] : '-'
         },
         {
             header: 'End Date',
             accessor: 'end_date',
             sortable: true,
-            onClick: () => handleSort('end_date')
+            onClick: () => handleSort('end_date'),
+            render: (val) => val ? val.split('T')[0] : '-'
         },
         {
             header: 'Status',
