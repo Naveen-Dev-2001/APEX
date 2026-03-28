@@ -1,24 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, DatePicker, Button, Table, Space, Tag } from 'antd';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Form, Select, DatePicker, Button } from 'antd';
 import { createDelegation, getDelegations, deleteDelegation } from '../../../api/delegationApi';
 import { useAuthStore } from '../../../store/authStore';
 import toast from '../../../utils/toast';
+import ReusableDataTable from '../../../shared/components/ReusableDataTable';
 
 const { Option } = Select;
 
 const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
+    const [tableLoading, setTableLoading] = useState(false);
     const [delegations, setDelegations] = useState([]);
     const user = useAuthStore((state) => state.user);
 
     const fetchDelegations = async () => {
+        setTableLoading(true);
         try {
             const data = await getDelegations();
-            setDelegations(data);
+            // Transform data for the data table
+            setDelegations(data.map((d, index) => ({ ...d, s_no: index + 1 })));
         } catch (error) {
             console.error('Failed to fetch delegations:', error);
             toast.error('Failed to fetch delegations');
+        } finally {
+            setTableLoading(false);
         }
     };
 
@@ -73,73 +79,105 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
         }
     };
 
-    const columns = [
+    const columnDefs = useMemo(() => [
         {
-            title: 'Original Approver',
-            dataIndex: 'original_approver',
-            key: 'original_approver',
-            render: (email) => <span className="text-gray-700">{email}</span>
+            headerName: "S.no",
+            valueGetter: "node.rowIndex + 1",
+            width: 80,
+            pinned: "left",
         },
         {
-            title: 'Substitute',
-            dataIndex: 'substitute_approver',
-            key: 'substitute_approver',
-            render: (email) => <span className="text-gray-700">{email}</span>
+            headerName: 'Original Approver',
+            field: 'original_approver',
+            flex: 1.5,
+            minWidth: 200,
         },
         {
-            title: 'Start Date',
-            dataIndex: 'start_date',
-            key: 'start_date',
-            render: (date) => <span className="text-gray-600">{date}</span>
+            headerName: 'Substitute',
+            field: 'substitute_approver',
+            flex: 1.5,
+            minWidth: 200,
         },
         {
-            title: 'End Date',
-            dataIndex: 'end_date',
-            key: 'end_date',
-            render: (date) => <span className="text-gray-600">{date}</span>
+            headerName: 'Start Date',
+            field: 'start_date',
+            flex: 1,
+            minWidth: 120,
         },
         {
-            title: 'Status',
-            key: 'status',
-            render: (_, record) => {
+            headerName: 'End Date',
+            field: 'end_date',
+            flex: 1,
+            minWidth: 120,
+        },
+        {
+            headerName: 'Status',
+            field: 'status',
+            flex: 1,
+            minWidth: 100,
+            cellRenderer: (params) => {
                 const now = new Date();
                 now.setHours(0, 0, 0, 0);
-                const start = new Date(record.start_date);
+                const start = new Date(params.data.start_date);
                 start.setHours(0, 0, 0, 0);
-                const end = new Date(record.end_date);
+                const end = new Date(params.data.end_date);
                 end.setHours(0, 0, 0, 0);
 
+                let color = 'bg-gray-100 text-gray-600';
+                let label = 'Expired';
+
                 if (now.getTime() >= start.getTime() && now.getTime() <= end.getTime()) {
-                    return <Tag color="green">Active</Tag>;
+                    color = 'bg-green-100 text-green-600';
+                    label = 'Active';
                 } else if (now.getTime() < start.getTime()) {
-                    return <Tag color="blue">Scheduled</Tag>;
-                } else {
-                    return <Tag color="default">Expired</Tag>;
+                    color = 'bg-blue-100 text-blue-600';
+                    label = 'Scheduled';
                 }
+
+                return (
+                    <div className="flex items-center h-full">
+                        <span className={`px-3 py-1 rounded-full text-[12px] font-medium border ${color}`}>
+                            {label}
+                        </span>
+                    </div>
+                );
             }
         },
         {
-            title: 'Action',
-            key: 'action',
-            render: (_, record) => (
-                <Button type="link" danger onClick={() => handleRevert(record.id)} className="p-0">
-                    Revert
-                </Button>
-            ),
-        },
-    ];
+            headerName: 'Action',
+            field: 'action',
+            width: 100,
+            pinned: 'right',
+            cellRenderer: (params) => (
+                <div className="flex items-center h-full">
+                    <button
+                        onClick={() => handleRevert(params.data.id)}
+                        className="text-red-500 hover:text-red-700 font-medium transition-colors cursor-pointer"
+                    >
+                        Revert
+                    </button>
+                </div>
+            )
+        }
+    ], []);
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-sm">
-            <Form form={form} layout="vertical" onFinish={handleCreate} className="mb-8">
+            <Form 
+                form={form} 
+                layout="vertical" 
+                onFinish={handleCreate} 
+                className="mb-8"
+                requiredMark={false} 
+            >
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                     <Form.Item
                         name="original_approver"
-                        label="From Approver"
+                        label={<span className="font-creato">* From Approver</span>}
                         rules={[{ required: true }]}
                         className="mb-0"
                     >
-                        <Select disabled={true} placeholder="Select Approver" className="w-full">
+                        <Select disabled={true} placeholder="Select Approver" className="w-full font-creato custom-input-height">
                             {[
                                 ...approvers,
                                 // Add current user to options if not present so it shows the label instead of email
@@ -154,11 +192,16 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
                     </Form.Item>
                     <Form.Item
                         name="substitute_approver"
-                        label="To Substitute"
+                        label={<span className="font-creato">* To Substitute</span>}
                         rules={[{ required: true }]}
                         className="mb-0"
                     >
-                        <Select showSearch optionFilterProp="children" placeholder="Select Substitute" className="w-full">
+                        <Select 
+                            showSearch 
+                            optionFilterProp="children" 
+                            placeholder="Select Approver" 
+                            className="w-full font-creato custom-input-height"
+                        >
                             {approvers.map(a => (
                                 <Option key={a.value} value={a.value}>{a.label}</Option>
                             ))}
@@ -166,37 +209,45 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
                     </Form.Item>
                     <Form.Item
                         name="start_date"
-                        label="Start Date"
+                        label={<span className="font-creato">* Start Date</span>}
                         rules={[{ required: true }]}
                         className="mb-0"
                     >
-                        <DatePicker className="w-full" />
+                        <DatePicker placeholder="Start Date" className="w-full font-creato custom-input-height" />
                     </Form.Item>
                     <Form.Item
                         name="end_date"
-                        label="End Date"
+                        label={<span className="font-creato">* End Date</span>}
                         rules={[{ required: true }]}
                         className="mb-0"
                     >
-                        <DatePicker className="w-full" />
+                        <DatePicker placeholder="End Date" className="w-full font-creato custom-input-height" />
                     </Form.Item>
-                    <div className="flex justify-end">
-                        <Button type="primary" htmlType="submit" loading={loading} className="bg-[#1e9bd8] hover:bg-[#1589c3]">
+                    <Form.Item label=" " className="mb-0">
+                        <Button 
+                            type="primary" 
+                            htmlType="submit" 
+                            loading={loading} 
+                            className="w-full custom-input-height bg-[#1e9bd8] hover:bg-[#1589c3] rounded-lg font-medium font-creato border-none flex items-center justify-center text-[14px]"
+                        >
                             Add Delegation
                         </Button>
-                    </div>
+                    </Form.Item>
                 </div>
             </Form>
 
-            <Table
-                dataSource={delegations}
-                columns={columns}
-                rowKey="id"
-                pagination={{ pageSize: 5 }}
-                size="middle"
-                className="delegation-table"
-                locale={{ emptyText: 'No delegations found' }}
-            />
+            <div className="mt-6 border border-gray-100 rounded-lg overflow-hidden">
+                <ReusableDataTable
+                    title="Delegations"
+                    columnDefs={columnDefs}
+                    data={delegations}
+                    loading={tableLoading}
+                    tableSearch={false}
+                    tableHeader={false}
+                    rowHeight={52}
+                    shouldUseFlex={true}
+                />
+            </div>
         </div>
     );
 };

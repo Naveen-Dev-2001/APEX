@@ -193,6 +193,23 @@
     background-color: #22B4E6;
 }
 
+/* Custom Input & Button Heights for Uniformity */
+.custom-input-height {
+    height: 40px !important;
+}
+
+.custom-input-height.ant-select .ant-select-selector,
+.custom-input-height.ant-picker {
+    height: 40px !important;
+    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.custom-input-height.ant-btn {
+    border-radius: 8px !important;
+}
+
 /* Horizontal split (vertical divider) */
 .gutter.gutter-horizontal {
     cursor: col-resize;
