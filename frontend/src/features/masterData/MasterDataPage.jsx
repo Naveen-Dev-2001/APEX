@@ -184,6 +184,11 @@ const MasterDataPage = () => {
     };
 
     const handleDelete = (row, indexInPage) => {
+        if (isEntityTab && row.invoice_count > 0) {
+            toast.error("You can’t delete this entity because an invoice has already been created for it.");
+            return;
+        }
+
         const itemName = row.entity_name || row.entityName || row.vendor_name || row.vendorName || 'this item';
 
         showConfirm({
@@ -258,11 +263,11 @@ const MasterDataPage = () => {
                 render: (_, row, index) => {
                     const isTopLevelEntity = isEntityTab && (row.entity_name === 'Top Level' || row.entity_name === 'Default Entity');
                     const hasInvoices = isEntityTab && row.invoice_count > 0;
-                    const isDeleteDisabled = isTopLevelEntity || hasInvoices;
-                    
+                    const isDeleteDisabled = isTopLevelEntity;
+
                     let deleteTooltip = "Delete";
                     if (isTopLevelEntity) deleteTooltip = "Top Level Entity cannot be deleted";
-                    else if (hasInvoices) deleteTooltip = "Entity has associated invoices and cannot be deleted";
+                    else if (hasInvoices) deleteTooltip = "Cannot delete: Invoice created under this entity";
 
                     return (
                         <div className="flex items-center gap-4">
@@ -276,8 +281,8 @@ const MasterDataPage = () => {
                             <button
                                 onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && handleDelete(row, index)}
                                 disabled={isDeleteDisabled}
-                                className={`transition-colors p-1 ${isDeleteDisabled 
-                                    ? 'text-gray-300 cursor-not-allowed' 
+                                className={`transition-colors p-1 ${isDeleteDisabled
+                                    ? 'text-gray-300 cursor-not-allowed'
                                     : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
                                 title={deleteTooltip}
                             >

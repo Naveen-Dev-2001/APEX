@@ -102,10 +102,10 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                         const isTopLevel = form.entity_name === 'Top Level' || form.entity_name === 'Default Entity';
                         const hasInvoices = rowData?.invoice_count > 0;
                         const isFieldReadOnly = isEdit && (isTopLevel || hasInvoices);
-                        
+
                         return (
                             <>
-                                {isFieldReadOnly && (
+                                {/* {isFieldReadOnly && (
                                     <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 mb-2">
                                         <AlertCircle size={18} className="flex-shrink-0" />
                                         <span className="text-[13px] leading-tight">
@@ -114,7 +114,7 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                                                 : "Entity ID and Name cannot be edited because this entity has associated invoices."}
                                         </span>
                                     </div>
-                                )}
+                                )} */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <FormField
                                         label="Entity Id"
@@ -209,8 +209,8 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                                 className="flex items-center gap-2 group cursor-pointer"
                             >
                                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all
-                                    ${form.gst_applicable 
-                                        ? 'border-[#1D71AB] bg-[#1D71AB]' 
+                                    ${form.gst_applicable
+                                        ? 'border-[#1D71AB] bg-[#1D71AB]'
                                         : 'border-[#D9D9D9] bg-white group-hover:border-[#1D71AB]'}`}
                                 >
                                     {form.gst_applicable && (
@@ -226,8 +226,8 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                                 className="flex items-center gap-2 group cursor-pointer"
                             >
                                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all
-                                    ${!form.gst_applicable 
-                                        ? 'border-[#1D71AB] bg-[#1D71AB]' 
+                                    ${!form.gst_applicable
+                                        ? 'border-[#1D71AB] bg-[#1D71AB]'
                                         : 'border-[#D9D9D9] bg-white group-hover:border-[#1D71AB]'}`}
                                 >
                                     {!form.gst_applicable && (
