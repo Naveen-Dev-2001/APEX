@@ -14,18 +14,23 @@ const SelectEntityPage = () => {
   const setEntity = useCommonStore((state) => state.setEntity)
 
   // State for selected entity display and dropdown visibility
-  const [selectedEntity, setSelectedEntity] = useState('Select Entity');
+  const [selectedEntity, setSelectedEntity] = useState('Choose Entity');
   const [isSelectOpen, setIsSelectOpen] = useState(false);
 
   const { masters, fetchEntityMasterData, entityLoading } = useMasterDataStore();
   
   // Get entities from store and format them
   const entityData = masters['Entity Master']?.data || [];
-  const entities = entityData.map((entity, index) => ({
-    id: entity.id || index,
-    name: entity.entity_name,
-    displayName: entity.entity_name
-  }));
+  const entities = entityData.map((entity, index) => {
+    const name = entity.entity_name === 'Default Entity' ? 'Top Level' : entity.entity_name;
+    return {
+      id: entity.id || index,
+      name: name,
+      displayName: name
+    };
+  });
+
+
 
   useEffect(() => {
     if (entityData.length === 0) {

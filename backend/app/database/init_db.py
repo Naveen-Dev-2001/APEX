@@ -177,7 +177,7 @@ def create_default_entity(db):
     if existing_count == 0:
         default_entity = EntityMaster(
             entity_id="DEFAULT",
-            entity_name="Default Entity",
+            entity_name="Top Level",
             registered_address="",
             address_line1="",
             address_line2="",
