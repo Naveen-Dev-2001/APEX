@@ -18,11 +18,13 @@ import codingSelectIcon from '../assets/header-icons/coding-icon-select.png';
 import codingUnselectIcon from '../assets/header-icons/coding-icon-unselect.png';
 import approvalSelectIcon from '../assets/header-icons/approval-icon-select.png';
 import approvalUnselectIcon from '../assets/header-icons/approval-icon-unselect.png';
+import invoiceSelectIcon from '../assets/header-icons/invoics-icon-select.png';
+import invoiceUnselectIcon from '../assets/header-icons/invoics-icon-unselect.png';
 import useAdminStore from '../store/useAdminStore';
 
 const tabs = [
     { name: 'Dashboard', route: '/dashboard', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
-    { name: 'Invoices', route: '/invoices', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
+    { name: 'Invoices', route: '/invoices', selectIcon: invoiceSelectIcon, unselectIcon: invoiceUnselectIcon },
     { name: 'Master Data', route: '/master-data', selectIcon: masterDataSelectIcon, unselectIcon: masterDataUnselectIcon },
     { name: 'Settings', route: '/settings', selectIcon: settingsSelectIcon, unselectIcon: settingsUnselectIcon },
     { name: 'Admin', route: '/admin', selectIcon: adminSelectIcon, unselectIcon: adminUnselectIcon },
@@ -30,7 +32,7 @@ const tabs = [
 // Map of names/labels to icons
 const iconMap = {
     'Dashboard': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon },
-    'Invoices': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon },
+    'Invoices': { select: invoiceSelectIcon, unselect: invoiceUnselectIcon },
     'Master Data': { select: masterDataSelectIcon, unselect: masterDataUnselectIcon },
     'Settings': { select: settingsSelectIcon, unselect: settingsUnselectIcon },
     'Admin': { select: adminSelectIcon, unselect: adminUnselectIcon },
