@@ -3,7 +3,7 @@ import { Form, Select, DatePicker, Button } from 'antd';
 import { createDelegation, getDelegations, deleteDelegation } from '../../../api/delegationApi';
 import { useAuthStore } from '../../../store/authStore';
 import toast from '../../../utils/toast';
-import ReusableDataTable from '../../../shared/components/ReusableDataTable';
+import DataTable from '../../../components/ui/DataTable';
 
 const { Option } = Select;
 
@@ -12,6 +12,10 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
     const [loading, setLoading] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
     const [delegations, setDelegations] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(15);
+    const [sortColumn, setSortColumn] = useState(null);
+    const [sortDirection, setSortDirection] = useState('asc');
     const user = useAuthStore((state) => state.user);
 
     const fetchDelegations = async () => {
@@ -79,87 +83,101 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
         }
     };
 
+    const handleSort = (column) => {
+        if (sortColumn === column) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+    };
+
     const columnDefs = useMemo(() => [
         {
-            headerName: "S.no",
-            valueGetter: "node.rowIndex + 1",
-            width: 80,
-            pinned: "left",
+            header: 'Original Approver',
+            accessor: 'original_approver',
+            sortable: true,
+            onClick: () => handleSort('original_approver')
         },
         {
-            headerName: 'Original Approver',
-            field: 'original_approver',
-            flex: 1.5,
-            minWidth: 200,
+            header: 'Substitute',
+            accessor: 'substitute_approver',
+            sortable: true,
+            onClick: () => handleSort('substitute_approver')
         },
         {
-            headerName: 'Substitute',
-            field: 'substitute_approver',
-            flex: 1.5,
-            minWidth: 200,
+            header: 'Start Date',
+            accessor: 'start_date',
+            sortable: true,
+            onClick: () => handleSort('start_date')
         },
         {
-            headerName: 'Start Date',
-            field: 'start_date',
-            flex: 1,
-            minWidth: 120,
+            header: 'End Date',
+            accessor: 'end_date',
+            sortable: true,
+            onClick: () => handleSort('end_date')
         },
         {
-            headerName: 'End Date',
-            field: 'end_date',
-            flex: 1,
-            minWidth: 120,
-        },
-        {
-            headerName: 'Status',
-            field: 'status',
-            flex: 1,
-            minWidth: 100,
-            cellRenderer: (params) => {
+            header: 'Status',
+            accessor: 'status',
+            render: (val, row) => {
                 const now = new Date();
                 now.setHours(0, 0, 0, 0);
-                const start = new Date(params.data.start_date);
+                const start = new Date(row.start_date);
                 start.setHours(0, 0, 0, 0);
-                const end = new Date(params.data.end_date);
+                const end = new Date(row.end_date);
                 end.setHours(0, 0, 0, 0);
 
-                let color = 'bg-gray-100 text-gray-600';
-                let label = 'Expired';
+                let color = 'bg-green-50 text-green-500 border-green-100';
+                let label = 'Active';
 
-                if (now.getTime() >= start.getTime() && now.getTime() <= end.getTime()) {
-                    color = 'bg-green-100 text-green-600';
-                    label = 'Active';
-                } else if (now.getTime() < start.getTime()) {
-                    color = 'bg-blue-100 text-blue-600';
+                if (now.getTime() < start.getTime()) {
+                    color = 'bg-blue-50 text-blue-500 border-blue-100';
                     label = 'Scheduled';
+                } else if (now.getTime() > end.getTime()) {
+                    color = 'bg-gray-50 text-gray-400 border-gray-100';
+                    label = 'Expired';
                 }
 
                 return (
-                    <div className="flex items-center h-full">
-                        <span className={`px-3 py-1 rounded-full text-[12px] font-medium border ${color}`}>
-                            {label}
-                        </span>
-                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${color}`}>
+                        {label}
+                    </span>
                 );
             }
         },
         {
-            headerName: 'Action',
-            field: 'action',
-            width: 100,
-            pinned: 'right',
-            cellRenderer: (params) => (
-                <div className="flex items-center h-full">
-                    <button
-                        onClick={() => handleRevert(params.data.id)}
-                        className="text-red-500 hover:text-red-700 font-medium transition-colors cursor-pointer"
-                    >
-                        Revert
-                    </button>
-                </div>
+            header: 'Action',
+            accessor: 'action',
+            render: (val, row) => (
+                <button
+                    onClick={() => handleRevert(row.id)}
+                    className="text-red-500 hover:text-red-700 font-medium transition-colors cursor-pointer text-[13px]"
+                >
+                    Revert
+                </button>
             )
         }
-    ], []);
+    ], [sortColumn, sortDirection]);
+
+    const sortedAndPaginatedDelegations = useMemo(() => {
+        let result = [...delegations];
+        
+        // Sort
+        if (sortColumn) {
+            result.sort((a, b) => {
+                const valA = a[sortColumn] || '';
+                const valB = b[sortColumn] || '';
+                if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        // Paginate
+        const start = (currentPage - 1) * itemsPerPage;
+        return result.slice(start, start + itemsPerPage);
+    }, [delegations, currentPage, itemsPerPage, sortColumn, sortDirection]);
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -236,16 +254,18 @@ const DelegationManager = ({ isAdmin = false, onUpdate, approvers = [] }) => {
                 </div>
             </Form>
 
-            <div className="mt-6 border border-gray-100 rounded-lg overflow-hidden">
-                <ReusableDataTable
-                    title="Delegations"
-                    columnDefs={columnDefs}
-                    data={delegations}
+            <div className="mt-6">
+                <DataTable
+                    columns={columnDefs}
+                    data={sortedAndPaginatedDelegations}
                     loading={tableLoading}
-                    tableSearch={false}
-                    tableHeader={false}
-                    rowHeight={52}
-                    shouldUseFlex={true}
+                    totalItems={delegations.length}
+                    currentPage={currentPage}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={setItemsPerPage}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
                 />
             </div>
         </div>

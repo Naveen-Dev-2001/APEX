@@ -165,7 +165,7 @@ export default function ReusableDataTable({
                         theme="legacy"
                         getRowStyle={(params) => {
                             if (params.node.rowIndex % 2 === 1) {
-                                return { backgroundColor: "#F7F7F7" };
+                                return { backgroundColor: "#FFFFFF" }; // No zebra striping to match screenshot
                             }
                             return { backgroundColor: "#FFFFFF" };
                         }}
@@ -177,7 +177,7 @@ export default function ReusableDataTable({
                     <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 rounded-b-lg bg-white">
                         {/* Left */}
                         <div className="flex items-center gap-3">
-                            <span className="text-sm text-gray-600">Items per page:</span>
+                            <span className="text-[13px] text-[#4B5563]">Items:</span>
 
                             <select
                                 value={pageSize}
@@ -190,19 +190,19 @@ export default function ReusableDataTable({
                                         gridApi.paginationGoToPage(0);
                                     }
                                 }}
-                                className="border border-gray-300 rounded px-2 py-1 text-sm"
+                                className="border border-[#E5E7EB] rounded px-2 py-0.5 text-[13px] bg-white text-[#4B5563]"
                             >
                                 {pageSizeOptions.map((s) => (
                                     <option key={s} value={s}>{s}</option>
                                 ))}
                             </select>
 
-                            <span className="text-sm text-gray-500">
+                            <span className="text-[13px] text-[#4B5563] ml-2">
                                 {Math.min((currentPage - 1) * pageSize + 1, filteredData.length)}
-                                {" - "}
+                                {"-"}
                                 {Math.min(currentPage * pageSize, filteredData.length)}
                                 {" of "}
-                                {filteredData.length} items
+                                {filteredData.length}
                             </span>
                         </div>
 
@@ -262,9 +262,9 @@ export default function ReusableDataTable({
                                                         setCurrentPage(p);
                                                         gridApi?.paginationGoToPage(p - 1);
                                                     }}
-                                                    className={`min-w-[32px] h-8 rounded text-sm font-medium transition-colors ${currentPage === p
-                                                        ? "bg-[#00A8E8] !text-white"
-                                                        : "bg-white text-gray-700 hover:bg-gray-50"
+                                                    className={`min-w-[32px] h-8 rounded text-[13px] font-medium transition-colors ${currentPage === p
+                                                        ? "bg-[#1e9bd8] !text-white"
+                                                        : "bg-white text-[#4B5563] hover:bg-gray-50"
                                                         }`}
                                                 >
                                                     {p}
@@ -284,9 +284,9 @@ export default function ReusableDataTable({
                                     }
                                 }}
                                 disabled={currentPage === 1}
-                                className={`min-w-[32px] h-8 rounded text-sm transition-colors ${currentPage === 1
-                                    ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                                    : "bg-white text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                className={`min-w-[32px] h-8 flex items-center justify-center text-[18px] transition-colors ${currentPage === 1
+                                    ? "text-gray-300 cursor-not-allowed"
+                                    : "text-[#4B5563] hover:text-[#1e9bd8] cursor-pointer"
                                     }`}
                             >
                                 &lt;
@@ -302,9 +302,9 @@ export default function ReusableDataTable({
                                     }
                                 }}
                                 disabled={currentPage === Math.ceil(filteredData.length / pageSize)}
-                                className={`min-w-[32px] h-8 rounded text-sm transition-colors ${currentPage === Math.ceil(filteredData.length / pageSize)
-                                    ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                                    : "bg-white text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                className={`min-w-[32px] h-8 flex items-center justify-center text-[18px] transition-colors ${currentPage === Math.ceil(filteredData.length / pageSize)
+                                    ? "text-gray-300 cursor-not-allowed"
+                                    : "text-[#4B5563] hover:text-[#1e9bd8] cursor-pointer"
                                     }`}
                             >
                                 &gt;

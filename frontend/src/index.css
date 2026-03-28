@@ -124,14 +124,18 @@
 
 /* AG Grid Styling */
 .ag-theme-alpine .ag-header {
-    background-color: #0369a1 !important;
+    background-color: #1e9bd8 !important;
+    border-bottom: none !important;
 }
 
+.ag-theme-alpine .ag-header-row {
+    background-color: #1e9bd8 !important;
+}
 
 .ag-theme-alpine .ag-header-cell {
-    font-size: 14px !important;
-    font-weight: 500;
-    background-color: #0369a1 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    background-color: #1e9bd8 !important;
     color: white !important;
 }
 
@@ -139,8 +143,22 @@
     color: white !important;
 }
 
+.ag-theme-alpine .ag-sort-indicator-icon {
+    color: white !important;
+    opacity: 0.7;
+}
+
 .ag-theme-alpine .ag-cell {
     font-size: 13px !important;
+    border-right: none !important;
+}
+
+.ag-theme-alpine .ag-row {
+    border-bottom: 1px solid #f3f4f6 !important;
+}
+
+.ag-theme-alpine .ag-row-hover {
+    background-color: #f9fafb !important;
 }
 
 .ant-modal {

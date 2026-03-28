@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, Tag, Space, Button, Modal } from 'antd';
 import { EyeOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import ReusableDataTable from '../../shared/components/ReusableDataTable';
+import DataTable from '../../components/ui/DataTable';
 import DelegationManager from './components/DelegationManager';
 import { getUnapprovedInvoices, updateApprovalStatus } from '../../api/approvalApi';
 import { getDelegations } from '../../api/delegationApi';
@@ -19,6 +19,12 @@ const ApprovalsPage = () => {
     const [loading, setLoading] = useState(false);
     const [activeDelegations, setActiveDelegations] = useState([]);
     const [approvers, setApprovers] = useState([]);
+    
+    // Pagination and Sorting State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(15);
+    const [sortColumn, setSortColumn] = useState(null);
+    const [sortDirection, setSortDirection] = useState('asc');
 
     const fetchData = async () => {
         setLoading(true);
@@ -108,73 +114,107 @@ const ApprovalsPage = () => {
         });
     };
 
+    const handleSort = (column) => {
+        if (sortColumn === column) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+    };
+
     const columnDefs = useMemo(() => [
         {
-            headerName: "S.no",
-            valueGetter: "node.rowIndex + 1",
-            width: 80,
-            pinned: "left",
+            header: "S.no",
+            accessor: "s_no",
+            width: "80px",
+            render: (val, row, idx) => (currentPage - 1) * itemsPerPage + (row.index + 1)
         },
         {
-            headerName: "Vendor Name",
-            field: "vendor_name",
-            minWidth: 200,
+            header: "Vendor Name",
+            accessor: "vendor_name",
+            sortable: true,
+            onClick: () => handleSort("vendor_name")
         },
         {
-            headerName: "Invoice ID",
-            field: "invoice_number",
-            minWidth: 150,
+            header: "Invoice ID",
+            accessor: "invoice_number",
+            sortable: true,
+            onClick: () => handleSort("invoice_number")
         },
         {
-            headerName: "Total Amount ($)",
-            field: "total_amount",
-            minWidth: 150,
-            valueFormatter: (p) => `$ ${p.value}`
+            header: "Total Amount ($)",
+            accessor: "total_amount",
+            sortable: true,
+            onClick: () => handleSort("total_amount"),
+            render: (val) => `$ ${val}`
         },
         {
-            headerName: "Updated By",
-            field: "uploaded_by",
-            minWidth: 180,
+            header: "Updated By",
+            accessor: "uploaded_by",
+            sortable: true,
+            onClick: () => handleSort("uploaded_by")
         },
         {
-            headerName: "Status",
-            field: "status",
-            minWidth: 180,
-            cellRenderer: (p) => (
-                <div className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-[12px] font-medium inline-block border border-orange-200">
+            header: "Status",
+            accessor: "status",
+            render: () => (
+                <div className="bg-orange-50 text-orange-500 px-3 py-1 rounded-full text-[12px] font-medium inline-block border border-orange-100">
                     Waiting for Approval
                 </div>
             )
         },
         {
-            headerName: "Approver",
-            field: "approver_name",
-            minWidth: 220,
+            header: "Approver",
+            accessor: "approver_name",
+            sortable: true,
+            onClick: () => handleSort("approver_name")
         },
         {
-            headerName: "Actions",
-            width: 120,
-            pinned: "right",
-            cellRenderer: (p) => (
-                <div className="flex items-center space-x-2 h-full">
+            header: "Actions",
+            accessor: "actions",
+            render: (val, row) => (
+                <div className="flex items-center space-x-3">
                     <button
-                        onClick={() => handleView(p.data)}
+                        onClick={() => handleView(row)}
                         className="text-gray-400 hover:text-[#1e9bd8] transition-colors cursor-pointer"
                         title="View"
                     >
-                        <EyeOutlined style={{ fontSize: 18 }} />
+                        <EyeOutlined style={{ fontSize: 16 }} />
                     </button>
                     <button
-                        onClick={() => handleDelete(p.data)}
+                        onClick={() => handleDelete(row)}
                         className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                         title="Delete"
                     >
-                        <DeleteOutlined style={{ fontSize: 18 }} />
+                        <DeleteOutlined style={{ fontSize: 16 }} />
                     </button>
                 </div>
             )
         }
-    ], [navigate]);
+    ], [currentPage, itemsPerPage, sortColumn, sortDirection]);
+
+    const sortedAndPaginatedInvoices = useMemo(() => {
+        let result = [...invoices];
+        
+        // Sort
+        if (sortColumn) {
+            result.sort((a, b) => {
+                const valA = a[sortColumn] || '';
+                const valB = b[sortColumn] || '';
+                if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        // Map with original index for S.no
+        const withIndex = result.map((item, index) => ({ ...item, index }));
+
+        // Paginate
+        const start = (currentPage - 1) * itemsPerPage;
+        return withIndex.slice(start, start + itemsPerPage);
+    }, [invoices, currentPage, itemsPerPage, sortColumn, sortDirection]);
 
     const items = [
         {
@@ -182,16 +222,19 @@ const ApprovalsPage = () => {
             label: 'Unapproved Invoices',
             children: (
                 <div className="pt-4">
-                    <ReusableDataTable
-                        title="Approvals"
-                        columnDefs={columnDefs}
-                        data={invoices}
+                    <DataTable
+                        columns={columnDefs}
+                        data={sortedAndPaginatedInvoices}
                         loading={loading}
-                        searchPlaceholder="Search approvals..."
-                        tableSearch={true}
-                        tableHeader={false} // We handle the title in our own layout if needed
-                        rowHeight={52}
-                        shouldUseFlex={true}
+                        totalItems={invoices.length}
+                        currentPage={currentPage}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onItemsPerPageChange={setItemsPerPage}
+                        sortColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        maxHeight="calc(100vh - 320px)"
+                        stickyHeader={true}
                     />
                 </div>
             ),
