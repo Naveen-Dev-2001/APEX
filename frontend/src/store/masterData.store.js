@@ -44,8 +44,8 @@ const useMasterDataStore = create((set, get) => ({
     // Loading / error state for Currency
     currencyLoading: false,
     currencyError: null,
-
     // Master data for all tabs
+    syncingData: false,
     masters: {
         'Entity Master': {
             columns: [
@@ -435,6 +435,25 @@ const useMasterDataStore = create((set, get) => ({
         } catch (err) {
             console.error('[Currency] fetch failed', err);
             set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
+        }
+    },
+
+    syncMasterData: async (tabName) => {
+        set({ syncingData: true });
+        try {
+            await masterDataService.syncTabData(tabName);
+            // Refresh data based on the active tab
+            if (tabName === 'Entity Master') await get().fetchEntityMasterData();
+            else if (tabName === 'Vendor Master') await get().fetchVendorMasterData();
+            else if (tabName === 'TDS Rates') await get().fetchTDSRatesData();
+            else if (tabName === 'GL Master') await get().fetchGLMasterData();
+            else if (tabName === 'LOB Master') await get().fetchLOBMasterData();
+            else if (tabName === 'Department Master') await get().fetchDepartmentMasterData();
+            else if (tabName === 'Customer Master') await get().fetchCustomerMasterData();
+            else if (tabName === 'Item Master') await get().fetchItemMasterData();
+            else if (tabName === 'Currency') await get().fetchCurrencyData();
+        } finally {
+            set({ syncingData: false });
         }
     },
 

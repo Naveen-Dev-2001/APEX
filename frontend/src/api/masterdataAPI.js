@@ -352,6 +352,23 @@ export const masterDataService = {
         return res.data;
     },
 
+    /** Sync data for a specific tab */
+    async syncTabData(tabName) {
+        let identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER 
+                        : tabName === 'Vendor Master' ? VENDOR_IDENTIFIER 
+                        : tabName === 'TDS Rates' ? TDS_IDENTIFIER 
+                        : tabName === 'GL Master' ? GL_IDENTIFIER 
+                        : tabName === 'LOB Master' ? LOB_IDENTIFIER 
+                        : tabName === 'Department Master' ? DEPARTMENT_IDENTIFIER 
+                        : tabName === 'Customer Master' ? CUSTOMER_IDENTIFIER 
+                        : tabName === 'Item Master' ? ITEM_IDENTIFIER 
+                        : tabName === 'Currency' ? CURRENCY_IDENTIFIER : tabName;
+        // Fix for sync identifiers if needed, based on backend config
+        if (tabName === 'Currency') identifier = 'Exchange_Rate';
+        const res = await API.post(`/master/sync/${identifier}`);
+        return res.data;
+    },
+
     // ─── Currency ──────────────────────────────────────────────────────────
     /** Fetch all currencies from DB */
     async getCurrencyData() {

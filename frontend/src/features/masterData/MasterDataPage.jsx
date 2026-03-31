@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Trash2, Upload, Plus, Pencil, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Trash2, Upload, Plus, Pencil, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import useMasterDataStore from '../../store/masterData.store';
 import useToastStore from '../../store/useToastStore';
 import toast from '../../utils/toast';
@@ -41,6 +41,7 @@ const MasterDataPage = () => {
         addCustomerRow, updateCustomerRow, deleteCustomerRow,
         addItemRow, updateItemRow, deleteItemRow,
         addCurrencyRow, updateCurrencyRow, deleteCurrencyRow,
+        syncingData, syncMasterData,
     } = useMasterDataStore();
     const { showConfirm } = useToastStore();
 
@@ -459,6 +460,18 @@ const MasterDataPage = () => {
         }
     };
 
+    const handleSync = async () => {
+        const loadingToast = toast.loading(`Syncing data for ${activeTab} from Sage...`);
+        try {
+            await syncMasterData(activeTab);
+            toast.dismiss(loadingToast);
+            toast.success(`${activeTab} synced successfully`);
+        } catch (err) {
+            toast.dismiss(loadingToast);
+            toast.error('Failed to sync: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
     return (
         <div className="p-6 flex flex-col gap-6 w-full bg-[#FBFBFB] min-h-screen">
             {/* Header */}
@@ -528,6 +541,17 @@ const MasterDataPage = () => {
                         >
                             <Upload size={15} className="text-[#24A1DD]" />
                             <span>Reupload</span>
+                        </button>
+                        <button
+                            onClick={handleSync}
+                            disabled={syncingData}
+                            className={`flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium border rounded-[4px] transition-all whitespace-nowrap
+                                ${syncingData 
+                                    ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50' 
+                                    : 'text-gray-700 border-[#24A1DD] hover:bg-[#F0F9FF]'}`}
+                        >
+                            <RefreshCw size={15} className={`${syncingData ? 'text-gray-400 animate-spin' : 'text-[#24A1DD]'}`} />
+                            <span>{syncingData ? 'Syncing...' : 'Sync'}</span>
                         </button>
                     </>
                 )}
