@@ -26,6 +26,9 @@ const AdminPage = () => {
     const tabs = ['User Management', 'Global Config', 'Delegations'];
 
     const handleEditClick = (user) => {
+        if (user.email?.toLowerCase() === 'admin@example.com') {
+            return;
+        }
         setEditingUser(user);
         setEditForm({ role: user.role, status: user.status });
     };

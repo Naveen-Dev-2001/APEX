@@ -71,6 +71,13 @@ async def update_user_role(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Prevent editing the primary admin account
+    if user.email and user.email.lower() == "admin@example.com":
+        raise HTTPException(
+            status_code=403,
+            detail="The primary admin account cannot be modified."
+        )
+
     old_status = user.status
     user.role = update_data.role
     user.status = update_data.status

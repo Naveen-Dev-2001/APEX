@@ -98,8 +98,13 @@ const UserManagementTab = ({ onEdit }) => {
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => onEdit && onEdit(row)}
-                        className="text-gray-500 hover:text-gray-700 transition-colors p-1"
-                        title="Edit"
+                        disabled={row.email?.toLowerCase() === 'admin@example.com'}
+                        className={`transition-colors p-1 ${
+                            row.email?.toLowerCase() === 'admin@example.com' 
+                                ? 'text-gray-300 cursor-not-allowed' 
+                                : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title={row.email?.toLowerCase() === 'admin@example.com' ? "Cannot edit main admin" : "Edit"}
                     >
                         <Pencil size={18} />
                     </button>
