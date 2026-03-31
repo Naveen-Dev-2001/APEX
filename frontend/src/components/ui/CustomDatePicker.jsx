@@ -36,6 +36,7 @@ const CustomDatePicker = ({
       style={{
         width: '100%',
         borderRadius: '8px',
+        fontSize: '10px',
         ...style
       }}
       value={dateValue}

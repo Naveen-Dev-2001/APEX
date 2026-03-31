@@ -18,7 +18,7 @@ const Dropdown = ({ label, value, options, onChange, className = '', error = '',
                 className="h-[40px]"
                 status={error ? 'error' : ''}
                 size="large"
-                style={{ borderRadius: '8px', width: '100%', ...style }}
+                style={{ borderRadius: '8px', width: '100%', fontSize: '10px', ...style }}
                 getPopupContainer={getPopupContainer ?? (triggerNode => triggerNode.parentNode)}
                 styles={{
                     popup: {
