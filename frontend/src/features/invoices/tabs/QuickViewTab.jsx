@@ -4,12 +4,13 @@ import { Dropdown } from "../../../components/ui";
 import CustomInput from "../../../shared/components/CustomInput";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useVendersListSync, useVendorDetailSync } from "../../hooks/useInvoiceDetailSync";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AutoComplete } from "antd";
 import CustomDatePicker from "../../../shared/components/CustomDatePicker";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
+import InvoiceCalculationModal from "./InvoiceCalculationModal";
 
 dayjs.extend(customParseFormat);
 
@@ -33,6 +34,7 @@ const QuickViewTab = () => {
 
     const { vendorsList } = useVendersListSync();
     const { vendor } = useVendorDetailSync(selectedVendorId);
+    const [showCalcModal, setShowCalcModal] = useState(false);
 
     useEffect(() => {
         if (!vendor || !selectedVendorId) return;
@@ -377,7 +379,7 @@ const QuickViewTab = () => {
                                             <button
                                                 className="text-[#2F5D7C] hover:text-[#1e4560] transition-colors"
                                                 title="View breakdown"
-                                                onClick={() => { }}
+                                                onClick={() => { setShowCalcModal(true) }}
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
                                                     viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -410,6 +412,11 @@ const QuickViewTab = () => {
                     />
                 );
             })}
+
+            <InvoiceCalculationModal
+                open={showCalcModal}
+                onClose={() => setShowCalcModal(false)}
+            />
 
         </div>
     );
