@@ -159,7 +159,7 @@ class ExchangeRateSyncService(BaseSyncService):
         async with lock:
             try:
                 import httpx
-                async with httpx.AsyncClient(timeout=120.0) as client:
+                async with httpx.AsyncClient(timeout=120.0, verify=self.verify_ssl) as client:
                     token = await self._get_access_token(client)
                     location_id = "201"
                     if "|" in self.username:
@@ -264,9 +264,18 @@ class ExchangeRateSyncService(BaseSyncService):
                         logger.info(f"Successfully synced {len(valid_lines)} exchange rates.")
 
                 if event: event.set()
+                if event: event.set()
+            except httpx.ConnectError as e:
+                if "CERTIFICATE_VERIFY_FAILED" in str(e):
+                    msg = "Network issue try again"
+                    logger.error(f"SSL Certificate Verification Failed in ExchangeRateSync: {e}")
+                    if event: event.set()
+                    raise RuntimeError(msg)
+                raise e
             except Exception as e:
                 logger.error(f"Exchange Rate Sync failed: {e}", exc_info=True)
                 if event: event.set()
+                raise e
 
     async def get_all_data(self) -> List[ExchangeRateMaster]:
         return await super().get_all_data(ExchangeRateMaster, "sync_exchange_rates")

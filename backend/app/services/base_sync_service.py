@@ -22,6 +22,7 @@ class BaseSyncService:
         self.client_id = os.getenv("SAGE_CLIENT_ID", settings.SAGE_CLIENT_ID)
         self.client_secret = os.getenv("SAGE_CLIENT_SECRET", settings.SAGE_CLIENT_SECRET)
         self.username = os.getenv("SAGE_USERNAME", settings.SAGE_USERNAME)
+        self.verify_ssl = os.getenv("SAGE_VERIFY_SSL", "true").lower() == "true"
 
     async def _get_access_token(self, client: httpx.AsyncClient) -> str:
         """Fetch OAuth2 token."""
@@ -106,7 +107,7 @@ class BaseSyncService:
             logger.info(f"Starting Two-Stage Sync for {sage_object}...")
             
             try:
-                async with httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=50)) as client:
+                async with httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=50), verify=self.verify_ssl) as client:
                     token = await self._get_access_token(client)
                     # Extract location ID from username if possible (e.g. Apex...|201)
                     location_id = "201"
@@ -190,9 +191,17 @@ class BaseSyncService:
 
                 logger.info(f"Sync complete for {sage_object}. Duration: {datetime.utcnow() - start_time}")
                 if event: event.set()
+            except httpx.ConnectError as e:
+                if "CERTIFICATE_VERIFY_FAILED" in str(e):
+                    msg = "Network issue try again"
+                    logger.error(f"SSL Certificate Verification Failed: {e}")
+                    if event: event.set()
+                    raise RuntimeError(msg)
+                raise e
             except Exception as e:
                 logger.error(f"Sync failed for {sage_object}: {e}", exc_info=True)
                 if event: event.set()
+                raise e
 
     async def sync_rest_object(self, 
                     model: Type, 
@@ -210,7 +219,7 @@ class BaseSyncService:
             logger.info(f"Starting REST Sync for {sage_object}...")
             
             try:
-                async with httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=50)) as client:
+                async with httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=50), verify=self.verify_ssl) as client:
                     token = await self._get_access_token(client)
                     # Extract location ID from username if possible
                     location_id = "201"
@@ -271,25 +280,18 @@ class BaseSyncService:
 
                 logger.info(f"REST Sync complete for {sage_object}. Duration: {datetime.utcnow() - start_time}")
                 if event: event.set()
+            except httpx.ConnectError as e:
+                if "CERTIFICATE_VERIFY_FAILED" in str(e):
+                    msg = "Network issue try again"
+                    logger.error(f"SSL Certificate Verification Failed: {e}")
+                    if event: event.set()
+                    raise RuntimeError(msg)
+                raise e
             except Exception as e:
                 logger.error(f"REST Sync failed for {sage_object}: {e}", exc_info=True)
                 if event: event.set()
+                raise e
 
     async def get_all_data(self, model: Type, sync_func_name: str) -> List[Any]:
-        """Generic entry point for master data; triggers sync if DB empty."""
-        count = self.db.query(model).count()
-        if count == 0:
-            logger.info(f"Database for {model.__name__} is empty. Triggering sync...")
-            # Trigger sync and wait for first batch or completion
-            event = asyncio.Event()
-            # Call the sync function by name (e.g. 'sync_gl_accounts')
-            sync_func = getattr(self, sync_func_name)
-            asyncio.create_task(sync_func(event=event))
-            try:
-                # Wait up to 60 seconds for at least one batch or completion
-                await asyncio.wait_for(event.wait(), timeout=60)
-                logger.info(f"First batch or full sync complete for {model.__name__}.")
-            except asyncio.TimeoutError:
-                logger.warning(f"Timed out waiting for initial {model.__name__} sync batch.")
-        
+        """Generic entry point for master data; returns current DB records without auto-sync."""
         return self.db.query(model).all()

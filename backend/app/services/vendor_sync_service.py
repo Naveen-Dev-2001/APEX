@@ -25,6 +25,7 @@ class VendorSyncService:
         self.client_id = os.getenv("SAGE_CLIENT_ID", settings.SAGE_CLIENT_ID)
         self.client_secret = os.getenv("SAGE_CLIENT_SECRET", settings.SAGE_CLIENT_SECRET)
         self.username = os.getenv("SAGE_USERNAME", settings.SAGE_USERNAME)
+        self.verify_ssl = os.getenv("SAGE_VERIFY_SSL", "true").lower() == "true"
         
     async def _get_access_token(self, client: httpx.AsyncClient) -> str:
         """Fetch OAuth2 token with optimized error handling."""
@@ -104,7 +105,7 @@ class VendorSyncService:
             logger.info("Starting High-Performance Vendor Sync...")
             
             try:
-                async with httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=50)) as client:
+                async with httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=50), verify=self.verify_ssl) as client:
                     token = await self._get_access_token(client)
                     
                     # 1. Pre-fetch existing mappings (crucial for speed)
@@ -170,8 +171,16 @@ class VendorSyncService:
                 # After all concurrent pages are processed
                 logger.info(f"Sync complete. Duration: {datetime.utcnow() - start_time}")
                 if event: event.set()
+            except httpx.ConnectError as e:
+                if "CERTIFICATE_VERIFY_FAILED" in str(e):
+                    msg = "Network issue try again"
+                    logger.error(f"SSL Certificate Verification Failed: {e}")
+                    if event and not event.is_set(): event.set()
+                    raise RuntimeError(msg)
+                raise e
             except Exception as e:
                 logger.error(f"Sync failed: {e}", exc_info=True)
+                raise e
             finally:
                 if event and not event.is_set(): event.set()
                 VendorSyncService._active_task = None
@@ -187,19 +196,5 @@ class VendorSyncService:
         return cls._sync_lock
 
     async def get_all_vendors(self) -> List[VendorMaster]:
-        """Entry point for UI; triggers sync if DB empty."""
-        lock = VendorSyncService._get_lock()
-        count = self.db.query(VendorMaster).count()
-        
-        if count == 0:
-            if not lock.locked():
-                VendorSyncService._first_batch_event = asyncio.Event()
-                VendorSyncService._active_task = asyncio.create_task(self.sync_vendors(event=VendorSyncService._first_batch_event))
-            
-            if VendorSyncService._first_batch_event:
-                try:
-                    await asyncio.wait_for(VendorSyncService._first_batch_event.wait(), timeout=300)
-                except asyncio.TimeoutError:
-                    logger.warning("Timed out waiting for first batch.")
-        
+        """Entry point for UI; returns current DB records without auto-sync."""
         return self.db.query(VendorMaster).all()

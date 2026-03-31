@@ -10,6 +10,7 @@ import re
 import json
 from datetime import datetime
 from typing import Dict, Any, List, Union
+import logging
  
 from app.database.database import get_db
 from app.models.db_models import (
@@ -47,7 +48,9 @@ TAB_MODEL_MAP = {
     "master_data_Customer": CustomerMaster,
     "master_data_Item": ItemMaster,
     "Exchange_Rate": ExchangeRateMaster,
-    "master_data_Exchange_Rate": ExchangeRateMaster
+    "master_data_Exchange_Rate": ExchangeRateMaster,
+    "Currency": ExchangeRateMaster,
+    "master_data_Currency": ExchangeRateMaster
 }
  
 def normalize_column(col_name: str) -> str:
@@ -144,12 +147,18 @@ async def trigger_master_sync(
         "Exchange_Rate": "sync_exchange_rates"
     }
     
-    method_name = method_map.get(tab_name)
-    if hasattr(sync_service, method_name):
-        await getattr(sync_service, method_name)()
-        return {"status": "success", "message": f"Sync started for {tab_name}"}
-    
-    raise HTTPException(500, f"Service method {method_name} not found")
+    try:
+        method_name = method_map.get(tab_name)
+        if hasattr(sync_service, method_name):
+            await getattr(sync_service, method_name)()
+            return {"status": "success", "message": f"Sync started for {tab_name}"}
+        
+        raise HTTPException(500, f"Service method {method_name} not found")
+    except Exception as e:
+        if "Network issue try again" in str(e):
+             raise HTTPException(status_code=400, detail="Network issue try again")
+        print(f"Sync error: {e}")
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 @router.get("/entities")
 def get_entities(
