@@ -53,45 +53,10 @@ def create_database_if_not_exists():
 
 
 def create_tables():
-    """Create all database tables and sync schema"""
+    """Create all database tables"""
     print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
-    
-    # Custom Migration: Ensure 'gst_applicable' exists in 'entity_master'
-    # Base.metadata.create_all doesn't add new columns to existing tables in SQL Server.
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT COUNT(*) FROM sys.columns 
-                WHERE object_id = OBJECT_ID(N'[dbo].[entity_master]') 
-                AND name = 'gst_applicable'
-            """))
-            if result.scalar() == 0:
-                print("Adding missing column 'gst_applicable' to 'entity_master'...")
-                conn.execute(text("ALTER TABLE entity_master ADD gst_applicable BIT DEFAULT 0 NOT NULL"))
-                conn.commit()
-                print("✓ Column 'gst_applicable' added successfully")
-    except Exception as e:
-        print(f"⚠ Warning during schema sync: {e}")
-        
-    print("✓ All tables synchronized successfully")
-    
-    # Custom Migration: Ensure 'symbol' in 'currencies' is NVARCHAR and fix '?' symbols
-    try:
-        with engine.connect() as conn:
-            # Check column type or just try to ALTER it (it's safe if it's already NVARCHAR)
-            print("Ensuring 'currencies.symbol' is NVARCHAR and fixing '?' symbols...")
-            conn.execute(text("ALTER TABLE currencies ALTER COLUMN symbol NVARCHAR(10)"))
-            
-            # Fix symbols that are '?' or other incorrect characters
-            conn.execute(text("UPDATE currencies SET symbol = N'₹' WHERE code = 'INR' AND symbol = '?'"))
-            conn.execute(text("UPDATE currencies SET symbol = N'€' WHERE code = 'EUR' AND symbol = '?'"))
-            conn.execute(text("UPDATE currencies SET symbol = N'£' WHERE code = 'GBP' AND symbol = '?'"))
-            
-            conn.commit()
-            print("✓ Currency symbols fixed")
-    except Exception as e:
-        print(f"⚠ Warning during currency fix: {e}")
+    print("✓ All tables created successfully")
 
 
 def create_admin_user(db):
@@ -144,7 +109,9 @@ def create_default_settings(db):
         "statuses": ["active", "pending", "rejected"],
         "navigation": [
             {"label": "Dashboard", "path": "/dashboard", "roles": ["all"]},
-            {"label": "Invoices", "path": "/invoices", "roles": ["coder"]},
+            {"label": "Invoice", "path": "/invoice", "roles": ["coder"]},
+            {"label": "Coding", "path": "/coding", "roles": ["coder"]},
+            {"label": "Approvals", "path": "/approvals", "roles": ["approver"]},
             {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
             {"label": "Settings", "path": "/settings", "roles": ["admin"]},
             {"label": "Admin", "path": "/admin", "roles": ["admin"]}
@@ -177,7 +144,7 @@ def create_default_entity(db):
     if existing_count == 0:
         default_entity = EntityMaster(
             entity_id="DEFAULT",
-            entity_name="Top Level",
+            entity_name="Default Entity",
             registered_address="",
             address_line1="",
             address_line2="",
@@ -232,6 +199,52 @@ def init_database():
         raise
     finally:
         db.close()
+
+
+async def seed_api_master_data(db):
+    """
+    Seed master data from Sage Intacct if tables are empty.
+    Calls sync services for Vendors, GL, LOB, Items, Departments, and Customers.
+    """
+    from app.services.vendor_sync_service import VendorSyncService
+    from app.services.master_sync_services import (
+        GLSyncService, LOBSyncService, DepartmentSyncService, 
+        CustomerSyncService, ItemSyncService, ExchangeRateSyncService
+    )
+    from app.models.db_models import (
+        VendorMaster, GLMaster, LOBMaster, ItemMaster, DepartmentMaster, CustomerMaster, ExchangeRateMaster
+    )
+
+    masters = [
+        (VendorMaster, VendorSyncService, "sync_vendors"),
+        (GLMaster, GLSyncService, "sync_gl_accounts"),
+        (LOBMaster, LOBSyncService, "sync_lob"),
+        (ItemMaster, ItemSyncService, "sync_items"),
+        (DepartmentMaster, DepartmentSyncService, "sync_departments"),
+        (CustomerMaster, CustomerSyncService, "sync_customers"),
+        (ExchangeRateMaster, ExchangeRateSyncService, "sync_exchange_rates")
+    ]
+
+    print("\n" + "-"*30)
+    print("SEEDING MASTER DATA FROM SAGE")
+    print("-"*30)
+
+    for model, service_class, sync_method in masters:
+        try:
+            count = db.query(model).count()
+            if count == 0:
+                print(f"→ Seeding {model.__name__}...")
+                service = service_class(db)
+                sync_func = getattr(service, sync_method)
+                await sync_func()
+                new_count = db.query(model).count()
+                print(f"  ✓ {model.__name__} seeded ({new_count} records)")
+            else:
+                print(f"✓ {model.__name__} already has {count} records, skipping seed")
+        except Exception as e:
+            print(f"  ✗ Error checking/seeding {model.__name__}: {e}")
+    
+    print("-"*30 + "\n")
 
 
 if __name__ == "__main__":
