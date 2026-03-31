@@ -6,7 +6,7 @@ These models replace the MongoDB collections with SQL Server tables.
 from sqlalchemy import (
     Column, Integer, String, DateTime, Text, ForeignKey, 
     DECIMAL, Boolean, Index, UniqueConstraint, Enum as SQLEnum,
-    Float, LargeBinary
+    Float, LargeBinary, Date
 )
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.dialects.mssql import NVARCHAR
@@ -291,8 +291,8 @@ class Delegation(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     original_approver = Column(String(200), nullable=False, index=True)
     substitute_approver = Column(String(200), nullable=False)
-    start_date = Column(DateTime, nullable=False)
-    end_date = Column(DateTime, nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_by = Column(String(100), nullable=True)
 

@@ -122,7 +122,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
             onClick: () => setSort('start_date'),
             render: (date) => (
                 <span className="text-gray-500 whitespace-nowrap">
-                    {date ? new Date(date).toISOString().split('T')[0] : '-'}
+                    {date ? (typeof date === 'string' ? date.split('T')[0] : dayjs(date).format('YYYY-MM-DD')) : '-'}
                 </span>
             )
         },
@@ -133,7 +133,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
             onClick: () => setSort('end_date'),
             render: (date) => (
                 <span className="text-gray-500 whitespace-nowrap">
-                    {date ? new Date(date).toISOString().split('T')[0] : '-'}
+                    {date ? (typeof date === 'string' ? date.split('T')[0] : dayjs(date).format('YYYY-MM-DD')) : '-'}
                 </span>
             )
         },
@@ -141,21 +141,18 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
             header: 'Status',
             accessor: 'id',
             render: (_, row) => {
-                const now = new Date();
-                now.setHours(0, 0, 0, 0);
-                const start = new Date(row.start_date);
-                start.setHours(0, 0, 0, 0);
-                const end = new Date(row.end_date);
-                end.setHours(23, 59, 59, 999);
+                const now = dayjs().startOf('day');
+                const start = dayjs(row.start_date).startOf('day');
+                const end = dayjs(row.end_date).endOf('day');
                 
-                if (now >= start && now <= end) {
+                if (now.isSame(start) || (now.isAfter(start) && now.isBefore(end))) {
                     return (
                         <span className="px-2.5 py-0.5 rounded-[4px] bg-[#f0fdf4] text-[#22c55e] text-[12px] font-medium border border-[#dcfce7]">
                             Active
                         </span>
                     );
                 }
-                if (now < start) {
+                if (now.isBefore(start)) {
                     return (
                         <span className="px-2.5 py-0.5 rounded-[4px] bg-[#eff6ff] text-[#3b82f6] text-[12px] font-medium border border-[#dbeafe]">
                             Scheduled

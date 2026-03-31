@@ -21,11 +21,25 @@ async def create_delegation(
     entity: str = Depends(get_current_entity)
 ):
     # Validation
-    if delegation.original_approver == delegation.substitute_approver:
+    if delegation.original_approver.lower() == delegation.substitute_approver.lower():
         raise HTTPException(400, "Original approver and substitute approver cannot be the same.")
     
-    if current_user.role != "admin" and current_user.email != delegation.original_approver:
+    if current_user.role != "admin" and current_user.email.lower() != delegation.original_approver.lower():
         raise HTTPException(403, "You do not have permission to delegate this user's approvals.")
+
+    # Overlap validation: s1 <= e2 AND e1 >= s2
+    existing_overlap = db.query(DBDelegation).filter(
+        DBDelegation.original_approver == delegation.original_approver.lower(),
+        DBDelegation.entity == entity,
+        DBDelegation.start_date <= delegation.end_date,
+        DBDelegation.end_date >= delegation.start_date
+    ).first()
+    
+    if existing_overlap:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"An active or scheduled delegation already exists for this approver in the selected period ({existing_overlap.start_date} to {existing_overlap.end_date})."
+        )
 
     new_del = DBDelegation(
         delegator_email=delegation.original_approver.lower(),
