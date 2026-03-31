@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CustomInput from "../../shared/components/CustomInput";
 import { SearchOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import Dropdown from "../../components/ui/Dropdown";
@@ -10,29 +10,102 @@ import { useInvoiceStore } from "../../store/invoice.store";
 import { Skeleton } from "antd";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
-import { uploadInvoices } from "../../api/invoiceApi";
+import { deleteInvoice, uploadInvoices, fetchEntityMaster } from "../../api/invoiceApi";
 import { message } from "antd";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
+import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
 
 const Invoice = () => {
     const [search, setSearch] = useState("");
-    const { invoiceSection, skip, limit, view, setView, setInvoiceSection, setIsModalOpen, isModalOpen } = useInvoiceStore();
+    const { invoiceSection, skip, limit, view, setView, setInvoiceSection, setIsModalOpen, isModalOpen, setViewInvoiceId, viewInvoiceId, quickViewFormData, setQuickViewFormData, selectedVendorId, setSelectedVendorId, setQuickViewLineItems, setEntityMaster } = useInvoiceStore();
     const { invoices, isLoading, refetch } = useInvoiceData({ skip, limit });
     const [messageApi, contextHolder] = message.useMessage();
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const { isLoadingVendorDetail, vendor } = useVendorDetailSync(selectedVendorId);
 
-    console.log('invoices', invoices);
+    console.log('vendor', vendor);
+    console.log('quickViewFormData', vendor, quickViewFormData);
+
+    useEffect(() => {
+        fetchEntityMaster().then((data) => {
+            const selectedEntity = data.filter((item) => {
+                return item.entity_name == sessionStorage?.selected_entity
+            })
+            setEntityMaster(selectedEntity?.[0] || {});
+        }).catch((err) => {
+            console.error("Failed to fetch entity master", err);
+        })
+    }, [])
+
+    const removeCurrencyFormat = (value) => {
+        if (!value) return "";
+        return value.toString().replace(/,/g, "");
+    };
 
 
     const handleView = useCallback((data) => {
-        console.log("View", data);
+        console.log('handleView', data);
+
+        const id = Number(data.id);
+        if (!id) return;
+
+        setQuickViewFormData({
+            vendorId: data.vendor_id ?? "",
+            vendorName: data.vendor_name ?? "",
+            invoiceNumber: data.invoice_number ?? "",
+            invoiceDate: data.extracted_data?.invoice_details?.invoice_date?.value ?? "",
+            invoiceCurrency: data.extracted_data?.invoice_details?.currency?.value ?? "",
+            exchangeRate: data.exchange_rate ?? "",
+            totalAmount: data.extracted_data?.amounts?.total_invoice_amount?.value ?? "",
+            totalPayable: data.extracted_data?.amounts?.amount_due?.value ?? "",
+            amountPaid: data.extracted_data?.amounts?.amount_paid?.value ?? "",
+            memo: data.extracted_data?.additional_info?.notes_terms?.value ?? "",
+            gstEligibility: "",
+            tdsApplicability: "",
+            tdsRate: "",
+            tdsSection: "",
+            lineGrouping: "",
+            paymentTerms: "",
+            dueDate: "",
+            gst_eligibility: "",
+
+            total_invoice_amount: removeCurrencyFormat(data.extracted_data?.amounts?.total_invoice_amount?.value) ?? "",
+            total_tax_amount: removeCurrencyFormat(data.extracted_data?.amounts?.total_tax_amount?.value) ?? "",
+        });
+
+        const items = data?.extracted_data?.Items?.value || [];
+        const mappedItems = items.map((item, index) => {
+            const netAmount = item.amount?.value || 0;
+            return {
+                id: index + 1,
+                description: item.description?.value || "",
+                qty: 1,
+                unitPrice: netAmount,
+                discount: 0,
+                netAmount: netAmount,
+                taxAmt: 0,
+            };
+        });
+
+        setQuickViewLineItems(mappedItems);
+        setViewInvoiceId(id);
+
+        // Mark that this vendor fetch was intentionally triggered
+        setSelectedVendorId(data.vendor_id);
         setInvoiceSection(2);
-    }, []);
+    }, [setQuickViewFormData, setViewInvoiceId, setSelectedVendorId, setQuickViewLineItems]);
 
     const handleDelete = useCallback((data) => {
-        console.log("Delete", data);
+        deleteInvoice(data.id).then(() => {
+            messageApi.success("Invoice deleted successfully");
+            console.log("Delete", data);
+
+            refetch();
+        }).catch(() => {
+            messageApi.error("Failed to delete invoice");
+        });
     }, []);
 
     const columnDefs = useMemo(
@@ -189,7 +262,6 @@ const Invoice = () => {
                                 tableSearch={false}
                                 defaultPageSize={10}
                                 shouldUseFlex={false}
-
                             />
                         )}
                     </div>

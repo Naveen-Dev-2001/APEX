@@ -198,3 +198,17 @@
     cursor: col-resize;
     width: 6px;
 }
+
+/* Global typography for Ant Design inputs */
+.ant-input,
+.ant-input-password,
+.ant-select-selector,
+.ant-select-item,
+.ant-select-selection-item,
+.ant-select-selection-placeholder {
+    font-size: 14px;
+    font-weight: 400;
+    font-family: 'Creato Display', sans-serif;
+    line-height: 16px;
+    /* optional */
+}
