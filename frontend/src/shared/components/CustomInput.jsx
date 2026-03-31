@@ -43,7 +43,7 @@ const CustomInput = memo(({
                 )}
                 status={error ? "error" : ""}
                 size="large"
-                style={{ borderRadius: '8px', fontSize: '10px' }}
+                style={{ borderRadius: '8px', fontSize: '13px' }}
                 {...props}
             />
             {error && (

@@ -336,6 +336,7 @@ const MasterDataPage = () => {
             const files = e.target.files;
             if (files && files.length > 0) {
                 await onUpload(files[0]);
+                e.target.value = '';
             }
         };
 
@@ -456,6 +457,8 @@ const MasterDataPage = () => {
                 }
             } catch (err) {
                 toast.error('Upload failed: ' + (err.response?.data?.detail || err.message));
+            } finally {
+                e.target.value = '';
             }
         }
     };

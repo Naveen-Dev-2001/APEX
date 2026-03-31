@@ -236,9 +236,6 @@ async def upload_master_file(
         if not model:
             raise HTTPException(400, f"Unsupported tab: {tab_name}")
 
-        if tab_name in ["Vendor_Master", "vendor_master"]:
-            raise HTTPException(400, "Vendor Master upload is disabled. Please use the Sync API.")
-
         if not file.filename.endswith(('.xls', '.xlsx', '.csv')):
              raise HTTPException(400, "Invalid format. Use .xls, .xlsx, or .csv")
              
