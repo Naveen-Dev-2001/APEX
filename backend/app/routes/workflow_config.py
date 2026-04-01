@@ -47,7 +47,7 @@ def transform_workflow_response(w):
         "mandatory_approver_3": retrieve_single_approver(w.mandatory_approver_3),
         "mandatory_approver_4": retrieve_single_approver(w.mandatory_approver_4),
         "mandatory_approver_5": retrieve_single_approver(w.mandatory_approver_5),
-        "is_threshold_enabled": getattr(w, 'is_threshold_enabled', False),
+        "is_threshold_enabled": getattr(w, 'is_threshold_enabled',   False),
         "amount_threshold": w.amount_threshold,
         "threshold_approver": retrieve_single_approver(w.threshold_approver),
         "optional_approver": retrieve_single_approver(getattr(w, 'optional_approver', None)),
