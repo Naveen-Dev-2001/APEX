@@ -594,7 +594,9 @@ class VendorWorkflow(Base):
     is_threshold_enabled = Column(Boolean, default=False)
     amount_threshold = Column(Float, default=0.0)
     threshold_approver = Column(String(200), nullable=True)
+    optional_approver = Column(String(200), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
 
 class CodificationWorkflow(Base):
     __tablename__ = "codification_workflows"
@@ -612,7 +614,9 @@ class CodificationWorkflow(Base):
     is_threshold_enabled = Column(Boolean, default=False)
     amount_threshold = Column(Float, default=0.0)
     threshold_approver = Column(String(200), nullable=True)
+    optional_approver = Column(String(200), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
 
 
 class ExchangeRateMaster(Base):

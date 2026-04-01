@@ -118,6 +118,7 @@ async def update_vendor_workflow(
     existing.optional_approver = workflow.optional_approver
 
     existing.entity = entity
+    existing.updated_at = datetime.utcnow()
     
     db.commit()
     return {**workflow.dict(), "id": str(workflow_id), "entity": entity, "created_at": existing.created_at}
@@ -266,6 +267,7 @@ async def update_codification_workflow(
     existing.optional_approver = workflow.optional_approver
 
     existing.entity = entity
+    existing.updated_at = datetime.utcnow()
     
     db.commit()
     return {**workflow.dict(), "id": str(workflow_id), "entity": entity, "created_at": existing.created_at}
