@@ -31,6 +31,10 @@ def deserialize_approver(val):
         except: return [val]
     return [val] if val else []
 
+def retrieve_single_approver(val):
+    lst = deserialize_approver(val)
+    return lst[0] if lst else None
+
 def transform_workflow_response(w):
     return {
         "id": w.id,
@@ -38,16 +42,16 @@ def transform_workflow_response(w):
         "vendor_name": getattr(w, 'vendor_name', None),
         "lob": getattr(w, 'lob', None),
         "department_id": getattr(w, 'department_id', None),
-        "mandatory_approver_1": deserialize_approver(w.mandatory_approver_1),
-        "mandatory_approver_2": deserialize_approver(w.mandatory_approver_2),
-        "mandatory_approver_3": deserialize_approver(w.mandatory_approver_3),
-        "mandatory_approver_4": deserialize_approver(w.mandatory_approver_4),
-        "mandatory_approver_5": deserialize_approver(w.mandatory_approver_5),
-        "is_threshold_enabled": w.is_threshold_enabled or False,
+        "mandatory_approver_1": retrieve_single_approver(w.mandatory_approver_1),
+        "mandatory_approver_2": retrieve_single_approver(w.mandatory_approver_2),
+        "mandatory_approver_3": retrieve_single_approver(w.mandatory_approver_3),
+        "mandatory_approver_4": retrieve_single_approver(w.mandatory_approver_4),
+        "mandatory_approver_5": retrieve_single_approver(w.mandatory_approver_5),
+        "is_threshold_enabled": getattr(w, 'is_threshold_enabled', False),
         "amount_threshold": w.amount_threshold,
-        "threshold_approver": deserialize_approver(w.threshold_approver),
+        "threshold_approver": retrieve_single_approver(w.threshold_approver),
+        "optional_approver": retrieve_single_approver(getattr(w, 'optional_approver', None)),
         "approver_count": w.approver_count or 1,
-        "is_parallel": w.is_parallel or False,
         "entity": getattr(w, 'entity', 'Consolidated Analytics Inc'),
         "created_at": getattr(w, 'created_at', datetime.utcnow()),
         "updated_at": getattr(w, 'updated_at', None)
@@ -93,10 +97,10 @@ async def create_vendor_workflow(
             mandatory_approver_3=serialize_approver(workflow.mandatory_approver_3),
             mandatory_approver_4=serialize_approver(workflow.mandatory_approver_4),
             mandatory_approver_5=serialize_approver(workflow.mandatory_approver_5),
-            is_threshold_enabled=workflow.is_threshold_enabled,
+            is_threshold_enabled=getattr(workflow, 'is_threshold_enabled', False),
             amount_threshold=workflow.amount_threshold,
             threshold_approver=serialize_approver(workflow.threshold_approver),
-            is_parallel=workflow.is_parallel,
+            optional_approver=serialize_approver(getattr(workflow, 'optional_approver', None)),
             created_at=datetime.utcnow()
         )
         db.add(new_workflow)
@@ -136,10 +140,10 @@ async def update_vendor_workflow(
         existing.mandatory_approver_3 = serialize_approver(workflow.mandatory_approver_3)
         existing.mandatory_approver_4 = serialize_approver(workflow.mandatory_approver_4)
         existing.mandatory_approver_5 = serialize_approver(workflow.mandatory_approver_5)
-        existing.is_threshold_enabled = workflow.is_threshold_enabled
+        existing.is_threshold_enabled = getattr(workflow, 'is_threshold_enabled', False)
         existing.amount_threshold = workflow.amount_threshold
         existing.threshold_approver = serialize_approver(workflow.threshold_approver)
-        existing.is_parallel = workflow.is_parallel
+        existing.optional_approver = serialize_approver(getattr(workflow, 'optional_approver', None))
         existing.entity = entity
         
         db.commit()
@@ -235,10 +239,10 @@ async def create_codification_workflow(
             mandatory_approver_3=serialize_approver(workflow.mandatory_approver_3),
             mandatory_approver_4=serialize_approver(workflow.mandatory_approver_4),
             mandatory_approver_5=serialize_approver(workflow.mandatory_approver_5),
-            is_threshold_enabled=workflow.is_threshold_enabled,
+            is_threshold_enabled=getattr(workflow, 'is_threshold_enabled', False),
             amount_threshold=workflow.amount_threshold,
             threshold_approver=serialize_approver(workflow.threshold_approver),
-            is_parallel=workflow.is_parallel,
+            optional_approver=serialize_approver(getattr(workflow, 'optional_approver', None)),
             created_at=datetime.utcnow()
         )
         db.add(new_workflow)
@@ -275,10 +279,10 @@ async def update_codification_workflow(
         existing.mandatory_approver_3 = serialize_approver(workflow.mandatory_approver_3)
         existing.mandatory_approver_4 = serialize_approver(workflow.mandatory_approver_4)
         existing.mandatory_approver_5 = serialize_approver(workflow.mandatory_approver_5)
-        existing.is_threshold_enabled = workflow.is_threshold_enabled
+        existing.is_threshold_enabled = getattr(workflow, 'is_threshold_enabled', False)
         existing.amount_threshold = workflow.amount_threshold
         existing.threshold_approver = serialize_approver(workflow.threshold_approver)
-        existing.is_parallel = workflow.is_parallel
+        existing.optional_approver = serialize_approver(getattr(workflow, 'optional_approver', None))
         existing.entity = entity
         
         db.commit()
