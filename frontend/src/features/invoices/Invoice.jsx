@@ -40,8 +40,8 @@ const Invoice = () => {
     }, [])
 
     const removeCurrencyFormat = (value) => {
-        if (!value) return "";
-        return value.toString().replace(/,/g, "");
+        if (!value) return 0;
+        return Number(value.toString().replace(/[^0-9.]/g, ""));
     };
 
 
