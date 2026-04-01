@@ -126,8 +126,13 @@ const useAdminStore = create((set, get) => ({
             
             if (hasAccess && !updatedRoles.includes(lowerRole)) {
                 updatedRoles.push(lowerRole);
-            } else if (!hasAccess && updatedRoles.includes(lowerRole)) {
-                updatedRoles = updatedRoles.filter(r => r !== lowerRole);
+            } else if (!hasAccess) {
+                if (updatedRoles.includes(lowerRole)) {
+                    updatedRoles = updatedRoles.filter(r => r !== lowerRole);
+                } else if (updatedRoles.includes('all')) {
+                    // Expand 'all' into explicit roles before removing this one
+                    updatedRoles = roles.filter(r => r !== lowerRole);
+                }
             }
             
             return { ...nav, roles: updatedRoles };

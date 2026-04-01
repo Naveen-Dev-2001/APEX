@@ -7,7 +7,7 @@ DEFAULT_SETTINGS = {
     "roles": ["admin", "coder", "approver"],
     "statuses": ["active", "pending", "rejected"],
     "navigation": [
-        {"label": "Dashboard", "path": "/dashboard", "roles": ["all"]},
+        {"label": "Dashboard", "path": "/dashboard", "roles": ["admin", "coder", "approver"]},
         {"label": "Invoices", "path": "/invoices", "roles": ["coder"]},
         {"label": "Coding", "path": "/coding", "roles": ["coder", "admin"]},
         {"label": "Approvals", "path": "/approvals", "roles": ["approver", "admin"]},
