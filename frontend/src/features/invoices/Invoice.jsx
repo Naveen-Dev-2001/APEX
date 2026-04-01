@@ -52,27 +52,73 @@ const Invoice = () => {
         if (!id) return;
 
         setQuickViewFormData({
+            // Header
             vendorId: data.vendor_id ?? "",
             vendorName: data.vendor_name ?? "",
             invoiceNumber: data.invoice_number ?? "",
             invoiceDate: data.extracted_data?.invoice_details?.invoice_date?.value ?? "",
+            dueDate: data.extracted_data?.invoice_details?.due_date?.value ?? "",
+            paymentTerms: data.extracted_data?.invoice_details?.payment_terms?.value ?? "",
             invoiceCurrency: data.extracted_data?.invoice_details?.currency?.value ?? "",
             exchangeRate: data.exchange_rate ?? "",
+
             totalAmount: data.extracted_data?.amounts?.total_invoice_amount?.value ?? "",
             totalPayable: data.extracted_data?.amounts?.amount_due?.value ?? "",
             amountPaid: data.extracted_data?.amounts?.amount_paid?.value ?? "",
             memo: data.extracted_data?.additional_info?.notes_terms?.value ?? "",
+
+            invoiceType: data.extracted_data?.invoice_details?.type?.value ?? "",
+            poNumber: data.extracted_data?.invoice_details?.po_number?.value ?? "",
+            paymentMethod: data.extracted_data?.invoice_details?.payment_method?.value ?? "",
+            costCenter: data.extracted_data?.invoice_details?.cost_center?.value ?? "",
+
+            serviceStartDate: data.extracted_data?.service_period?.start_date?.value ?? "",
+            serviceEndDate: data.extracted_data?.service_period?.end_date?.value ?? "",
+
+            // Vendor Level
+            vendorAddress: data.extracted_data?.vendor_info?.address?.value ?? "",
+            vendorCountry: data.extracted_data?.vendor_info?.country?.value ?? "",
+            vendorTaxId: data.extracted_data?.vendor_info?.tax_id?.value ?? "",
+            vendorEmail: data.extracted_data?.vendor_info?.contact_email?.value ?? "",
+            vendorPhone: data.extracted_data?.vendor_info?.phone?.value ?? "",
+            vendorBankName: data.extracted_data?.vendor_info?.bank_name?.value ?? "",
+            vendorBankAccount: data.extracted_data?.vendor_info?.bank_account_number?.value ?? "",
+            vendorContactPerson: data.extracted_data?.vendor_info?.contact_person?.value ?? "",
+
+            // Buyer
+            clientName: data.extracted_data?.client_info?.name?.value ?? "",
+            billingAddress: data.extracted_data?.client_info?.billing_address?.value ?? "",
+            shippingAddress: data.extracted_data?.client_info?.shipping_address?.value ?? "",
+            phoneNumber: data.extracted_data?.client_info?.phone?.value ?? "",
+            email: data.extracted_data?.client_info?.email?.value ?? "",
+            clientTaxId: data.extracted_data?.client_info?.tax_id?.value ?? "",
+            contactPerson: data.extracted_data?.client_info?.contact_person?.value ?? "",
+
+            // Taxes
+            totalTaxAmount: removeCurrencyFormat(data.extracted_data?.amounts?.total_tax_amount?.value),
+            cgst: data.extracted_data?.amounts?.CGST?.value ?? "",
+            sgst: data.extracted_data?.amounts?.SGST?.value ?? "",
+            igst: data.extracted_data?.amounts?.IGST?.value ?? "",
+            withholdingTax: data.extracted_data?.amounts?.withholding_tax?.value ?? "",
+
+            // Totals
+            subtotal: removeCurrencyFormat(data.extracted_data?.amounts?.subtotal?.value),
+            shippingFees: data.extracted_data?.amounts?.shipping_handling_fees?.value ?? "",
+            surcharges: data.extracted_data?.amounts?.surcharges?.value ?? "",
+            totalInvoiceAmount: removeCurrencyFormat(data.extracted_data?.amounts?.total_invoice_amount?.value),
+            amountDue: removeCurrencyFormat(data.extracted_data?.amounts?.amount_due?.value),
+
+            // Compliance
+            notes: data.extracted_data?.additional_info?.notes_terms?.value ?? "",
+            qrOrIrn: data.extracted_data?.additional_info?.qr_code_irn?.value ?? "",
+            companyRegistrationNumber: data.extracted_data?.additional_info?.company_registration_number?.value ?? "",
+
+            // Vendor master (empty → will be filled later)
             gstEligibility: "",
             tdsApplicability: "",
             tdsRate: "",
             tdsSection: "",
             lineGrouping: "",
-            paymentTerms: "",
-            dueDate: "",
-            gst_eligibility: "",
-
-            total_invoice_amount: removeCurrencyFormat(data.extracted_data?.amounts?.total_invoice_amount?.value) ?? "",
-            total_tax_amount: removeCurrencyFormat(data.extracted_data?.amounts?.total_tax_amount?.value) ?? "",
         });
 
         const items = data?.extracted_data?.Items?.value || [];
