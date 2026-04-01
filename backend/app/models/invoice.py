@@ -10,6 +10,8 @@ class InvoiceStatus(str, Enum):
     REJECTED = "rejected"
     PROCESSED = "processed"
     REWORKED = "reworked"
+    SAGE_POSTED = "sage_posted"
+    SAGE_POST_FAILED = "sage_post_failed"
 
 class StatusHistoryItem(BaseModel):
     status: InvoiceStatus
@@ -25,10 +27,11 @@ class InvoiceBase(BaseModel):
     status: InvoiceStatus = InvoiceStatus.WAITING_APPROVAL
     status_history: Optional[List[StatusHistoryItem]] = []
     required_approvers: Optional[int] = None
+    is_parallel: Optional[bool] = False
     approver_breakdown: Optional[Dict[str, Any]] = None
     entity: Optional[str] = None
     approved_by: Optional[List[str]] = []
-    assigned_approvers: Optional[List[str]] = []
+    assigned_approvers: Optional[List[Any]] = []
     current_approver_level: Optional[int] = 1
     gl_summary: Optional[List[Dict[str, Any]]] = None
     gl_summary: Optional[List[Dict[str, Any]]] = None

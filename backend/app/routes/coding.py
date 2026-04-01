@@ -343,6 +343,11 @@ async def create_or_update_coding(
         )
         db.add(new_coding)
     
+    if coding_data.vendor_name is not None:
+        invoice.vendor_name = coding_data.vendor_name
+    if getattr(coding_data, 'vendor_id', None) is not None:
+        invoice.vendor_id = coding_data.vendor_id
+        
     db.commit()
 
     # Update history and gl_summary
@@ -391,9 +396,6 @@ async def create_or_update_coding(
     except: pass
     
     db.commit()
-
-    await audit_service.log_action(db, inv_id, AuditAction.CODING_SAVED, current_user.username, entity, 
-                                  details={"line_items_count": len(coding_data.line_items)})
 
     saved = db.query(DBCoding).filter(DBCoding.invoice_id == inv_id).first()
     return CodingResponse(
