@@ -1,17 +1,16 @@
-import { ArrowLeftOutlined, DownloadOutlined, EditOutlined, MoreOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
 import CustomButton from "../../shared/components/CustomButton";
 import { icons } from "../../file";
+import { useInvoiceStore } from "../../store/invoice.store";
 
 const InvoiceTopBar = ({ invoice = {} }) => {
-    const navigate = useNavigate();
+    const { setInvoiceSection } = useInvoiceStore();
 
     return (
         <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4  flex items-center justify-between ">
 
             {/* Left — back + title */}
             <div
-                onClick={() => navigate(-1)}
+                onClick={() => setInvoiceSection(1)}
                 className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
             >
                 <img src={icons.arrowLeft} alt="Back" />

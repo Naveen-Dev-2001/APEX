@@ -11,3 +11,30 @@ export const uploadInvoices = (formData, taskId, onUploadProgress) => {
         onUploadProgress, // axios will call this with { loaded, total }
     });
 };
+
+export const deleteInvoice = (invoiceId) =>
+    API.delete(`/invoices/${invoiceId}`).then(res => {
+        return res.data;
+    });
+
+export const getInvoiceById = (invoiceId) =>
+    API.get(`/invoices/${invoiceId}`).then(res => {
+        console.log("res.data", res.data);
+
+        return res.data;
+    });
+
+export const getVendorById = (vendorId) =>
+    API.get(`/master/vendor/${vendorId}`).then(res => {
+        return res.data;
+    });
+
+export const fetchAllVendors = () =>
+    API.get("/master/getvendors").then(res => {
+        return res.data;
+    });
+
+export const fetchEntityMaster = () =>
+    API.get("/master/sheet/Entity_Master").then(res => {
+        return res.data;
+    })

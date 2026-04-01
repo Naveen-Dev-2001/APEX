@@ -114,7 +114,7 @@ const DashboardPage = React.memo(() => {
                 ) : (
                     <>
                         <Card icon={icons.invoice} title="Total Invoices" value={summary?.total_invoices} />
-                        <Card icon={icons.overdue} title="Total Overdue" value={summary?.total_due} />
+                        <Card icon={icons.overdue} title="Total Overdue" value={Number(summary?.total_due).toFixed(2)} />
                         <Card icon={icons.approved} title="Approved" value={summary?.approved} />
                         <Card icon={icons.pending} title="Pending Approval" value={summary?.waiting_approval} />
                     </>

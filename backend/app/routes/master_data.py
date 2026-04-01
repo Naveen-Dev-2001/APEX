@@ -11,18 +11,18 @@ import json
 from datetime import datetime
 from typing import Dict, Any, List, Union
 import logging
- 
+
 from app.database.database import get_db
 from app.models.db_models import (
-    EntityMaster, VendorMaster, TdsRate, GLMaster, 
+    EntityMaster, VendorMaster, TdsRate, GLMaster,
     LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster
 )
 from app.auth.jwt import get_current_user
 from app.models.user import UserResponse
 from app.ai.vector_matcher import find_best_vendor_match
- 
+
 router = APIRouter(tags=["Master Data"])
- 
+
 # Mapping frontend tab names to SQLAlchemy models
 TAB_MODEL_MAP = {
     "Entity_Master": EntityMaster,
@@ -52,7 +52,8 @@ TAB_MODEL_MAP = {
     "Currency": ExchangeRateMaster,
     "master_data_Currency": ExchangeRateMaster
 }
- 
+
+
 def normalize_column(col_name: str) -> str:
     """Normalize Excel column names to snake_case attribute names."""
     # Remove special characters, replace spaces/hyphens with underscores, lowercase
@@ -61,7 +62,7 @@ def normalize_column(col_name: str) -> str:
     # Handle specific common variations/typos
     if 'terittory' in name:
         name = name.replace('terittory', 'territory')
-   
+
     mapping = {
         "gst_use_tax_eligibility_configuration": "gst_eligibility",
         "tdswithhold_tax_applicability_configuration": "tds_applicability",
@@ -72,11 +73,13 @@ def normalize_column(col_name: str) -> str:
         "gst_applicable": "gst_applicable"
     }
     return mapping.get(name, name)
- 
+
+
 class SearchVendorRequest(BaseModel):
     vendor_name: str
     vendor_address: str = None
- 
+
+
 @router.post("/search-vendor")
 def search_vendor(
     request: SearchVendorRequest,
@@ -86,10 +89,12 @@ def search_vendor(
     """
     Search for a vendor in the active Vendor Master list.
     """
-    result = find_best_vendor_match(db, request.vendor_name, request.vendor_address)
+    result = find_best_vendor_match(
+        db, request.vendor_name, request.vendor_address)
     if result and result["match"]:
         return {"match": result["match"], "score": result["score"], "method": result["method"]}
     return {"match": None, "score": 0.0, "method": "none"}
+
 
 @router.post("/sync-vendors")
 async def trigger_vendor_sync(
@@ -104,6 +109,7 @@ async def trigger_vendor_sync(
     result = await sync_service.sync_vendors()
     return result
 
+
 @router.post("/sync/{tab_name}")
 async def trigger_master_sync(
     tab_name: str,
@@ -114,10 +120,10 @@ async def trigger_master_sync(
     Trigger manual sync for specific master data.
     """
     from app.services.master_sync_services import (
-        GLSyncService, LOBSyncService, DepartmentSyncService, 
+        GLSyncService, LOBSyncService, DepartmentSyncService,
         CustomerSyncService, ItemSyncService, ExchangeRateSyncService
     )
-    
+
     services = {
         "GL": GLSyncService,
         "LOB": LOBSyncService,
@@ -127,14 +133,14 @@ async def trigger_master_sync(
         "Line_Items": ItemSyncService,
         "Exchange_Rate": ExchangeRateSyncService
     }
-    
+
     service_class = services.get(tab_name)
     if not service_class:
         if tab_name in ["Vendor", "Vendor_Master"]:
             from app.services.vendor_sync_service import VendorSyncService
             return await VendorSyncService(db).sync_vendors()
         raise HTTPException(400, f"Sync not supported for {tab_name}")
-    
+
     sync_service = service_class(db)
     # Map method names
     method_map = {
@@ -146,19 +152,21 @@ async def trigger_master_sync(
         "Line_Items": "sync_items",
         "Exchange_Rate": "sync_exchange_rates"
     }
-    
+
     try:
         method_name = method_map.get(tab_name)
         if hasattr(sync_service, method_name):
             await getattr(sync_service, method_name)()
             return {"status": "success", "message": f"Sync started for {tab_name}"}
-        
+
         raise HTTPException(500, f"Service method {method_name} not found")
     except Exception as e:
         if "Network issue try again" in str(e):
-             raise HTTPException(status_code=400, detail="Network issue try again")
+            raise HTTPException(
+                status_code=400, detail="Network issue try again")
         print(f"Sync error: {e}")
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
 
 @router.get("/entities")
 def get_entities(
@@ -182,7 +190,8 @@ def get_entities(
             row_dict[column.name] = val
         result.append(row_dict)
     return result
- 
+
+
 @router.get("/files")
 def list_files(
     db: Session = Depends(get_db),
@@ -191,20 +200,21 @@ def list_files(
     """
     List status of the fixed master data tabs by checking if tables have data.
     """
-    tabs = ["Entity_Master", "Vendor_Master", "TDS_Rates", "Item", "Exchange_Rate"]
+    tabs = ["Entity_Master", "Vendor_Master",
+            "TDS_Rates", "Item", "Exchange_Rate"]
     # Add new tabs if needed by frontend
     additional_tabs = ["GL", "LOB", "Department", "Customer"]
-   
+
     result = []
-   
+
     for tab in tabs + additional_tabs:
         model = TAB_MODEL_MAP.get(tab)
         if not model:
             continue
-           
+
         count = db.query(func.count(model.id)).scalar()
         is_vendor = tab in ["Vendor_Master", "vendor_master", "Vendor"]
-        
+
         if count > 0 or is_vendor:
             result.append({
                 "id": tab,
@@ -223,7 +233,33 @@ def list_files(
                 "sheets": []
             })
     return result
- 
+
+    vendor_id: int
+
+
+@router.get("/vendor/{vendor_id}")
+def get_vendor_master_by_vendor_id(
+    vendor_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch all Vendor_Master rows for a given vendor_id
+    """
+
+    data = db.query(VendorMaster).filter(
+        VendorMaster.vendor_id == vendor_id).all()
+
+    print("data", data)
+
+    if not data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No records found for vendor_id: {vendor_id}"
+        )
+
+    return data
+
+
 @router.post("/upload")
 async def upload_master_file(
     tab_name: str,
@@ -237,33 +273,36 @@ async def upload_master_file(
             raise HTTPException(400, f"Unsupported tab: {tab_name}")
 
         if not file.filename.endswith(('.xls', '.xlsx', '.csv')):
-             raise HTTPException(400, "Invalid format. Use .xls, .xlsx, or .csv")
-             
+            raise HTTPException(
+                400, "Invalid format. Use .xls, .xlsx, or .csv")
+
         contents = await file.read()
-       
+
         if file.filename.endswith('.csv'):
             df = pd.read_csv(io.BytesIO(contents))
         else:
             df = pd.read_excel(io.BytesIO(contents))
-           
+
         df = df.replace({np.nan: None})
-       
+
         # Normalize columns and prepare data
-        model_cols = [c.name for c in model.__table__.columns if c.name not in ['id', 'created_at', 'updated_at']]
-       
+        model_cols = [c.name for c in model.__table__.columns if c.name not in [
+            'id', 'created_at', 'updated_at']]
+
         records_to_insert = []
         for _, row in df.iterrows():
             record = {}
             row_dict = row.to_dict()
-           
+
             # Map Excel column to model column
-            excel_cols_normalized = {normalize_column(c): c for c in row_dict.keys()}
-           
+            excel_cols_normalized = {
+                normalize_column(c): c for c in row_dict.keys()}
+
             for m_col in model_cols:
                 # Direct match
                 if m_col in excel_cols_normalized:
                     raw_val = row_dict[excel_cols_normalized[m_col]]
-                   
+
                     # Boolean Conversion for SQLAlchemy Boolean columns
                     col_info = model.__table__.columns.get(m_col)
                     if col_info is not None and isinstance(col_info.type, Boolean):
@@ -274,10 +313,10 @@ async def upload_master_file(
                             elif rv_lower in ["no", "false", "0", "n", "f", "ineligible"]:
                                 raw_val = False
                             else:
-                                raw_val = None # Or default
+                                raw_val = None  # Or default
                         elif isinstance(raw_val, (int, float)):
                             raw_val = bool(raw_val)
-                   
+
                     elif col_info is not None and isinstance(col_info.type, String):
                         if raw_val is not None:
                             # Handle numeric types becoming strings, remove .0 if it's an integer-like float
@@ -285,38 +324,44 @@ async def upload_master_file(
                                 raw_val = str(int(raw_val))
                             else:
                                 raw_val = str(raw_val)
-                   
+
                     record[m_col] = raw_val
                 # Also check some variations if needed
-           
+
             if record:
                 # Defaults for Vendor Master Config
                 if tab_name == "Vendor_Master" or tab_name == "vendor_master":
-                    if record.get("gst_eligibility") is None: record["gst_eligibility"] = False
-                    if record.get("tds_applicability") is None: record["tds_applicability"] = False
-                    if record.get("workflow_applicable") is None: record["workflow_applicable"] = True
-                    if record.get("line_grouping") is None: record["line_grouping"] = False
-               
+                    if record.get("gst_eligibility") is None:
+                        record["gst_eligibility"] = False
+                    if record.get("tds_applicability") is None:
+                        record["tds_applicability"] = False
+                    if record.get("workflow_applicable") is None:
+                        record["workflow_applicable"] = True
+                    if record.get("line_grouping") is None:
+                        record["line_grouping"] = False
+
                 if tab_name == "Entity_Master" or tab_name == "entity_master":
-                    if record.get("gst_applicable") is None: record["gst_applicable"] = True
- 
+                    if record.get("gst_applicable") is None:
+                        record["gst_applicable"] = True
+
                 records_to_insert.append(record)
- 
+
         # Clear existing and insert
         db.query(model).delete()
         if records_to_insert:
             db.bulk_insert_mappings(model, records_to_insert)
-       
+
         db.commit()
-       
+
         return {"message": f"Uploaded {len(records_to_insert)} rows to {tab_name}"}
-       
+
     except Exception as e:
         db.rollback()
         print(f"Error uploading: {e}")
         traceback.print_exc()
         raise HTTPException(500, f"Upload failed: {str(e)}")
- 
+
+
 @router.delete("/files/{tab_name}")
 async def delete_tab_data(
     tab_name: str,
@@ -325,11 +370,12 @@ async def delete_tab_data(
     model = TAB_MODEL_MAP.get(tab_name)
     if not model:
         raise HTTPException(400, "Unsupported tab")
-   
+
     db.query(model).delete()
     db.commit()
     return {"message": f"Data for {tab_name} deleted successfully"}
- 
+
+
 @router.get("/sheet/{identifier}")
 async def get_sheet_data(
     identifier: str,
@@ -338,17 +384,17 @@ async def get_sheet_data(
     model = TAB_MODEL_MAP.get(identifier)
     if not model:
         raise HTTPException(404, "Table not found")
-        
+
     # Normalize identifier (remove prefix used by some frontend components)
     clean_id = identifier.replace("master_data_", "")
-    
+
     if clean_id in ["Vendor_Master", "Vendor"]:
         from app.services.vendor_sync_service import VendorSyncService
         sync_service = VendorSyncService(db)
         rows = await sync_service.get_all_vendors()
     elif clean_id in ["GL", "LOB", "Department", "Customer", "Item", "Line_Items", "Exchange_Rate"]:
         from app.services.master_sync_services import (
-            GLSyncService, LOBSyncService, DepartmentSyncService, 
+            GLSyncService, LOBSyncService, DepartmentSyncService,
             CustomerSyncService, ItemSyncService, ExchangeRateSyncService
         )
         services = {
@@ -368,7 +414,7 @@ async def get_sheet_data(
             rows = db.query(model).order_by(model.id).all()
     else:
         rows = db.query(model).order_by(model.id).all()
-    
+
     # Convert SQLAlchemy objects to dicts
     result = []
     for row in rows:
@@ -390,7 +436,7 @@ async def get_sheet_data(
                     "workflow_applicable": "Workflow Applicability Configuration",
                     "line_grouping": "Line Grouping"
                 }
-               
+
                 if column.name in pretty_map:
                     pretty_val = val
                     # Match frontend switch logic
@@ -398,7 +444,7 @@ async def get_sheet_data(
                         pretty_val = "Eligible" if val is True or val == 1 else "Ineligible"
                     elif column.name in ["tds_applicability", "workflow_applicable", "line_grouping"]:
                         pretty_val = "Yes" if val is True or val == 1 else "No"
-                   
+
                     row_dict[pretty_map[column.name]] = pretty_val
                     continue
 
@@ -411,12 +457,42 @@ async def get_sheet_data(
                 if column.name in pretty_map:
                     row_dict[pretty_map[column.name]] = val
                     continue
- 
+
             row_dict[column.name] = val
         result.append(row_dict)
-       
+
     return result
- 
+
+
+@router.get("/getvendors")
+def get_all_vendors(db: Session = Depends(get_db)):
+    """
+    Fetch all vendor_id and vendor_name
+    """
+
+    data = db.query(
+        VendorMaster.vendor_id,
+        VendorMaster.vendor_name
+    ).all()
+
+    if not data:
+        raise HTTPException(
+            status_code=404,
+            detail="No vendors found"
+        )
+
+    # Convert tuple → dict
+    result = [
+        {
+            "vendor_id": row.vendor_id,
+            "vendor_name": row.vendor_name
+        }
+        for row in data
+    ]
+
+    return result
+
+
 @router.post("/sheet/{identifier}/add")
 def add_row(
     identifier: str,
@@ -426,13 +502,13 @@ def add_row(
     model = TAB_MODEL_MAP.get(identifier)
     if not model:
         raise HTTPException(404, "Table not found")
-       
+
     # Remove metadata if present
     data = request.get("new_row", request)
     data.pop('id', None)
     data.pop('created_at', None)
     data.pop('updated_at', None)
-   
+
     # Reverse mapping for pretty names
     reverse_map = {}
     if identifier in ["Vendor_Master", "vendor_master", "Entity_Master", "entity_master", "Entity"]:
@@ -450,28 +526,31 @@ def add_row(
             "Nature of Payment": "nature_of_payment",
             "TDS Rate": "tds_rate"
         }
-    
+
     final_data = {}
     for k, v in data.items():
         m_col = reverse_map.get(k, k)
-       
+
         # Boolean Conversion
         col_info = model.__table__.columns.get(m_col)
         if col_info is not None and isinstance(col_info.type, Boolean):
             if isinstance(v, str):
                 v_lower = v.strip().lower()
-                if v_lower in ["yes", "true", "1", "eligible"]: v = True
-                elif v_lower in ["no", "false", "0", "ineligible"]: v = False
+                if v_lower in ["yes", "true", "1", "eligible"]:
+                    v = True
+                elif v_lower in ["no", "false", "0", "ineligible"]:
+                    v = False
             elif isinstance(v, (int, float)):
                 v = bool(v)
-       
+
         final_data[m_col] = v
- 
+
     new_record = model(**final_data)
     db.add(new_record)
     db.commit()
     return {"status": "success"}
- 
+
+
 @router.patch("/sheet/{identifier}/edit")
 def edit_row(
     identifier: str,
@@ -481,22 +560,24 @@ def edit_row(
     model = TAB_MODEL_MAP.get(identifier)
     if not model:
         raise HTTPException(404, "Table not found")
-       
-    row_index = request.get("row_index") # This might be the list index or ID depending on frontend
+
+    # This might be the list index or ID depending on frontend
+    row_index = request.get("row_index")
     updated_data = request.get("updated_row")
-   
+
     record = None
     record_id = updated_data.get('id')
     if record_id:
         record = db.query(model).get(record_id)
-   
+
     if not record and row_index is not None:
         # Fallback to offset (Requires order_by for MSSQL)
-        record = db.query(model).order_by(model.id).offset(row_index).limit(1).first()
+        record = db.query(model).order_by(
+            model.id).offset(row_index).limit(1).first()
 
     if not record:
         raise HTTPException(404, "Record not found")
-   
+
     # Reverse mapping for pretty names
     reverse_map = {}
     if identifier in ["Vendor_Master", "vendor_master", "Entity_Master", "entity_master", "Entity"]:
@@ -514,11 +595,11 @@ def edit_row(
             "Nature of Payment": "nature_of_payment",
             "TDS Rate": "tds_rate"
         }
-        
+
     for k, v in updated_data.items():
         if k in ['id', 'created_at', 'updated_at']:
             continue
-           
+
         m_col = reverse_map.get(k, k)
         if hasattr(record, m_col):
             # Boolean Conversion
@@ -526,32 +607,36 @@ def edit_row(
             if col_info is not None and isinstance(col_info.type, Boolean):
                 if isinstance(v, str):
                     v_lower = v.strip().lower()
-                    if v_lower in ["yes", "true", "1", "eligible"]: v = True
-                    elif v_lower in ["no", "false", "0", "ineligible"]: v = False
+                    if v_lower in ["yes", "true", "1", "eligible"]:
+                        v = True
+                    elif v_lower in ["no", "false", "0", "ineligible"]:
+                        v = False
                 elif isinstance(v, (int, float)):
                     v = bool(v)
-           
+
             setattr(record, m_col, v)
-           
+
     db.commit()
     return {"status": "updated"}
- 
+
+
 @router.delete("/sheet/{identifier}/delete")
 def delete_row(
     identifier: str,
-    row_index: int, # Frontend sends list index, we need ID or to query by offset
+    row_index: int,  # Frontend sends list index, we need ID or to query by offset
     db: Session = Depends(get_db)
 ):
     model = TAB_MODEL_MAP.get(identifier)
     if not model:
         raise HTTPException(404, "Table not found")
-       
+
     # If row_index is actually the ID, use it directly.
     # But usually frontend 'key' is index.
     # Let's try to find the ID from the offset if possible (Requires order_by for MSSQL)
-    record = db.query(model).order_by(model.id).offset(row_index).limit(1).first()
+    record = db.query(model).order_by(
+        model.id).offset(row_index).limit(1).first()
     if record:
         db.delete(record)
         db.commit()
-   
+
     return {"status": "deleted"}
