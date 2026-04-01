@@ -25,8 +25,11 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     username: str
-    email: str
     role: Optional[str] = None
+    ispasswordchange: bool = True
 
+class ChangePasswordFirstTimeRequest(BaseModel):
+    email: EmailStr
+    new_password: str
 class TokenData(BaseModel):
     email: str = None

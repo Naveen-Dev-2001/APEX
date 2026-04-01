@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
+from datetime import datetime
 from typing import List
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from app.database.database import get_db
 from app.models.db_models import User as DBUser
 from app.models.user import UserResponse
@@ -22,6 +24,48 @@ def get_current_admin(current_user: UserResponse = Depends(get_current_user)):
             detail="Admin privileges required"
         )
     return current_user
+ 
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    role: str
+    status: str
+
+@router.post("/", response_model=UserResponse)
+async def create_new_user(
+    user_data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_admin)
+):
+    """Create a new user by Admin"""
+    # Check if user already exists
+    existing_user = db.query(DBUser).filter(DBUser.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    existing_username = db.query(DBUser).filter(DBUser.username == user_data.username).first()
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    from app.auth.jwt import get_password_hash
+    hashed_password = get_password_hash("Apex2026")
+
+    new_user = DBUser(
+        username=user_data.username,
+        email=user_data.email,
+        password=hashed_password,
+        role=user_data.role,
+        status=user_data.status,
+        isCreatedByUser=False,
+        createdby="admin",
+        ispasswordchange=False,
+        created_at=datetime.utcnow()
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
 
 @router.get("/", response_model=List[UserResponse])
 async def get_all_users(
@@ -29,7 +73,9 @@ async def get_all_users(
     current_user: UserResponse = Depends(get_current_admin)
 ):
     """Get all users (Admin only)"""
-    users = db.query(DBUser).all()
+    users = db.query(DBUser)\
+              .order_by(desc(DBUser.id))\
+              .all()    
     return users
 
 
@@ -37,6 +83,7 @@ async def get_all_users(
 async def update_user_role(
     user_id: int,
     update_data: UserRoleUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_admin)
 ):
@@ -60,23 +107,17 @@ async def update_user_role(
             detail=f"Invalid status: {update_data.status}"
         )
 
-    # Prevent admin removing own admin role
-    if current_user.id == user_id and update_data.role != "admin":
-        raise HTTPException(
-            status_code=400,
-            detail="Admin cannot remove own admin role"
-        )
-
     user = db.query(DBUser).filter(DBUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Prevent editing the primary admin account
-    if user.email and user.email.lower() == "admin@example.com":
+    # Prevent admin from removing own admin role
+    if current_user.id == user_id:
         raise HTTPException(
-            status_code=403,
-            detail="The primary admin account cannot be modified."
+            status_code=400,
+            detail="admin cannot change the role"
         )
+
 
     old_status = user.status
     user.role = update_data.role
@@ -87,6 +128,6 @@ async def update_user_role(
     # If user is approved (status changed to active), send notification
     if old_status != "active" and user.status == "active":
         from app.services.email_service import email_service
-        email_service.send_approval_notification(user.email, user.username, user.role)
+        background_tasks.add_task(email_service.send_approval_notification, user.email, user.username, user.role)
 
     return user

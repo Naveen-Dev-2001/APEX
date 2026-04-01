@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from app.models.auth import LoginRequest, Token, CheckEmailRequest, ResetPasswordRequest, SendOTPRequest, VerifyOTPRequest
+from app.models.auth import LoginRequest, Token, CheckEmailRequest, ResetPasswordRequest, SendOTPRequest, VerifyOTPRequest, ChangePasswordFirstTimeRequest
 from app.models.user import User as UserPydantic, UserResponse
 from app.models.db_models import User as UserDB
 from app.database.database import get_db
@@ -48,7 +48,7 @@ async def verify_otp(request: VerifyOTPRequest, db: Session = Depends(get_db)):
     return {"message": "OTP verified successfully"}
 
 @router.post("/register", response_model=UserResponse)
-async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def register(user: UserPydantic, db: Session = Depends(get_db)):
     # Check if OTP was verified
     if not otp_service.is_verified(db, user.email, "registration"):
         raise HTTPException(
@@ -81,6 +81,9 @@ async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Se
         password=hashed_password,
         status="pending",
         role="coder", # Default role, can be changed during approval
+        isCreatedByUser=True,
+        createdby="self",
+        ispasswordchange=True,
         created_at=datetime.utcnow()
     )
     
@@ -88,26 +91,17 @@ async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Se
     db.commit()
     db.refresh(new_user)
     
-    # Notify all Admins and the user via background tasks
+    # Notify all Admins and the user
     admins = db.query(UserDB).filter(UserDB.role == "admin").all()
-    if admins:
-        for admin in admins:
-            background_tasks.add_task(
-                email_service.send_admin_new_user_notification,
-                admin.email, new_user.email, new_user.username
-            )
-    else:
-        # If no admins found in DB, fallback to settings default admin email
-        background_tasks.add_task(
-            email_service.send_admin_new_user_notification,
-            settings.ADMIN_EMAIL, new_user.email, new_user.username
-        )
+    for admin in admins:
+        email_service.send_admin_new_user_notification(admin.email, new_user.email, new_user.username)
+    
+    # If no admins found in DB, fallback to settings default admin email
+    if not admins:
+        email_service.send_admin_new_user_notification(settings.ADMIN_EMAIL, new_user.email, new_user.username)
 
-    # Send confirmation to the user that their account is pending approval
-    background_tasks.add_task(
-        email_service.send_user_pending_approval,
-        new_user.email, new_user.username
-    )
+    # NEW: Send confirmation to the user that their account is pending approval
+    email_service.send_user_pending_approval(new_user.email, new_user.username)
     
     return UserResponse(
         id=str(new_user.id),
@@ -140,14 +134,29 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         data={"sub": user.email},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    
     return {
         "access_token": access_token, 
         "token_type": "bearer",
         "username": user.username,
-        "email": user.email,
-        "role": user.role
+        "role": user.role,
+        "ispasswordchange": user.ispasswordchange
     }
+
+@router.post("/change-password-first-time")
+async def change_password_first_time(request: ChangePasswordFirstTimeRequest, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.email == request.email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    hashed_password = get_password_hash(request.new_password)
+    user.password = hashed_password
+    user.ispasswordchange = True
+    db.commit()
+    
+    return {"message": "Password updated successfully"}
 
 @router.post("/check-email")
 async def check_email(request: CheckEmailRequest, db: Session = Depends(get_db)):
