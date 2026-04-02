@@ -1,7 +1,7 @@
 import React from 'react';
 import { Select } from 'antd';
 
-const Dropdown = ({ label, value, options, onChange, className = '', error = '', placeholder = 'Select an option', getPopupContainer, style = {} }) => {
+const Dropdown = ({ label, value, options, onChange, className = '', error = '', placeholder = 'Select an option', getPopupContainer, style = {}, mode }) => {
     return (
         <div className={`flex flex-col gap-1.5 ${className}`}>
             {label && (
@@ -11,11 +11,13 @@ const Dropdown = ({ label, value, options, onChange, className = '', error = '',
             )}
             <Select
                 showSearch
+                mode={mode}
+                maxTagCount="responsive"
                 value={value}
                 onChange={onChange}
                 options={options}
                 placeholder={placeholder}
-                className="h-[40px]"
+                className={`${mode ? 'min-h-[40px]' : 'h-[40px] shadow-sm'}`}
                 status={error ? 'error' : ''}
                 size="large"
                 style={{ borderRadius: '8px', width: '100%', fontSize: '10px', ...style }}

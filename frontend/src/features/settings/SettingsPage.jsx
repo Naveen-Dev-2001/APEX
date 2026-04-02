@@ -53,12 +53,27 @@ const SettingsPage = () => {
     
     const getApproverName = (email) => {
         if (!email) return <span className="text-gray-400">-</span>;
-        const approver = (approversList || []).find(a => a.value === email);
-        if (approver) {
-            // Extract name from "Name (Email)"
-            return approver.label.split(' (')[0];
+        
+        const formatSingle = (e) => {
+            const approver = (approversList || []).find(a => a.value === e);
+            if (approver) return approver.label.split(' (')[0];
+            return e;
+        };
+
+        if (Array.isArray(email)) {
+            if (email.length === 0) return <span className="text-gray-400">-</span>;
+            return (
+                <div className="flex flex-wrap gap-1 max-w-[200px]">
+                    {email.map((e, i) => (
+                        <span key={i} className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] text-gray-600 border border-gray-200">
+                            {formatSingle(e)}
+                        </span>
+                    ))}
+                </div>
+            );
         }
-        return email;
+
+        return formatSingle(email);
     };
 
     const handleDelete = (row) => {
@@ -84,6 +99,18 @@ const SettingsPage = () => {
 
     const vendorColumns = [
         { header: 'Vendor Name', accessor: 'vendor_name', sortable: true },
+        {
+            header: 'Type',
+            accessor: 'is_parallel',
+            render: (val) => (
+                <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
+                    ${val 
+                        ? 'bg-blue-50 text-blue-600 border-blue-100' 
+                        : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+                    {val ? 'Parallel' : 'Sequential'}
+                </span>
+            )
+        },
         { 
             header: 'Approver 1', 
             accessor: 'mandatory_approver_1',
@@ -159,6 +186,18 @@ const SettingsPage = () => {
                 const opt = useWorkflowStore.getState().departmentsList.find(o => o.value === val);
                 return opt ? opt.label : val;
             }
+        },
+        {
+            header: 'Type',
+            accessor: 'is_parallel',
+            render: (val) => (
+                <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
+                    ${val 
+                        ? 'bg-blue-50 text-blue-600 border-blue-100' 
+                        : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+                    {val ? 'Parallel' : 'Sequential'}
+                </span>
+            )
         },
         { 
             header: 'Approver 1', 

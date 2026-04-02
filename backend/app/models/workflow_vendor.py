@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Union
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -6,15 +6,16 @@ from pydantic import BaseModel, EmailStr, field_validator
 class VendorWorkflow(BaseModel):
     vendor_name: str
     vendor_id: Optional[str] = None
-    mandatory_approver_1: Optional[EmailStr] = None
-    mandatory_approver_2: Optional[EmailStr] = None
-    mandatory_approver_3: Optional[EmailStr] = None
-    mandatory_approver_4: Optional[EmailStr] = None
-    mandatory_approver_5: Optional[EmailStr] = None
-    threshold_approver: Optional[EmailStr] = None  # approver based on amount threshold
-    optional_approver: Optional[EmailStr] = None
-    amount_threshold: Optional[float] = None  # threshold for threshold approver
-    approver_count: int = 1  # 1 to 5
+    mandatory_approver_1: Optional[Union[EmailStr, List[EmailStr]]] = None
+    mandatory_approver_2: Optional[Union[EmailStr, List[EmailStr]]] = None
+    mandatory_approver_3: Optional[Union[EmailStr, List[EmailStr]]] = None
+    mandatory_approver_4: Optional[Union[EmailStr, List[EmailStr]]] = None
+    mandatory_approver_5: Optional[Union[EmailStr, List[EmailStr]]] = None
+    threshold_approver: Optional[Union[EmailStr, List[EmailStr]]] = None
+    optional_approver: Optional[Union[EmailStr, List[EmailStr]]] = None
+    amount_threshold: Optional[float] = None
+    approver_count: int = 1
+    is_parallel: bool = False
 
     entity: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -40,15 +41,16 @@ class VendorWorkflowResponse(BaseModel):
     id: int
     vendor_name: str
     vendor_id: Optional[str] = None
-    mandatory_approver_1: Optional[str] = None
-    mandatory_approver_2: Optional[str] = None
-    mandatory_approver_3: Optional[str] = None
-    mandatory_approver_4: Optional[str] = None
-    mandatory_approver_5: Optional[str] = None
-    threshold_approver: Optional[str] = None
-    optional_approver: Optional[str] = None
+    mandatory_approver_1: Optional[Union[str, List[str]]] = None
+    mandatory_approver_2: Optional[Union[str, List[str]]] = None
+    mandatory_approver_3: Optional[Union[str, List[str]]] = None
+    mandatory_approver_4: Optional[Union[str, List[str]]] = None
+    mandatory_approver_5: Optional[Union[str, List[str]]] = None
+    threshold_approver: Optional[Union[str, List[str]]] = None
+    optional_approver: Optional[Union[str, List[str]]] = None
     amount_threshold: Optional[float] = None
     approver_count: int
+    is_parallel: bool = False
 
     entity: str
     created_at: datetime

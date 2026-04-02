@@ -7,15 +7,16 @@ import Dropdown from '../../components/ui/Dropdown';
 const EMPTY_FORM = {
     vendor_id: '',
     vendor_name: '',
-    mandatory_approver_1: '',
-    mandatory_approver_2: '',
-    mandatory_approver_3: '',
-    mandatory_approver_4: '',
-    mandatory_approver_5: '',
-    threshold_approver: '',
+    mandatory_approver_1: [],
+    mandatory_approver_2: [],
+    mandatory_approver_3: [],
+    mandatory_approver_4: [],
+    mandatory_approver_5: [],
+    threshold_approver: [],
     amount_threshold: '',
     approver_count: 1,
-    enableThreshold: 'No'
+    enableThreshold: 'No',
+    is_parallel: false
 };
 
 const FormField = ({ label, id, value, onChange, type = "text", placeholder = '', required = false }) => (
@@ -78,15 +79,16 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
             setForm({
                 vendor_id: rowData.vendor_id || '',
                 vendor_name: rowData.vendor_name || '',
-                mandatory_approver_1: rowData.mandatory_approver_1 || '',
-                mandatory_approver_2: rowData.mandatory_approver_2 || '',
-                mandatory_approver_3: rowData.mandatory_approver_3 || '',
-                mandatory_approver_4: rowData.mandatory_approver_4 || '',
-                mandatory_approver_5: rowData.mandatory_approver_5 || '',
-                threshold_approver: rowData.threshold_approver || '',
+                mandatory_approver_1: Array.isArray(rowData.mandatory_approver_1) ? rowData.mandatory_approver_1 : (rowData.mandatory_approver_1 ? [rowData.mandatory_approver_1] : []),
+                mandatory_approver_2: Array.isArray(rowData.mandatory_approver_2) ? rowData.mandatory_approver_2 : (rowData.mandatory_approver_2 ? [rowData.mandatory_approver_2] : []),
+                mandatory_approver_3: Array.isArray(rowData.mandatory_approver_3) ? rowData.mandatory_approver_3 : (rowData.mandatory_approver_3 ? [rowData.mandatory_approver_3] : []),
+                mandatory_approver_4: Array.isArray(rowData.mandatory_approver_4) ? rowData.mandatory_approver_4 : (rowData.mandatory_approver_4 ? [rowData.mandatory_approver_4] : []),
+                mandatory_approver_5: Array.isArray(rowData.mandatory_approver_5) ? rowData.mandatory_approver_5 : (rowData.mandatory_approver_5 ? [rowData.mandatory_approver_5] : []),
+                threshold_approver: Array.isArray(rowData.threshold_approver) ? rowData.threshold_approver : (rowData.threshold_approver ? [rowData.threshold_approver] : []),
                 amount_threshold: rowData.amount_threshold || '',
-                approver_count: rowData.approver_count || 2,
-                enableThreshold: rowData.threshold_approver ? 'Yes' : 'No'
+                approver_count: rowData.approver_count || 1,
+                enableThreshold: (rowData.threshold_approver && rowData.threshold_approver.length > 0) ? 'Yes' : 'No',
+                is_parallel: rowData.is_parallel || false
             });
         }
     }, [isEdit, rowData]);
@@ -122,19 +124,24 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
 
         const payload = {
             ...form,
-            threshold_approver: form.enableThreshold === 'Yes' ? (form.threshold_approver || null) : null,
+            threshold_approver: form.enableThreshold === 'Yes' ? (form.threshold_approver || []) : [],
             amount_threshold: form.enableThreshold === 'Yes' ? parseFloat(form.amount_threshold) : null,
         };
 
         // Clean up mandatory approvers that are not needed
         for (let i = 1; i <= 5; i++) {
             if (i > form.approver_count) {
-                payload[`mandatory_approver_${i}`] = null;
-            } else if (payload[`mandatory_approver_${i}`] === "") {
-                payload[`mandatory_approver_${i}`] = null;
+                payload[`mandatory_approver_${i}`] = [];
             }
         }
-        if (payload.optional_approver === "") payload.optional_approver = null;
+        
+        // Ensure all approver fields are lists and any empty ones are null for the backend if needed
+        // but our backend handles list|null, so empty list is usually fine or let's be explicit
+        ['mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3', 'mandatory_approver_4', 'mandatory_approver_5', 'threshold_approver'].forEach(f => {
+            if (Array.isArray(payload[f]) && payload[f].length === 0) {
+                payload[f] = null;
+            }
+        });
 
 
         setIsSubmitting(true);
@@ -175,17 +182,25 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
 
     // Filter approvers to avoid selecting the same person twice and clean labels
     const getFilteredApprovers = (currentField) => {
-        const selected = [
+        const selected = new Set();
+        [
             form.mandatory_approver_1,
             form.mandatory_approver_2,
             form.mandatory_approver_3,
             form.mandatory_approver_4,
             form.mandatory_approver_5,
             form.threshold_approver
-        ].filter(v => v && v !== form[currentField]);
+        ].forEach(field => {
+            if (field === form[currentField]) return;
+            if (Array.isArray(field)) {
+                field.forEach(email => selected.add(email));
+            } else if (field) {
+                selected.add(field);
+            }
+        });
 
         return approversList
-            .filter(apt => !selected.includes(apt.value))
+            .filter(apt => !selected.has(apt.value))
             .map(opt => ({
                 ...opt,
                 label: opt.label.includes(' (') ? opt.label.split(' (')[0] : opt.label
@@ -237,6 +252,16 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
                         />
 
                         <RadioGroup
+                            label="Approval Type"
+                            value={form.is_parallel ? 'Parallel (Any one per level can approve)' : 'Sequential (Level by Level)'}
+                            options={['Sequential (Level by Level)', 'Parallel (Any one per level can approve)']}
+                            onChange={(val) => setForm(prev => ({ 
+                                ...prev, 
+                                is_parallel: val === 'Parallel (Any one per level can approve)' 
+                            }))}
+                        />
+
+                        <RadioGroup
                             label="Enable Threshold Approver"
                             value={form.enableThreshold}
                             options={['Yes', 'No']}
@@ -251,6 +276,7 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
                                 key={idx}
                                 label={`Approver ${idx + 1} (Mandatory) *`}
                                 value={form[`mandatory_approver_${idx + 1}`]}
+                                mode="multiple"
                                 options={getFilteredApprovers(`mandatory_approver_${idx + 1}`)}
                                 onChange={(val) => setForm(prev => ({ ...prev, [`mandatory_approver_${idx + 1}`]: val }))}
                                 placeholder={`Select Approver ${idx + 1}`}
@@ -264,6 +290,7 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
                             <Dropdown
                                 label="Threshold Approver *"
                                 value={form.threshold_approver}
+                                mode="multiple"
                                 options={getFilteredApprovers('threshold_approver')}
                                 onChange={(val) => setForm(prev => ({ ...prev, threshold_approver: val }))}
                                 placeholder="Select Threshold Approver"
