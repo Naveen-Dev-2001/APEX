@@ -43,3 +43,8 @@ export const getInvoicePdf = (invoiceId) =>
     API.get(`/invoices/${invoiceId}/file`, { responseType: 'blob' }).then(res => {
         return res.data;
     });
+
+export const checkDuplicate = (payload) =>
+    API.post(`/invoices/check-duplicate`, payload).then(res => {
+        return res.data;
+    });

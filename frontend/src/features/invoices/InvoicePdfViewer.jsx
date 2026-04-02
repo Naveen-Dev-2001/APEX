@@ -59,7 +59,7 @@ const InvoicePdfViewer = () => {
     });
 
     return (
-        <div className="flex flex-col h-full bg-[#EAECF0] rounded-xl shadow-inner border border-[#E1E6EB] overflow-hidden">
+        <div className="flex flex-col h-full bg-[#EAECF0] shadow-inner border border-[#E1E6EB] overflow-hidden">
             {/* 🛠 Toolbar */}
             <InvoicePdfToolbar 
                 fileName={fileName}
@@ -81,7 +81,7 @@ const InvoicePdfViewer = () => {
             <div
                 ref={viewerRef}
                 id="pdf-container"
-                className="flex-1 overflow-auto p-4 flex justify-center items-start relative scrollbar-thin scrollbar-thumb-gray-400"
+                className="flex-1 overflow-auto flex justify-center items-start relative scrollbar-thin scrollbar-thumb-gray-400"
             >
                 {(isPdfLoading || isRendering) && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FDFDFD]/80 z-50 backdrop-blur-sm">
@@ -93,7 +93,7 @@ const InvoicePdfViewer = () => {
                 )}
 
                 {pdfObj ? (
-                    <div className="relative inline-block bg-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] rounded-lg transition-all overflow-hidden">
+                    <div className="relative inline-block bg-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] transition-all overflow-hidden">
                         <canvas ref={canvasRef} className="block" />
                         
                         {/* React-rendered highlights overlay */}

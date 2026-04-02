@@ -1,9 +1,11 @@
 import CustomButton from "../../shared/components/CustomButton";
 import { icons } from "../../file";
 import { useInvoiceStore } from "../../store/invoice.store";
+import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 
 const InvoiceTopBar = ({ invoice = {} }) => {
-    const { setInvoiceSection } = useInvoiceStore();
+    const { setInvoiceSection, isDuplicate } = useInvoiceStore();
+    useDuplicateCheck();
 
     return (
         <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4  flex items-center justify-between ">
@@ -48,6 +50,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                     <CustomButton
                         variant="success"
                         className="w-40"
+                        disabled={isDuplicate}
                         onClick={() => {/* handle send to coding */ }}
                     >
                         Send to Coding

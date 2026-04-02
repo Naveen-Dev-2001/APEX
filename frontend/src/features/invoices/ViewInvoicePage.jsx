@@ -23,7 +23,7 @@ const ViewInvoicePage = () => {
                 >
                     {/* LEFT */}
                     <div className="flex flex-col overflow-hidden bg-[#EFEFEF]">
-                        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                        <div className="flex-1 min-h-0 overflow-y-auto">
                             <InvoicePdfViewer />
                         </div>
                     </div>
