@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.auth import LoginRequest, Token, CheckEmailRequest, ResetPasswordRequest, SendOTPRequest, VerifyOTPRequest, ChangePasswordFirstTimeRequest
 from app.models.user import User as UserPydantic, UserResponse
 from app.models.db_models import User as UserDB
+from app.repository.repositories import user_repo, otp_repo
 from app.database.database import get_db
 from app.auth.jwt import verify_password, get_password_hash, create_access_token
 from app.services.email_service import email_service
@@ -16,13 +17,13 @@ router = APIRouter()
 async def send_otp(request: SendOTPRequest, db: Session = Depends(get_db)):
     # If purpose is forgot_password, check if email exists
     if request.purpose == "forgot_password":
-        user = db.query(UserDB).filter(UserDB.email == request.email).first()
+        user = user_repo.get_multi(db, filters={"email": request.email}, limit=1)
         if not user:
             raise HTTPException(status_code=404, detail="Email not found")
     
     # If purpose is registration, check if email already exists
     if request.purpose == "registration":
-        user = db.query(UserDB).filter(UserDB.email == request.email).first()
+        user = user_repo.get_multi(db, filters={"email": request.email}, limit=1)
         if user:
             raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -32,7 +33,8 @@ async def send_otp(request: SendOTPRequest, db: Session = Depends(get_db)):
     if request.purpose == "registration":
         success = email_service.send_registration_otp(request.email, otp)
     else:
-        user = db.query(UserDB).filter(UserDB.email == request.email).first()
+        user_list = user_repo.get_multi(db, filters={"email": request.email}, limit=1)
+        user = user_list[0] if user_list else None
         success = email_service.send_forgot_password_otp(request.email, user.username if user else "User", otp)
     
     if not success:
@@ -57,14 +59,14 @@ async def register(user: UserPydantic, db: Session = Depends(get_db)):
         )
 
     # Check if user already exists (redundant but safe)
-    existing_email = db.query(UserDB).filter(UserDB.email == user.email).first()
+    existing_email = user_repo.get_multi(db, filters={"email": user.email}, limit=1)
     if existing_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
     
-    existing_username = db.query(UserDB).filter(UserDB.username == user.username).first()
+    existing_username = user_repo.get_multi(db, filters={"username": user.username}, limit=1)
     if existing_username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -75,21 +77,19 @@ async def register(user: UserPydantic, db: Session = Depends(get_db)):
     hashed_password = get_password_hash(user.password)
     
     # Create new user with pending status
-    new_user = UserDB(
-        username=user.username,
-        email=user.email,
-        password=hashed_password,
-        status="pending",
-        role="coder", # Default role, can be changed during approval
-        isCreatedByUser=True,
-        createdby="self",
-        ispasswordchange=True,
-        created_at=datetime.utcnow()
-    )
+    new_user_data = {
+        "username": user.username,
+        "email": user.email,
+        "password": hashed_password,
+        "status": "pending",
+        "role": "coder",
+        "isCreatedByUser": True,
+        "createdby": "self",
+        "ispasswordchange": True,
+        "created_at": datetime.utcnow()
+    }
     
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    new_user = user_repo.create(db, obj_in=new_user_data)
     
     # Notify all Admins and the user
     admins = db.query(UserDB).filter(UserDB.role == "admin").all()
@@ -115,7 +115,8 @@ async def register(user: UserPydantic, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     # Find user by email
-    user = db.query(UserDB).filter(UserDB.email == login_data.email).first()
+    user_list = user_repo.get_multi(db, filters={"email": login_data.email}, limit=1)
+    user = user_list[0] if user_list else None
     
     if not user or not verify_password(login_data.password, user.password):
         raise HTTPException(
@@ -144,7 +145,8 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/change-password-first-time")
 async def change_password_first_time(request: ChangePasswordFirstTimeRequest, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.email == request.email).first()
+    user_list = user_repo.get_multi(db, filters={"email": request.email}, limit=1)
+    user = user_list[0] if user_list else None
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -152,17 +154,15 @@ async def change_password_first_time(request: ChangePasswordFirstTimeRequest, db
         )
     
     hashed_password = get_password_hash(request.new_password)
-    user.password = hashed_password
-    user.ispasswordchange = True
-    db.commit()
+    user_repo.update(db, db_obj=user, obj_in={"password": hashed_password, "ispasswordchange": True})
     
     return {"message": "Password updated successfully"}
 
 @router.post("/check-email")
 async def check_email(request: CheckEmailRequest, db: Session = Depends(get_db)):
     try:
-        user = db.query(UserDB).filter(UserDB.email == request.email).first()
-        if not user:
+        user_list = user_repo.get_multi(db, filters={"email": request.email}, limit=1)
+        if not user_list:
             return {"exists": False, "message": "Email does not exist"}
         return {"exists": True, "message": "Email exists"}
     except Exception as e:
@@ -180,7 +180,8 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
             detail="OTP not verified for this email."
         )
 
-    user = db.query(UserDB).filter(UserDB.email == request.email).first()
+    user_list = user_repo.get_multi(db, filters={"email": request.email}, limit=1)
+    user = user_list[0] if user_list else None
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -188,7 +189,6 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
         )
     
     hashed_password = get_password_hash(request.new_password)
-    user.password = hashed_password
-    db.commit()
+    user_repo.update(db, db_obj=user, obj_in={"password": hashed_password})
     
     return {"message": "Password updated successfully"}

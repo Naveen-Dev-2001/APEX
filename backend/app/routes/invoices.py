@@ -22,6 +22,10 @@ from app.models.db_models import (
     WorkflowStepStatusEnum, InvoiceStatusEnum, InvoiceStatusHistory,
     VendorMetadata, RawExtractionData, User, EntityMaster
 )
+from app.repository.repositories import (
+    invoice_repo, workflow_step_repo, invoice_status_history_repo,
+    user_repo, entity_repo, vendor_metadata_repo, raw_extraction_repo
+)
 from app.database.db_utils import (
     invoice_to_dict, serialize_json_field, deserialize_json_field
 )
@@ -210,9 +214,7 @@ async def upload_invoices(
             new_invoice.status_history.append(history_item)
             
             db_start = time.time()
-            task_db.add(new_invoice)
-            task_db.commit()
-            task_db.refresh(new_invoice)
+            invoice_repo.create(task_db, obj_in=new_invoice)
             invoice_id = new_invoice.id
             print(f"[Backend] Initial DB record created in {time.time() - db_start:.2f}s: {invoice_id}")
             logger.info({
@@ -287,8 +289,7 @@ async def upload_invoices(
                     llm_prompt=extraction.get("llm_prompt"),
                     llm_raw_response=extraction.get("llm_raw_response")
                 )
-                task_db.add(raw_record)
-                task_db.commit()
+                raw_extraction_repo.create(task_db, obj_in=raw_record)
                 print(f"[Backend] Raw extraction data and PDF binary saved in {time.time() - raw_start:.2f}s")
                 logger.info({
                     "request_id": request_id,
@@ -441,8 +442,7 @@ async def upload_invoices(
                 timestamp=datetime.utcnow(),
                 entity=entity
             )
-            task_db.add(workflow_step)
-            task_db.commit()
+            workflow_step_repo.create(task_db, obj_in=workflow_step)
 
             logger.info({
                 "request_id": request_id,
@@ -559,13 +559,18 @@ async def get_invoices(
     show_all: bool = True,
     db: Session = Depends(get_db)
 ):
-    from sqlalchemy import desc
-    query = db.query(Invoice).filter(Invoice.entity == entity)
-    
+    filters = {"entity": entity}
     if not show_all:
-        query = query.filter(Invoice.uploaded_by == current_user.username)
+        filters["uploaded_by"] = current_user.username
 
-    invoices = query.order_by(desc(Invoice.uploaded_at)).offset(skip).limit(limit).all()
+    invoices = invoice_repo.get_multi(
+        db, 
+        skip=skip, 
+        limit=limit, 
+        filters=filters, 
+        order_by="uploaded_at", 
+        descending=True
+    )
 
     return [InvoiceResponse(**invoice_to_dict(inv)) for inv in invoices]
 
@@ -577,15 +582,15 @@ async def get_invoice(
     entity: str = Depends(get_current_entity),
     db: Session = Depends(get_db)
 ):
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.entity == entity).first()
-    if not invoice:
+    invoice = invoice_repo.get(db, invoice_id)
+    if not invoice or invoice.entity != entity:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     return InvoiceResponse(**invoice_to_dict(invoice))
 
 @router.get("/debug/raw/{invoice_id}")
 async def get_raw_invoice(invoice_id: int, db: Session = Depends(get_db)):
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         return {"error": "Not found"}
     return invoice_to_dict(invoice)
@@ -645,7 +650,7 @@ async def update_invoice_status(
     except:
         pass
 
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).with_for_update().first()
+    invoice = invoice_repo.get_for_update(db, invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
@@ -782,10 +787,10 @@ async def update_invoice_status(
     if status == InvoiceStatusEnum.WAITING_CODING:
         main_status = InvoiceStatusEnum.WAITING_CODING
 
-        db.query(WorkflowStep).filter(
-            WorkflowStep.invoice_id == invoice_id,
-            WorkflowStep.step_type == WorkflowStepTypeEnum.CODING
-        ).delete()
+        workflow_step_repo.delete_all(db, filters={
+            "invoice_id": invoice_id,
+            "step_type": WorkflowStepTypeEnum.CODING
+        })
 
         invoice.status = main_status
         invoice.validation_results = serialize_json_field({})

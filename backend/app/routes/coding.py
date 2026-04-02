@@ -11,6 +11,9 @@ from app.database.database import get_db
 from app.models.db_models import (
     Invoice, Coding as DBCoding, CodingHistory, InvoiceStatusHistory
 )
+from app.repository.repositories import (
+    invoice_repo, coding_repo, coding_history_repo
+)
 from app.database.db_utils import invoice_to_dict
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
@@ -85,13 +88,14 @@ def update_coding_history(db: Session, vendor_name: str, line_items: List[LineIt
             embedding = embed_text(norm_desc)
             
             # Priority 1: vendor_id, Priority 2: vendor_key
-            query = db.query(CodingHistory)
+            expressions = []
             if vendor_id:
-                query = query.filter(CodingHistory.vendor_id == vendor_id)
+                filters = {"vendor_id": vendor_id, "normalized_description": norm_desc}
             else:
-                query = query.filter(CodingHistory.vendor_key == vendor_key)
+                filters = {"vendor_key": vendor_key, "normalized_description": norm_desc}
                 
-            history = query.filter(CodingHistory.normalized_description == norm_desc).first()
+            history_list = coding_history_repo.get_multi(db, filters=filters, limit=1)
+            history = history_list[0] if history_list else None
 
             coding_data = {
                 "gl_code": item.gl_code,
@@ -102,23 +106,24 @@ def update_coding_history(db: Session, vendor_name: str, line_items: List[LineIt
             }
 
             if history:
-                history.description = item.description
-                history.embedding = json.dumps(embedding)
-                history.coding_json = json.dumps(coding_data)
-                history.updated_at = datetime.utcnow()
-                if vendor_id: history.vendor_id = vendor_id # Update id if missing
+                coding_history_repo.update(db, db_obj=history, obj_in={
+                    "description": item.description,
+                    "embedding": json.dumps(embedding),
+                    "coding_json": json.dumps(coding_data),
+                    "updated_at": datetime.utcnow(),
+                    "vendor_id": vendor_id if vendor_id else history.vendor_id
+                })
             else:
-                new_history = CodingHistory(
-                    vendor_id=vendor_id,
-                    vendor_key=vendor_key,
-                    vendor_name=vendor_name,
-                    description=item.description,
-                    normalized_description=norm_desc,
-                    embedding=json.dumps(embedding),
-                    coding_json=json.dumps(coding_data)
-                )
-                db.add(new_history)
-        db.commit()
+                new_history_data = {
+                    "vendor_id": vendor_id,
+                    "vendor_key": vendor_key,
+                    "vendor_name": vendor_name,
+                    "description": item.description,
+                    "normalized_description": norm_desc,
+                    "embedding": json.dumps(embedding),
+                    "coding_json": json.dumps(coding_data)
+                }
+                coding_history_repo.create(db, obj_in=new_history_data)
     except Exception as e:
         logger.error(f"Error updating coding history: {e}")
         db.rollback()
@@ -132,7 +137,7 @@ def get_coding_suggestions(db: Session, vendor_name: str, extracted_items: List[
     # 1. Fetch by Vendor ID (Strong matching)
     if vendor_id:
         try:
-            id_entries = db.query(CodingHistory).filter(CodingHistory.vendor_id == vendor_id).all()
+            id_entries = coding_history_repo.get_multi(db, filters={"vendor_id": vendor_id}, limit=500)
             for h in id_entries:
                 history_entries.append(h)
                 seen_ids.add(h.id)
@@ -142,12 +147,16 @@ def get_coding_suggestions(db: Session, vendor_name: str, extracted_items: List[
     # 2. Fetch by Vendor Name (Broad matching) - ALWAYS fetch to fill gaps
     if vendor_key:
         try:
-            name_query = db.query(CodingHistory).filter(CodingHistory.vendor_key == vendor_key)
+            expressions = []
             if vendor_id:
-                # Exclude what we already fetched
-                name_query = name_query.filter(CodingHistory.vendor_id != vendor_id)
+                expressions = [CodingHistory.vendor_id != vendor_id]
             
-            name_entries = name_query.all()
+            name_entries = coding_history_repo.get_multi(
+                db, 
+                filters={"vendor_key": vendor_key}, 
+                expressions=expressions,
+                limit=500
+            )
             history_entries.extend(name_entries)
         except Exception as e:
             logger.error(f"Error fetching Name-based history: {e}")
@@ -213,11 +222,12 @@ async def get_coding(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = invoice_repo.get(db, invoice_id)
     if not invoice or invoice.entity != entity:
         raise HTTPException(404, "Invoice not found or access denied")
 
-    existing = db.query(DBCoding).filter(DBCoding.invoice_id == invoice_id).first()
+    coding_list = coding_repo.get_multi(db, filters={"invoice_id": invoice_id}, limit=1)
+    existing = coding_list[0] if coding_list else None
     if existing:
         saved_items = json.loads(existing.line_items) if existing.line_items else []
         
@@ -290,7 +300,7 @@ async def get_suggestions(
     """
     Fetch coding suggestions for an invoice, optionally overriding the vendor_id.
     """
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = invoice_repo.get(db, invoice_id)
     if not invoice or invoice.entity != entity:
         raise HTTPException(404, "Invoice not found or access denied")
 
@@ -321,34 +331,35 @@ async def create_or_update_coding(
     try: inv_id = int(coding_data.invoice_id)
     except: raise HTTPException(400, "Invalid invoice ID")
 
-    invoice = db.query(Invoice).filter(Invoice.id == inv_id).first()
+    invoice = invoice_repo.get(db, inv_id)
     if not invoice or invoice.entity != entity:
         raise HTTPException(404, "Invoice not found or access denied")
 
-    existing_coding = db.query(DBCoding).filter(DBCoding.invoice_id == inv_id).first()
+    coding_list = coding_repo.get_multi(db, filters={"invoice_id": inv_id}, limit=1)
+    existing_coding = coding_list[0] if coding_list else None
     
     line_items_json = json.dumps([item.dict() for item in coding_data.line_items]) if coding_data.line_items else "[]"
     
     if existing_coding:
-        existing_coding.header_coding = coding_data.header_coding
-        existing_coding.line_items = line_items_json
-        existing_coding.updated_at = datetime.utcnow()
+        coding_repo.update(db, db_obj=existing_coding, obj_in={
+            "header_coding": coding_data.header_coding,
+            "line_items": line_items_json,
+            "updated_at": datetime.utcnow()
+        })
     else:
-        new_coding = DBCoding(
-            invoice_id=inv_id,
-            header_coding=coding_data.header_coding,
-            line_items=line_items_json,
-            entity=entity,
-            created_at=datetime.utcnow()
-        )
-        db.add(new_coding)
+        new_coding_data = {
+            "invoice_id": inv_id,
+            "header_coding": coding_data.header_coding,
+            "line_items": line_items_json,
+            "entity": entity,
+            "created_at": datetime.utcnow()
+        }
+        coding_repo.create(db, obj_in=new_coding_data)
     
     if coding_data.vendor_name is not None:
-        invoice.vendor_name = coding_data.vendor_name
+        invoice_repo.update(db, db_obj=invoice, obj_in={"vendor_name": coding_data.vendor_name})
     if getattr(coding_data, 'vendor_id', None) is not None:
-        invoice.vendor_id = coding_data.vendor_id
-        
-    db.commit()
+        invoice_repo.update(db, db_obj=invoice, obj_in={"vendor_id": coding_data.vendor_id})
 
     # Update history and gl_summary
     vendor_name = coding_data.vendor_name or get_vendor_name(invoice)
@@ -362,42 +373,41 @@ async def create_or_update_coding(
             summary_map[item.gl_code] = summary_map.get(item.gl_code, 0.0) + item.net_amount
     
     gl_summary = [{"gl_code": k, "total_amount": v} for k, v in summary_map.items()]
-    invoice.gl_summary = json.dumps(gl_summary)
+    # Update gl_summary and extracted_data via invoice_repo
+    update_vals = {"gl_summary": json.dumps(gl_summary)}
     
     # Sync to extracted_data
     try:
         ext_data = json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else invoice.extracted_data
+        # ... logic as before ...
         if "Items" not in ext_data: ext_data["Items"] = {"value": []}
-        
         orig_items = ext_data["Items"].get("value", [])
         new_ext_items = []
         for c_item in coding_data.line_items:
-            if c_item.original_index is not None and 0 <= c_item.original_index < len(orig_items):
-                bi = orig_items[c_item.original_index]
-                if "description" not in bi: bi["description"] = {}
-                bi["description"]["value"] = c_item.description
-                if "quantity" not in bi: bi["quantity"] = {}
-                bi["quantity"]["value"] = c_item.quantity
-                if "unit_price" not in bi: bi["unit_price"] = {}
-                bi["unit_price"]["value"] = c_item.unit_price
-                if "amount" not in bi: bi["amount"] = {}
-                bi["amount"]["value"] = c_item.net_amount
-                new_ext_items.append(bi)
-            else:
-                new_ext_items.append({
-                    "description": {"value": c_item.description},
-                    "quantity": {"value": c_item.quantity},
-                    "unit_price": {"value": c_item.unit_price},
-                    "amount": {"value": c_item.net_amount},
-                    "item_code": {"value": c_item.item}
-                })
+             if c_item.original_index is not None and 0 <= c_item.original_index < len(orig_items):
+                 bi = orig_items[c_item.original_index]
+                 # ...
+                 bi["description"] = {"value": c_item.description}
+                 bi["quantity"] = {"value": c_item.quantity}
+                 bi["unit_price"] = {"value": c_item.unit_price}
+                 bi["amount"] = {"value": c_item.net_amount}
+                 new_ext_items.append(bi)
+             else:
+                 new_ext_items.append({
+                     "description": {"value": c_item.description},
+                     "quantity": {"value": c_item.quantity},
+                     "unit_price": {"value": c_item.unit_price},
+                     "amount": {"value": c_item.net_amount},
+                     "item_code": {"value": c_item.item}
+                 })
         ext_data["Items"]["value"] = new_ext_items
-        invoice.extracted_data = json.dumps(ext_data)
+        update_vals["extracted_data"] = json.dumps(ext_data)
     except: pass
     
-    db.commit()
+    invoice_repo.update(db, db_obj=invoice, obj_in=update_vals)
 
-    saved = db.query(DBCoding).filter(DBCoding.invoice_id == inv_id).first()
+    saved_list = coding_repo.get_multi(db, filters={"invoice_id": inv_id}, limit=1)
+    saved = saved_list[0] if saved_list else None
     return CodingResponse(
         id=str(saved.id),
         invoice_id=str(saved.invoice_id),

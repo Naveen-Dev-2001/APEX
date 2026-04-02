@@ -96,11 +96,11 @@ class Invoice(Base):
     file_path = Column(String(1000), nullable=False)
     uploaded_by = Column(String(100), nullable=False)  # Username for backward compatibility
     uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # FK to users
-    status = Column(SQLEnum(InvoiceStatusEnum), nullable=False, default=InvoiceStatusEnum.WAITING_APPROVAL)
-    entity = Column(String(100), nullable=True, index=True)
+    status = Column(SQLEnum(InvoiceStatusEnum), nullable=False, default=InvoiceStatusEnum.WAITING_APPROVAL, index=True)
+    entity = Column(String(100), ForeignKey("entity_master.entity_id"), nullable=True, index=True)
     
     # Vendor information
-    vendor_id = Column(String(100), nullable=True, index=True)
+    vendor_id = Column(String(100), ForeignKey("vendor_master.vendor_id"), nullable=True, index=True)
     vendor_name = Column(String(500), nullable=True, index=True)
     invoice_number = Column(String(200), nullable=True, index=True)
     azure_vendor_name = Column(String(500), nullable=True)
@@ -212,7 +212,7 @@ class Coding(Base):
     invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
     header_coding = Column(Text, nullable=True)  # Store as JSON string
     line_items = Column(Text, nullable=True)    # Store as JSON string
-    entity = Column(String(100), nullable=False, index=True)
+    entity = Column(String(100), ForeignKey("entity_master.entity_id"), nullable=False, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
 
@@ -227,9 +227,9 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False, index=True)
-    action = Column(String(100), nullable=False)
-    user = Column(String(100), nullable=False)
-    entity = Column(String(100), nullable=False, index=True)
+    action = Column(String(100), nullable=False, index=True)
+    user = Column(String(100), nullable=False, index=True)
+    entity = Column(String(100), ForeignKey("entity_master.entity_id"), nullable=False, index=True)
     details = Column(Text, nullable=True)  # JSON stored as text
     sage_bill_number = Column(String(200), nullable=True)
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
@@ -255,9 +255,9 @@ class WorkflowStep(Base):
     user = Column(String(100), nullable=False)
     status = Column(String(100), nullable=False) 
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
-    approver_number = Column(Integer, nullable=True)
+    approver_number = Column(Integer, nullable=True, index=True)
     comment = Column(Text, nullable=True)
-    entity = Column(String(100), nullable=False, index=True)
+    entity = Column(String(100), ForeignKey("entity_master.entity_id"), nullable=False, index=True)
 
     # Relationships
     invoice = relationship("Invoice", back_populates="workflow_steps")
@@ -288,8 +288,8 @@ class Delegation(Base):
     __tablename__ = "delegations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity = Column(String(100), nullable=False, index=True)
-    delegator_email = Column(String(200), nullable=False) # Copied from original_approver usually
+    entity = Column(String(100), ForeignKey("entity_master.entity_id"), nullable=False, index=True)
+    delegator_email = Column(String(200), nullable=False, index=True) # Copied from original_approver usually
     substitute_email = Column(String(200), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
     original_approver = Column(String(200), nullable=False, index=True)
@@ -366,7 +366,7 @@ class EntityMaster(Base):
     __tablename__ = "entity_master"
  
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity_id = Column(String(50), unique=True, nullable=False, index=True)
+    entity_id = Column(String(100), unique=True, nullable=False, index=True)
     entity_name = Column(String(200), nullable=False)
     registered_address = Column(Text, nullable=True)
     address_line1 = Column(String(255), nullable=True)
@@ -389,7 +389,7 @@ class VendorMaster(Base):
     __tablename__ = "vendor_master"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    vendor_id = Column(String(50), unique=True, nullable=False, index=True)
+    vendor_id = Column(String(100), unique=True, nullable=False, index=True)
     vendor_name = Column(String(200), nullable=False, index=True)
     vendor_is_an_individual_person = Column(Boolean, default=False)
     address_line1 = Column(String(255), nullable=True)
@@ -417,7 +417,7 @@ class VendorMaster(Base):
     line_grouping = Column(Boolean, nullable=True, default=False)
     
     # Suggested Foreign Key to Entity
-    entity_id = Column(String(50), nullable=True)
+    entity_id = Column(String(100), ForeignKey("entity_master.entity_id"), nullable=True, index=True)
     
     # Sage Intacct Sync Fields
     vendor_key = Column(String(100), index=True, nullable=True)
@@ -448,7 +448,7 @@ class GLMaster(Base):
     __tablename__ = "gl_master"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    account_number = Column(String(50), unique=True, nullable=False, index=True)
+    account_number = Column(String(100), unique=True, nullable=False, index=True)
     title = Column(String(200), nullable=False)
     normal_balance = Column(String(20), nullable=True) # Debit/Credit
     require_department = Column(Boolean, default=False)
@@ -475,7 +475,7 @@ class LOBMaster(Base):
     __tablename__ = "lob_master"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lob_id = Column(String(50), unique=True, nullable=False, index=True)
+    lob_id = Column(String(100), unique=True, nullable=False, index=True)
     name = Column(String(200), nullable=False)
     parent_id = Column(String(50), nullable=True)
     
@@ -494,7 +494,7 @@ class DepartmentMaster(Base):
     __tablename__ = "department_master"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    department_id = Column(String(50), unique=True, nullable=False, index=True)
+    department_id = Column(String(100), unique=True, nullable=False, index=True)
     department_name = Column(String(200), nullable=False)
     
     # Sage Intacct Sync Fields
@@ -512,7 +512,7 @@ class CustomerMaster(Base):
     __tablename__ = "customer_master"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    customer_id = Column(String(50), unique=True, nullable=False, index=True)
+    customer_id = Column(String(100), unique=True, nullable=False, index=True)
     customer_name = Column(String(200), nullable=False)
     
     # Sage Intacct Sync Fields
@@ -530,7 +530,7 @@ class ItemMaster(Base):
     __tablename__ = "item_master"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    item_id = Column(String(50), unique=True, nullable=False, index=True)
+    item_id = Column(String(100), unique=True, nullable=False, index=True)
     name = Column(String(200), nullable=False)
     product_line_id = Column(String(50), nullable=True)
     gl_group = Column(String(50), nullable=True)
@@ -585,8 +585,8 @@ class VendorWorkflow(Base):
     __tablename__ = "vendor_workflows"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity = Column(String(100), nullable=False, index=True)
-    vendor_id = Column(String(100), nullable=True, index=True)
+    entity = Column(String(100), ForeignKey("entity_master.entity_id"), nullable=False, index=True)
+    vendor_id = Column(String(100), ForeignKey("vendor_master.vendor_id"), nullable=True, index=True)
     vendor_name = Column(String(500), nullable=True)
     approver_count = Column(Integer, default=3)
     mandatory_approver_1 = Column(Text, nullable=True)
@@ -606,9 +606,9 @@ class CodificationWorkflow(Base):
     __tablename__ = "codification_workflows"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity = Column(String(100), nullable=False, index=True)
-    lob = Column(String(200), nullable=False)
-    department_id = Column(String(200), nullable=False)
+    entity = Column(String(100), ForeignKey("entity_master.entity_id"), nullable=False, index=True)
+    lob = Column(String(200), nullable=False, index=True)
+    department_id = Column(String(200), nullable=False, index=True)
     approver_count = Column(Integer, default=3)
     mandatory_approver_1 = Column(Text, nullable=True)
     mandatory_approver_2 = Column(Text, nullable=True)

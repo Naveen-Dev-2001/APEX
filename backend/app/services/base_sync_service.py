@@ -56,11 +56,12 @@ class BaseSyncService:
         to_update = []
         
         # Pre-fetch existing keys for the batch to decide between insert and update
+        # Use optimized repository logic for pre-fetching keys
         keys = [str(item.get("key")) for item in items if item.get("key")]
-        # Use label to ensure we can access the column value consistently
+        # For bulk check, we can use a specialized repository check if needed, 
+        # but for now we'll keep it efficient with a direct query if repo doesn't support specific col fetch
         col = getattr(model, key_field)
         existing = self.db.query(col).filter(col.in_(keys)).all()
-        # existing is a list of tuples like [('key1',), ('key2',)]
         existing_keys = {str(r[0]) for r in existing}
 
         for item in items:
@@ -294,4 +295,5 @@ class BaseSyncService:
 
     async def get_all_data(self, model: Type, sync_func_name: str) -> List[Any]:
         """Generic entry point for master data; returns current DB records without auto-sync."""
+        # This will be overridden by subclasses to use specific repositories
         return self.db.query(model).all()

@@ -5,6 +5,7 @@ import requests
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.db_models import Invoice, VendorMetadata
+from app.repository.repositories import invoice_repo, vendor_metadata_repo
 from app.ai.normalizer import normalize_vendor, normalize_address
 from app.ai.vector_matcher import find_best_vendor_match, get_cached_vendors
 
@@ -57,11 +58,17 @@ def get_vendor_id_from_master(
 
         # 1A. Address-based mapping → ALWAYS SAFE
         if normalized_address:
-            # Check Address-based Mapping
-            query = db.query(VendorMetadata).filter(VendorMetadata.extracted_address_normalized == normalized_address)
+            # Check Address-based Mapping using repository
+            mapping_list = vendor_metadata_repo.get_multi(
+                db, 
+                filters={"extracted_address_normalized": normalized_address},
+                limit=1
+            )
             if entity:
-                query = query.filter(VendorMetadata.entity == entity)
-            mapping = query.first()
+                # If we need entity filtering, we can check here or use expressions in get_multi
+                mapping_list = [m for m in mapping_list if not entity or m.entity == entity]
+            
+            mapping = mapping_list[0] if mapping_list else None
             
             if mapping:
                 logger.info(f"Vendor Mapping (Address): '{vendor_address}' -> '{mapping.official_name}'")
@@ -79,11 +86,16 @@ def get_vendor_id_from_master(
 
         # 1B. Name-based mapping → Learned mappings override ambiguity
         if normalized_name:
-            # Check Name-based Mapping
-            query = db.query(VendorMetadata).filter(VendorMetadata.extracted_name_normalized == normalized_name)
+            # Check Name-based Mapping using repository
+            mapping_list = vendor_metadata_repo.get_multi(
+                db, 
+                filters={"extracted_name_normalized": normalized_name},
+                limit=1
+            )
             if entity:
-                query = query.filter(VendorMetadata.entity == entity)
-            mapping = query.first()
+                mapping_list = [m for m in mapping_list if not entity or m.entity == entity]
+            
+            mapping = mapping_list[0] if mapping_list else None
             
             if mapping:
                 logger.info(f"Vendor Mapping (Name): '{vendor_name}' -> '{mapping.official_name}'")
@@ -139,11 +151,17 @@ def check_duplicate_invoice(db: Session, vendor_id: str, invoice_number: str, en
     
     # SQL Server is usually case-insensitive by default with its collations, 
     # but we can use func.lower() for safety or if the collation is case-sensitive.
-    existing = db.query(Invoice).filter(
-        func.lower(Invoice.vendor_id) == vendor_id.lower().strip(),
-        func.lower(Invoice.invoice_number) == invoice_number.lower().strip(),
-        Invoice.entity == entity
-    ).first()
+    # Check if invoice with same vendor_id + invoice_number exists using Repository
+    existing_list = invoice_repo.get_multi(
+        db,
+        filters={"entity": entity},
+        expressions=[
+            func.lower(Invoice.vendor_id) == vendor_id.lower().strip(),
+            func.lower(Invoice.invoice_number) == invoice_number.lower().strip()
+        ],
+        limit=1
+    )
+    existing = existing_list[0] if existing_list else None
     
     if existing:
         logger.info(f"Duplicate invoice found: vendor_id={vendor_id}, invoice_number={invoice_number}")

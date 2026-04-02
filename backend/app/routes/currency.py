@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database.database import get_db
 from app.models.db_models import Currency, ExchangeRateMaster
+from app.repository.repositories import currency_repo, exchange_rate_master_repo
 from app.auth.jwt import get_current_user
 from app.models.user import UserResponse
 from app.models.currency import CurrencyCreate, CurrencyUpdate, CurrencyResponse
@@ -16,17 +17,16 @@ async def get_currencies(
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user)
 ):
-    currencies = db.query(Currency).all()
+    currencies = currency_repo.get_multi(db, limit=1000)
     
     # Seed default currencies if none exist
     if not currencies:
         default_currencies = [
-            Currency(name="US Dollar", symbol="$", code="USD"),
-            Currency(name="Indian Rupee", symbol="₹", code="INR")
+            {"name": "US Dollar", "symbol": "$", "code": "USD"},
+            {"name": "Indian Rupee", "symbol": "₹", "code": "INR"}
         ]
-        db.add_all(default_currencies)
-        db.commit()
-        currencies = db.query(Currency).all()
+        currency_repo.bulk_create(db, obj_in=default_currencies)
+        currencies = currency_repo.get_multi(db, limit=1000)
         
     return currencies
 
@@ -39,14 +39,12 @@ async def create_currency(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can add currencies")
         
-    new_currency = Currency(
-        name=currency.name,
-        symbol=currency.symbol,
-        code=currency.code
-    )
-    db.add(new_currency)
-    db.commit()
-    db.refresh(new_currency)
+    new_currency_data = {
+        "name": currency.name,
+        "symbol": currency.symbol,
+        "code": currency.code
+    }
+    new_currency = currency_repo.create(db, obj_in=new_currency_data)
     
     return new_currency
 
@@ -60,17 +58,17 @@ async def update_currency(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can update currencies")
         
-    db_currency = db.query(Currency).filter(Currency.id == currency_id).first()
+    db_currency = currency_repo.get(db, currency_id)
     if not db_currency:
         raise HTTPException(status_code=404, detail="Currency not found")
         
-    if currency.name is not None: db_currency.name = currency.name
-    if currency.symbol is not None: db_currency.symbol = currency.symbol
-    if currency.code is not None: db_currency.code = currency.code
-    db_currency.updated_at = datetime.utcnow()
+    update_data = {}
+    if currency.name is not None: update_data["name"] = currency.name
+    if currency.symbol is not None: update_data["symbol"] = currency.symbol
+    if currency.code is not None: update_data["code"] = currency.code
+    update_data["updated_at"] = datetime.utcnow()
     
-    db.commit()
-    db.refresh(db_currency)
+    db_currency = currency_repo.update(db, db_obj=db_currency, obj_in=update_data)
     return db_currency
 
 @router.delete("/{currency_id}")
@@ -82,12 +80,11 @@ async def delete_currency(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can delete currencies")
         
-    db_currency = db.query(Currency).filter(Currency.id == currency_id).first()
+    db_currency = currency_repo.get(db, currency_id)
     if not db_currency:
         raise HTTPException(status_code=404, detail="Currency not found")
         
-    db.delete(db_currency)
-    db.commit()
+    currency_repo.remove(db, id=currency_id)
     
     return {"message": "Currency deleted successfully"}
 
@@ -123,17 +120,20 @@ async def get_exchange_rate(
                 inv_date = datetime.strptime(invoice_date, "%m-%d-%Y")
 
             # Find the closest rate on or before the invoice date
-            rate_record = (
-                db.query(ExchangeRateMaster)
-                .filter(
-                    ExchangeRateMaster.base_currency == base_currency.upper(),
-                    ExchangeRateMaster.target_currency == target_currency.upper(),
-                    ExchangeRateMaster.status == "active",
-                    ExchangeRateMaster.effective_date <= inv_date
-                )
-                .order_by(ExchangeRateMaster.effective_date.desc())
-                .first()
+            rate_list = exchange_rate_master_repo.get_multi(
+                db,
+                filters={
+                    "base_currency": base_currency.upper(),
+                    "target_currency": target_currency.upper(),
+                    "status": "active"
+                },
+                expressions=[ExchangeRateMaster.effective_date <= inv_date],
+                order_by="effective_date",
+                descending=True,
+                limit=1
             )
+            rate_record = rate_list[0] if rate_list else None
+            
             if rate_record:
                 use_fallback = False
         except (ValueError, Exception):
@@ -141,16 +141,18 @@ async def get_exchange_rate(
 
     if use_fallback or not rate_record:
         # Fall back to the latest effective rate available
-        rate_record = (
-            db.query(ExchangeRateMaster)
-            .filter(
-                ExchangeRateMaster.base_currency == base_currency.upper(),
-                ExchangeRateMaster.target_currency == target_currency.upper(),
-                ExchangeRateMaster.status == "active"
-            )
-            .order_by(ExchangeRateMaster.effective_date.desc())
-            .first()
+        rate_list = exchange_rate_master_repo.get_multi(
+            db,
+            filters={
+                "base_currency": base_currency.upper(),
+                "target_currency": target_currency.upper(),
+                "status": "active"
+            },
+            order_by="effective_date",
+            descending=True,
+            limit=1
         )
+        rate_record = rate_list[0] if rate_list else None
 
     if not rate_record:
         raise HTTPException(

@@ -1,0 +1,32 @@
+STDOUT:
+
+==================================================
+DATABASE INITIALIZATION
+==================================================
+
+Connecting to master DB to ensure 'accounts_payable' exists...
+
+STDERR:
+Traceback (most recent call last):
+  File "c:\Users\LDNA40022\Lokesh\APEX\backend\app\database\init_db.py", line 46, in create_database_if_not_exists
+    print("\u2713 Database 'accounts_payable' created successfully")
+  File "C:\Users\LDNA40022\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 0: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "c:\Users\LDNA40022\Lokesh\APEX\backend\app\database\init_db.py", line 252, in <module>
+    init_database()
+  File "c:\Users\LDNA40022\Lokesh\APEX\backend\app\database\init_db.py", line 178, in init_database
+    create_database_if_not_exists()
+  File "c:\Users\LDNA40022\Lokesh\APEX\backend\app\database\init_db.py", line 51, in create_database_if_not_exists
+    print(f"\u2717 Failed to create database: {e}")
+  File "C:\Users\LDNA40022\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2717' in position 0: character maps to <undefined>

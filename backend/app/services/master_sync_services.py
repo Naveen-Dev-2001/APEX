@@ -9,6 +9,10 @@ from app.services.base_sync_service import BaseSyncService
 from app.models.db_models import (
     GLMaster, LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster
 )
+from app.repository.repositories import (
+    gl_master_repo, lob_master_repo, department_master_repo, 
+    customer_master_repo, item_master_repo, exchange_rate_master_repo
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +33,7 @@ class GLSyncService(BaseSyncService):
         await self.sync_object(GLMaster, "general-ledger/account", fields, "gl_key", event)
 
     async def get_all_data(self) -> List[GLMaster]:
-        return await super().get_all_data(GLMaster, "sync_gl_accounts")
+        return gl_master_repo.get_multi(self.db, limit=50000)
 
 class LOBSyncService(BaseSyncService):
     def _extract_map(self, v: Dict[str, Any]) -> Dict[str, Any]:
@@ -50,7 +54,7 @@ class LOBSyncService(BaseSyncService):
         await self.sync_object(LOBMaster, "company-config/class", fields, "lob_key", event)
 
     async def get_all_data(self) -> List[LOBMaster]:
-        return await super().get_all_data(LOBMaster, "sync_lob")
+        return lob_master_repo.get_multi(self.db, limit=50000)
 
 class DepartmentSyncService(BaseSyncService):
     def _extract_map(self, v: Dict[str, Any]) -> Dict[str, Any]:
@@ -68,7 +72,7 @@ class DepartmentSyncService(BaseSyncService):
         await self.sync_object(DepartmentMaster, "company-config/department", fields, "dept_key", event)
 
     async def get_all_data(self) -> List[DepartmentMaster]:
-        return await super().get_all_data(DepartmentMaster, "sync_departments")
+        return department_master_repo.get_multi(self.db, limit=50000)
 
 class CustomerSyncService(BaseSyncService):
     def _extract_map(self, v: Dict[str, Any]) -> Dict[str, Any]:
@@ -86,7 +90,7 @@ class CustomerSyncService(BaseSyncService):
         await self.sync_object(CustomerMaster, "accounts-receivable/customer", fields, "customer_key", event)
 
     async def get_all_data(self) -> List[CustomerMaster]:
-        return await super().get_all_data(CustomerMaster, "sync_customers")
+        return customer_master_repo.get_multi(self.db, limit=50000)
 
 class ItemSyncService(BaseSyncService):
     def _extract_map(self, v: Dict[str, Any]) -> Dict[str, Any]:
@@ -112,7 +116,7 @@ class ItemSyncService(BaseSyncService):
         await self.sync_object(ItemMaster, "inventory-control/item", fields, "item_key", event)
 
     async def get_all_data(self) -> List[ItemMaster]:
-        return await super().get_all_data(ItemMaster, "sync_items")
+        return item_master_repo.get_multi(self.db, limit=50000)
 
 class ExchangeRateSyncService(BaseSyncService):
     def __init__(self, db: Session):
@@ -278,5 +282,5 @@ class ExchangeRateSyncService(BaseSyncService):
                 raise e
 
     async def get_all_data(self) -> List[ExchangeRateMaster]:
-        return await super().get_all_data(ExchangeRateMaster, "sync_exchange_rates")
+        return exchange_rate_master_repo.get_multi(self.db, limit=100000)
 

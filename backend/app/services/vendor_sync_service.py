@@ -9,6 +9,7 @@ import json
 
 from app.config.settings import settings
 from app.models.db_models import VendorMaster
+from app.repository.repositories import vendor_master_repo
 
 # Performance-tuned logging
 logger = logging.getLogger(__name__)
@@ -197,4 +198,4 @@ class VendorSyncService:
 
     async def get_all_vendors(self) -> List[VendorMaster]:
         """Entry point for UI; returns current DB records without auto-sync."""
-        return self.db.query(VendorMaster).all()
+        return vendor_master_repo.get_multi(self.db, limit=100000)

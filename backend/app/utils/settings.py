@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models.db_models import GlobalSetting
+from app.repository.repositories import global_setting_repo
 import json
 
 DEFAULT_SETTINGS = {
@@ -30,7 +31,8 @@ def get_app_settings(db: Session = None):
         close_session = True
     
     try:
-        setting = db.query(GlobalSetting).filter(GlobalSetting.setting_key == "app_settings").first()
+        setting_list = global_setting_repo.get_multi(db, filters={"setting_key": "app_settings"}, limit=1)
+        setting = setting_list[0] if setting_list else None
         
         if not setting or not setting.setting_value:
             return DEFAULT_SETTINGS.copy()

@@ -17,6 +17,10 @@ from app.models.db_models import (
     EntityMaster, VendorMaster, TdsRate, GLMaster,
     LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster
 )
+from app.repository.repositories import (
+    entity_master_repo, vendor_master_repo, tds_rate_repo, gl_master_repo, lob_master_repo, department_master_repo, 
+    customer_master_repo, item_master_repo, exchange_rate_master_repo
+)
 from app.auth.jwt import get_current_user
 from app.models.user import UserResponse
 from app.ai.vector_matcher import find_best_vendor_match
@@ -51,6 +55,23 @@ TAB_MODEL_MAP = {
     "master_data_Exchange_Rate": ExchangeRateMaster,
     "Currency": ExchangeRateMaster,
     "master_data_Currency": ExchangeRateMaster
+}
+
+TAB_REPO_MAP = {
+    "Entity_Master": entity_master_repo,
+    "Vendor_Master": vendor_master_repo,
+    "Line_Items": item_master_repo,
+    "TDS_Rates": tds_rate_repo,
+    "GL": gl_master_repo,
+    "LOB": lob_master_repo,
+    "Department": department_master_repo,
+    "Customer": customer_master_repo,
+    "Entity": entity_master_repo,
+    "Vendor": vendor_master_repo,
+    "Item": item_master_repo,
+    "TDS": tds_rate_repo,
+    "Exchange_Rate": exchange_rate_master_repo,
+    "Currency": exchange_rate_master_repo
 }
 
 
@@ -347,11 +368,17 @@ async def upload_master_file(
                 records_to_insert.append(record)
 
         # Clear existing and insert
-        db.query(model).delete()
-        if records_to_insert:
-            db.bulk_insert_mappings(model, records_to_insert)
-
-        db.commit()
+        repo = TAB_REPO_MAP.get(tab_name)
+        if repo:
+            repo.delete_all(db)
+            if records_to_insert:
+                repo.bulk_create(db, obj_list=records_to_insert)
+        else:
+             # Fallback for aliases not in repo map
+             db.query(model).delete()
+             if records_to_insert:
+                 db.bulk_insert_mappings(model, records_to_insert)
+             db.commit()
 
         return {"message": f"Uploaded {len(records_to_insert)} rows to {tab_name}"}
 
@@ -367,12 +394,12 @@ async def delete_tab_data(
     tab_name: str,
     db: Session = Depends(get_db)
 ):
-    model = TAB_MODEL_MAP.get(tab_name)
-    if not model:
-        raise HTTPException(400, "Unsupported tab")
-
-    db.query(model).delete()
-    db.commit()
+    repo = TAB_REPO_MAP.get(tab_name)
+    if repo:
+        repo.delete_all(db)
+    else:
+        db.query(model).delete()
+        db.commit()
     return {"message": f"Data for {tab_name} deleted successfully"}
 
 
@@ -545,10 +572,12 @@ def add_row(
 
         final_data[m_col] = v
 
-    new_record = model(**final_data)
-    db.add(new_record)
-    db.commit()
-    return {"status": "success"}
+    repo = TAB_REPO_MAP.get(identifier)
+    if not repo:
+        raise HTTPException(404, "Table not found")
+
+    new_record = repo.create(db, obj_in=final_data)
+    return {"status": "success", "id": new_record.id}
 
 
 @router.patch("/sheet/{identifier}/edit")
@@ -557,23 +586,21 @@ def edit_row(
     request: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db)
 ):
-    model = TAB_MODEL_MAP.get(identifier)
-    if not model:
+    repo = TAB_REPO_MAP.get(identifier)
+    if not repo:
         raise HTTPException(404, "Table not found")
 
-    # This might be the list index or ID depending on frontend
-    row_index = request.get("row_index")
-    updated_data = request.get("updated_row")
-
-    record = None
+    # PREFER PK LOOKUP FOR SPEED
+    updated_data = request.get("updated_row", {})
     record_id = updated_data.get('id')
+    
     if record_id:
-        record = db.query(model).get(record_id)
-
-    if not record and row_index is not None:
+        record = repo.get(db, record_id)
+    else:
         # Fallback to offset (Requires order_by for MSSQL)
-        record = db.query(model).order_by(
-            model.id).offset(row_index).limit(1).first()
+        row_index = request.get("row_index")
+        if row_index is not None:
+             record = db.query(repo.model).order_by(repo.model.id).offset(row_index).limit(1).first()
 
     if not record:
         raise HTTPException(404, "Record not found")
@@ -596,6 +623,7 @@ def edit_row(
             "TDS Rate": "tds_rate"
         }
 
+    valid_update_data = {}
     for k, v in updated_data.items():
         if k in ['id', 'created_at', 'updated_at']:
             continue
@@ -603,7 +631,7 @@ def edit_row(
         m_col = reverse_map.get(k, k)
         if hasattr(record, m_col):
             # Boolean Conversion
-            col_info = model.__table__.columns.get(m_col)
+            col_info = repo.model.__table__.columns.get(m_col)
             if col_info is not None and isinstance(col_info.type, Boolean):
                 if isinstance(v, str):
                     v_lower = v.strip().lower()
@@ -613,10 +641,9 @@ def edit_row(
                         v = False
                 elif isinstance(v, (int, float)):
                     v = bool(v)
+            valid_update_data[m_col] = v
 
-            setattr(record, m_col, v)
-
-    db.commit()
+    repo.update(db, db_obj=record, obj_in=valid_update_data)
     return {"status": "updated"}
 
 
@@ -626,17 +653,16 @@ def delete_row(
     row_index: int,  # Frontend sends list index, we need ID or to query by offset
     db: Session = Depends(get_db)
 ):
-    model = TAB_MODEL_MAP.get(identifier)
-    if not model:
+    repo = TAB_REPO_MAP.get(identifier)
+    if not repo:
         raise HTTPException(404, "Table not found")
 
-    # If row_index is actually the ID, use it directly.
-    # But usually frontend 'key' is index.
-    # Let's try to find the ID from the offset if possible (Requires order_by for MSSQL)
-    record = db.query(model).order_by(
-        model.id).offset(row_index).limit(1).first()
+    # Try to find the record to get its ID if offset was passed.
+    # Ideally frontend should pass ID.
+    record = db.query(repo.model).order_by(
+        repo.model.id).offset(row_index).limit(1).first()
+    
     if record:
-        db.delete(record)
-        db.commit()
+        repo.remove(db, id=record.id)
 
     return {"status": "deleted"}

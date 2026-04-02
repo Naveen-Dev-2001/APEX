@@ -3,6 +3,7 @@ import string
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from app.models.db_models import OTPRecord
+from app.repository.repositories import otp_repo
 from app.config.settings import settings
 import logging
 
@@ -18,11 +19,11 @@ class OTPService:
     def create_otp_record(db: Session, email: str, purpose: str) -> str:
         """Create a new OTP record in the database and return the OTP code."""
         # Deactivate any previous codes for the same email and purpose
-        db.query(OTPRecord).filter(
-            OTPRecord.email == email,
-            OTPRecord.purpose == purpose,
-            OTPRecord.is_verified == False
-        ).delete()
+        otp_repo.delete_all(db, filters={
+            "email": email,
+            "purpose": purpose,
+            "is_verified": False
+        })
         
         otp_code = OTPService.generate_otp()
         expires_at = datetime.utcnow() + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
@@ -33,21 +34,23 @@ class OTPService:
             purpose=purpose,
             expires_at=expires_at
         )
-        db.add(db_otp)
-        db.commit()
-        db.refresh(db_otp)
+        otp_repo.create(db, obj_in=db_otp)
         return otp_code
 
     @staticmethod
     def verify_otp(db: Session, email: str, otp_code: str, purpose: str) -> bool:
-        """Verify an OTP code."""
-        db_otp = db.query(OTPRecord).filter(
-            OTPRecord.email == email,
-            OTPRecord.otp_code == otp_code,
-            OTPRecord.purpose == purpose,
-            OTPRecord.is_verified == False,
-            OTPRecord.expires_at > datetime.utcnow()
-        ).first()
+        # Verify an OTP code.
+        otps = otp_repo.get_multi(
+            db,
+            filters={
+                "email": email,
+                "otp_code": otp_code,
+                "purpose": purpose,
+                "is_verified": False
+            },
+            limit=1
+        )
+        db_otp = otps[0] if otps and otps[0].expires_at > datetime.utcnow() else None
 
         if not db_otp:
             # Increment attempts for the record if found by code or just email/purpose
@@ -58,16 +61,13 @@ class OTPService:
             ).order_by(OTPRecord.created_at.desc()).first()
             
             if db_otp_any:
-                db_otp_any.attempts += 1
-                db.commit()
+                otp_repo.update(db, db_obj=db_otp_any, obj_in={"attempts": db_otp_any.attempts + 1})
                 # Check if max retries exceeded (e.g., 5)
                 if db_otp_any.attempts >= 5:
-                    db.delete(db_otp_any)
-                    db.commit()
+                    otp_repo.remove(db, id=db_otp_any.id)
             return False
 
-        db_otp.is_verified = True
-        db.commit()
+        otp_repo.update(db, db_obj=db_otp, obj_in={"is_verified": True})
         return True
 
     @staticmethod
@@ -75,11 +75,13 @@ class OTPService:
         """Check if an email has recently verified an OTP for a specific purpose."""
         # Check for a verified record that isn't too old (e.g., verified in last 15 mins)
         cutoff = datetime.utcnow() - timedelta(minutes=15)
-        return db.query(OTPRecord).filter(
-            OTPRecord.email == email,
-            OTPRecord.purpose == purpose,
-            OTPRecord.is_verified == True,
-            OTPRecord.created_at > cutoff
+        # Using a direct query because the filter has a range (> cutoff) which get_multi doesn't handle yet
+        # But we use the repository's model for consistency
+        return db.query(otp_repo.model).filter(
+            otp_repo.model.email == email,
+            otp_repo.model.purpose == purpose,
+            otp_repo.model.is_verified == True,
+            otp_repo.model.created_at > cutoff
         ).first() is not None
 
 otp_service = OTPService()

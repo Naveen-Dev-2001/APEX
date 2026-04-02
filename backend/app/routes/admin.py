@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.database.database import get_db
 from app.models.db_models import User as DBUser
-from app.models.user import UserResponse
+from app.repository.repositories import user_repo
 from app.auth.jwt import get_current_user
 from app.utils.settings import get_app_settings
+from app.models.user import UserResponse
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -39,32 +40,29 @@ async def create_new_user(
 ):
     """Create a new user by Admin"""
     # Check if user already exists
-    existing_user = db.query(DBUser).filter(DBUser.email == user_data.email).first()
-    if existing_user:
+    existing_email_list = user_repo.get_multi(db, filters={"email": user_data.email}, limit=1)
+    if existing_email_list:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    existing_username = db.query(DBUser).filter(DBUser.username == user_data.username).first()
-    if existing_username:
+    existing_username_list = user_repo.get_multi(db, filters={"username": user_data.username}, limit=1)
+    if existing_username_list:
         raise HTTPException(status_code=400, detail="Username already taken")
 
     from app.auth.jwt import get_password_hash
     hashed_password = get_password_hash("Apex2026")
 
-    new_user = DBUser(
-        username=user_data.username,
-        email=user_data.email,
-        password=hashed_password,
-        role=user_data.role,
-        status=user_data.status,
-        isCreatedByUser=False,
-        createdby="admin",
-        ispasswordchange=False,
-        created_at=datetime.utcnow()
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    new_user_data = {
+        "username": user_data.username,
+        "email": user_data.email,
+        "password": hashed_password,
+        "role": user_data.role,
+        "status": user_data.status,
+        "isCreatedByUser": False,
+        "createdby": "admin",
+        "ispasswordchange": False,
+        "created_at": datetime.utcnow()
+    }
+    new_user = user_repo.create(db, obj_in=new_user_data)
     return new_user
 
 @router.get("/", response_model=List[UserResponse])
@@ -73,9 +71,12 @@ async def get_all_users(
     current_user: UserResponse = Depends(get_current_admin)
 ):
     """Get all users (Admin only)"""
-    users = db.query(DBUser)\
-              .order_by(desc(DBUser.id))\
-              .all()    
+    users = user_repo.get_multi(
+        db, 
+        order_by="id", 
+        descending=True, 
+        limit=1000
+    )
     return users
 
 
@@ -107,7 +108,7 @@ async def update_user_role(
             detail=f"Invalid status: {update_data.status}"
         )
 
-    user = db.query(DBUser).filter(DBUser.id == user_id).first()
+    user = user_repo.get(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -120,10 +121,10 @@ async def update_user_role(
 
 
     old_status = user.status
-    user.role = update_data.role
-    user.status = update_data.status
-    db.commit()
-    db.refresh(user)
+    user_repo.update(db, db_obj=user, obj_in={
+        "role": update_data.role,
+        "status": update_data.status
+    })
 
     # If user is approved (status changed to active), send notification
     if old_status != "active" and user.status == "active":

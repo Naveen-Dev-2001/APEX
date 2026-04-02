@@ -19,6 +19,9 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import asc
+from app.repository.repositories import (
+    invoice_repo, workflow_step_repo, audit_log_repo, coding_repo
+)
 
 # Use the app's logger
 logger = logging.getLogger("ai_app")
@@ -298,28 +301,29 @@ def generate_approval_pdf(db: Session, invoice_id: int) -> str:
     from app.models.db_models import Invoice, WorkflowStep, AuditLog, Coding
 
     # ── 1. Fetch data from SQL Server ─────────────────────────────────────────
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         logger.error(f"[PDFService] Invoice {invoice_id} not found in DB.")
         raise ValueError(f"Invoice {invoice_id} not found.")
 
     logger.info(f"[PDFService] Found invoice: {invoice.invoice_number}, fetching workflow and audit logs...")
 
-    workflow_steps = (
-        db.query(WorkflowStep)
-        .filter(WorkflowStep.invoice_id == invoice_id)
-        .order_by(asc(WorkflowStep.timestamp))
-        .all()
+    workflow_steps = workflow_step_repo.get_multi(
+        db, 
+        filters={"invoice_id": invoice_id}, 
+        order_by="timestamp", 
+        limit=500
     )
 
-    audit_logs = (
-        db.query(AuditLog)
-        .filter(AuditLog.invoice_id == invoice_id)
-        .order_by(asc(AuditLog.timestamp))
-        .all()
+    audit_logs = audit_log_repo.get_multi(
+        db, 
+        filters={"invoice_id": invoice_id}, 
+        order_by="timestamp", 
+        limit=1000
     )
 
-    coding = db.query(Coding).filter(Coding.invoice_id == invoice_id).first()
+    coding_list = coding_repo.get_multi(db, filters={"invoice_id": invoice_id}, limit=1)
+    coding = coding_list[0] if coding_list else None
 
     # ── 2. Ensure output directory exists ─────────────────────────────────────
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

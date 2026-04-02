@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from rapidfuzz import fuzz, process
 
 from app.models.db_models import VendorMaster
+from app.repository.repositories import vendor_master_repo
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class VendorMatcher:
     # ------------------------------------------------------
     def load_from_db(self, db: Session):
         """Load all vendors from structured VendorMaster table."""
-        vendors = db.query(VendorMaster).all()
+        vendors = vendor_master_repo.get_multi(db, limit=100000)
         
         if not vendors:
             logger.warning("No Vendor Master records found")

@@ -9,6 +9,10 @@ from app.models.db_models import (
     Invoice, WorkflowStep, InvoiceStatusHistory, Coding as DBCoding,
     InvoiceAssignedApprover, User
 )
+from app.repository.repositories import (
+    invoice_repo, coding_repo, invoice_assigned_approver_repo,
+    invoice_status_history_repo, workflow_step_repo, user_repo
+)
 
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
@@ -36,7 +40,7 @@ async def send_to_approval(
     Send invoice to approval workflow using SQLAlchemy.
     """
     # 1. Verify invoice exists
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
@@ -44,7 +48,8 @@ async def send_to_approval(
     entity = invoice.entity
     
     # 2. Verify coding exists
-    coding = db.query(DBCoding).filter(DBCoding.invoice_id == invoice_id).first()
+    coding_list = coding_repo.get_multi(db, filters={"invoice_id": invoice_id}, limit=1)
+    coding = coding_list[0] if coding_list else None
     if not coding:
         raise HTTPException(status_code=400, detail="Coding must be completed before sending to approval")
     
@@ -69,7 +74,7 @@ async def send_to_approval(
 
     
     # Clear existing assigned approvers
-    db.query(InvoiceAssignedApprover).filter(InvoiceAssignedApprover.invoice_id == invoice_id).delete()
+    invoice_assigned_approver_repo.delete_all(db, filters={"invoice_id": invoice_id})
     
     # Store assigned approvers
     assigned_approvers = requirement_data.get("assigned_approvers", [])
@@ -78,65 +83,80 @@ async def send_to_approval(
         emails = [email_item] if isinstance(email_item, str) else email_item
         for email in emails:
             if email:
-                db.add(InvoiceAssignedApprover(
-                    invoice_id=invoice_id,
-                    approver_email=email,
-                    sequence_order=idx + 1
-                ))
+                invoice_assigned_approver_repo.create(db, obj_in={
+                    "invoice_id": invoice_id,
+                    "approver_email": email,
+                    "sequence_order": idx + 1
+                })
     import json
     
     # Update requirement breakdown if we want to persist it (using JSON field)
     invoice.approver_breakdown = json.dumps(requirement_data.get("breakdown", {}))
     
     # 5. Add to Status History
-    history = InvoiceStatusHistory(
-        invoice_id=invoice_id,
-        status=InvoiceStatus.WAITING_APPROVAL,
-        user=current_user.username,
-        timestamp=datetime.utcnow(),
-        comment="Sent to approval"
-    )
-    db.add(history)
+    history_data = {
+        "invoice_id": invoice_id,
+        "status": InvoiceStatus.WAITING_APPROVAL,
+        "user": current_user.username,
+        "timestamp": datetime.utcnow(),
+        "comment": "Sent to approval"
+    }
+    invoice_status_history_repo.create(db, obj_in=history_data)
 
     # 6. Workflow Steps
     # Check if we need to insert "Coding Completed" step
     # We define cycle start
     last_cycle_start = datetime(1753, 1, 1)
-    histories = db.query(InvoiceStatusHistory).filter(InvoiceStatusHistory.invoice_id == invoice_id).order_by(InvoiceStatusHistory.timestamp.desc()).all()
+    histories = invoice_status_history_repo.get_multi(
+        db, 
+        filters={"invoice_id": invoice_id}, 
+        order_by="timestamp", 
+        descending=True
+    )
     for h in histories:
         if h.status in [InvoiceStatus.REWORKED, InvoiceStatus.WAITING_CODING]:
             last_cycle_start = h.timestamp
             break
             
-    existing_coding_step = db.query(WorkflowStep).filter(
-        WorkflowStep.invoice_id == invoice_id,
-        WorkflowStep.step_type == WorkflowStepType.CODING,
-        WorkflowStep.timestamp > last_cycle_start
-    ).first()
+    existing_coding_step_list = workflow_step_repo.get_multi(
+        db,
+        filters={
+            "invoice_id": invoice_id,
+            "step_type": WorkflowStepType.CODING
+        },
+        expressions=[WorkflowStep.timestamp > last_cycle_start],
+        limit=1
+    )
+    existing_coding_step = existing_coding_step_list[0] if existing_coding_step_list else None
 
     if not existing_coding_step:
-        db.add(WorkflowStep(
-            invoice_id=invoice_id,
-            step_name="Coding",
-            step_type=WorkflowStepType.CODING,
-            user=current_user.username,
-            status=WorkflowStepStatus.COMPLETED,
-            timestamp=datetime.utcnow(),
-            entity=entity
-        ))
+        workflow_step_repo.create(db, obj_in={
+            "invoice_id": invoice_id,
+            "step_name": "Coding",
+            "step_type": WorkflowStepType.CODING,
+            "user": current_user.username,
+            "status": WorkflowStepStatus.COMPLETED,
+            "timestamp": datetime.utcnow(),
+            "entity": entity
+        })
 
     # Add "Waiting for Approval" step
-    db.add(WorkflowStep(
-        invoice_id=invoice_id,
-        step_name="Waiting for Approval",
-        step_type=WorkflowStepType.WAITING_APPROVAL,
-        user=current_user.username,
-        status=WorkflowStepStatus.PENDING,
-        timestamp=datetime.utcnow(),
-        entity=entity
-    ))
+    workflow_step_repo.create(db, obj_in={
+        "invoice_id": invoice_id,
+        "step_name": "Waiting for Approval",
+        "step_type": WorkflowStepType.WAITING_APPROVAL,
+        "user": current_user.username,
+        "status": WorkflowStepStatus.PENDING,
+        "timestamp": datetime.utcnow(),
+        "entity": entity
+    })
     
-    db.commit()
+    invoice_repo.update(db, db_obj=invoice, obj_in={
+        "status": InvoiceStatus.WAITING_APPROVAL,
+        "current_approver_level": 1,
+        "required_approvers": requirement_data["required"],
+        "approver_breakdown": json.dumps(requirement_data.get("breakdown", {}))
+    })
 
     # 7. TRIGGER FIRST APPROVAL EMAIL
     if assigned_approvers:
@@ -148,7 +168,8 @@ async def send_to_approval(
             if not approver_email: continue
             
             # Get approver's name
-            approver_user = db.query(User).filter(User.email == approver_email).first()
+            approver_user_list = user_repo.get_multi(db, filters={"email": approver_email}, limit=1)
+            approver_user = approver_user_list[0] if approver_user_list else None
             approver_name = approver_user.username if approver_user else "Approver"
             
             # Prioritize invoice number from extracted_data

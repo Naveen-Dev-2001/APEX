@@ -11,6 +11,7 @@ from app.models.db_models import (
     Invoice, InvoiceStatusHistory, InvoiceApprovedBy, 
     InvoiceAssignedApprover, User
 )
+from app.repository.repositories import user_repo
 
 
 def serialize_json_field(data: Any) -> Optional[str]:
@@ -139,7 +140,8 @@ def dict_to_invoice(data: Dict[str, Any], db: Session) -> Invoice:
     
     # Get or create user reference
     if "uploaded_by" in data:
-        user = db.query(User).filter(User.username == data["uploaded_by"]).first()
+        user_list = user_repo.get_multi(db, filters={"username": data["uploaded_by"]}, limit=1)
+        user = user_list[0] if user_list else None
         if user:
             data["uploaded_by_id"] = user.id
     
@@ -181,9 +183,11 @@ def dict_to_invoice(data: Dict[str, Any], db: Session) -> Invoice:
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """Get user by email"""
-    return db.query(User).filter(User.email == email).first()
+    user_list = user_repo.get_multi(db, filters={"email": email}, limit=1)
+    return user_list[0] if user_list else None
 
 
 def get_user_by_username(db: Session, username: str) -> Optional[User]:
     """Get user by username"""
-    return db.query(User).filter(User.username == username).first()
+    user_list = user_repo.get_multi(db, filters={"username": username}, limit=1)
+    return user_list[0] if user_list else None

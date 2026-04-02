@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models.db_models import User as UserDB
+from app.repository.repositories import user_repo
 from app.models.user import UserResponse
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -50,7 +51,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if email is None:
         raise credentials_exception
         
-    user = db.query(UserDB).filter(UserDB.email == email).first()
+    user_list = user_repo.get_multi(db, filters={"email": email}, limit=1)
+    user = user_list[0] if user_list else None
     if user is None:
         raise credentials_exception
             

@@ -6,6 +6,7 @@ from enum import Enum
 
 from app.database.database import get_db
 from app.models.db_models import Invoice
+from app.repository.repositories import invoice_repo
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
 from app.models.user import UserResponse
@@ -83,7 +84,7 @@ def summary(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = db.query(Invoice).filter(Invoice.entity == entity).all()
+    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
     
     total_due = 0.0
     approved = 0
@@ -116,7 +117,7 @@ def aging(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = db.query(Invoice).filter(Invoice.entity == entity).all()
+    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
     buckets = {"0_30": 0, "31_60": 0, "61_90": 0, "91_120": 0, "120_plus": 0}
     
     for inv in invoices:
@@ -146,7 +147,7 @@ def status_breakdown(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = db.query(Invoice).filter(Invoice.entity == entity).all()
+    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
     
     counts = {
         "processed": 0,
@@ -170,7 +171,7 @@ def vendors(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = db.query(Invoice).filter(Invoice.entity == entity).all()
+    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
     
     vendor_count = {}
     vendor_amount = {}
@@ -194,7 +195,7 @@ def top_vendors(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = db.query(Invoice).filter(Invoice.entity == entity).all()
+    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
     
     totals = {}
     counts = {}
@@ -220,7 +221,7 @@ def payments(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = db.query(Invoice).filter(Invoice.entity == entity).all()
+    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
     
     total = 0.0
     paid = 0.0

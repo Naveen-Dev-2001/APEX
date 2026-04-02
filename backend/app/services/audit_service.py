@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models.db_models import AuditLog
+from app.repository.repositories import audit_log_repo
 from app.models.audit_log import AuditLogCreate, AuditLogResponse
 from app.middleware.trace_middleware import trace_logger
 
@@ -23,17 +24,15 @@ class AuditService:
         except:
             inv_id = invoice_id
 
-        log_entry = AuditLog(
-            invoice_id=inv_id,
-            action=action,
-            user=user,
-            entity=entity,
-            details=json.dumps(details) if details else None,
-            timestamp=datetime.utcnow()
-        )
-        
-        db.add(log_entry)
-        db.commit()
+        log_data = {
+            "invoice_id": inv_id,
+            "action": action,
+            "user": user,
+            "entity": entity,
+            "details": json.dumps(details) if details else None,
+            "timestamp": datetime.utcnow()
+        }
+        audit_log_repo.create(db, obj_in=log_data)
         
         # Echo to trace log
         trace_logger.info(f"AUDIT_EVENT | {user} | {action} | Invoice: {invoice_id} | Details: {json.dumps(details if details else {})}")
@@ -51,10 +50,13 @@ class AuditService:
         except:
             inv_id = invoice_id
 
-        logs = db.query(AuditLog).filter(
-            AuditLog.invoice_id == inv_id,
-            AuditLog.entity == entity
-        ).order_by(AuditLog.timestamp.desc()).all()
+        logs = audit_log_repo.get_multi(
+            db,
+            filters={"invoice_id": inv_id, "entity": entity},
+            order_by="timestamp",
+            descending=True,
+            limit=1000
+        )
         
         result = []
         for log in logs:

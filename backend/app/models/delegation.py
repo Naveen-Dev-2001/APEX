@@ -4,6 +4,7 @@ from datetime import datetime, date
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from app.models.db_models import Delegation as DBDelegation
+from app.repository.repositories import delegation_repo
 
 class DelegationBase(BaseModel):
     original_approver: str = Field(..., description="Email of the original approver")
@@ -30,11 +31,17 @@ def check_active_delegation(db: Session, original_approver_email: str, entity: s
     """
     today = datetime.utcnow().date()
 
-    delegations = db.query(DBDelegation).filter(
-        DBDelegation.original_approver == original_approver_email.lower(),
-        DBDelegation.entity == entity,
-        DBDelegation.start_date <= today,
-        DBDelegation.end_date >= today
-    ).all()
+    delegations = delegation_repo.get_multi(
+        db,
+        filters={
+            "original_approver": original_approver_email.lower(),
+            "entity": entity
+        },
+        expressions=[
+            DBDelegation.start_date <= today,
+            DBDelegation.end_date >= today
+        ],
+        limit=100
+    )
     
     return [d.substitute_approver.lower() for d in delegations]

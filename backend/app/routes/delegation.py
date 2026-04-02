@@ -6,10 +6,11 @@ from datetime import datetime
 
 from app.database.database import get_db
 from app.models.db_models import Delegation as DBDelegation
-from app.models.delegation import DelegationCreate, DelegationResponse
+from app.repository.repositories import delegation_repo
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
 from app.models.user import UserResponse
+from app.models.delegation import DelegationCreate, DelegationResponse
 
 router = APIRouter()
 
@@ -28,12 +29,19 @@ async def create_delegation(
         raise HTTPException(403, "You do not have permission to delegate this user's approvals.")
 
     # Overlap validation: s1 <= e2 AND e1 >= s2
-    existing_overlap = db.query(DBDelegation).filter(
-        DBDelegation.original_approver == delegation.original_approver.lower(),
-        DBDelegation.entity == entity,
-        DBDelegation.start_date <= delegation.end_date,
-        DBDelegation.end_date >= delegation.start_date
-    ).first()
+    overlap_list = delegation_repo.get_multi(
+        db,
+        filters={
+            "original_approver": delegation.original_approver.lower(),
+            "entity": entity
+        },
+        expressions=[
+            DBDelegation.start_date <= delegation.end_date,
+            DBDelegation.end_date >= delegation.start_date
+        ],
+        limit=1
+    )
+    existing_overlap = overlap_list[0] if overlap_list else None
     
     if existing_overlap:
         raise HTTPException(
@@ -41,21 +49,19 @@ async def create_delegation(
             detail=f"An active or scheduled delegation already exists for this approver in the selected period ({existing_overlap.start_date} to {existing_overlap.end_date})."
         )
 
-    new_del = DBDelegation(
-        delegator_email=delegation.original_approver.lower(),
-        substitute_email=delegation.substitute_approver.lower(),
-         is_active=True,
-        original_approver=delegation.original_approver.lower(),
-        substitute_approver=delegation.substitute_approver.lower(),
-        start_date=delegation.start_date,
-        end_date=delegation.end_date,
-        entity=entity,
-        created_at=datetime.utcnow(),
-        created_by=current_user.email
-    )
-    db.add(new_del)
-    db.commit()
-    db.refresh(new_del)
+    new_del_data = {
+        "delegator_email": delegation.original_approver.lower(),
+        "substitute_email": delegation.substitute_approver.lower(),
+        "is_active": True,
+        "original_approver": delegation.original_approver.lower(),
+        "substitute_approver": delegation.substitute_approver.lower(),
+        "start_date": delegation.start_date,
+        "end_date": delegation.end_date,
+        "entity": entity,
+        "created_at": datetime.utcnow(),
+        "created_by": current_user.email
+    }
+    new_del = delegation_repo.create(db, obj_in=new_del_data)
     
     return DelegationResponse(
         id=new_del.id,
@@ -74,18 +80,13 @@ async def get_delegations(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    query = db.query(DBDelegation).filter(DBDelegation.entity == entity)
-    
-    # No longer filtering by user - returning all delegations for the entity as requested
-    # if current_user.role != "admin":
-    #     email = current_user.email.lower()
-    #     query = query.filter(or_(
-    #         DBDelegation.original_approver == email,
-    #         DBDelegation.substitute_approver == email,
-    #         DBDelegation.created_by == current_user.email
-    #     ))
-        
-    delegations = query.order_by(DBDelegation.created_at.desc()).all()
+    delegations = delegation_repo.get_multi(
+        db, 
+        filters={"entity": entity},
+        order_by="created_at",
+        descending=True,
+        limit=1000
+    )
     return delegations
 
 @router.delete("/{delegation_id}")
@@ -94,7 +95,7 @@ async def delete_delegation(
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user)
 ):
-    delegation = db.query(DBDelegation).filter(DBDelegation.id == delegation_id).first()
+    delegation = delegation_repo.get(db, delegation_id)
     if not delegation:
         raise HTTPException(404, "Delegation not found")
     
@@ -105,6 +106,5 @@ async def delete_delegation(
        current_user.email.lower() != (delegation.original_approver or "").lower():
         raise HTTPException(403, "You do not have permission to revert this delegation.")
         
-    db.delete(delegation)
-    db.commit()
+    delegation_repo.remove(db, id=delegation_id)
     return {"message": "Delegation reverted successfully"}
