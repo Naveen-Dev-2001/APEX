@@ -687,83 +687,71 @@ async def update_invoice_status(
     extracted_data = deserialize_json_field(invoice.extracted_data) or {}
     currency = extracted_data.get("invoice_details", {}).get("currency", {}).get("value", "USD")
     
+    # Get assigned approvers and is_parallel flag from requirement data
     requirement_data = get_required_approver_count(db, vendor_name, total_amount, invoice_id, invoice_data=invoice_to_dict(invoice), currency=currency, entity=invoice.entity)
-    assigned_approvers = requirement_data.get("assigned_approvers", [])
+    assigned_approvers = requirement_data.get("assigned_approvers", []) # This is a List[List[str]] or List[str]
     
-    existing_approvals = sum(1 for h in current_cycle_history if h.status == InvoiceStatusEnum.APPROVED)
-    
-    is_parallel = requirement_data.get("is_parallel", False)
-
-    # Who are the EXPECTED approvers right now?
-    expected_emails = []
-    if assigned_approvers and existing_approvals < len(assigned_approvers):
-        current_level = assigned_approvers[existing_approvals]
-        if isinstance(current_level, list):
-            expected_emails = current_level
-        elif isinstance(current_level, str):
-            try:
-                parsed = json.loads(current_level)
-                expected_emails = parsed if isinstance(parsed, list) else [current_level]
-            except:
-                expected_emails = [current_level]
-        else:
-            expected_emails = [current_level]
-
-    # Is the current user the expected approver OR their active substitute?
-    is_authorized = False
+    # -----------------------------------------------------
+    # NEW PARALLEL AUTHORIZATION LOGIC
+    # -----------------------------------------------------
+    user_email = current_user.email.lower()
     from app.models.delegation import check_active_delegation
-    import json
     
-    def _flatten_emails(items):
-        res = []
-        for item in items:
-            if isinstance(item, list):
-                res.extend(_flatten_emails(item))
-            elif isinstance(item, str):
-                item = item.strip()
-                if item.startswith("["):
-                    try:
-                        parsed = json.loads(item)
-                        if isinstance(parsed, list):
-                            res.extend(_flatten_emails(parsed))
-                        else:
-                            res.append(item)
-                    except:
-                        res.append(item)
-                else:
-                    res.append(item)
-        return res
+    # Find all levels where the user (or their substitute) is assigned
+    user_assigned_levels = []
+    
+    def _is_user_in_group(group_item, target_email, entity_str):
+        emails = [group_item] if isinstance(group_item, str) else group_item
+        # Flatten if needed (handle nested JSON lists)
+        flat_emails = []
+        for e in emails:
+            if not e: continue
+            if isinstance(e, str) and e.startswith("["):
+                try: 
+                    parsed = json.loads(e)
+                    if isinstance(parsed, list): flat_emails.extend([x.lower() for x in parsed])
+                    else: flat_emails.append(e.lower())
+                except: flat_emails.append(e.lower())
+            else: flat_emails.append(e.lower())
+        
+        if target_email in flat_emails:
+            return True
+        
+        # Check delegations
+        for e in flat_emails:
+            substitutes = check_active_delegation(db, e, entity_str)
+            if target_email in [s.lower() for s in substitutes]:
+                return True
+        return False
 
-    if is_parallel:
-        # In parallel mode, any assigned approver (or their substitute) is authorized
-        flat_all = _flatten_emails(assigned_approvers)
-        for a_email in flat_all:
-            if not a_email: continue
-            a_email_lower = a_email.lower()
-            if current_user.email.lower() == a_email_lower:
-                is_authorized = True
-                break
-            
-            substitutes = check_active_delegation(db, a_email_lower, invoice.entity)
-            if current_user.email.lower() in [s.lower() for s in substitutes]:
-                is_authorized = True
-                break
-    elif expected_emails:
-        flat_expected = _flatten_emails(expected_emails)
-        for expected_email in flat_expected:
-            if not expected_email: continue
-            if current_user.email.lower() == expected_email.lower():
-                is_authorized = True
-                break
-            else:
-                substitutes = check_active_delegation(db, expected_email.lower(), invoice.entity)
-                if current_user.email.lower() in [s.lower() for s in substitutes]:
-                    is_authorized = True
-                    break
+    for idx, group in enumerate(assigned_approvers):
+        if _is_user_in_group(group, user_email, invoice.entity):
+            user_assigned_levels.append(idx + 1)
 
+    current_level = invoice.current_approver_level or 1
+    is_authorized = False
+    
+    if not user_assigned_levels:
+        # User not assigned to any level
+        raise HTTPException(status_code=403, detail="You are not authorized to approve this invoice.")
+    
+    # Check if user is at the CURRENT active level
+    if current_level in user_assigned_levels:
+        is_authorized = True
+    elif any(lvl < current_level for lvl in user_assigned_levels):
+        # User was in a previous level that is already approved
+        raise HTTPException(status_code=400, detail="In the same level another already approves the invoices.")
+    elif any(lvl > current_level for lvl in user_assigned_levels):
+        # User is in a future level
+        raise HTTPException(status_code=400, detail="It is not yet your turn for approval.")
+    else:
+        raise HTTPException(status_code=403, detail="Approver level mismatch.")
+
+    # Idempotency / Double action check within the same level
+    existing_approvals = sum(1 for h in current_cycle_history if h.status == InvoiceStatusEnum.APPROVED)
     already_acted_for_this_level = any(
         h.user == approver_name and 
-        h.approver_level == existing_approvals + 1 and 
+        h.approver_level == current_level and 
         h.status in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED]
         for h in current_cycle_history
     )
@@ -782,8 +770,9 @@ async def update_invoice_status(
         user=approver_name,
         timestamp=timestamp,
         comment=comment,
-        approver_level=existing_approvals + 1 if status in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED] else None
+        approver_level=current_level if status in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED] else None
     )
+
 
     main_status = InvoiceStatusEnum.WAITING_APPROVAL
 
@@ -897,14 +886,35 @@ async def update_invoice_status(
     
     invoice.status_history.append(new_status_entry)
 
+    # Determine the status after this action
+    main_status = InvoiceStatusEnum.WAITING_APPROVAL
     if status == InvoiceStatusEnum.APPROVED:
-        # Avoid duplicate approvals in the list
+        if current_level >= len(assigned_approvers):
+            main_status = InvoiceStatusEnum.APPROVED
+        else:
+            main_status = InvoiceStatusEnum.WAITING_APPROVAL
+    elif status == InvoiceStatusEnum.REJECTED:
+        main_status = InvoiceStatusEnum.REJECTED
+    elif status == InvoiceStatusEnum.REWORKED:
+        main_status = InvoiceStatusEnum.REWORKED
+    elif status == InvoiceStatusEnum.WAITING_CODING:
+        main_status = InvoiceStatusEnum.WAITING_CODING
+
+    # [AUDIT] Log Approval Action 
+    # (Note: we log it before updating the main status if we want to capture the transition)
+    
+    # Update main invoice status
+    invoice.status = main_status
+    
+    if status == InvoiceStatusEnum.APPROVED:
+        # Add to approved_by_list for tracking
         if not any(a.approver_email == current_user.email for a in invoice.approved_by_list):
             from app.models.db_models import InvoiceApprovedBy
             invoice.approved_by_list.append(InvoiceApprovedBy(approver_email=current_user.email))
         
+        # If not final level, increment level for next group
         if main_status == InvoiceStatusEnum.WAITING_APPROVAL:
-            invoice.current_approver_level = approvals + 1
+            invoice.current_approver_level = current_level + 1
             
     elif status in [InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED, InvoiceStatusEnum.WAITING_CODING]:
         invoice.approved_by_list = []
@@ -912,15 +922,10 @@ async def update_invoice_status(
 
         # TRIGGER NOTIFICATION TO CODER (REJECTED/REWORKED)
         if status in [InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED]:
-            # Find the coder from WorkflowStep (most recent coding step)
-
-            
             coding_step = db.query(WorkflowStep).filter(
                 WorkflowStep.invoice_id == invoice_id,
                 WorkflowStep.step_type == WorkflowStepTypeEnum.CODING
             ).order_by(WorkflowStep.timestamp.desc()).first()
-
-            # Removed db.refresh(invoice) which was reverting status/level changes
             
             if coding_step:
                 coder_username = coding_step.user
@@ -940,16 +945,18 @@ async def update_invoice_status(
                         comment=comment
                     )
 
+
     db.commit()
 
 
     # 8. TRIGGER NEXT APPROVER EMAIL
     if status == InvoiceStatusEnum.APPROVED and main_status == InvoiceStatusEnum.WAITING_APPROVAL:
         # We need the next approver's email
-        # assigned_approvers is a list of lists
-        if assigned_approvers and (approvals) < len(assigned_approvers):
-            next_level_approvers = assigned_approvers[approvals]
+        # assigned_approvers is a list of lists. If current_level was 1, index 1 is next.
+        if assigned_approvers and current_level < len(assigned_approvers):
+            next_level_approvers = assigned_approvers[current_level]
             emails = [next_level_approvers] if isinstance(next_level_approvers, str) else next_level_approvers
+
             
             for next_approver_email in emails:
                 if not next_approver_email: continue

@@ -253,13 +253,14 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose }) => {
 
                         <RadioGroup
                             label="Approval Type"
-                            value={form.is_parallel ? 'Parallel (Any one per level can approve)' : 'Sequential (Level by Level)'}
-                            options={['Sequential (Level by Level)', 'Parallel (Any one per level can approve)']}
+                            value={form.is_parallel ? 'Parallel' : 'Sequential'}
+                            options={['Sequential', 'Parallel']}
                             onChange={(val) => setForm(prev => ({ 
                                 ...prev, 
-                                is_parallel: val === 'Parallel (Any one per level can approve)' 
+                                is_parallel: val === 'Parallel' 
                             }))}
                         />
+
 
                         <RadioGroup
                             label="Enable Threshold Approver"
