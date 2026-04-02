@@ -23,6 +23,10 @@ export const useInvoiceStore = create((set, get) => ({
     viewInvoiceId: null,
     setViewInvoiceId: (id) => set({ viewInvoiceId: id }),
 
+    fileName: "",
+    setFileName: (name) => set({ fileName: name }),
+
+
     isModalOpen: false,
     setIsModalOpen: (open) => set({ isModalOpen: open }),
 
@@ -247,6 +251,9 @@ export const useInvoiceStore = create((set, get) => ({
     // =============================
     highlightedField: null,
     setHighlightedField: (field) => set({ highlightedField: field }),
+
+    activeInvoiceData: null,
+    setActiveInvoiceData: (data) => set({ activeInvoiceData: data }),
 
     entityMaster: {},
     setEntityMaster: (data) => set({ entityMaster: data }),

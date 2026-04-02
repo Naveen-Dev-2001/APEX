@@ -18,7 +18,7 @@ import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
 
 const Invoice = () => {
     const [search, setSearch] = useState("");
-    const { invoiceSection, skip, limit, view, setView, setInvoiceSection, setIsModalOpen, isModalOpen, setViewInvoiceId, viewInvoiceId, quickViewFormData, setQuickViewFormData, selectedVendorId, setSelectedVendorId, setQuickViewLineItems, setEntityMaster } = useInvoiceStore();
+    const { invoiceSection, skip, limit, view, setView, setInvoiceSection, setIsModalOpen, isModalOpen, setFileName, setViewInvoiceId, viewInvoiceId, quickViewFormData, setQuickViewFormData, selectedVendorId, setSelectedVendorId, setQuickViewLineItems, setEntityMaster, setActiveInvoiceData } = useInvoiceStore();
     const { invoices, isLoading, refetch } = useInvoiceData({ skip, limit });
     const [messageApi, contextHolder] = message.useMessage();
     const [uploadLoading, setUploadLoading] = useState(false);
@@ -50,6 +50,9 @@ const Invoice = () => {
 
         const id = Number(data.id);
         if (!id) return;
+
+        setFileName(data.original_filename ?? "");
+        setActiveInvoiceData(data);
 
         setQuickViewFormData({
             // Header
@@ -238,7 +241,11 @@ const Invoice = () => {
 
             await new Promise((res) => setTimeout(res, 700));
 
-            files.length === 1 ? setInvoiceSection(2) : setInvoiceSection(1);
+            if (files.length === 1 && response?.data?.invoices?.length > 0) {
+                handleView(response.data.invoices[0]);
+            } else {
+                setInvoiceSection(1);
+            }
             setIsModalOpen(false);
 
         } catch (error) {

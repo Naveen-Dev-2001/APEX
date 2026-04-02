@@ -9,6 +9,7 @@ const CustomDatePicker = ({
     error,
     required = false,
     className = "mb-4 w-full",
+    ...props
 }) => {
 
     return (
@@ -35,6 +36,7 @@ const CustomDatePicker = ({
                         root: { zIndex: 1050 }
                     }
                 }}
+                {...props}
             />
 
             {error && (
