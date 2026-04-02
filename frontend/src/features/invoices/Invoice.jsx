@@ -30,9 +30,9 @@ const Invoice = () => {
 
     useEffect(() => {
         fetchEntityMaster().then((data) => {
-            const selectedEntity = data.filter((item) => {
-                return item.entity_name == sessionStorage?.selected_entity
-            })
+            // selected_entity now holds entity_id (FK value), so compare against entity_id
+            const selectedEntityId = sessionStorage.getItem('selected_entity');
+            const selectedEntity = data.filter((item) => item.entity_id === selectedEntityId);
             setEntityMaster(selectedEntity?.[0] || {});
         }).catch((err) => {
             console.error("Failed to fetch entity master", err);

@@ -278,7 +278,14 @@ def get_vendor_master_by_vendor_id(
             detail=f"No records found for vendor_id: {vendor_id}"
         )
 
-    return data
+    result = []
+    for v in data:
+        row_dict = {}
+        for column in v.__table__.columns:
+            row_dict[column.name] = getattr(v, column.name)
+        result.append(row_dict)
+
+    return result
 
 
 @router.post("/upload")

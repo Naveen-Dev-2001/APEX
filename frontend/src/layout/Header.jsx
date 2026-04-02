@@ -52,7 +52,8 @@ const Header = () => {
     const logout = useAuthStore((state) => state.logout);
     const user = useAuthStore((state) => state.user);
     const entity = useCommonStore((state) => state.entity);
-    const selectedEntityName = entity || sessionStorage.getItem('selected_entity') || 'consolidated analytics';
+    // Use the display name for UI; fall back to entity_id or a default
+    const selectedEntityName = sessionStorage.getItem('selected_entity_name') || entity || sessionStorage.getItem('selected_entity') || 'consolidated analytics';
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

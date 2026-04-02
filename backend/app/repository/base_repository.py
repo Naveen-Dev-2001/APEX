@@ -50,8 +50,15 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return query.offset(skip).limit(limit).all()
 
     def create(self, db: Session, *, obj_in: Union[CreateSchemaType, Dict[str, Any]]) -> ModelType:
-        obj_in_data = jsonable_encoder(obj_in)
-        db_obj = self.model(**obj_in_data)
+        if isinstance(obj_in, self.model):
+            db_obj = obj_in
+        else:
+            if isinstance(obj_in, dict):
+                obj_in_data = obj_in
+            else:
+                obj_in_data = obj_in.dict(exclude_unset=True)
+            db_obj = self.model(**obj_in_data)
+        
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
@@ -64,14 +71,15 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db_obj: ModelType,
         obj_in: Union[UpdateSchemaType, Dict[str, Any]]
     ) -> ModelType:
-        obj_data = jsonable_encoder(db_obj)
         if isinstance(obj_in, dict):
             update_data = obj_in
         else:
             update_data = obj_in.dict(exclude_unset=True)
-        for field in obj_data:
-            if field in update_data:
-                setattr(db_obj, field, update_data[field])
+
+        for field, value in update_data.items():
+            if hasattr(db_obj, field):
+                setattr(db_obj, field, value)
+
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)

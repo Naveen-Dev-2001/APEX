@@ -22,11 +22,12 @@ const SelectEntityPage = () => {
   // Get entities from store and format them
   const entityData = masters['Entity Master']?.data || [];
   const entities = entityData.map((entity, index) => {
-    const name = entity.entity_name === 'Default Entity' ? 'Top Level' : entity.entity_name;
+    const displayName = entity.entity_name === 'Default Entity' ? 'Top Level' : entity.entity_name;
     return {
       id: entity.id || index,
-      name: name,
-      displayName: name
+      entityId: entity.entity_id,   // FK value used in DB
+      name: displayName,            // Display name for UI
+      displayName: displayName
     };
   });
 
@@ -52,10 +53,10 @@ const SelectEntityPage = () => {
   const handleSelectEntity = (entity) => {
     setSelectedEntity(entity.displayName);
     setIsSelectOpen(false);
-    setEntity(entity.name);
-    sessionStorage.setItem('selected_entity', entity.name); // Save selected entity to session storage
-    // Add logic to save to session storage and context like old frontend
-    // setEntity(entity.name)
+    // Store the entity_id as the FK value sent in X-Entity header to the backend
+    setEntity(entity.entityId || entity.name);
+    sessionStorage.setItem('selected_entity', entity.entityId || entity.name); // entity_id for DB FK
+    sessionStorage.setItem('selected_entity_name', entity.displayName);         // Display name for UI
     setActiveTab('Dashboard');
     navigate("/dashboard");
   };
