@@ -16,7 +16,7 @@ const ViewInvoicePage = () => {
             <div className="flex-1 min-h-0 mb-12">
                 <Split
                     className="flex h-full"
-                    sizes={[50, 50]}
+                    sizes={[45, 55]}
                     minSize={320}
                     gutterSize={6}
                     direction="horizontal"

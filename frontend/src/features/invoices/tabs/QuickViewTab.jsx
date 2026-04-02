@@ -16,7 +16,7 @@ dayjs.extend(customParseFormat);
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
-const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect }) => {
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave }) => {
     // Local state → instant feedback
     const [localValue, setLocalValue] = useState(storeValue ?? "");
     const debounceRef = useRef(null);
@@ -38,60 +38,82 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
         label: field.label,
         value: localValue,
         disabled: !field.editable,
+        onMouseEnter: () => onHover(field.key),
+        onMouseLeave: onLeave,
     };
 
-    if (field.key === "vendorId" || field.key === "vendorName") {
-        return (
-            <AutoComplete
-                value={localValue}
-                options={vendorOptions}
-                style={{ width: "100%", height: "40px" }}
-                filterOption={filterVendors}
-                onSelect={(val, option) => {
-                    const name = option.label.split(" - ")[1];
-                    setLocalValue(field.key === "vendorId" ? val : name);
-                    onVendorSelect(val, name);
-                }}
-                onSearch={(val) => handleChange(val)}
-                placeholder="Search Vendor"
-            />
-        );
-    }
-
-    switch (field.type) {
-        case "input":
+    const fieldContent = (() => {
+        if (field.key === "vendorId" || field.key === "vendorName") {
             return (
-                <CustomInput
-                    {...commonProps}
-                    onChange={(e) => handleChange(e.target.value)}
-                    height="40px"
-                />
-            );
-
-        case "dropdown":
-            return (
-                <CustomDropdown
-                    {...commonProps}
-                    options={field.options || []}
-                    style={{ width: "100%", borderRadius: "8px", height: "40px" }}
-                    onChange={(val) => handleChange(val)}
-                    filterOption={filterVendors}
-                    placement="bottomLeft"
-                />
-            );
-
-        case "date":
-            return (
-                <CustomDatePicker
-                    {...commonProps}
+                <AutoComplete
                     value={localValue}
-                    onChange={(_date, dateString) => handleChange(dateString)}
+                    options={vendorOptions}
+                    style={{ width: "100%", height: "40px" }}
+                    filterOption={filterVendors}
+                    onSelect={(val, option) => {
+                        const name = option.label.split(" - ")[1];
+                        setLocalValue(field.key === "vendorId" ? val : name);
+                        onVendorSelect(val, name);
+                    }}
+                    onSearch={(val) => handleChange(val)}
+                    placeholder="Search Vendor"
                 />
             );
+        }
 
-        default:
-            return null;
-    }
+        switch (field.type) {
+            case "input":
+                return (
+                    <CustomInput
+                        {...commonProps}
+                        label={null} // label will be handled by the outer wrapper for hover
+                        onChange={(e) => handleChange(e.target.value)}
+                        height="40px"
+                    />
+                );
+
+            case "dropdown":
+                return (
+                    <CustomDropdown
+                        {...commonProps}
+                        label={null}
+                        options={field.options || []}
+                        style={{ width: "100%", borderRadius: "8px", height: "40px" }}
+                        onChange={(val) => handleChange(val)}
+                        filterOption={filterVendors}
+                        placement="bottomLeft"
+                    />
+                );
+
+            case "date":
+                return (
+                    <CustomDatePicker
+                        {...commonProps}
+                        label={null}
+                        value={localValue}
+                        onChange={(_date, dateString) => handleChange(dateString)}
+                    />
+                );
+
+            default:
+                return null;
+        }
+    })();
+
+    return (
+        <div 
+            onMouseEnter={commonProps.onMouseEnter} 
+            onMouseLeave={commonProps.onMouseLeave}
+            className="w-full"
+        >
+            {field.label && (
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {field.label}
+                </label>
+            )}
+            {fieldContent}
+        </div>
+    );
 });
 
 FieldRenderer.displayName = "FieldRenderer";
@@ -99,7 +121,7 @@ FieldRenderer.displayName = "FieldRenderer";
 // ─────────────────────────────────────────────────────────────────────────────
 // Line-item cell — isolated so only the changed cell re-renders
 // ─────────────────────────────────────────────────────────────────────────────
-const LineItemCell = memo(({ value, disabled, rowId, colKey, onUpdate }) => {
+const LineItemCell = memo(({ value, disabled, rowId, colKey, onUpdate, onHover, onLeave }) => {
     const [local, setLocal] = useState(value ?? "");
     const debounceRef = useRef(null);
 
@@ -114,7 +136,20 @@ const LineItemCell = memo(({ value, disabled, rowId, colKey, onUpdate }) => {
 
     useEffect(() => () => clearTimeout(debounceRef.current), []);
 
-    return <CustomInput value={local} disabled={disabled} onChange={handleChange} />;
+    return (
+        <div 
+            onMouseEnter={() => onHover(rowId, colKey)} 
+            onMouseLeave={onLeave}
+            className="w-full h-full min-h-[40px] flex items-center"
+        >
+            <CustomInput 
+                value={local} 
+                disabled={disabled} 
+                onChange={handleChange} 
+                className="mb-0 w-full"
+            />
+        </div>
+    );
 });
 
 LineItemCell.displayName = "LineItemCell";
@@ -135,6 +170,7 @@ const QuickViewTab = ({ isAllFields = false }) => {
         addQuickViewLineItem,
         entityMaster,
         setSelectedVendorId,
+        setHighlightedField,
     } = useInvoiceStore();
 
     const { vendorsList } = useVendersListSync();
@@ -200,11 +236,28 @@ const QuickViewTab = ({ isAllFields = false }) => {
         deleteQuickViewLineItem(id);
     }, [deleteQuickViewLineItem]);
 
+    const handleHoverField = useCallback((key) => {
+        setHighlightedField(key);
+    }, [setHighlightedField]);
+
+    const handleHoverLineItem = useCallback((rowId, colKey) => {
+        // Find index of the row by internal ID
+        const index = quickViewLineItems.findIndex(item => item.id === rowId);
+        if (index !== -1) {
+            setHighlightedField(`LineItem_${index}_${colKey}`);
+        }
+    }, [quickViewLineItems, setHighlightedField]);
+
+    const handleLeaveField = useCallback(() => {
+        setHighlightedField(null);
+    }, [setHighlightedField]);
+
     // Derived line-item values (memoized so table doesn't recompute on every field change)
     const { processedItems, gstTaxLabel, gstTaxValue, tdsDeductionValue, totalAmountPayable } = useMemo(() => {
         const isGstEligible = entityMaster?.gst_applicable === true;
         const gstTaxLabel = isGstEligible ? "Total GST" : "Total Tax";
         const gstTaxValue = parseFloat(quickViewFormData?.total_tax_amount || 0);
+        console.log("..........", gstTaxValue);
         const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
         const totalInvoiceAmount = parseFloat(quickViewFormData?.total_invoice_amount || 0);
         const tdsDeductionValue = -Math.abs(tdsRate * totalInvoiceAmount);
@@ -261,6 +314,8 @@ const QuickViewTab = ({ isAllFields = false }) => {
                                                     vendorOptions={vendorOptions}
                                                     filterVendors={filterVendors}
                                                     onVendorSelect={handleVendorSelect}
+                                                    onHover={handleHoverField}
+                                                    onLeave={handleLeaveField}
                                                 />
                                             </div>
                                         ))}
@@ -294,6 +349,8 @@ const QuickViewTab = ({ isAllFields = false }) => {
                                                                         rowId={row.id}
                                                                         colKey={col.key}
                                                                         onUpdate={handleUpdateLineItem}
+                                                                        onHover={handleHoverLineItem}
+                                                                        onLeave={handleLeaveField}
                                                                     />
                                                                 </td>
                                                             ))}

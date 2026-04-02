@@ -38,3 +38,8 @@ export const fetchEntityMaster = () =>
     API.get("/master/sheet/Entity_Master").then(res => {
         return res.data;
     })
+
+export const getInvoicePdf = (invoiceId) =>
+    API.get(`/invoices/${invoiceId}/file`, { responseType: 'blob' }).then(res => {
+        return res.data;
+    });
