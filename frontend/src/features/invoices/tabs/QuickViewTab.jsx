@@ -16,7 +16,7 @@ dayjs.extend(customParseFormat);
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
-const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave }) => {
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage }) => {
     // Local state → instant feedback
     const [localValue, setLocalValue] = useState(storeValue ?? "");
     const debounceRef = useRef(null);
@@ -112,6 +112,11 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
                 </label>
             )}
             {fieldContent}
+            {field.key === "invoiceNumber" && isDuplicate && duplicateMessage && (
+                <div className="text-red-500 text-xs mt-1 font-medium italic">
+                    ⚠️ {duplicateMessage}
+                </div>
+            )}
         </div>
     );
 });
@@ -167,10 +172,12 @@ const QuickViewTab = ({ isAllFields = false }) => {
         selectedVendorId,
         batchUpdateQuickViewFields,   // new batch action (add to store — see store patch)
         setQuickViewFormData,
-        addQuickViewLineItem,
-        entityMaster,
         setSelectedVendorId,
         setHighlightedField,
+        addQuickViewLineItem,
+        entityMaster,
+        isDuplicate,
+        duplicateMessage
     } = useInvoiceStore();
 
     const { vendorsList } = useVendersListSync();
@@ -306,7 +313,7 @@ const QuickViewTab = ({ isAllFields = false }) => {
                                             return field.visible(quickViewFormData);
                                         })
                                         .map(field => (
-                                            <div key={field.key} className="flex flex-col justify-end">
+                                            <div key={field.key} className="flex flex-col justify-start">
                                                 <FieldRenderer
                                                     field={field}
                                                     storeValue={quickViewFormData?.[field.key] ?? ""}
@@ -316,6 +323,8 @@ const QuickViewTab = ({ isAllFields = false }) => {
                                                     onVendorSelect={handleVendorSelect}
                                                     onHover={handleHoverField}
                                                     onLeave={handleLeaveField}
+                                                    isDuplicate={isDuplicate}
+                                                    duplicateMessage={duplicateMessage}
                                                 />
                                             </div>
                                         ))}

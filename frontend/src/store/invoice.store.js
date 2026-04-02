@@ -109,6 +109,12 @@ export const useInvoiceStore = create((set, get) => ({
         lineGrouping: "",
     },
 
+    isDuplicate: false,
+    setIsDuplicate: (isDuplicate) => set({ isDuplicate }),
+
+    duplicateMessage: "",
+    setDuplicateMessage: (msg) => set({ duplicateMessage: msg }),
+
     // ── Update single field (used by debounced FieldRenderer) ──────────────
     setQuickViewField: (key, value) =>
         set((state) => ({
