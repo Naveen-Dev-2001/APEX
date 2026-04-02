@@ -109,9 +109,9 @@ def create_default_settings(db):
         "statuses": ["active", "pending", "rejected"],
         "navigation": [
             {"label": "Dashboard", "path": "/dashboard", "roles": ["all"]},
-            {"label": "Invoice", "path": "/invoice", "roles": ["coder"]},
-            {"label": "Coding", "path": "/coding", "roles": ["coder"]},
-            {"label": "Approvals", "path": "/approvals", "roles": ["approver"]},
+            {"label": "Invoices", "path": "/invoices", "roles": ["coder", "admin"]},
+            {"label": "Coding", "path": "/coding", "roles": ["coder", "admin"]},
+            {"label": "Approvals", "path": "/approvals", "roles": ["approver", "admin"]},
             {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
             {"label": "Settings", "path": "/settings", "roles": ["admin"]},
             {"label": "Admin", "path": "/admin", "roles": ["admin"]}

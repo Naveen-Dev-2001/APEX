@@ -8,7 +8,7 @@ DEFAULT_SETTINGS = {
     "statuses": ["active", "pending", "rejected"],
     "navigation": [
         {"label": "Dashboard", "path": "/dashboard", "roles": ["admin", "coder", "approver"]},
-        {"label": "Invoices", "path": "/invoices", "roles": ["coder"]},
+        {"label": "Invoices", "path": "/invoices", "roles": ["coder", "admin"]},
         {"label": "Coding", "path": "/coding", "roles": ["coder", "admin"]},
         {"label": "Approvals", "path": "/approvals", "roles": ["approver", "admin"]},
         {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
