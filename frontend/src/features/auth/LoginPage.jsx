@@ -92,7 +92,7 @@ const LoginPage = () => {
                         type="submit"
                         variant="primary"
                         disabled={loading}
-                        className="bg-blue-500 hover:bg-blue-600 !text-white !h-11 !rounded font-medium w-full"
+                        className="bg-blue-500 !text-white !h-11 !rounded font-medium w-full"
                     >
                         {loading ? "Signing in..." : "Login →"}
                     </CustomButton>

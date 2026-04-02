@@ -15,6 +15,7 @@ export default function CustomButton({
     rounded-lg
     !font-creato custom-font-creato text-base leading-4
     transition-all duration-150 
+    hover:opacity-85 active:opacity-75
   `;
 
     const variantClasses = {
@@ -43,7 +44,6 @@ export default function CustomButton({
         success: `
             bg-green-500
             text-white cursor-pointer
-            hover:bg-green-600
         `,
     };
 

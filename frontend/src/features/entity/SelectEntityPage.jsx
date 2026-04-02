@@ -133,7 +133,7 @@ const SelectEntityPage = () => {
           <div className="relative w-full text-left mt-6">
             <button
               type="button"
-              className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#1e9bd8] hover:bg-[#1880b3] text-white font-medium transition-colors focus:outline-none"
+              className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#1e9bd8] hover:opacity-85 active:opacity-75 text-white font-medium transition-all focus:outline-none"
               onClick={() => setIsSelectOpen(!isSelectOpen)}
             >
               <span>{selectedEntity}</span>
