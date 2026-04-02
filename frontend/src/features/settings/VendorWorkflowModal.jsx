@@ -16,7 +16,7 @@ const EMPTY_FORM = {
     amount_threshold: '',
     approver_count: 1,
     enableThreshold: 'No',
-    is_parallel: false
+    is_parallel: true
 };
 
 const FormField = ({ label, id, value, onChange, type = "text", placeholder = '', required = false }) => (
@@ -88,7 +88,7 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
                 amount_threshold: rowData.amount_threshold || '',
                 approver_count: rowData.approver_count || 1,
                 enableThreshold: (rowData.threshold_approver && rowData.threshold_approver.length > 0) ? 'Yes' : 'No',
-                is_parallel: rowData.is_parallel || false
+                is_parallel: true
             });
         }
     }, [isEdit, rowData]);
@@ -249,16 +249,6 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
                                 { value: 5, label: '5 Approvers' },
                             ]}
                             onChange={(val) => setForm(prev => ({ ...prev, approver_count: val }))}
-                        />
-
-                        <RadioGroup
-                            label="Approval Type"
-                            value={form.is_parallel ? 'Parallel' : 'Sequential'}
-                            options={['Sequential', 'Parallel']}
-                            onChange={(val) => setForm(prev => ({ 
-                                ...prev, 
-                                is_parallel: val === 'Parallel' 
-                            }))}
                         />
 
 
