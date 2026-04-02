@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/ui.store';
-import authBg from '../../assets/auth_background.png';
+import '../../layout/AuthLayout.css';
 import logo from '../../assets/loandna_logo_dark.png';
 import { useCommonStore } from '../../store/common.store';
 import useMasterDataStore from '../../store/masterData.store';
@@ -74,13 +74,12 @@ const SelectEntityPage = () => {
   }, []);
 
   return (
-    <div
-      className="min-h-screen w-full flex justify-center items-center relative overflow-hidden font-sans"
-      style={{
-        background: `url(${authBg}) no-repeat center center fixed`,
-        backgroundSize: 'cover'
-      }}
-    >
+    <div className="auth-background min-h-screen w-full flex justify-center items-center font-creato">
+      {/* Background elements */}
+      <div className="auth-circle auth-circle-left"></div>
+      <div className="auth-circle auth-circle-right"></div>
+      <div className="auth-bottom-curve"></div>
+
       {/* Header */}
       <header className="fixed top-0 left-0 w-full h-[70px] bg-white border-b border-[#e8e8e8] shadow-[0_2px_8px_rgba(0,0,0,0.05)] px-[30px] flex justify-between items-center z-[2000]">
         <img
