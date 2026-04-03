@@ -483,13 +483,10 @@ async def get_sheet_data(
                     continue
 
             if identifier in ["TDS_Rates", "tds_rates", "TDS"]:
-                pretty_map = {
-                    "section": "Section",
-                    "nature_of_payment": "Nature of Payment",
-                    "tds_rate": "TDS Rate"
-                }
-                if column.name in pretty_map:
-                    row_dict[pretty_map[column.name]] = val
+                # Keep snake_case keys to match frontend table accessors
+                # (section, nature_of_payment, tds_rate)
+                if column.name in ["section", "nature_of_payment", "tds_rate"]:
+                    row_dict[column.name] = val
                     continue
 
             row_dict[column.name] = val
