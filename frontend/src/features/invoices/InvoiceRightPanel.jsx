@@ -7,7 +7,7 @@ const GLSummaryTab = lazy(() => import("./tabs/GLSummaryTab"));
 const WorkflowTab = lazy(() => import("./tabs/WorkflowTab"));
 const AuditTrailTab = lazy(() => import("./tabs/AuditTrailTab"));
 const AllFieldsTab = lazy(() => import("./tabs/AllFieldsTab"));
-const LineItemsTable = lazy(() => import("./tabs/LineItemsTable"));
+const CodingTab = lazy(() => import("./tabs/CodingTab"));
 
 const TAB_COMPONENTS = {
     "Quick View": QuickViewTab,
@@ -15,7 +15,7 @@ const TAB_COMPONENTS = {
     "GL Summary": GLSummaryTab,
     "Workflow": WorkflowTab,
     "Audit Trail": AuditTrailTab,
-    "Line Items": LineItemsTable,
+    "Coding": CodingTab,
 };
 
 const InvoiceRightPanel = ({ invoice = {} }) => {

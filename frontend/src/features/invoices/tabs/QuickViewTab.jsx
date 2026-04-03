@@ -16,7 +16,7 @@ dayjs.extend(customParseFormat);
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
-const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage }) => {
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, forceDisabled = false }) => {
     // Local state → instant feedback
     const [localValue, setLocalValue] = useState(storeValue ?? "");
     const debounceRef = useRef(null);
@@ -37,7 +37,7 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
     const commonProps = {
         label: field.label,
         value: localValue,
-        disabled: !field.editable,
+        disabled: forceDisabled || !field.editable,
         onMouseEnter: () => onHover(field.key),
         onMouseLeave: onLeave,
     };
@@ -49,6 +49,7 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
                     value={localValue}
                     options={vendorOptions}
                     style={{ width: "100%", height: "40px" }}
+                    disabled={commonProps.disabled}
                     filterOption={filterVendors}
                     onSelect={(val, option) => {
                         const name = option.label.split(" - ")[1];
@@ -101,8 +102,8 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
     })();
 
     return (
-        <div 
-            onMouseEnter={commonProps.onMouseEnter} 
+        <div
+            onMouseEnter={commonProps.onMouseEnter}
             onMouseLeave={commonProps.onMouseLeave}
             className="w-full"
         >
@@ -142,15 +143,15 @@ const LineItemCell = memo(({ value, disabled, rowId, colKey, onUpdate, onHover, 
     useEffect(() => () => clearTimeout(debounceRef.current), []);
 
     return (
-        <div 
-            onMouseEnter={() => onHover(rowId, colKey)} 
+        <div
+            onMouseEnter={() => onHover(rowId, colKey)}
             onMouseLeave={onLeave}
             className="w-full h-full min-h-[40px] flex items-center"
         >
-            <CustomInput 
-                value={local} 
-                disabled={disabled} 
-                onChange={handleChange} 
+            <CustomInput
+                value={local}
+                disabled={disabled}
+                onChange={handleChange}
                 className="mb-0 w-full"
             />
         </div>
@@ -162,7 +163,7 @@ LineItemCell.displayName = "LineItemCell";
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
-const QuickViewTab = ({ isAllFields = false }) => {
+const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const {
         quickViewFormData,
         setQuickViewField,
@@ -299,7 +300,7 @@ const QuickViewTab = ({ isAllFields = false }) => {
     return (
         <div className="p-2">
             {QUICK_VIEW_CONFIG
-                .filter(section => isAllFields || !section.showInAllFields)
+                .filter(section => (showOnlyHeader ? section.section === "Header" : (isAllFields || !section.showInAllFields)))
                 .map((section) => {
                     const content = (
                         <>
@@ -325,6 +326,7 @@ const QuickViewTab = ({ isAllFields = false }) => {
                                                     onLeave={handleLeaveField}
                                                     isDuplicate={isDuplicate}
                                                     duplicateMessage={duplicateMessage}
+                                                    forceDisabled={showOnlyHeader}
                                                 />
                                             </div>
                                         ))}

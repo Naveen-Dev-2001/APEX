@@ -31,7 +31,7 @@ export const useInvoiceStore = create((set, get) => ({
     setIsModalOpen: (open) => set({ isModalOpen: open }),
 
     // Invoice View Screen State
-    tabList: ["Quick View", "All Fields", "GL Summary", "Workflow", "Audit Trail", "Line Items"],
+    tabList: ["Quick View", "All Fields", "GL Summary", "Workflow", "Audit Trail", "Coding"],
 
     invoiceActiveTab: "Quick View",
     setInvoiceActiveTab: (tab) => set({ invoiceActiveTab: tab }),
@@ -221,6 +221,12 @@ export const useInvoiceStore = create((set, get) => ({
                 discount: 0,
                 netAmount: 0,
                 taxAmt: 0,
+                lineType: "Expense",
+                glCode: "",
+                lob: "",
+                department: "",
+                customer: "",
+                item: "",
                 isNetAmountOverridden: false,
             };
             const regularItems = state.quickViewLineItems.filter(
