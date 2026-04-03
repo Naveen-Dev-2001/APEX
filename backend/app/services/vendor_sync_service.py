@@ -198,30 +198,14 @@ class VendorSyncService:
 
     async def get_all_vendors(self, skip: int = 0, limit: int = 15, search: str = None, sort_by: str = None, sort_dir: str = 'asc') -> Dict[str, Any]:
         """Returns paginated DB records with optional search and sort."""
-        from sqlalchemy import or_
-        expressions = []
-        if search:
-            search_filter = f"%{search}%"
-            expressions.append(or_(
-                VendorMaster.vendor_id.ilike(search_filter),
-                VendorMaster.vendor_name.ilike(search_filter),
-                VendorMaster.address_line1.ilike(search_filter),
-                VendorMaster.city.ilike(search_filter),
-                VendorMaster.primary_email_address.ilike(search_filter)
-            ))
+        search_fields = ["vendor_id", "vendor_name", "address_line1", "city", "primary_email_address"]
         
-        # Use repository for data and count
-        data = vendor_master_repo.get_multi(
-            self.db, 
-            skip=skip, 
-            limit=limit, 
-            expressions=expressions, 
-            order_by=sort_by or 'id', 
+        return vendor_master_repo.get_paginated(
+            self.db,
+            skip=skip,
+            limit=limit,
+            search=search,
+            search_fields=search_fields,
+            order_by=sort_by,
             descending=(sort_dir.lower() == 'desc')
         )
-        total = vendor_master_repo.count(self.db, expressions=expressions)
-        
-        return {
-            "data": data,
-            "total": total
-        }

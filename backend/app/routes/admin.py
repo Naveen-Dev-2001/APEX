@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.database.database import get_db
@@ -8,7 +8,7 @@ from app.models.db_models import User as DBUser
 from app.repository.repositories import user_repo
 from app.auth.jwt import get_current_user
 from app.utils.settings import get_app_settings
-from app.models.user import UserResponse
+from app.models.user import UserResponse, UserPaginatedResponse
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -65,19 +65,29 @@ async def create_new_user(
     new_user = user_repo.create(db, obj_in=new_user_data)
     return new_user
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("/", response_model=UserPaginatedResponse)
 async def get_all_users(
     db: Session = Depends(get_db),
-    current_user: UserResponse = Depends(get_current_admin)
+    current_user: UserResponse = Depends(get_current_admin),
+    skip: int = 0,
+    limit: int = 15,
+    search: str = None,
+    sort_by: str = "id",
+    sort_dir: str = "desc"
 ):
-    """Get all users (Admin only)"""
-    users = user_repo.get_multi(
-        db, 
-        order_by="id", 
-        descending=True, 
-        limit=1000
+    """Get All Users (Admin only) with pagination and search."""
+    search_fields = ["username", "email", "role", "status"]
+    
+    paginated_res = user_repo.get_paginated(
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        search_fields=search_fields,
+        order_by=sort_by,
+        descending=(sort_dir.lower() == 'desc')
     )
-    return users
+    return paginated_res
 
 
 @router.put("/{user_id}/role", response_model=UserResponse)

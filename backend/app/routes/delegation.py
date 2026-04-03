@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from typing import List
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime
@@ -10,7 +10,7 @@ from app.repository.repositories import delegation_repo
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
 from app.models.user import UserResponse
-from app.models.delegation import DelegationCreate, DelegationResponse
+from app.models.delegation import DelegationCreate, DelegationResponse, DelegationPaginatedResponse
 
 router = APIRouter()
 
@@ -74,20 +74,30 @@ async def create_delegation(
         created_by=new_del.created_by
     )
 
-@router.get("/", response_model=List[DelegationResponse])
+@router.get("/", response_model=DelegationPaginatedResponse)
 async def get_delegations(
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
-    entity: str = Depends(get_current_entity)
+    entity: str = Depends(get_current_entity),
+    skip: int = 0,
+    limit: int = 15,
+    search: str = None,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc"
 ):
-    delegations = delegation_repo.get_multi(
-        db, 
+    search_fields = ["original_approver", "substitute_approver"]
+    
+    paginated_res = delegation_repo.get_paginated(
+        db,
+        skip=skip,
+        limit=limit,
         filters={"entity": entity},
-        order_by="created_at",
-        descending=True,
-        limit=1000
+        search=search,
+        search_fields=search_fields,
+        order_by=sort_by,
+        descending=(sort_dir.lower() == 'desc')
     )
-    return delegations
+    return paginated_res
 
 @router.delete("/{delegation_id}")
 async def delete_delegation(

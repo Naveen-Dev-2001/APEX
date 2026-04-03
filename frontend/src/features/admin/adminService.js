@@ -2,9 +2,8 @@ import API from '../services/api';
 
 // Admin service methods
 export const adminService = {
-  async getAllUsers() {
-    // Modify URL if your backend changed
-    const response = await API.get('/users/');
+  async getAllUsers(params = {}) {
+    const response = await API.get('/users/', { params });
     return response.data;
   },
 
@@ -24,8 +23,8 @@ export const adminService = {
   },
 
   // Delegation methods
-  async getDelegations() {
-    const response = await API.get('/delegations/');
+  async getDelegations(params = {}) {
+    const response = await API.get('/delegations/', { params });
     return response.data;
   },
 

@@ -149,8 +149,20 @@ const useAdminStore = create((set, get) => ({
     fetchUsers: async () => {
         set({ loading: true, error: null });
         try {
-            const data = await adminService.getAllUsers();
-            set({ users: data, totalUsers: data.length, loading: false });
+            const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection } = get();
+            const response = await adminService.getAllUsers({
+                skip: (currentPage - 1) * itemsPerPage,
+                limit: itemsPerPage,
+                search: searchQuery,
+                sort_by: sortColumn,
+                sort_dir: sortDirection
+            });
+            // response is { data, total, ... }
+            set({ 
+                users: response.data || [], 
+                totalUsers: response.total || 0, 
+                loading: false 
+            });
         } catch (error) {
             const msg = error.message || 'Failed to fetch users';
             set({ error: msg, loading: false });
@@ -221,8 +233,19 @@ const useAdminStore = create((set, get) => ({
     fetchDelegations: async () => {
         set({ loading: true, error: null });
         try {
-            const data = await adminService.getDelegations();
-            set({ delegations: data, loading: false });
+            const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection } = get();
+            const response = await adminService.getDelegations({
+                skip: (currentPage - 1) * itemsPerPage,
+                limit: itemsPerPage,
+                search: searchQuery,
+                sort_by: sortColumn,
+                sort_dir: sortDirection
+            });
+            set({ 
+                delegations: response.data || [], 
+                totalDelegations: response.total || 0,
+                loading: false 
+            });
         } catch (error) {
             const msg = error.message || 'Failed to fetch delegations';
             set({ error: msg, loading: false });

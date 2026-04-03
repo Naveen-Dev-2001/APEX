@@ -29,7 +29,7 @@ const DelegationsTab = () => {
     useEffect(() => {
         fetchUsers();
         fetchDelegations();
-    }, [fetchUsers, fetchDelegations]);
+    }, [fetchUsers, fetchDelegations, currentPage, itemsPerPage, sortColumn, sortDirection]);
 
     const approvers = (users || []).filter(u => u.role?.toLowerCase() === 'approver');
     
@@ -164,22 +164,7 @@ const DelegationsTab = () => {
         }
     ];
 
-    const displayDelegations = [...(delegations || [])].sort((a, b) => {
-        if (!sortColumn) return 0;
-        let valA = a[sortColumn];
-        let valB = b[sortColumn];
-
-        if (valA === null || valA === undefined) valA = '';
-        if (valB === null || valB === undefined) valB = '';
-
-        if (typeof valA === 'string') valA = valA.toLowerCase();
-        if (typeof valB === 'string') valB = valB.toLowerCase();
-
-        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-    });
-    const paginatedDelegations = displayDelegations.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const displayDelegations = delegations || [];
 
     return (
         <div className="flex flex-col gap-6 animate-fadeIn p-1">
@@ -235,9 +220,9 @@ const DelegationsTab = () => {
             <div className="w-full">
                 <DataTable
                     columns={columns}
-                    data={paginatedDelegations}
+                    data={displayDelegations}
                     loading={loading}
-                    totalItems={displayDelegations.length}
+                    totalItems={useAdminStore.getState().totalDelegations || displayDelegations.length}
                     currentPage={currentPage}
                     itemsPerPage={itemsPerPage}
                     onPageChange={setCurrentPage}

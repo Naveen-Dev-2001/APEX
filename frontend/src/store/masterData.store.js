@@ -161,26 +161,90 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
-    // ─── Entity Master: Load from backend ────────────────────────────────────
-    fetchEntityMasterData: async () => {
-        set({ entityLoading: true, entityError: null });
+    // ─── Unified Fetcher: Handles all tabs with server-side pagination ──────
+    fetchMasterData: async (tabName) => {
+        const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection } = get();
+        const loadingKeyMap = {
+            'Entity Master': 'entityLoading',
+            'Vendor Master': 'vendorLoading',
+            'TDS Rates': 'tdsLoading',
+            'GL Master': 'glLoading',
+            'LOB Master': 'lobLoading',
+            'Department Master': 'departmentLoading',
+            'Customer Master': 'customerLoading',
+            'Item Master': 'itemLoading',
+            'Currency': 'currencyLoading'
+        };
+        const errorKeyMap = {
+            'Entity Master': 'entityError',
+            'Vendor Master': 'vendorError',
+            'TDS Rates': 'tdsError',
+            'GL Master': 'glError',
+            'LOB Master': 'lobError',
+            'Department Master': 'departmentError',
+            'Customer Master': 'customerError',
+            'Item Master': 'itemError',
+            'Currency': 'currencyError'
+        };
+        const fetcherMap = {
+            'Entity Master': masterDataService.getEntityMasterData,
+            'Vendor Master': masterDataService.getVendorMasterData,
+            'TDS Rates': masterDataService.getTDSRatesData,
+            'GL Master': masterDataService.getGLMasterData,
+            'LOB Master': masterDataService.getLOBMasterData,
+            'Department Master': masterDataService.getDepartmentMasterData,
+            'Customer Master': masterDataService.getCustomerMasterData,
+            'Item Master': masterDataService.getItemMasterData,
+            'Currency': masterDataService.getCurrencyData
+        };
+
+        const loadingKey = loadingKeyMap[tabName];
+        const errorKey = errorKeyMap[tabName];
+        const fetcher = fetcherMap[tabName]?.bind(masterDataService);
+
+        if (!loadingKey || !fetcher) return;
+
+        set({ [loadingKey]: true, [errorKey]: null });
         try {
-            const rows = await masterDataService.getEntityMasterData();
+            const response = await fetcher({
+                page: currentPage,
+                page_size: itemsPerPage,
+                search: searchQuery,
+                sort_by: sortColumn,
+                sort_dir: sortDirection
+            });
+
+            // Backend returns { data: [], total: 0, ... }
+            const rows = response.data || [];
+            const total = response.total || 0;
+
             set((state) => ({
-                entityLoading: false,
+                [loadingKey]: false,
                 masters: {
                     ...state.masters,
-                    'Entity Master': {
-                        ...state.masters['Entity Master'],
+                    [tabName]: {
+                        ...state.masters[tabName],
                         data: rows,
+                        total: total,
                     },
                 },
             }));
         } catch (err) {
-            console.error('[EntityMaster] fetch failed', err);
-            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            console.error(`[${tabName}] fetch failed`, err);
+            set({ [loadingKey]: false, [errorKey]: err?.response?.data?.detail || err.message });
         }
     },
+
+    // ─── Individual Fetchers (Delegating to unified fetcher) ──────────────────
+    fetchEntityMasterData: async () => get().fetchMasterData('Entity Master'),
+    fetchVendorMasterData: async () => get().fetchMasterData('Vendor Master'),
+    fetchTDSRatesData: async () => get().fetchMasterData('TDS Rates'),
+    fetchGLMasterData: async () => get().fetchMasterData('GL Master'),
+    fetchLOBMasterData: async () => get().fetchMasterData('LOB Master'),
+    fetchDepartmentMasterData: async () => get().fetchMasterData('Department Master'),
+    fetchCustomerMasterData: async () => get().fetchMasterData('Customer Master'),
+    fetchItemMasterData: async () => get().fetchMasterData('Item Master'),
+    fetchCurrencyData: async () => get().fetchMasterData('Currency'),
 
     uploadEntityMaster: async (file) => {
         set({ entityLoading: true, entityError: null });
@@ -190,61 +254,6 @@ const useMasterDataStore = create((set, get) => ({
         } catch (err) {
             set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
             throw err;
-        }
-    },
-
-    // ─── Vendor Master: Load from backend ────────────────────────────────────
-    fetchVendorMasterData: async () => {
-        const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection } = get();
-        set({ vendorLoading: true, vendorError: null });
-        try {
-            const response = await masterDataService.getVendorMasterData({
-                page: currentPage,
-                page_size: itemsPerPage,
-                search: searchQuery,
-                sort_by: sortColumn,
-                sort_dir: sortDirection
-            });
-            
-            // Backend returns { data: [], total: 0, ... }
-            const rows = response.data || [];
-            const total = response.total || 0;
-
-            set((state) => ({
-                vendorLoading: false,
-                masters: {
-                    ...state.masters,
-                    'Vendor Master': {
-                        ...state.masters['Vendor Master'],
-                        data: rows,
-                        total: total, // Store total count for pagination
-                    },
-                },
-            }));
-        } catch (err) {
-            console.error('[VendorMaster] fetch failed', err);
-            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
-        }
-    },
-
-    // ─── TDS Rates: Load from backend ────────────────────────────────────────
-    fetchTDSRatesData: async () => {
-        set({ tdsLoading: true, tdsError: null });
-        try {
-            const rows = await masterDataService.getTDSRatesData();
-            set((state) => ({
-                tdsLoading: false,
-                masters: {
-                    ...state.masters,
-                    'TDS Rates': {
-                        ...state.masters['TDS Rates'],
-                        data: rows,
-                    },
-                },
-            }));
-        } catch (err) {
-            console.error('[TDSRates] fetch failed', err);
-            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
         }
     },
 
@@ -270,27 +279,6 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
-    // ─── GL Master: Load from backend ────────────────────────────────────────
-    fetchGLMasterData: async () => {
-        set({ glLoading: true, glError: null });
-        try {
-            const rows = await masterDataService.getGLMasterData();
-            set((state) => ({
-                glLoading: false,
-                masters: {
-                    ...state.masters,
-                    'GL Master': {
-                        ...state.masters['GL Master'],
-                        data: rows,
-                    },
-                },
-            }));
-        } catch (err) {
-            console.error('[GLMaster] fetch failed', err);
-            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
-        }
-    },
-
     uploadGLMaster: async (file) => {
         set({ glLoading: true, glError: null });
         try {
@@ -299,27 +287,6 @@ const useMasterDataStore = create((set, get) => ({
         } catch (err) {
             set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
             throw err;
-        }
-    },
-
-    // ─── LOB Master: Load from backend ────────────────────────────────────────
-    fetchLOBMasterData: async () => {
-        set({ lobLoading: true, lobError: null });
-        try {
-            const rows = await masterDataService.getLOBMasterData();
-            set((state) => ({
-                lobLoading: false,
-                masters: {
-                    ...state.masters,
-                    'LOB Master': {
-                        ...state.masters['LOB Master'],
-                        data: rows,
-                    },
-                },
-            }));
-        } catch (err) {
-            console.error('[LOBMaster] fetch failed', err);
-            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
         }
     },
 
@@ -334,27 +301,6 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
-    // ─── Department Master: Load from backend ─────────────────────────────────
-    fetchDepartmentMasterData: async () => {
-        set({ departmentLoading: true, departmentError: null });
-        try {
-            const rows = await masterDataService.getDepartmentMasterData();
-            set((state) => ({
-                departmentLoading: false,
-                masters: {
-                    ...state.masters,
-                    'Department Master': {
-                        ...state.masters['Department Master'],
-                        data: rows,
-                    },
-                },
-            }));
-        } catch (err) {
-            console.error('[DepartmentMaster] fetch failed', err);
-            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
-        }
-    },
-
     uploadDepartmentMaster: async (file) => {
         set({ departmentLoading: true, departmentError: null });
         try {
@@ -363,27 +309,6 @@ const useMasterDataStore = create((set, get) => ({
         } catch (err) {
             set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
             throw err;
-        }
-    },
-
-    // ─── Customer Master: Load from backend ─────────────────────────────────
-    fetchCustomerMasterData: async () => {
-        set({ customerLoading: true, customerError: null });
-        try {
-            const rows = await masterDataService.getCustomerMasterData();
-            set((state) => ({
-                customerLoading: false,
-                masters: {
-                    ...state.masters,
-                    'Customer Master': {
-                        ...state.masters['Customer Master'],
-                        data: rows,
-                    },
-                },
-            }));
-        } catch (err) {
-            console.error('[CustomerMaster] fetch failed', err);
-            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
         }
     },
 
@@ -398,27 +323,6 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
-    // ─── Item Master: Load from backend ─────────────────────────────────
-    fetchItemMasterData: async () => {
-        set({ itemLoading: true, itemError: null });
-        try {
-            const rows = await masterDataService.getItemMasterData();
-            set((state) => ({
-                itemLoading: false,
-                masters: {
-                    ...state.masters,
-                    'Item Master': {
-                        ...state.masters['Item Master'],
-                        data: rows,
-                    },
-                },
-            }));
-        } catch (err) {
-            console.error('[ItemMaster] fetch failed', err);
-            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
-        }
-    },
-
     uploadItemMaster: async (file) => {
         set({ itemLoading: true, itemError: null });
         try {
@@ -430,7 +334,6 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
-    // ─── Currency: Load from backend ─────────────────────────────────────────
     fetchCurrencyData: async () => {
         set({ currencyLoading: true, currencyError: null });
         try {
@@ -967,48 +870,16 @@ const useMasterDataStore = create((set, get) => ({
         
         let processed = [...master.data];
 
-        // Map "Default Entity" to "Top Level" for Entity Master tab
+        // Sort & Filter (Server-side for everything now)
+        // Except for Entity Master where we might want to map names, 
+        // but even then, the backend should ideally handle it.
+        // For now, let's just bypass client-side search/sort for all.
+        
         if (activeTab === 'Entity Master') {
             processed = processed.map(item => ({
                 ...item,
                 entity_name: item.entity_name === 'Default Entity' ? 'Top Level' : item.entity_name
             }));
-        }
-
-        // Sort & Filter (Client-side for other tabs, Server-side for Vendor Master)
-        if (activeTab === 'Vendor Master') {
-            // Already filtered/sorted by backend correctly for the current page
-            return processed;
-        }
-
-        // Filter
-        if (searchQuery) {
-            const lowerQuery = searchQuery.toLowerCase();
-            processed = processed.filter((item) =>
-                Object.values(item).some((val) =>
-                    String(val).toLowerCase().includes(lowerQuery)
-                )
-            );
-        }
-
-        // Sort
-        if (sortColumn) {
-            processed.sort((a, b) => {
-                let valA = a[sortColumn];
-                let valB = b[sortColumn];
-
-                // Handle nulls/undefined
-                if (valA === null || valA === undefined) valA = '';
-                if (valB === null || valB === undefined) valB = '';
-
-                // Case insensitive string comparison
-                if (typeof valA === 'string') valA = valA.toLowerCase();
-                if (typeof valB === 'string') valB = valB.toLowerCase();
-
-                if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-                if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
         }
 
         return processed;

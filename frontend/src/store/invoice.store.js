@@ -11,14 +11,21 @@ export const useInvoiceStore = create((set, get) => ({
     selectedEntity: null,
     setSelectedEntity: (entity) => set({ selectedEntity: entity }),
 
+    view: "condensed",
+    setView: (view) => set({ view }),
+
+    searchQuery: "",
+    setSearchQuery: (query) => set({ searchQuery: query, skip: 0 }),
+
+    sortColumn: "uploaded_at",
+    sortDirection: "desc",
+    setSort: (column, direction) => set({ sortColumn: column, sortDirection: direction }),
+
     skip: 0,
     setSkip: (skip) => set({ skip }),
 
     limit: 10,
     setLimit: (limit) => set({ limit }),
-
-    view: "condensed",
-    setView: (view) => set({ view }),
 
     viewInvoiceId: null,
     setViewInvoiceId: (id) => set({ viewInvoiceId: id }),

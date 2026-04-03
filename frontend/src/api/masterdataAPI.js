@@ -11,10 +11,23 @@ const ITEM_IDENTIFIER = 'Item';
 const CURRENCY_IDENTIFIER = 'Currency';
 
 export const masterDataService = {
-    /** Fetch all entity master rows from DB */
-    async getEntityMasterData() {
-        const res = await API.get(`/master/sheet/${ENTITY_IDENTIFIER}`);
+    /** Generic Paginated Fetch for any Master Data tab */
+    async getMasterData(identifier, params = {}) {
+        const res = await API.get(`/master/sheet/${identifier}`, {
+            params: {
+                page: params.page || 1,
+                page_size: params.page_size || 100,
+                search: params.search || undefined,
+                sort_by: params.sort_by || undefined,
+                sort_dir: params.sort_dir || undefined
+            }
+        });
         return res.data;
+    },
+
+    /** Fetch all entity master rows from DB */
+    async getEntityMasterData(params = {}) {
+        return this.getMasterData(ENTITY_IDENTIFIER, params);
     },
 
     /** Add a new entity master row */
@@ -54,16 +67,7 @@ export const masterDataService = {
     // ─── Vendor Master ───────────────────────────────────────────────────────
     /** Fetch all vendor master rows from DB (Supports pagination) */
     async getVendorMasterData(params = {}) {
-        const res = await API.get(`/master/sheet/${VENDOR_IDENTIFIER}`, {
-            params: {
-                page: params.page || 1,
-                page_size: params.page_size || 100,
-                search: params.search || undefined,
-                sort_by: params.sort_by || undefined,
-                sort_dir: params.sort_dir || undefined
-            }
-        });
-        return res.data;
+        return this.getMasterData(VENDOR_IDENTIFIER, params);
     },
 
     /** Upload a vendor master file */
@@ -102,9 +106,8 @@ export const masterDataService = {
 
     // ─── TDS Rates ──────────────────────────────────────────────────────────
     /** Fetch all TDS rates from DB */
-    async getTDSRatesData() {
-        const res = await API.get(`/master/sheet/${TDS_IDENTIFIER}`);
-        return res.data;
+    async getTDSRatesData(params = {}) {
+        return this.getMasterData(TDS_IDENTIFIER, params);
     },
 
     /** Add a new TDS rate row */
@@ -143,9 +146,8 @@ export const masterDataService = {
 
     // ─── GL Master ──────────────────────────────────────────────────────────
     /** Fetch all GL master rows from DB */
-    async getGLMasterData() {
-        const res = await API.get(`/master/sheet/${GL_IDENTIFIER}`);
-        return res.data;
+    async getGLMasterData(params = {}) {
+        return this.getMasterData(GL_IDENTIFIER, params);
     },
 
     /** Add a new GL master row */
@@ -184,9 +186,8 @@ export const masterDataService = {
 
     // ─── LOB Master ──────────────────────────────────────────────────────────
     /** Fetch all LOB master rows from DB */
-    async getLOBMasterData() {
-        const res = await API.get(`/master/sheet/${LOB_IDENTIFIER}`);
-        return res.data;
+    async getLOBMasterData(params = {}) {
+        return this.getMasterData(LOB_IDENTIFIER, params);
     },
 
     /** Add a new LOB master row */
@@ -225,9 +226,8 @@ export const masterDataService = {
 
     // ─── Department Master ──────────────────────────────────────────────────
     /** Fetch all Department master rows from DB */
-    async getDepartmentMasterData() {
-        const res = await API.get(`/master/sheet/${DEPARTMENT_IDENTIFIER}`);
-        return res.data;
+    async getDepartmentMasterData(params = {}) {
+        return this.getMasterData(DEPARTMENT_IDENTIFIER, params);
     },
 
     /** Add a new Department master row */
@@ -266,9 +266,8 @@ export const masterDataService = {
 
     // ─── Customer Master ────────────────────────────────────────────────────
     /** Fetch all Customer master rows from DB */
-    async getCustomerMasterData() {
-        const res = await API.get(`/master/sheet/${CUSTOMER_IDENTIFIER}`);
-        return res.data;
+    async getCustomerMasterData(params = {}) {
+        return this.getMasterData(CUSTOMER_IDENTIFIER, params);
     },
 
     /** Add a new Customer master row */
@@ -307,9 +306,8 @@ export const masterDataService = {
 
     // ─── Item Master ────────────────────────────────────────────────────────
     /** Fetch all Item master rows from DB */
-    async getItemMasterData() {
-        const res = await API.get(`/master/sheet/${ITEM_IDENTIFIER}`);
-        return res.data;
+    async getItemMasterData(params = {}) {
+        return this.getMasterData(ITEM_IDENTIFIER, params);
     },
 
     /** Add a new Item master row */

@@ -16,27 +16,12 @@ const UserManagementTab = ({ onEdit }) => {
     useEffect(() => {
         fetchUsers();
         fetchSettings();
-    }, [fetchUsers, fetchSettings]);
+    }, [fetchUsers, fetchSettings, currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection]);
 
     const safeUsers = users || [];
 
-    // Filter and Sort
-    const processedUsers = [...safeUsers]
-        .filter(u =>
-            u.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            u.role?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        .sort((a, b) => {
-            const valA = (a[sortColumn] || '').toString().toLowerCase();
-            const valB = (b[sortColumn] || '').toString().toLowerCase();
-            if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-            if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-            return 0;
-        });
-
-    const displayUsers = processedUsers;
-    const paginatedUsers = displayUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    // Processed users now handled by backend
+    const displayUsers = users || [];
 
     const getRoleStyles = (role) => {
         switch (role?.toLowerCase()) {
@@ -118,9 +103,9 @@ const UserManagementTab = ({ onEdit }) => {
         <div className="w-full mt-2 animate-fadeIn">
             <DataTable
                 columns={columns}
-                data={paginatedUsers}
+                data={displayUsers}
                 loading={loading}
-                totalItems={displayUsers.length}
+                totalItems={useAdminStore.getState().totalUsers || displayUsers.length}
                 currentPage={currentPage}
                 itemsPerPage={itemsPerPage}
                 onPageChange={setCurrentPage}

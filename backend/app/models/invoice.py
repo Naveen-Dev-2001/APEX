@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, Dict, Any, List
+from pydantic import BaseModel, EmailStr, ConfigDict
+from typing import Optional, Dict, Any, List, Union
 from datetime import datetime
 from enum import Enum
 
@@ -34,7 +34,6 @@ class InvoiceBase(BaseModel):
     assigned_approvers: Optional[List[Any]] = []
     current_approver_level: Optional[int] = 1
     gl_summary: Optional[List[Dict[str, Any]]] = None
-    gl_summary: Optional[List[Dict[str, Any]]] = None
     exchange_rate: Optional[float] = None
     vendor_id: Optional[str] = None
     vendor_name: Optional[str] = None
@@ -51,7 +50,9 @@ class InvoiceUpdate(BaseModel):
     exchange_rate: Optional[float] = None
 
 class Invoice(InvoiceBase):
-    id: str
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: Union[str, int]
     extracted_data: Optional[Dict[str, Any]] = None
     processing_steps: Optional[List[str]] = None
     validation_results: Optional[Dict[str, Any]] = None
@@ -61,8 +62,11 @@ class Invoice(InvoiceBase):
     duplicate_info: Optional[Dict[str, Any]] = None
     original_items: Optional[List[Dict[str, Any]]] = None
 
-    class Config:
-        from_attributes = True
-
 class InvoiceResponse(Invoice):
     pass
+
+class InvoicePaginatedResponse(BaseModel):
+    data: List[InvoiceResponse]
+    total: int
+    page: int
+    page_size: int

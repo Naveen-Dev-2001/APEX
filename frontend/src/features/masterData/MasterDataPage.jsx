@@ -21,9 +21,9 @@ const MasterDataPage = () => {
         currentPage, setCurrentPage,
         itemsPerPage, setItemsPerPage,
         sortColumn, sortDirection, setSort,
-        masters, getFilteredData,
-        fetchEntityMasterData, entityLoading, entityError, uploadEntityMaster,
-        fetchVendorMasterData, vendorLoading, vendorError, uploadVendorMaster,
+        masters, getFilteredData, fetchMasterData,
+        entityLoading, entityError, uploadEntityMaster,
+        vendorLoading, vendorError, uploadVendorMaster,
         fetchTDSRatesData, tdsLoading, tdsError, uploadTDSRatesData,
         fetchGLMasterData, glLoading, glError, uploadGLMaster,
         fetchLOBMasterData, lobLoading, lobError, uploadLOBMaster,
@@ -60,35 +60,11 @@ const MasterDataPage = () => {
     const isItemTab = activeTab === 'Item Master';
     const isCurrencyTab = activeTab === 'Currency';
 
-    // Fetch data on mount or tab change
+    // Fetch data on mount, tab change, or pagination/search change
     useEffect(() => {
-        if (isEntityTab) {
-            fetchEntityMasterData();
-        } else if (isVendorTab) {
-            fetchVendorMasterData();
-        } else if (isTDSTab) {
-            fetchTDSRatesData();
-        } else if (isGLTab) {
-            fetchGLMasterData();
-        } else if (isLOBTab) {
-            fetchLOBMasterData();
-        } else if (isDepartmentTab) {
-            fetchDepartmentMasterData();
-        } else if (isCustomerTab) {
-            fetchCustomerMasterData();
-        } else if (isItemTab) {
-            fetchItemMasterData();
-        } else if (isCurrencyTab) {
-            fetchCurrencyData();
-        }
-    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, fetchGLMasterData, fetchLOBMasterData, fetchDepartmentMasterData, fetchCustomerMasterData, fetchItemMasterData, fetchCurrencyData]);
-
-    // Handle server-side pagination for Vendor Master
-    useEffect(() => {
-        if (isVendorTab) {
-            fetchVendorMasterData();
-        }
-    }, [currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection, isVendorTab]);
+        // Unified fetcher handles all tabs
+        fetchMasterData(activeTab);
+    }, [activeTab, fetchMasterData, currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
@@ -611,10 +587,10 @@ const MasterDataPage = () => {
                         ) : (
                             <DataTable
                                 columns={columns}
-                                data={isVendorTab ? filteredData : filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+                                data={filteredData} // Now already paginated by backend
                                 loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : currencyLoading}
                                 skeletonRows={itemsPerPage}
-                                totalItems={isVendorTab ? (masters['Vendor Master']?.total || 0) : filteredData.length}
+                                totalItems={masters[activeTab]?.total || 0}
                                 currentPage={currentPage}
                                 itemsPerPage={itemsPerPage}
                                 onPageChange={setCurrentPage}

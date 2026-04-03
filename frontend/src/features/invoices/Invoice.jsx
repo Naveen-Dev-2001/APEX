@@ -15,11 +15,33 @@ import { message } from "antd";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
-
 const Invoice = () => {
-    const [search, setSearch] = useState("");
-    const { invoiceSection, skip, limit, view, setView, setInvoiceSection, setIsModalOpen, isModalOpen, setFileName, setViewInvoiceId, viewInvoiceId, quickViewFormData, setQuickViewFormData, selectedVendorId, setSelectedVendorId, setQuickViewLineItems, setEntityMaster, setActiveInvoiceData } = useInvoiceStore();
-    const { invoices, isLoading, refetch } = useInvoiceData({ skip, limit });
+    const { 
+        invoiceSection, skip, limit, view, setView, setInvoiceSection, 
+        setIsModalOpen, isModalOpen, setFileName, setViewInvoiceId, 
+        viewInvoiceId, quickViewFormData, setQuickViewFormData, 
+        selectedVendorId, setSelectedVendorId, setQuickViewLineItems, 
+        setEntityMaster, setActiveInvoiceData,
+        searchQuery, setSearchQuery, sortColumn, sortDirection, setSort, setSkip, setLimit
+    } = useInvoiceStore();
+    
+    const [localSearch, setLocalSearch] = useState(searchQuery);
+
+    const { invoices, total, isLoading, refetch } = useInvoiceData({ 
+        skip, 
+        limit, 
+        search: searchQuery, 
+        sort_by: sortColumn, 
+        sort_dir: sortDirection 
+    });
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setSearchQuery(localSearch);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [localSearch, setSearchQuery]);
     const [messageApi, contextHolder] = message.useMessage();
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -29,7 +51,8 @@ const Invoice = () => {
     console.log('quickViewFormData', vendor, quickViewFormData);
 
     useEffect(() => {
-        fetchEntityMaster().then((data) => {
+        fetchEntityMaster().then((res) => {
+            const data = res.data || [];
             // selected_entity now holds entity_id (FK value), so compare against entity_id
             const selectedEntityId = sessionStorage.getItem('selected_entity');
             const selectedEntity = data.filter((item) => item.entity_id === selectedEntityId);
@@ -268,7 +291,7 @@ const Invoice = () => {
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-3xl font-bold custom-font-jura">
                                 Invoices <span className="text-base font-normal  px-2 py-1 rounded-3xl shadow-sm bg-[#E0E0E0] inline-block">
-                                    {invoices?.length || 0}
+                                    {total || 0}
                                 </span>
                             </span>
 
@@ -276,11 +299,11 @@ const Invoice = () => {
                                 <div className="w-[300px]">
                                     <CustomInput
                                         placeholder="Search invoices..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
+                                        value={localSearch}
+                                        onChange={(e) => setLocalSearch(e.target.value)}
                                         icon={<SearchOutlined />}
-                                        rightIcon={search && <CloseCircleOutlined />}
-                                        onRightIconClick={() => setSearch("")}
+                                        rightIcon={localSearch && <CloseCircleOutlined />}
+                                        onRightIconClick={() => setLocalSearch("")}
                                         className="mb-0"
                                     />
                                 </div>
@@ -310,11 +333,21 @@ const Invoice = () => {
                             <ReusableDataTable
                                 columnDefs={columnDefs}
                                 data={invoices ?? []}
-                                searchText={search}
+                                searchText={searchQuery}
                                 tableHeader={false}
                                 tableSearch={false}
                                 defaultPageSize={10}
                                 shouldUseFlex={false}
+                                // Server-side props
+                                totalItems={total}
+                                currentPage={(skip / limit) + 1}
+                                itemsPerPage={limit}
+                                onPageChange={(page) => setSkip((page - 1) * limit)}
+                                onItemsPerPageChange={(newLimit) => {
+                                    setLimit(newLimit);
+                                    setSkip(0);
+                                }}
+                                onSortChange={(col, dir) => setSort(col, dir)}
                             />
                         )}
                     </div>

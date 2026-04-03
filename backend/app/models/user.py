@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, Union
+from pydantic import BaseModel, EmailStr, ConfigDict
+from typing import Optional, Union, List
 from datetime import datetime
 
 class User(BaseModel):
@@ -14,6 +14,8 @@ class UserInDB(User):
     id: Union[str, int]
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: Union[str, int]
     username: str
     email: EmailStr
@@ -24,5 +26,8 @@ class UserResponse(BaseModel):
     ispasswordchange: bool = True
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+class UserPaginatedResponse(BaseModel):
+    data: List[UserResponse]
+    total: int
+    page: int
+    page_size: int

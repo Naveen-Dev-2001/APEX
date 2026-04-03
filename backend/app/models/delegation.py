@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime, date
 from sqlalchemy.orm import Session
@@ -17,12 +17,18 @@ class DelegationCreate(DelegationBase):
     pass
 
 class DelegationResponse(DelegationBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     created_at: datetime
     created_by: str
 
-    class Config:
-        from_attributes = True
+class DelegationPaginatedResponse(BaseModel):
+    data: List[DelegationResponse]
+    total: int
+    page: int
+    page_size: int
+
 
 def check_active_delegation(db: Session, original_approver_email: str, entity: str) -> List[str]:
     """

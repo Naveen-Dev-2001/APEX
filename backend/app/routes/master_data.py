@@ -57,6 +57,19 @@ TAB_MODEL_MAP = {
     "master_data_Currency": ExchangeRateMaster
 }
 
+# Search fields for each model
+TAB_SEARCH_FIELDS = {
+    "Entity_Master": ["entity_id", "entity_name", "registered_address", "city"],
+    "Vendor_Master": ["vendor_id", "vendor_name", "address_line1", "city", "primary_email_address"],
+    "Line_Items": ["item_id", "name", "gl_group"],
+    "TDS_Rates": ["section", "nature_of_payment"],
+    "GL": ["account_number", "title"],
+    "LOB": ["lob_id", "name"],
+    "Department": ["department_id", "department_name"],
+    "Customer": ["customer_id", "customer_name"],
+    "Exchange_Rate": ["code", "name"]
+}
+
 TAB_REPO_MAP = {
     "Entity_Master": entity_master_repo,
     "Vendor_Master": vendor_master_repo,
@@ -426,43 +439,26 @@ async def get_sheet_data(
 
     # Normalize identifier (remove prefix used by some frontend components)
     clean_id = identifier.replace("master_data_", "")
+    repo = TAB_REPO_MAP.get(clean_id) or TAB_REPO_MAP.get(identifier)
 
-    if clean_id in ["Vendor_Master", "Vendor"]:
-        from app.services.vendor_sync_service import VendorSyncService
-        sync_service = VendorSyncService(db)
-        # Use pagination for Vendor Master
+    # Use generic pagination if repo exists
+    if repo:
         skip = (page - 1) * page_size
-        results = await sync_service.get_all_vendors(
-            skip=skip, 
-            limit=page_size, 
-            search=search, 
-            sort_by=sort_by, 
-            sort_dir=sort_dir
+        search_fields = TAB_SEARCH_FIELDS.get(clean_id) or TAB_SEARCH_FIELDS.get(identifier)
+        
+        paginated_res = repo.get_paginated(
+            db,
+            skip=skip,
+            limit=page_size,
+            search=search,
+            search_fields=search_fields,
+            order_by=sort_by,
+            descending=(sort_dir.lower() == 'desc')
         )
-        rows = results["data"]
-        total_count = results["total"]
-    elif clean_id in ["GL", "LOB", "Department", "Customer", "Item", "Line_Items", "Exchange_Rate"]:
-        from app.services.master_sync_services import (
-            GLSyncService, LOBSyncService, DepartmentSyncService,
-            CustomerSyncService, ItemSyncService, ExchangeRateSyncService
-        )
-        services = {
-            "GL": GLSyncService,
-            "LOB": LOBSyncService,
-            "Department": DepartmentSyncService,
-            "Customer": CustomerSyncService,
-            "Item": ItemSyncService,
-            "Line_Items": ItemSyncService,
-            "Exchange_Rate": ExchangeRateSyncService
-        }
-        service_class = services.get(clean_id)
-        if service_class:
-            sync_service = service_class(db)
-            rows = await sync_service.get_all_data()
-        else:
-            rows = db.query(model).order_by(model.id).all()
-        total_count = len(rows)
+        rows = paginated_res["data"]
+        total_count = paginated_res["total"]
     else:
+        # Fallback for models without repositories (if any)
         rows = db.query(model).order_by(model.id).all()
         total_count = len(rows)
 
@@ -509,17 +505,13 @@ async def get_sheet_data(
             row_dict[column.name] = val
         result.append(row_dict)
 
-    # Wrap result in a standardized paginated response if identifier involves Vendors
-    clean_id = identifier.replace("master_data_", "")
-    if clean_id in ["Vendor_Master", "Vendor"]:
-        return {
-            "data": result,
-            "total": total_count,
-            "page": page,
-            "page_size": page_size
-        }
-    
-    return result
+    # Wrap result in a standardized paginated response
+    return {
+        "data": result,
+        "total": total_count,
+        "page": page,
+        "page_size": page_size
+    }
 
 
 @router.get("/getvendors")

@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from typing import List
 from app.services.invoice_processor import InvoiceProcessor
 from app.services.line_grouping import aggregate_items
-from app.models.invoice import InvoiceCreate, InvoiceResponse, InvoiceStatus, InvoiceUpdate
+from app.models.invoice import InvoiceCreate, InvoiceResponse, InvoiceStatus, InvoiceUpdate, InvoicePaginatedResponse
 from app.models.workflow import WorkflowStepType, WorkflowStepStatus
 from app.database.database import get_db, SessionLocal
 
@@ -14,7 +14,7 @@ error_logger = logging.getLogger("application_error")
 from fastapi import Query
 from fastapi.responses import StreamingResponse
 import json
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from app.services.email_service import email_service
 
 from app.models.db_models import (
@@ -550,12 +550,15 @@ async def upload_invoices(
     }
 
 
-@router.get("/", response_model=List[InvoiceResponse])
+@router.get("/", response_model=InvoicePaginatedResponse)
 async def get_invoices(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity),
     skip: int = 0,
     limit: int = 10,
+    search: str = None,
+    sort_by: str = "uploaded_at",
+    sort_dir: str = "desc",
     show_all: bool = True,
     db: Session = Depends(get_db)
 ):
@@ -563,16 +566,28 @@ async def get_invoices(
     if not show_all:
         filters["uploaded_by"] = current_user.username
 
-    invoices = invoice_repo.get_multi(
-        db, 
-        skip=skip, 
-        limit=limit, 
-        filters=filters, 
-        order_by="uploaded_at", 
-        descending=True
+    search_fields = ["invoice_number", "vendor_name", "vendor_id", "status", "filename"]
+    
+    paginated_res = invoice_repo.get_paginated(
+        db,
+        skip=skip,
+        limit=limit,
+        filters=filters,
+        search=search,
+        search_fields=search_fields,
+        order_by=sort_by,
+        descending=(sort_dir.lower() == 'desc')
     )
-
-    return [InvoiceResponse(**invoice_to_dict(inv)) for inv in invoices]
+    
+    # Convert models to dicts
+    data = [invoice_to_dict(inv) for inv in paginated_res["data"]]
+    
+    return {
+        "data": data,
+        "total": paginated_res["total"],
+        "page": paginated_res["page"],
+        "page_size": paginated_res["page_size"]
+    }
 
 
 @router.get("/{invoice_id}/", response_model=InvoiceResponse)

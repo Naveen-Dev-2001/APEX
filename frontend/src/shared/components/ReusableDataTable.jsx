@@ -28,18 +28,31 @@ export default function ReusableDataTable({
     tableHeader = true,
     rowHeight = 48,
     shouldUseFlex = false,
+    // Server-side pagination props
+    totalItems = null,
+    currentPage: externalPage = 1,
+    itemsPerPage: externalPageSize = 10,
+    onPageChange = null,
+    onItemsPerPageChange = null,
+    onSortChange = null,
 }) {
     const gridRef = useRef(null);
     const [gridApi, setGridApi] = useState(null);
     const [internalSearchText, setInternalSearchText] = useState("");
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(defaultPageSize);
+    const [internalCurrentPage, setInternalCurrentPage] = useState(1);
+    const [internalPageSize, setInternalPageSize] = useState(defaultPageSize);
+
+    const isServerSide = totalItems !== null;
+    const currentPage = isServerSide ? externalPage : internalCurrentPage;
+    const pageSize = isServerSide ? externalPageSize : internalPageSize;
+    const effectiveTotal = isServerSide ? totalItems : filteredData.length;
 
     // Use external search text if provided, otherwise use internal
     const activeSearchText = externalSearchText || internalSearchText;
 
     /* ---------- SEARCH ---------- */
     const filteredData = useMemo(() => {
+        if (isServerSide) return data; // Backend already filtered/sorted
         if (onSearch) return onSearch(data, activeSearchText);
         if (!activeSearchText) return data;
 
@@ -49,15 +62,17 @@ export default function ReusableDataTable({
                 String(v ?? "").toLowerCase().includes(s)
             )
         );
-    }, [data, activeSearchText, onSearch]);
+    }, [data, activeSearchText, onSearch, isServerSide]);
 
     /* ---------- GRID READY ---------- */
     const onGridReady = (params) => {
         setGridApi(params.api);
         params.api.setGridOption("paginationPageSize", pageSize);
-        params.api.addEventListener("paginationChanged", () => {
-            setCurrentPage(params.api.paginationGetCurrentPage() + 1);
-        });
+        if (!isServerSide) {
+            params.api.addEventListener("paginationChanged", () => {
+                setInternalCurrentPage(params.api.paginationGetCurrentPage() + 1);
+            });
+        }
         params.api.sizeColumnsToFit();
     };
 
@@ -72,10 +87,14 @@ export default function ReusableDataTable({
     // Reset to page 1 when search changes
     useEffect(() => {
         if (gridApi) {
-            setCurrentPage(1);
-            gridApi.paginationGoToPage(0);
+            if (isServerSide) {
+                // For server-side, parent handles page reset
+            } else {
+                setInternalCurrentPage(1);
+                gridApi.paginationGoToPage(0);
+            }
         }
-    }, [activeSearchText, gridApi]);
+    }, [activeSearchText, gridApi, isServerSide]);
 
     if (loading) {
         return (
@@ -137,12 +156,20 @@ export default function ReusableDataTable({
                         ) * rowHeight + 48}px`,
                     }}
                 >
-                    <AgGridReact
+                        <AgGridReact
                         ref={gridRef}
                         columnDefs={columnDefs}
                         rowData={filteredData}
                         domLayout="normal"
                         getRowId={(params) => String(params.data.id)}
+                        onSortChanged={(params) => {
+                            if (isServerSide && onSortChange) {
+                                const sortModel = params.api.getColumnState().find(c => c.sort != null);
+                                if (sortModel) {
+                                    onSortChange(sortModel.colId, sortModel.sort);
+                                }
+                            }
+                        }}
                         defaultColDef={{
                             sortable: true,
                             filter: false,
@@ -155,7 +182,7 @@ export default function ReusableDataTable({
                                 textOverflow: 'ellipsis',
                             },
                         }}
-                        pagination
+                        pagination={!isServerSide}
                         suppressPaginationPanel
                         rowHeight={rowHeight}
                         headerHeight={48}
@@ -173,7 +200,7 @@ export default function ReusableDataTable({
                 </div>
 
                 {/* ================= FOOTER ================= */}
-                {filteredData.length > 0 && (
+                {effectiveTotal > 0 && (
                     <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 rounded-b-lg bg-white">
                         {/* Left */}
                         <div className="flex items-center gap-3">
@@ -183,11 +210,15 @@ export default function ReusableDataTable({
                                 value={pageSize}
                                 onChange={(e) => {
                                     const newSize = Number(e.target.value);
-                                    setPageSize(newSize);
-                                    setCurrentPage(1);
-                                    if (gridApi) {
-                                        gridApi.setGridOption("paginationPageSize", newSize);
-                                        gridApi.paginationGoToPage(0);
+                                    if (isServerSide) {
+                                        onItemsPerPageChange?.(newSize);
+                                    } else {
+                                        setInternalPageSize(newSize);
+                                        setInternalCurrentPage(1);
+                                        if (gridApi) {
+                                            gridApi.setGridOption("paginationPageSize", newSize);
+                                            gridApi.paginationGoToPage(0);
+                                        }
                                     }
                                 }}
                                 className="border border-[#E5E7EB] rounded px-2 py-0.5 text-[13px] bg-white text-[#4B5563]"
@@ -198,44 +229,36 @@ export default function ReusableDataTable({
                             </select>
 
                             <span className="text-[13px] text-[#4B5563] ml-2">
-                                {Math.min((currentPage - 1) * pageSize + 1, filteredData.length)}
+                                {Math.min((currentPage - 1) * pageSize + 1, effectiveTotal)}
                                 {"-"}
-                                {Math.min(currentPage * pageSize, filteredData.length)}
+                                {Math.min(currentPage * pageSize, effectiveTotal)}
                                 {" of "}
-                                {filteredData.length}
+                                {effectiveTotal}
                             </span>
                         </div>
 
                         {/* Right - Pagination */}
                         <div className="flex items-center gap-1">
                             {(() => {
-                                const totalPages = Math.ceil(filteredData.length / pageSize);
+                                const totalPages = Math.ceil(effectiveTotal / pageSize);
                                 const pages = [];
                                 const maxVisible = 3; // Show max 3 page numbers
 
                                 if (totalPages <= maxVisible + 2) {
-                                    // Show all pages if total is small
-                                    for (let i = 1; i <= totalPages; i++) {
-                                        pages.push(i);
-                                    }
+                                    for (let i = 1; i <= totalPages; i++) pages.push(i);
                                 } else {
-                                    // Always show first page
                                     pages.push(1);
-
                                     if (currentPage <= 2) {
-                                        // Near start: 1 2 3 ... last
                                         pages.push(2);
                                         pages.push(3);
                                         pages.push('ellipsis');
                                         pages.push(totalPages);
                                     } else if (currentPage >= totalPages - 1) {
-                                        // Near end: 1 ... last-2 last-1 last
                                         pages.push('ellipsis');
                                         pages.push(totalPages - 2);
                                         pages.push(totalPages - 1);
                                         pages.push(totalPages);
                                     } else {
-                                        // Middle: 1 ... current ... last
                                         pages.push('ellipsis-start');
                                         pages.push(currentPage);
                                         pages.push('ellipsis-end');
@@ -247,20 +270,18 @@ export default function ReusableDataTable({
                                     <>
                                         {pages.map((p, idx) => {
                                             if (typeof p === 'string') {
-                                                // Render ellipsis
-                                                return (
-                                                    <span key={p} className="px-2 text-gray-400 text-sm">
-                                                        ...
-                                                    </span>
-                                                );
+                                                return <span key={idx} className="px-2 text-gray-400 text-sm">...</span>;
                                             }
-
                                             return (
                                                 <button
-                                                    key={p}
+                                                    key={idx}
                                                     onClick={() => {
-                                                        setCurrentPage(p);
-                                                        gridApi?.paginationGoToPage(p - 1);
+                                                        if (isServerSide) {
+                                                            onPageChange?.(p);
+                                                        } else {
+                                                            setInternalCurrentPage(p);
+                                                            gridApi?.paginationGoToPage(p - 1);
+                                                        }
                                                     }}
                                                     className={`min-w-[32px] h-8 rounded text-[13px] font-medium transition-colors ${currentPage === p
                                                         ? "bg-[#1e9bd8] !text-white"
@@ -279,8 +300,12 @@ export default function ReusableDataTable({
                             <button
                                 onClick={() => {
                                     if (currentPage > 1) {
-                                        setCurrentPage(currentPage - 1);
-                                        gridApi?.paginationGoToPage(currentPage - 2);
+                                        if (isServerSide) {
+                                            onPageChange?.(currentPage - 1);
+                                        } else {
+                                            setInternalCurrentPage(currentPage - 1);
+                                            gridApi?.paginationGoToPage(currentPage - 2);
+                                        }
                                     }
                                 }}
                                 disabled={currentPage === 1}
@@ -295,14 +320,18 @@ export default function ReusableDataTable({
                             {/* Next Button */}
                             <button
                                 onClick={() => {
-                                    const totalPages = Math.ceil(filteredData.length / pageSize);
+                                    const totalPages = Math.ceil(effectiveTotal / pageSize);
                                     if (currentPage < totalPages) {
-                                        setCurrentPage(currentPage + 1);
-                                        gridApi?.paginationGoToPage(currentPage);
+                                        if (isServerSide) {
+                                            onPageChange?.(currentPage + 1);
+                                        } else {
+                                            setInternalCurrentPage(currentPage + 1);
+                                            gridApi?.paginationGoToPage(currentPage);
+                                        }
                                     }
                                 }}
-                                disabled={currentPage === Math.ceil(filteredData.length / pageSize)}
-                                className={`min-w-[32px] h-8 flex items-center justify-center text-[18px] transition-colors ${currentPage === Math.ceil(filteredData.length / pageSize)
+                                disabled={currentPage === Math.ceil(effectiveTotal / pageSize)}
+                                className={`min-w-[32px] h-8 flex items-center justify-center text-[18px] transition-colors ${currentPage === Math.ceil(effectiveTotal / pageSize)
                                     ? "text-gray-300 cursor-not-allowed"
                                     : "text-[#4B5563] hover:text-[#1e9bd8] cursor-pointer"
                                     }`}

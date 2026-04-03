@@ -2,7 +2,7 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update, delete, asc, desc
+from sqlalchemy import select, update, delete, asc, desc, or_
 
 from app.database.database import Base
 
@@ -28,26 +28,87 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     def get_for_update(self, db: Session, id: Any) -> Optional[ModelType]:
         return db.query(self.model).filter(self.model.id == id).with_for_update().first()
-
     def get_multi(
-        self, db: Session, *, skip: int = 0, limit: int = 100, filters: Dict[str, Any] = None, expressions: List[Any] = None, order_by: str = None, descending: bool = False
+        self, 
+        db: Session, 
+        *, 
+        skip: int = 0, 
+        limit: int = 100, 
+        filters: Dict[str, Any] = None,
+        order_by: str = None,
+        descending: bool = False
     ) -> List[ModelType]:
         query = db.query(self.model)
         if filters:
             for field, value in filters.items():
                 if hasattr(self.model, field):
                     query = query.filter(getattr(self.model, field) == value)
-        if expressions:
-            for expr in expressions:
-                query = query.filter(expr)
         
+        if order_by and hasattr(self.model, order_by):
+            column = getattr(self.model, order_by)
+            if descending:
+                query = query.order_by(desc(column))
+            else:
+                query = query.order_by(asc(column))
+        elif order_by is None:
+            # Default order
+            query = query.order_by(self.model.id)
+
+        return query.offset(skip).limit(limit).all()
+
+    def get_paginated(
+        self,
+        db: Session,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        filters: Dict[str, Any] = None,
+        search: str = None,
+        search_fields: List[str] = None,
+        order_by: str = None,
+        descending: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Generic paginated query with search and filtering.
+        """
+
+        query = db.query(self.model)
+
+        # Filters (exact match)
+        if filters:
+            for field, value in filters.items():
+                if hasattr(self.model, field):
+                    query = query.filter(getattr(self.model, field) == value)
+
+        # Search (ILIKE across multiple fields)
+        if search and search_fields:
+            search_filter = f"%{search}%"
+            search_expressions = []
+            for field in search_fields:
+                if hasattr(self.model, field):
+                    search_expressions.append(getattr(self.model, field).ilike(search_filter))
+            if search_expressions:
+                query = query.filter(or_(*search_expressions))
+
+        # Total Count (before offset/limit)
+        total = query.count()
+
+        # Sorting
         if order_by and hasattr(self.model, order_by):
             sort_attr = getattr(self.model, order_by)
             query = query.order_by(desc(sort_attr) if descending else asc(sort_attr))
         else:
             query = query.order_by(self.model.id)
 
-        return query.offset(skip).limit(limit).all()
+        # Offset & Limit
+        data = query.offset(skip).limit(limit).all()
+
+        return {
+            "data": data,
+            "total": total,
+            "page": (skip // limit) + 1 if limit > 0 else 1,
+            "page_size": limit
+        }
 
     def create(self, db: Session, *, obj_in: Union[CreateSchemaType, Dict[str, Any]]) -> ModelType:
         if isinstance(obj_in, self.model):
