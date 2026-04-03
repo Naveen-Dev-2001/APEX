@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export const useInvoiceStore = create((set) => ({
+export const useInvoiceStore = create((set, get) => ({
 
     invoiceSection: 1,
     setInvoiceSection: (section) => set({ invoiceSection: section }),
@@ -23,11 +23,15 @@ export const useInvoiceStore = create((set) => ({
     viewInvoiceId: null,
     setViewInvoiceId: (id) => set({ viewInvoiceId: id }),
 
+    fileName: "",
+    setFileName: (name) => set({ fileName: name }),
+
+
     isModalOpen: false,
     setIsModalOpen: (open) => set({ isModalOpen: open }),
 
-    // Invoice View Screen State;
-    tabList: ["Quick View", "All Fields", "GL Summary", "Workflow", "Audit Trail"],
+    // Invoice View Screen State
+    tabList: ["Quick View", "All Fields", "GL Summary", "Workflow", "Audit Trail", "Coding"],
 
     invoiceActiveTab: "Quick View",
     setInvoiceActiveTab: (tab) => set({ invoiceActiveTab: tab }),
@@ -52,8 +56,52 @@ export const useInvoiceStore = create((set) => ({
         totalPayable: "",
         amountPaid: "",
         memo: "",
+        invoiceType: "",
+        poNumber: "",
+        paymentMethod: "",
+        costCenter: "",
+        serviceStartDate: "",
+        serviceEndDate: "",
 
-        // Vendor Master
+        // Vendor Level
+        vendorAddress: "",
+        vendorCountry: "",
+        vendorTaxId: "",
+        vendorEmail: "",
+        vendorPhone: "",
+        vendorBankName: "",
+        vendorBankAccount: "",
+        vendorContactPerson: "",
+
+        // Buyer
+        clientName: "",
+        billingAddress: "",
+        shippingAddress: "",
+        phoneNumber: "",
+        email: "",
+        clientTaxId: "",
+        contactPerson: "",
+
+        // Taxes
+        totalTaxAmount: "",
+        cgst: "",
+        sgst: "",
+        igst: "",
+        withholdingTax: "",
+
+        // Totals
+        subtotal: "",
+        shippingFees: "",
+        surcharges: "",
+        totalInvoiceAmount: "",
+        amountDue: "",
+
+        // Compliance
+        notes: "",
+        qrOrIrn: "",
+        companyRegistrationNumber: "",
+
+        // Vendor master
         gstEligibility: "",
         tdsApplicability: "",
         tdsRate: "",
@@ -61,7 +109,13 @@ export const useInvoiceStore = create((set) => ({
         lineGrouping: "",
     },
 
-    //  Update single field
+    isDuplicate: false,
+    setIsDuplicate: (isDuplicate) => set({ isDuplicate }),
+
+    duplicateMessage: "",
+    setDuplicateMessage: (msg) => set({ duplicateMessage: msg }),
+
+    // ── Update single field (used by debounced FieldRenderer) ──────────────
     setQuickViewField: (key, value) =>
         set((state) => ({
             quickViewFormData: {
@@ -70,14 +124,22 @@ export const useInvoiceStore = create((set) => ({
             },
         })),
 
-    //  Replace full form (API)
-    // invoice.store.js
+    // ── Update multiple fields in ONE set() call (avoids cascading re-renders) ──
+    batchUpdateQuickViewFields: (updates) =>
+        set((state) => ({
+            quickViewFormData: {
+                ...state.quickViewFormData,
+                ...updates,
+            },
+        })),
+
+    // ── Replace full form or functional update (used by vendor sync) ────────
     setQuickViewFormData: (dataOrUpdater) =>
         set((state) => ({
             quickViewFormData:
                 typeof dataOrUpdater === "function"
-                    ? dataOrUpdater(state.quickViewFormData)  // functional update
-                    : dataOrUpdater,                          // direct replace
+                    ? dataOrUpdater(state.quickViewFormData)
+                    : dataOrUpdater,
         })),
 
     // =============================
@@ -92,6 +154,7 @@ export const useInvoiceStore = create((set) => ({
             discount: 0,
             netAmount: 16,
             taxAmt: 0,
+            isNetAmountOverridden: false,
         },
         {
             id: 2,
@@ -101,6 +164,7 @@ export const useInvoiceStore = create((set) => ({
             discount: 0,
             netAmount: 23.1,
             taxAmt: 0,
+            isNetAmountOverridden: false,
         },
         {
             id: 3,
@@ -110,40 +174,43 @@ export const useInvoiceStore = create((set) => ({
             discount: 0,
             netAmount: 0,
             taxAmt: 0,
+            isNetAmountOverridden: false,
         },
     ],
 
-    //  Update table cell + auto calculation
+    // ── Update table cell + auto-calculation ────────────────────────────────
     updateQuickViewLineItem: (id, key, value) =>
         set((state) => ({
             quickViewLineItems: state.quickViewLineItems.map((item) => {
+                if (item.id !== id) return item;   // ← unchanged items keep same reference
 
-                if (item.id !== id) return item;
+                let updated = { ...item, [key]: value };
 
-                const updated = {
-                    ...item,
-                    [key]: value,
-                };
-
-                // Auto calculation
                 const qty = Number(updated.qty) || 0;
                 const price = Number(updated.unitPrice) || 0;
                 const discount = Number(updated.discount) || 0;
 
-                updated.netAmount = (qty * price) - discount;
+                if (key === "netAmount") {
+                    updated.isNetAmountOverridden = true;
+                }
+                if (["qty", "unitPrice", "discount"].includes(key)) {
+                    updated.isNetAmountOverridden = false;
+                }
+                if (!updated.isNetAmountOverridden) {
+                    updated.netAmount = qty * price - discount;
+                }
 
                 return updated;
             }),
         })),
 
-    //  Delete row
+    // ── Delete row ───────────────────────────────────────────────────────────
     deleteQuickViewLineItem: (id) =>
         set((state) => ({
             quickViewLineItems: state.quickViewLineItems.filter(i => i.id !== id),
         })),
 
-    //  Add new row
-    //  Add new row (always before Total GST row)
+    // ── Add new row (always before Total GST row) ───────────────────────────
     addQuickViewLineItem: () =>
         set((state) => {
             const newItem = {
@@ -154,32 +221,34 @@ export const useInvoiceStore = create((set) => ({
                 discount: 0,
                 netAmount: 0,
                 taxAmt: 0,
+                lineType: "Expense",
+                glCode: "",
+                lob: "",
+                department: "",
+                customer: "",
+                item: "",
+                isNetAmountOverridden: false,
             };
             const regularItems = state.quickViewLineItems.filter(
-                (row) => row.description !== "Total GST"
+                row => row.description !== "Total GST"
             );
             const gstRow = state.quickViewLineItems.filter(
-                (row) => row.description === "Total GST"
+                row => row.description === "Total GST"
             );
-            return {
-                quickViewLineItems: [...regularItems, newItem, ...gstRow],
-            };
+            return { quickViewLineItems: [...regularItems, newItem, ...gstRow] };
         }),
 
-    setQuickViewLineItems: (items) =>
-        set({ quickViewLineItems: items }),
+    setQuickViewLineItems: (items) => set({ quickViewLineItems: items }),
 
     // =============================
     // TOTAL CALCULATION
     // =============================
     recalculateQuickViewTotals: () => {
         const { quickViewLineItems } = get();
-
         const total = quickViewLineItems.reduce(
             (sum, item) => sum + (Number(item.netAmount) || 0),
             0
         );
-
         set((state) => ({
             quickViewFormData: {
                 ...state.quickViewFormData,
@@ -195,8 +264,9 @@ export const useInvoiceStore = create((set) => ({
     highlightedField: null,
     setHighlightedField: (field) => set({ highlightedField: field }),
 
+    activeInvoiceData: null,
+    setActiveInvoiceData: (data) => set({ activeInvoiceData: data }),
+
     entityMaster: {},
     setEntityMaster: (data) => set({ entityMaster: data }),
-
-
-}))
+}));

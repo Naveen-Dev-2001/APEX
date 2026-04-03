@@ -10,7 +10,7 @@ const Card = ({ icon, title, value, subtitle }) => {
                 <img
                     src={icons.cardFrame}
                     alt=""
-                    className="absolute -top-2 -right-2 w-24 opacity-30 pointer-events-none select-none"
+                    className="absolute top-0 right-0 w-24 opacity-30 pointer-events-none select-none"
                 />
             )}
 
