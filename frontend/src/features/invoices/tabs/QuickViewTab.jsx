@@ -204,7 +204,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 ...prev,
                 gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
                 tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
-                tdsRate: vendor?.tds_percentage ?? "NA",
+                tdsRate: vendor?.tds_percentage ?? 0,
                 tdsSection: vendor?.tds_section_code ?? "NA",
                 lineGrouping: vendor?.line_grouping ? "Yes" : "No",
                 paymentTerms: TERMS.includes(extracted) ? extracted : vendor?.pay_terms || "",
@@ -264,8 +264,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const { processedItems, gstTaxLabel, gstTaxValue, tdsDeductionValue, totalAmountPayable } = useMemo(() => {
         const isGstEligible = entityMaster?.gst_applicable === true;
         const gstTaxLabel = isGstEligible ? "Total GST" : "Total Tax";
-        const gstTaxValue = parseFloat(quickViewFormData?.total_tax_amount || 0);
-        console.log("..........", gstTaxValue);
+        const gstTaxValue = parseFloat(quickViewFormData?.totalTaxAmount || 0);
         const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
         const totalInvoiceAmount = parseFloat(quickViewFormData?.total_invoice_amount || 0);
         const tdsDeductionValue = -Math.abs(tdsRate * totalInvoiceAmount);
