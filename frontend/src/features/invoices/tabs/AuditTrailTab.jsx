@@ -1,4 +1,6 @@
 import { CheckOutlined } from "@ant-design/icons";
+import { getAuditflowSync } from "../../hooks/useWorkflow";
+import { useInvoiceStore } from "../../../store/invoice.store";
 
 const auditTrailData = [
     {
@@ -109,6 +111,9 @@ const ArrowIcon = () => (
 );
 
 const AuditTrailTab = () => {
+    const { viewInvoiceId } = useInvoiceStore()
+    const { getAuditData } = getAuditflowSync(viewInvoiceId)
+    console.log("getAuditData", getAuditData)
     return (
         <div className="bg-white p-6">
             {auditTrailData.map((item, index) => {
