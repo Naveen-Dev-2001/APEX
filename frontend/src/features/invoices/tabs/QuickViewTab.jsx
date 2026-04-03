@@ -1,117 +1,62 @@
 import { Collapse } from "antd";
 import { QUICK_VIEW_CONFIG } from "../Fields";
-import { Dropdown } from "../../../components/ui";
-import CustomInput from "../../../shared/components/CustomInput";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useVendersListSync, useVendorDetailSync } from "../../hooks/useInvoiceDetailSync";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef, memo } from "react";
 import { AutoComplete } from "antd";
+import CustomInput from "../../../shared/components/CustomInput";
 import CustomDatePicker from "../../../shared/components/CustomDatePicker";
-import dayjs from "dayjs";
-import customParseFormat from "dayjs/plugin/customParseFormat";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
 import InvoiceCalculationModal from "./InvoiceCalculationModal";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 
 dayjs.extend(customParseFormat);
 
-const QuickViewTab = () => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Isolated field component — only re-renders when ITS value changes
+// ─────────────────────────────────────────────────────────────────────────────
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, forceDisabled = false }) => {
+    // Local state → instant feedback
+    const [localValue, setLocalValue] = useState(storeValue ?? "");
+    const debounceRef = useRef(null);
 
-    const {
-        quickViewFormData,
-        setQuickViewField,
-        quickViewLineItems,
-        updateQuickViewLineItem,
-        deleteQuickViewLineItem,
-        selectedVendorId,
-        setQuickViewFormData,
-        addQuickViewLineItem,
-        entityMaster,
-        setSelectedVendorId
-    } = useInvoiceStore();
-
-    console.log("quickViewFormData-------------->", quickViewFormData);
-
-
-    const { vendorsList } = useVendersListSync();
-    const { vendor } = useVendorDetailSync(selectedVendorId);
-    const [showCalcModal, setShowCalcModal] = useState(false);
-
+    // Sync when the store pushes a new value from outside (e.g. vendor sync)
     useEffect(() => {
-        if (!vendor || !selectedVendorId) return;
+        setLocalValue(storeValue ?? "");
+    }, [storeValue]);
 
-        const TERMS = ['NET 7', 'NET 8', 'NET 12', 'NET 15', 'NET 20', 'NET 30', 'NET 45', 'NET 60', 'NET 90'];
+    const handleChange = useCallback((value) => {
+        setLocalValue(value);
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => onCommit(field.key, value), 300);
+    }, [field.key, onCommit]);
 
-        const getDueDate = (invoiceDate, payTerms) => {
-            if (!invoiceDate || !payTerms) return "";
+    useEffect(() => () => clearTimeout(debounceRef.current), []);
 
-            const days = parseInt(payTerms.match(/\d+/)?.[0] || 0, 10);
+    const commonProps = {
+        label: field.label,
+        value: localValue,
+        disabled: forceDisabled || !field.editable,
+        onMouseEnter: () => onHover(field.key),
+        onMouseLeave: onLeave,
+    };
 
-            return dayjs(invoiceDate).add(days, "day").format("YYYY-MM-DD");
-        };
-
-
-        setQuickViewFormData((prev) => {
-            const extracted = prev?.paymentTerms;
-            return {
-                ...prev,
-                gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
-                tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
-                tdsRate: vendor?.tds_percentage ?? "NA",
-                tdsSection: vendor?.tds_section_code ?? "NA",
-                lineGrouping: vendor?.line_grouping ? "Yes" : "No",
-                paymentTerms: TERMS.includes(extracted) ? extracted : vendor?.pay_terms || "",
-                dueDate: getDueDate(prev?.invoiceDate, vendor?.pay_terms),
-
-                gst_eligibility: vendor?.gst_eligibility
-
-            };
-        });
-
-    }, [vendor, selectedVendorId])
-
-
-    const vendorOptions = useMemo(() => {
-        if (!vendorsList?.length) return [];
-
-        return vendorsList.map(v => ({
-            value: v.vendor_id,
-            label: `${v.vendor_id} - ${v.vendor_name}`
-        }));
-    }, [vendorsList]);
-
-    // Replace with this
-    const handleChange = useCallback((key, value) => {
-        setQuickViewField(key, value);
-    }, [setQuickViewField]);
-
-    const filterVendors = useCallback((input, option) => {
-        return option?.label
-            ?.toLowerCase()
-            .includes(input.toLowerCase());
-    }, []);
-
-    const renderField = (field) => {
-        const value = quickViewFormData?.[field.key] ?? "";
-
-        const commonProps = {
-            label: field.label,
-            value,
-            disabled: !field.editable,
-        };
-
+    const fieldContent = (() => {
         if (field.key === "vendorId" || field.key === "vendorName") {
             return (
                 <AutoComplete
-                    value={value}
+                    value={localValue}
                     options={vendorOptions}
                     style={{ width: "100%", height: "40px" }}
+                    disabled={commonProps.disabled}
                     filterOption={filterVendors}
                     onSelect={(val, option) => {
-                        handleChange("vendorId", val);
-                        handleChange("vendorName", option.label.split(" - ")[1]);
-                        setSelectedVendorId(val);
+                        const name = option.label.split(" - ")[1];
+                        setLocalValue(field.key === "vendorId" ? val : name);
+                        onVendorSelect(val, name);
                     }}
-                    onSearch={(val) => handleChange(field.key, val)}
+                    onSearch={(val) => handleChange(val)}
                     placeholder="Search Vendor"
                 />
             );
@@ -122,9 +67,8 @@ const QuickViewTab = () => {
                 return (
                     <CustomInput
                         {...commonProps}
-                        onChange={(e) =>
-                            handleChange(field.key, e.target.value)
-                        }
+                        label={null} // label will be handled by the outer wrapper for hover
+                        onChange={(e) => handleChange(e.target.value)}
                         height="40px"
                     />
                 );
@@ -133,11 +77,10 @@ const QuickViewTab = () => {
                 return (
                     <CustomDropdown
                         {...commonProps}
+                        label={null}
                         options={field.options || []}
                         style={{ width: "100%", borderRadius: "8px", height: "40px" }}
-                        onChange={(val) =>
-                            handleChange(field.key, val)
-                        }
+                        onChange={(val) => handleChange(val)}
                         filterOption={filterVendors}
                         placement="bottomLeft"
                     />
@@ -147,207 +90,339 @@ const QuickViewTab = () => {
                 return (
                     <CustomDatePicker
                         {...commonProps}
-                        value={value}
-                        onChange={(date, dateString) =>
-                            handleChange(field.key, dateString)
-                        }
+                        label={null}
+                        value={localValue}
+                        onChange={(_date, dateString) => handleChange(dateString)}
                     />
                 );
 
             default:
                 return null;
         }
-    };
+    })();
+
+    return (
+        <div
+            onMouseEnter={commonProps.onMouseEnter}
+            onMouseLeave={commonProps.onMouseLeave}
+            className="w-full"
+        >
+            {field.label && (
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {field.label}
+                </label>
+            )}
+            {fieldContent}
+            {field.key === "invoiceNumber" && isDuplicate && duplicateMessage && (
+                <div className="text-red-500 text-xs mt-1 font-medium italic">
+                    ⚠️ {duplicateMessage}
+                </div>
+            )}
+        </div>
+    );
+});
+
+FieldRenderer.displayName = "FieldRenderer";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Line-item cell — isolated so only the changed cell re-renders
+// ─────────────────────────────────────────────────────────────────────────────
+const LineItemCell = memo(({ value, disabled, rowId, colKey, onUpdate, onHover, onLeave }) => {
+    const [local, setLocal] = useState(value ?? "");
+    const debounceRef = useRef(null);
+
+    useEffect(() => { setLocal(value ?? ""); }, [value]);
+
+    const handleChange = useCallback((e) => {
+        const v = e.target.value;
+        setLocal(v);
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => onUpdate(rowId, colKey, v), 300);
+    }, [rowId, colKey, onUpdate]);
+
+    useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+    return (
+        <div
+            onMouseEnter={() => onHover(rowId, colKey)}
+            onMouseLeave={onLeave}
+            className="w-full h-full min-h-[40px] flex items-center"
+        >
+            <CustomInput
+                value={local}
+                disabled={disabled}
+                onChange={handleChange}
+                className="mb-0 w-full"
+            />
+        </div>
+    );
+});
+
+LineItemCell.displayName = "LineItemCell";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
+const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
+    const {
+        quickViewFormData,
+        setQuickViewField,
+        quickViewLineItems,
+        updateQuickViewLineItem,
+        deleteQuickViewLineItem,
+        selectedVendorId,
+        batchUpdateQuickViewFields,   // new batch action (add to store — see store patch)
+        setQuickViewFormData,
+        setSelectedVendorId,
+        setHighlightedField,
+        addQuickViewLineItem,
+        entityMaster,
+        isDuplicate,
+        duplicateMessage
+    } = useInvoiceStore();
+
+    const { vendorsList } = useVendersListSync();
+    const { vendor } = useVendorDetailSync(selectedVendorId);
+    const [showCalcModal, setShowCalcModal] = useState(false);
+
+    // Vendor sync — write once via batch to avoid multiple re-renders
+    useEffect(() => {
+        if (!vendor || !selectedVendorId) return;
+
+        const TERMS = ['NET 7', 'NET 8', 'NET 12', 'NET 15', 'NET 20', 'NET 30', 'NET 45', 'NET 60', 'NET 90'];
+
+        const getDueDate = (invoiceDate, payTerms) => {
+            if (!invoiceDate || !payTerms) return "";
+            const days = parseInt(payTerms.match(/\d+/)?.[0] || 0, 10);
+            return dayjs(invoiceDate).add(days, "day").format("YYYY-MM-DD");
+        };
+
+        // Use functional update on setQuickViewFormData (or batchUpdate if added)
+        setQuickViewFormData((prev) => {
+            const extracted = prev?.paymentTerms;
+            return {
+                ...prev,
+                gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
+                tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
+                tdsRate: vendor?.tds_percentage ?? 0,
+                tdsSection: vendor?.tds_section_code ?? "NA",
+                lineGrouping: vendor?.line_grouping ? "Yes" : "No",
+                paymentTerms: TERMS.includes(extracted) ? extracted : vendor?.pay_terms || "",
+                dueDate: getDueDate(prev?.invoiceDate, vendor?.pay_terms),
+                gst_eligibility: vendor?.gst_eligibility,
+            };
+        });
+    }, [vendor, selectedVendorId, setQuickViewFormData]);
+
+    const vendorOptions = useMemo(() => {
+        if (!vendorsList?.length) return [];
+        return vendorsList.map(v => ({
+            value: v.vendor_id,
+            label: `${v.vendor_id} - ${v.vendor_name}`,
+        }));
+    }, [vendorsList]);
+
+    // Stable commit callback — doesn't change between renders
+    const handleCommit = useCallback((key, value) => {
+        setQuickViewField(key, value);
+    }, [setQuickViewField]);
+
+    const filterVendors = useCallback((input, option) =>
+        option?.label?.toLowerCase().includes(input.toLowerCase()), []);
+
+    const handleVendorSelect = useCallback((vendorId, vendorName) => {
+        setQuickViewField("vendorId", vendorId);
+        setQuickViewField("vendorName", vendorName);
+        setSelectedVendorId(vendorId);
+    }, [setQuickViewField, setSelectedVendorId]);
+
+    const handleUpdateLineItem = useCallback((id, key, value) => {
+        updateQuickViewLineItem(id, key, value);
+    }, [updateQuickViewLineItem]);
+
+    const handleDeleteLineItem = useCallback((id) => {
+        deleteQuickViewLineItem(id);
+    }, [deleteQuickViewLineItem]);
+
+    const handleHoverField = useCallback((key) => {
+        setHighlightedField(key);
+    }, [setHighlightedField]);
+
+    const handleHoverLineItem = useCallback((rowId, colKey) => {
+        // Find index of the row by internal ID
+        const index = quickViewLineItems.findIndex(item => item.id === rowId);
+        if (index !== -1) {
+            setHighlightedField(`LineItem_${index}_${colKey}`);
+        }
+    }, [quickViewLineItems, setHighlightedField]);
+
+    const handleLeaveField = useCallback(() => {
+        setHighlightedField(null);
+    }, [setHighlightedField]);
+
+    // Derived line-item values (memoized so table doesn't recompute on every field change)
+    const { processedItems, gstTaxLabel, gstTaxValue, tdsDeductionValue, totalAmountPayable } = useMemo(() => {
+        const isGstEligible = entityMaster?.gst_applicable === true;
+        const gstTaxLabel = isGstEligible ? "Total GST" : "Total Tax";
+        const gstTaxValue = parseFloat(quickViewFormData?.totalTaxAmount || 0);
+        const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
+        const totalInvoiceAmount = parseFloat(quickViewFormData?.total_invoice_amount || 0);
+        const tdsDeductionValue = -Math.abs(tdsRate * totalInvoiceAmount);
+
+        const regularItems = quickViewLineItems.filter(
+            row => row.description !== "Total GST" && row.description !== "Total Tax"
+        );
+        const isLineGrouped = quickViewFormData?.lineGrouping === "Yes";
+
+        const processedItems = isLineGrouped
+            ? (regularItems.length
+                ? [regularItems.reduce((acc, row) => ({
+                    id: 1,
+                    description: regularItems[0].description,
+                    qty: (acc.qty || 0) + (Number(row.qty) || 0),
+                    unitPrice: (acc.unitPrice || 0) + (Number(row.unitPrice) || 0),
+                    discount: (acc.discount || 0) + (Number(row.discount) || 0),
+                    netAmount: (acc.netAmount || 0) + (Number(row.netAmount) || 0),
+                    taxAmt: (acc.taxAmt || 0) + (Number(row.taxAmt) || 0),
+                }), {})]
+                : [])
+            : regularItems;
+
+        const totalAmountPayable = processedItems.reduce(
+            (sum, row) => sum + parseFloat(row.netAmount || 0), 0
+        ) + gstTaxValue + tdsDeductionValue;
+
+        return { processedItems, gstTaxLabel, gstTaxValue, tdsDeductionValue, totalAmountPayable };
+    }, [quickViewLineItems, quickViewFormData?.total_tax_amount, quickViewFormData?.tdsRate,
+        quickViewFormData?.total_invoice_amount, quickViewFormData?.lineGrouping, entityMaster]);
 
     return (
         <div className="p-2">
+            {QUICK_VIEW_CONFIG
+                .filter(section => (showOnlyHeader ? section.section === "Header" : (isAllFields || !section.showInAllFields)))
+                .map((section) => {
+                    const content = (
+                        <>
+                            {/* ── FORM ── */}
+                            {section.type === "form" && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    {section.fields
+                                        .filter(field => {
+                                            if (!isAllFields && field.showInAllFields) return false;
+                                            if (!field.visible) return true;
+                                            return field.visible(quickViewFormData);
+                                        })
+                                        .map(field => (
+                                            <div key={field.key} className="flex flex-col justify-start">
+                                                <FieldRenderer
+                                                    field={field}
+                                                    storeValue={quickViewFormData?.[field.key] ?? ""}
+                                                    onCommit={handleCommit}
+                                                    vendorOptions={vendorOptions}
+                                                    filterVendors={filterVendors}
+                                                    onVendorSelect={handleVendorSelect}
+                                                    onHover={handleHoverField}
+                                                    onLeave={handleLeaveField}
+                                                    isDuplicate={isDuplicate}
+                                                    duplicateMessage={duplicateMessage}
+                                                    forceDisabled={showOnlyHeader}
+                                                />
+                                            </div>
+                                        ))}
+                                </div>
+                            )}
 
-            {QUICK_VIEW_CONFIG.map((section) => {
-
-                const content = (
-                    <>
-                        {/* FORM */}
-                        {section.type === "form" && (
-                            <div className="grid grid-cols-2 gap-4">
-                                {section.fields
-                                    .filter((field) => {
-                                        if (!field.visible) return true;
-                                        return field.visible(quickViewFormData);
-                                    })
-                                    .map((field) => (
-                                        <div key={field.key} className="flex flex-col justify-end">
-                                            {renderField(field)}
-                                        </div>
-                                    ))}
-                            </div>
-                        )}
-
-                        {/* TABLE */}
-                        {section.type === "table" && (() => {
-
-                            // ── Derived row calculations ──────────────────────────────
-                            const isGstEligible = entityMaster?.gst_applicable === true ? true : false
-
-                            const gstTaxLabel = isGstEligible ? "Total GST" : "Total Tax";
-                            const gstTaxValue = parseFloat(quickViewFormData?.total_tax_amount || 0);
-
-                            const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
-                            const totalInvoiceAmount = parseFloat(quickViewFormData?.total_invoice_amount || 0);
-
-                            const tdsDeductionValue = -Math.abs(parseFloat(tdsRate || 0) * totalInvoiceAmount)
-
-                            const regularItems = quickViewLineItems.filter(row =>
-                                row.description !== "Total GST" && row.description !== "Total Tax"
-                            );
-
-
-
-                            const isLineGrouped = quickViewFormData?.lineGrouping === "Yes";
-
-                            const processedItems = isLineGrouped
-                                ? (regularItems.length
-                                    ? [regularItems.reduce((acc, row) => ({
-                                        id: 1,
-                                        description: regularItems[0].description,
-                                        qty: (acc.qty || 0) + (Number(row.qty) || 0),
-                                        unitPrice: (acc.unitPrice || 0) + (Number(row.unitPrice) || 0),
-                                        discount: (acc.discount || 0) + (Number(row.discount) || 0),
-                                        netAmount: (acc.netAmount || 0) + (Number(row.netAmount) || 0),
-                                        taxAmt: (acc.taxAmt || 0) + (Number(row.taxAmt) || 0),
-                                    }), {})]
-                                    : [])
-                                : regularItems;
-
-                            const totalAmountPayable = processedItems.reduce(
-                                (sum, row) => sum + parseFloat(row.netAmount || 0), 0
-                            ) + gstTaxValue + tdsDeductionValue;
-
-
-                            return (
+                            {/* ── TABLE ── */}
+                            {section.type === "table" && (
                                 <div className="w-full">
-
                                     <div className="overflow-x-auto">
                                         <div className="overflow-y-auto max-h-[300px]">
                                             <table className="w-full border-separate border-spacing-y-2" style={{ minWidth: "800px" }}>
-
                                                 <thead className="bg-[#2F5D7C] text-white sticky top-0 z-10">
                                                     <tr>
                                                         <th className="p-2 w-[60px]">S.No</th>
                                                         {section.columns.map(col => (
-                                                            <th key={col.key} className="p-2 text-left min-w-[150px]">
-                                                                {col.label}
-                                                            </th>
+                                                            <th key={col.key} className="p-2 text-left min-w-[150px]">{col.label}</th>
                                                         ))}
                                                         <th className="p-2 w-[60px]">Action</th>
                                                     </tr>
                                                 </thead>
-
                                                 <tbody>
-                                                    {/* Regular editable rows */}
-                                                    {processedItems?.map((row, index) => (
+                                                    {processedItems.map((row, index) => (
                                                         <tr key={row.id} className="bg-white shadow-sm">
                                                             <td className="p-2 text-center w-[60px]">{index + 1}</td>
                                                             {section.columns.map(col => (
                                                                 <td key={col.key} className="p-2 min-w-[150px]">
-                                                                    <CustomInput
+                                                                    <LineItemCell
                                                                         value={row[col.key]}
                                                                         disabled={!col.editable}
-                                                                        onChange={(e) =>
-                                                                            updateQuickViewLineItem(row.id, col.key, e.target.value)
-                                                                        }
+                                                                        rowId={row.id}
+                                                                        colKey={col.key}
+                                                                        onUpdate={handleUpdateLineItem}
+                                                                        onHover={handleHoverLineItem}
+                                                                        onLeave={handleLeaveField}
                                                                     />
                                                                 </td>
                                                             ))}
                                                             <td
                                                                 className="p-2 text-red-500 cursor-pointer text-center w-[60px]"
-                                                                onClick={() => deleteQuickViewLineItem(row.id)}
+                                                                onClick={() => handleDeleteLineItem(row.id)}
                                                             >
                                                                 🗑
                                                             </td>
                                                         </tr>
                                                     ))}
 
-                                                    {/* Row 1: Total GST / Total Tax */}
+                                                    {/* Total GST / Tax row */}
                                                     <tr className="shadow-sm">
-                                                        <td className="p-2 text-center w-[60px]">
-                                                            {processedItems?.length + 1}
-                                                        </td>
+                                                        <td className="p-2 text-center w-[60px]">{processedItems.length + 1}</td>
                                                         {section.columns.map((col, colIndex) => (
                                                             <td key={col.key} className="p-2 min-w-[150px]">
                                                                 <CustomInput
                                                                     value={
-                                                                        colIndex === 0
-                                                                            ? gstTaxLabel                    // description
-                                                                            : col.key === "qty"
-                                                                                ? "1"
-                                                                                : col.key === "unitPrice"
-                                                                                    ? gstTaxValue.toLocaleString("en-US", {
-                                                                                        minimumFractionDigits: 2,
-                                                                                        maximumFractionDigits: 2
-                                                                                    })
-                                                                                    : col.key === "discount"
-                                                                                        ? "0"
-                                                                                        : col.key === "netAmount"
-                                                                                            ? gstTaxValue.toLocaleString("en-US", {
-                                                                                                minimumFractionDigits: 2,
-                                                                                                maximumFractionDigits: 2
-                                                                                            })
-                                                                                            : col.key === "taxAmt"
-                                                                                                ? "0"
+                                                                        colIndex === 0 ? gstTaxLabel
+                                                                            : col.key === "qty" ? "1"
+                                                                                : col.key === "unitPrice" ? gstTaxValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                    : col.key === "discount" ? "0"
+                                                                                        : col.key === "netAmount" ? gstTaxValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                            : col.key === "taxAmt" ? "0"
                                                                                                 : ""
                                                                     }
                                                                     disabled={false}
-                                                                    onChange={(e) => { }}
-                                                                />
-                                                            </td>
-
-                                                        ))}
-                                                        <td className="p-2 w-[60px]" />
-                                                    </tr>
-
-                                                    {/* Row 2: TDS Deduction */}
-                                                    <tr className="shadow-sm">
-                                                        <td className="p-2 text-center w-[60px]">
-                                                            {processedItems?.length + 2}
-                                                        </td>
-                                                        {section.columns.map((col, colIndex) => (
-                                                            <td key={col.key} className="p-2 min-w-[150px]">
-                                                                <CustomInput
-                                                                    value={
-                                                                        colIndex === 0
-                                                                            ? "TDS Deduction"                // description
-                                                                            : col.key === "qty"
-                                                                                ? "1"
-                                                                                : col.key === "unitPrice"
-                                                                                    ? tdsDeductionValue.toLocaleString("en-US", {
-                                                                                        minimumFractionDigits: 2,
-                                                                                        maximumFractionDigits: 2
-                                                                                    })
-                                                                                    : col.key === "discount"
-                                                                                        ? "0"
-                                                                                        : col.key === "netAmount"
-                                                                                            ? tdsDeductionValue.toLocaleString("en-US", {
-                                                                                                minimumFractionDigits: 2,
-                                                                                                maximumFractionDigits: 2
-                                                                                            })
-                                                                                            : col.key === "taxAmt"
-                                                                                                ? "0"
-                                                                                                : ""
-                                                                    }
-                                                                    disabled={false}
-                                                                    onChange={(e) => { }}
+                                                                    onChange={() => { }}
                                                                 />
                                                             </td>
                                                         ))}
                                                         <td className="p-2 w-[60px]" />
                                                     </tr>
 
+                                                    {/* TDS Deduction row */}
+                                                    <tr className="shadow-sm">
+                                                        <td className="p-2 text-center w-[60px]">{processedItems.length + 2}</td>
+                                                        {section.columns.map((col, colIndex) => (
+                                                            <td key={col.key} className="p-2 min-w-[150px]">
+                                                                <CustomInput
+                                                                    value={
+                                                                        colIndex === 0 ? "TDS Deduction"
+                                                                            : col.key === "qty" ? "1"
+                                                                                : col.key === "unitPrice" ? tdsDeductionValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                    : col.key === "discount" ? "0"
+                                                                                        : col.key === "netAmount" ? tdsDeductionValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                            : col.key === "taxAmt" ? "0"
+                                                                                                : ""
+                                                                    }
+                                                                    disabled={false}
+                                                                    onChange={() => { }}
+                                                                />
+                                                            </td>
+                                                        ))}
+                                                        <td className="p-2 w-[60px]" />
+                                                    </tr>
                                                 </tbody>
                                             </table>
                                         </div>
                                     </div>
 
-                                    {/* Add Line Item Button */}
                                     <button
                                         onClick={addQuickViewLineItem}
                                         className="w-full flex items-center justify-center gap-2 py-2 mt-1 mb-4 border border-dashed border-[#2F5D7C] rounded-md text-[#2F5D7C] hover:bg-[#eaf2f8] transition-colors font-medium text-sm"
@@ -356,7 +431,6 @@ const QuickViewTab = () => {
                                         Add Line Item
                                     </button>
 
-                                    {/* Summary Footer */}
                                     <div className="border-t border-gray-200 pt-3 space-y-2">
                                         <div className="flex justify-end items-center gap-4 pr-2">
                                             <span className="text-sm text-gray-500">
@@ -368,23 +442,19 @@ const QuickViewTab = () => {
                                                     .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
                                         </div>
-
                                         <div className="flex justify-end items-center gap-4 pr-2 pb-2">
                                             <span className="text-sm text-gray-500">Total Amount Payable :</span>
                                             <span className="text-base font-bold text-[#2F5D7C] min-w-[120px] text-right">
-                                                $ {(
-                                                    totalAmountPayable
-                                                ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                $ {totalAmountPayable.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
                                             <button
                                                 className="text-[#2F5D7C] hover:text-[#1e4560] transition-colors"
                                                 title="View breakdown"
-                                                onClick={() => { setShowCalcModal(true) }}
+                                                onClick={() => setShowCalcModal(true)}
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
                                                     viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                                                >
+                                                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                                     <circle cx="12" cy="12" r="3" />
                                                 </svg>
@@ -392,32 +462,21 @@ const QuickViewTab = () => {
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        })()}
-                    </>
-                );
+                            )}
+                        </>
+                    );
 
-                return (
-                    <Collapse
-                        key={section.section}
-                        defaultActiveKey={[section.section]}
-                        className="mb-3 bg-white rounded-md"
-                        items={[
-                            {
-                                key: section.section,
-                                label: section.section,
-                                children: content,
-                            },
-                        ]}
-                    />
-                );
-            })}
+                    return (
+                        <Collapse
+                            key={section.section}
+                            defaultActiveKey={[section.section]}
+                            className="mb-3 bg-white rounded-md"
+                            items={[{ key: section.section, label: section.section, children: content }]}
+                        />
+                    );
+                })}
 
-            <InvoiceCalculationModal
-                open={showCalcModal}
-                onClose={() => setShowCalcModal(false)}
-            />
-
+            <InvoiceCalculationModal open={showCalcModal} onClose={() => setShowCalcModal(false)} />
         </div>
     );
 };

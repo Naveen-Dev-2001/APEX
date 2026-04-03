@@ -38,3 +38,28 @@ export const fetchEntityMaster = () =>
     API.get("/master/sheet/Entity_Master").then(res => {
         return res.data;
     })
+
+export const getInvoicePdf = (invoiceId) =>
+    API.get(`/invoices/${invoiceId}/file`, { responseType: 'blob' }).then(res => {
+        return res.data;
+    });
+
+export const checkDuplicate = (payload) =>
+    API.post(`/invoices/check-duplicate`, payload).then(res => {
+        return res.data;
+    });
+
+export const getWorkflowData = async (invoiceId) => {
+    const res = await API.get(`/workflow/${invoiceId}`);
+    return res.data;
+};
+
+export const getworkflowApprovers = async (invoiceId) => {
+    const res = await API.get(`/workflow/approvers/${invoiceId}`);
+    return res.data;
+};
+
+export const getAudit = async (invoice_id) => {
+    const res = await API.get(`/api/audit/${invoice_id}`)
+    return res.data;
+}
