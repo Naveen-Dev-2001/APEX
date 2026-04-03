@@ -81,7 +81,14 @@ const MasterDataPage = () => {
         } else if (isCurrencyTab) {
             fetchCurrencyData();
         }
-    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, fetchGLMasterData, fetchLOBMasterData, fetchDepartmentMasterData, fetchCustomerMasterData, fetchItemMasterData, fetchCurrencyData, isEntityTab, isVendorTab, isTDSTab, isGLTab, isLOBTab, isDepartmentTab, isCustomerTab, isItemTab, isCurrencyTab]);
+    }, [activeTab, fetchEntityMasterData, fetchVendorMasterData, fetchTDSRatesData, fetchGLMasterData, fetchLOBMasterData, fetchDepartmentMasterData, fetchCustomerMasterData, fetchItemMasterData, fetchCurrencyData]);
+
+    // Handle server-side pagination for Vendor Master
+    useEffect(() => {
+        if (isVendorTab) {
+            fetchVendorMasterData();
+        }
+    }, [currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection, isVendorTab]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
@@ -604,10 +611,10 @@ const MasterDataPage = () => {
                         ) : (
                             <DataTable
                                 columns={columns}
-                                data={filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+                                data={isVendorTab ? filteredData : filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
                                 loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : currencyLoading}
                                 skeletonRows={itemsPerPage}
-                                totalItems={filteredData.length}
+                                totalItems={isVendorTab ? (masters['Vendor Master']?.total || 0) : filteredData.length}
                                 currentPage={currentPage}
                                 itemsPerPage={itemsPerPage}
                                 onPageChange={setCurrentPage}

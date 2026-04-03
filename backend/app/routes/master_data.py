@@ -413,6 +413,11 @@ async def delete_tab_data(
 @router.get("/sheet/{identifier}")
 async def get_sheet_data(
     identifier: str,
+    page: int = 1,
+    page_size: int = 100,
+    search: str = None,
+    sort_by: str = None,
+    sort_dir: str = 'asc',
     db: Session = Depends(get_db)
 ):
     model = TAB_MODEL_MAP.get(identifier)
@@ -425,7 +430,17 @@ async def get_sheet_data(
     if clean_id in ["Vendor_Master", "Vendor"]:
         from app.services.vendor_sync_service import VendorSyncService
         sync_service = VendorSyncService(db)
-        rows = await sync_service.get_all_vendors()
+        # Use pagination for Vendor Master
+        skip = (page - 1) * page_size
+        results = await sync_service.get_all_vendors(
+            skip=skip, 
+            limit=page_size, 
+            search=search, 
+            sort_by=sort_by, 
+            sort_dir=sort_dir
+        )
+        rows = results["data"]
+        total_count = results["total"]
     elif clean_id in ["GL", "LOB", "Department", "Customer", "Item", "Line_Items", "Exchange_Rate"]:
         from app.services.master_sync_services import (
             GLSyncService, LOBSyncService, DepartmentSyncService,
@@ -446,8 +461,10 @@ async def get_sheet_data(
             rows = await sync_service.get_all_data()
         else:
             rows = db.query(model).order_by(model.id).all()
+        total_count = len(rows)
     else:
         rows = db.query(model).order_by(model.id).all()
+        total_count = len(rows)
 
     # Convert SQLAlchemy objects to dicts
     result = []
@@ -492,6 +509,16 @@ async def get_sheet_data(
             row_dict[column.name] = val
         result.append(row_dict)
 
+    # Wrap result in a standardized paginated response if identifier involves Vendors
+    clean_id = identifier.replace("master_data_", "")
+    if clean_id in ["Vendor_Master", "Vendor"]:
+        return {
+            "data": result,
+            "total": total_count,
+            "page": page,
+            "page_size": page_size
+        }
+    
     return result
 
 

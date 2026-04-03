@@ -52,9 +52,17 @@ export const masterDataService = {
     },
 
     // ─── Vendor Master ───────────────────────────────────────────────────────
-    /** Fetch all vendor master rows from DB */
-    async getVendorMasterData() {
-        const res = await API.get(`/master/sheet/${VENDOR_IDENTIFIER}`);
+    /** Fetch all vendor master rows from DB (Supports pagination) */
+    async getVendorMasterData(params = {}) {
+        const res = await API.get(`/master/sheet/${VENDOR_IDENTIFIER}`, {
+            params: {
+                page: params.page || 1,
+                page_size: params.page_size || 100,
+                search: params.search || undefined,
+                sort_by: params.sort_by || undefined,
+                sort_dir: params.sort_dir || undefined
+            }
+        });
         return res.data;
     },
 

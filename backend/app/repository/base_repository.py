@@ -114,3 +114,18 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         count = query.delete(synchronize_session=False)
         db.commit()
         return count
+
+    def count(self, db: Session, filters: Dict[str, Any] = None, expressions: List[Any] = None) -> int:
+        """
+        Get total count of records matching filters.
+        """
+        from sqlalchemy import func
+        query = db.query(func.count(self.model.id))
+        if filters:
+            for field, value in filters.items():
+                if hasattr(self.model, field):
+                    query = query.filter(getattr(self.model, field) == value)
+        if expressions:
+            for expr in expressions:
+                query = query.filter(expr)
+        return query.scalar()

@@ -196,6 +196,32 @@ class VendorSyncService:
         if cls._sync_lock is None: cls._sync_lock = asyncio.Lock()
         return cls._sync_lock
 
-    async def get_all_vendors(self) -> List[VendorMaster]:
-        """Entry point for UI; returns current DB records without auto-sync."""
-        return vendor_master_repo.get_multi(self.db, limit=100000)
+    async def get_all_vendors(self, skip: int = 0, limit: int = 15, search: str = None, sort_by: str = None, sort_dir: str = 'asc') -> Dict[str, Any]:
+        """Returns paginated DB records with optional search and sort."""
+        from sqlalchemy import or_
+        expressions = []
+        if search:
+            search_filter = f"%{search}%"
+            expressions.append(or_(
+                VendorMaster.vendor_id.ilike(search_filter),
+                VendorMaster.vendor_name.ilike(search_filter),
+                VendorMaster.address_line1.ilike(search_filter),
+                VendorMaster.city.ilike(search_filter),
+                VendorMaster.primary_email_address.ilike(search_filter)
+            ))
+        
+        # Use repository for data and count
+        data = vendor_master_repo.get_multi(
+            self.db, 
+            skip=skip, 
+            limit=limit, 
+            expressions=expressions, 
+            order_by=sort_by or 'id', 
+            descending=(sort_dir.lower() == 'desc')
+        )
+        total = vendor_master_repo.count(self.db, expressions=expressions)
+        
+        return {
+            "data": data,
+            "total": total
+        }

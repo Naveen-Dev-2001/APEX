@@ -195,9 +195,21 @@ const useMasterDataStore = create((set, get) => ({
 
     // ─── Vendor Master: Load from backend ────────────────────────────────────
     fetchVendorMasterData: async () => {
+        const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection } = get();
         set({ vendorLoading: true, vendorError: null });
         try {
-            const rows = await masterDataService.getVendorMasterData();
+            const response = await masterDataService.getVendorMasterData({
+                page: currentPage,
+                page_size: itemsPerPage,
+                search: searchQuery,
+                sort_by: sortColumn,
+                sort_dir: sortDirection
+            });
+            
+            // Backend returns { data: [], total: 0, ... }
+            const rows = response.data || [];
+            const total = response.total || 0;
+
             set((state) => ({
                 vendorLoading: false,
                 masters: {
@@ -205,6 +217,7 @@ const useMasterDataStore = create((set, get) => ({
                     'Vendor Master': {
                         ...state.masters['Vendor Master'],
                         data: rows,
+                        total: total, // Store total count for pagination
                     },
                 },
             }));
@@ -960,6 +973,12 @@ const useMasterDataStore = create((set, get) => ({
                 ...item,
                 entity_name: item.entity_name === 'Default Entity' ? 'Top Level' : item.entity_name
             }));
+        }
+
+        // Sort & Filter (Client-side for other tabs, Server-side for Vendor Master)
+        if (activeTab === 'Vendor Master') {
+            // Already filtered/sorted by backend correctly for the current page
+            return processed;
         }
 
         // Filter
