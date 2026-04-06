@@ -63,3 +63,8 @@ export const getAudit = async (invoice_id) => {
     const res = await API.get(`/api/audit/${invoice_id}`)
     return res.data;
 }
+
+export const saveInvoice = async (invoice_id, payload) => {
+    const res = await API.put(`/invoices/${invoice_id}`, payload)
+    return res.data
+}
