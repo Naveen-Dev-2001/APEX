@@ -201,9 +201,11 @@ def init_database():
         db.close()
 
 
-async def seed_api_master_data(db):
+async def seed_api_master_data(db, force=False):
     """
-    Seed master data from Sage Intacct if tables are empty.
+    Seed master data from Sage Intacct.
+    If force=False (default), it only seeds if tables are empty.
+    If force=True, it syncs regardless of current data.
     Calls sync services for Vendors, GL, LOB, Items, Departments, and Customers.
     """
     from app.services.vendor_sync_service import VendorSyncService
@@ -226,23 +228,24 @@ async def seed_api_master_data(db):
     ]
 
     print("\n" + "-"*30)
-    print("SEEDING MASTER DATA FROM SAGE")
+    print("SYNCING MASTER DATA FROM SAGE" if force else "SEEDING MASTER DATA FROM SAGE")
     print("-"*30)
 
     for model, service_class, sync_method in masters:
         try:
             count = db.query(model).count()
-            if count == 0:
-                print(f"→ Seeding {model.__name__}...")
+            if count == 0 or force:
+                action = "Syncing" if force else "Seeding"
+                print(f"→ {action} {model.__name__}...")
                 service = service_class(db)
                 sync_func = getattr(service, sync_method)
                 await sync_func()
                 new_count = db.query(model).count()
-                print(f"  ✓ {model.__name__} seeded ({new_count} records)")
+                print(f"  ✓ {model.__name__} {action.lower()} completed ({new_count} records)")
             else:
-                print(f"✓ {model.__name__} already has {count} records, skipping seed")
+                print(f"✓ {model.__name__} already has {count} records, skipping seed (use force to re-sync)")
         except Exception as e:
-            print(f"  ✗ Error checking/seeding {model.__name__}: {e}")
+            print(f"  ✗ Error checking/syncing {model.__name__}: {e}")
     
     print("-"*30 + "\n")
 

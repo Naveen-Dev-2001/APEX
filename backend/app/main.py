@@ -59,14 +59,6 @@ async def startup_event():
         # Initialize database (create tables and default data)
         init_database()
         print("✓ Database initialized successfully")
-
-        # Seed Master Data from Sage (Vendors, GL, LOB, etc.)
-        from app.database.database import SessionLocal
-        db = SessionLocal()
-        try:
-            await seed_api_master_data(db)
-        finally:
-            db.close()
     except Exception as e:
         print(f"✗ Startup initialization error: {e}")
         import traceback
