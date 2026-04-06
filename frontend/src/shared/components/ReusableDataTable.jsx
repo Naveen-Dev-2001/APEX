@@ -45,7 +45,6 @@ export default function ReusableDataTable({
     const isServerSide = totalItems !== null;
     const currentPage = isServerSide ? externalPage : internalCurrentPage;
     const pageSize = isServerSide ? externalPageSize : internalPageSize;
-    const effectiveTotal = isServerSide ? totalItems : filteredData.length;
 
     // Use external search text if provided, otherwise use internal
     const activeSearchText = externalSearchText || internalSearchText;
@@ -63,6 +62,8 @@ export default function ReusableDataTable({
             )
         );
     }, [data, activeSearchText, onSearch, isServerSide]);
+
+    const effectiveTotal = isServerSide ? totalItems : filteredData.length;
 
     /* ---------- GRID READY ---------- */
     const onGridReady = (params) => {
