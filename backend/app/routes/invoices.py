@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from typing import List
 from app.services.invoice_processor import InvoiceProcessor
 from app.services.line_grouping import aggregate_items
-from app.models.invoice import InvoiceCreate, InvoiceResponse, InvoiceStatus, InvoiceUpdate, InvoicePaginatedResponse
+from app.models.invoice import InvoiceCreate, InvoiceResponse, InvoiceStatus, InvoiceUpdate
 from app.models.workflow import WorkflowStepType, WorkflowStepStatus
 from app.database.database import get_db, SessionLocal
 
@@ -14,17 +14,13 @@ error_logger = logging.getLogger("application_error")
 from fastapi import Query
 from fastapi.responses import StreamingResponse
 import json
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 from app.services.email_service import email_service
 
 from app.models.db_models import (
     Invoice, WorkflowStep, WorkflowStepTypeEnum, 
     WorkflowStepStatusEnum, InvoiceStatusEnum, InvoiceStatusHistory,
     VendorMetadata, RawExtractionData, User, EntityMaster
-)
-from app.repository.repositories import (
-    invoice_repo, workflow_step_repo, invoice_status_history_repo,
-    user_repo, entity_repo, vendor_metadata_repo, raw_extraction_repo
 )
 from app.database.db_utils import (
     invoice_to_dict, serialize_json_field, deserialize_json_field
@@ -214,7 +210,9 @@ async def upload_invoices(
             new_invoice.status_history.append(history_item)
             
             db_start = time.time()
-            invoice_repo.create(task_db, obj_in=new_invoice)
+            task_db.add(new_invoice)
+            task_db.commit()
+            task_db.refresh(new_invoice)
             invoice_id = new_invoice.id
             print(f"[Backend] Initial DB record created in {time.time() - db_start:.2f}s: {invoice_id}")
             logger.info({
@@ -289,7 +287,8 @@ async def upload_invoices(
                     llm_prompt=extraction.get("llm_prompt"),
                     llm_raw_response=extraction.get("llm_raw_response")
                 )
-                raw_extraction_repo.create(task_db, obj_in=raw_record)
+                task_db.add(raw_record)
+                task_db.commit()
                 print(f"[Backend] Raw extraction data and PDF binary saved in {time.time() - raw_start:.2f}s")
                 logger.info({
                     "request_id": request_id,
@@ -442,7 +441,8 @@ async def upload_invoices(
                 timestamp=datetime.utcnow(),
                 entity=entity
             )
-            workflow_step_repo.create(task_db, obj_in=workflow_step)
+            task_db.add(workflow_step)
+            task_db.commit()
 
             logger.info({
                 "request_id": request_id,
@@ -550,44 +550,24 @@ async def upload_invoices(
     }
 
 
-@router.get("/", response_model=InvoicePaginatedResponse)
+@router.get("/", response_model=List[InvoiceResponse])
 async def get_invoices(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity),
     skip: int = 0,
     limit: int = 10,
-    search: str = None,
-    sort_by: str = "uploaded_at",
-    sort_dir: str = "desc",
     show_all: bool = True,
     db: Session = Depends(get_db)
 ):
-    filters = {"entity": entity}
+    from sqlalchemy import desc
+    query = db.query(Invoice).filter(Invoice.entity == entity)
+    
     if not show_all:
-        filters["uploaded_by"] = current_user.username
+        query = query.filter(Invoice.uploaded_by == current_user.username)
 
-    search_fields = ["invoice_number", "vendor_name", "vendor_id", "status", "filename"]
-    
-    paginated_res = invoice_repo.get_paginated(
-        db,
-        skip=skip,
-        limit=limit,
-        filters=filters,
-        search=search,
-        search_fields=search_fields,
-        order_by=sort_by,
-        descending=(sort_dir.lower() == 'desc')
-    )
-    
-    # Convert models to dicts
-    data = [invoice_to_dict(inv) for inv in paginated_res["data"]]
-    
-    return {
-        "data": data,
-        "total": paginated_res["total"],
-        "page": paginated_res["page"],
-        "page_size": paginated_res["page_size"]
-    }
+    invoices = query.order_by(desc(Invoice.uploaded_at)).offset(skip).limit(limit).all()
+
+    return [InvoiceResponse(**invoice_to_dict(inv)) for inv in invoices]
 
 
 @router.get("/{invoice_id}/", response_model=InvoiceResponse)
@@ -597,15 +577,15 @@ async def get_invoice(
     entity: str = Depends(get_current_entity),
     db: Session = Depends(get_db)
 ):
-    invoice = invoice_repo.get(db, invoice_id)
-    if not invoice or invoice.entity != entity:
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.entity == entity).first()
+    if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     return InvoiceResponse(**invoice_to_dict(invoice))
 
 @router.get("/debug/raw/{invoice_id}")
 async def get_raw_invoice(invoice_id: int, db: Session = Depends(get_db)):
-    invoice = invoice_repo.get(db, invoice_id)
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         return {"error": "Not found"}
     return invoice_to_dict(invoice)
@@ -665,7 +645,7 @@ async def update_invoice_status(
     except:
         pass
 
-    invoice = invoice_repo.get_for_update(db, invoice_id)
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).with_for_update().first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
@@ -707,71 +687,100 @@ async def update_invoice_status(
     extracted_data = deserialize_json_field(invoice.extracted_data) or {}
     currency = extracted_data.get("invoice_details", {}).get("currency", {}).get("value", "USD")
     
-    # Get assigned approvers and is_parallel flag from requirement data
     requirement_data = get_required_approver_count(db, vendor_name, total_amount, invoice_id, invoice_data=invoice_to_dict(invoice), currency=currency, entity=invoice.entity)
-    assigned_approvers = requirement_data.get("assigned_approvers", []) # This is a List[List[str]] or List[str]
+    assigned_approvers = requirement_data.get("assigned_approvers", [])
     
-    # -----------------------------------------------------
-    # NEW PARALLEL AUTHORIZATION LOGIC
-    # -----------------------------------------------------
-    user_email = current_user.email.lower()
-    from app.models.delegation import check_active_delegation
-    
-    # Find all levels where the user (or their substitute) is assigned
-    user_assigned_levels = []
-    
-    def _is_user_in_group(group_item, target_email, entity_str):
-        emails = [group_item] if isinstance(group_item, str) else group_item
-        # Flatten if needed (handle nested JSON lists)
-        flat_emails = []
-        for e in emails:
-            if not e: continue
-            if isinstance(e, str) and e.startswith("["):
-                try: 
-                    parsed = json.loads(e)
-                    if isinstance(parsed, list): flat_emails.extend([x.lower() for x in parsed])
-                    else: flat_emails.append(e.lower())
-                except: flat_emails.append(e.lower())
-            else: flat_emails.append(e.lower())
-        
-        if target_email in flat_emails:
-            return True
-        
-        # Check delegations
-        for e in flat_emails:
-            substitutes = check_active_delegation(db, e, entity_str)
-            if target_email in [s.lower() for s in substitutes]:
-                return True
-        return False
-
-    for idx, group in enumerate(assigned_approvers):
-        if _is_user_in_group(group, user_email, invoice.entity):
-            user_assigned_levels.append(idx + 1)
-
-    current_level = invoice.current_approver_level or 1
-    is_authorized = False
-    
-    if not user_assigned_levels:
-        # User not assigned to any level
-        raise HTTPException(status_code=403, detail="You are not authorized to approve this invoice.")
-    
-    # Check if user is at the CURRENT active level
-    if current_level in user_assigned_levels:
-        is_authorized = True
-    elif any(lvl < current_level for lvl in user_assigned_levels):
-        # User was in a previous level that is already approved
-        raise HTTPException(status_code=400, detail="In the same level another already approves the invoices.")
-    elif any(lvl > current_level for lvl in user_assigned_levels):
-        # User is in a future level
-        raise HTTPException(status_code=400, detail="It is not yet your turn for approval.")
-    else:
-        raise HTTPException(status_code=403, detail="Approver level mismatch.")
-
-    # Idempotency / Double action check within the same level
     existing_approvals = sum(1 for h in current_cycle_history if h.status == InvoiceStatusEnum.APPROVED)
+    
+    # Who are the EXPECTED approvers right now?
+    current_active_level_idx = existing_approvals
+    expected_emails = []
+    if assigned_approvers and current_active_level_idx < len(assigned_approvers):
+        current_level_data = assigned_approvers[current_active_level_idx]
+        if isinstance(current_level_data, list):
+            expected_emails = current_level_data
+        elif isinstance(current_level_data, str):
+            try:
+                parsed = json.loads(current_level_data)
+                expected_emails = parsed if isinstance(parsed, list) else [current_level_data]
+            except:
+                expected_emails = [current_level_data]
+        else:
+            expected_emails = [current_level_data]
+
+    # ---------------------------------------------------------
+    # LEVEL-SPECIFIC AUTHORIZATION & PROGRESSION CHECK
+    # ---------------------------------------------------------
+    is_authorized = False
+    from app.models.delegation import check_active_delegation
+    import json
+    
+    def _flatten_emails(items):
+        res = []
+        for item in items:
+            if isinstance(item, list):
+                res.extend(_flatten_emails(item))
+            elif isinstance(item, str):
+                item = item.strip()
+                if item.startswith("["):
+                    try:
+                        parsed = json.loads(item)
+                        if isinstance(parsed, list):
+                            res.extend(_flatten_emails(parsed))
+                        else:
+                            res.append(item)
+                    except:
+                        res.append(item)
+                else:
+                    res.append(item)
+        return res
+
+    # Find which level(s) the current user belongs to
+    user_assigned_levels = []
+    for idx, level_approvers in enumerate(assigned_approvers):
+        # Allow input as string or list
+        level_list = [level_approvers] if not isinstance(level_approvers, list) else level_approvers
+        flat_level = _flatten_emails(level_list)
+        for a_email in flat_level:
+            if not a_email: continue
+            a_email_lower = a_email.lower()
+            if current_user.email.lower() == a_email_lower:
+                user_assigned_levels.append(idx + 1)
+                break
+            
+            substitutes = check_active_delegation(db, a_email_lower, invoice.entity)
+            if current_user.email.lower() in [s.lower() for s in substitutes]:
+                user_assigned_levels.append(idx + 1)
+                break
+
+    current_active_level = existing_approvals + 1
+    
+    # If the user is in assigned_approvers, they MUST be in the current active level
+    if user_assigned_levels:
+        if current_active_level in user_assigned_levels:
+            is_authorized = True
+        else:
+            # If they were in a previous level, it means that level is already completed
+            if any(lvl < current_active_level for lvl in user_assigned_levels):
+                completed_lvl = max([lvl for lvl in user_assigned_levels if lvl < current_active_level])
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Approval for level {completed_lvl} has already been completed by another approver."
+                )
+            else:
+                # They are from a future level
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"It is not yet your turn to approve. Current active level is {current_active_level}."
+                )
+    else:
+        # Fallback for non-assigned users if needed (legacy check)
+        # In current design, if assigned_approvers exists, they must be in it
+        pass
+
     already_acted_for_this_level = any(
         h.user == approver_name and 
-        h.approver_level == current_level and 
+        h.approver_level == current_active_level and 
         h.status in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED]
         for h in current_cycle_history
     )
@@ -779,7 +788,7 @@ async def update_invoice_status(
     if already_acted_for_this_level and status in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED]:
          raise HTTPException(
             status_code=400,
-            detail=f"User {approver_name} has already taken action for this level."
+            detail=f"User {approver_name} has already taken action for level {current_active_level}."
         )
 
     # =====================================================
@@ -790,9 +799,8 @@ async def update_invoice_status(
         user=approver_name,
         timestamp=timestamp,
         comment=comment,
-        approver_level=current_level if status in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED] else None
+        approver_level=existing_approvals + 1 if status in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED] else None
     )
-
 
     main_status = InvoiceStatusEnum.WAITING_APPROVAL
 
@@ -802,10 +810,10 @@ async def update_invoice_status(
     if status == InvoiceStatusEnum.WAITING_CODING:
         main_status = InvoiceStatusEnum.WAITING_CODING
 
-        workflow_step_repo.delete_all(db, filters={
-            "invoice_id": invoice_id,
-            "step_type": WorkflowStepTypeEnum.CODING
-        })
+        db.query(WorkflowStep).filter(
+            WorkflowStep.invoice_id == invoice_id,
+            WorkflowStep.step_type == WorkflowStepTypeEnum.CODING
+        ).delete()
 
         invoice.status = main_status
         invoice.validation_results = serialize_json_field({})
@@ -855,7 +863,6 @@ async def update_invoice_status(
         )
         required_approvers = requirement_data["required"]
         assigned_approvers = requirement_data.get("assigned_approvers", [])
-        is_parallel = requirement_data.get("is_parallel", False)
 
         # COUNT ONLY CURRENT CYCLE APPROVALS
         existing_approvals = sum(
@@ -865,13 +872,13 @@ async def update_invoice_status(
 
         if assigned_approvers:
             if not is_authorized:
-                 expected_flat = _flatten_emails(expected_emails)
-                 detail_msg = f"Only {', '.join(expected_flat)} (or their active substitute) can take action at this level."
-                 if is_parallel:
-                     all_flat = _flatten_emails(assigned_approvers)
-                     detail_msg = f"Only designated parallel approvers {', '.join(all_flat)} (or their active substitutes) can take action."
-                 
-                 raise HTTPException(
+                expected_flat = _flatten_emails(expected_emails)
+                if len(expected_emails) > 1:
+                    detail_msg = f"Only designated approvers {', '.join(expected_flat)} (or their active substitutes) can take action at this level."
+                else:
+                    detail_msg = f"Only {', '.join(expected_flat)} (or their active substitute) can take action at this level."
+                
+                raise HTTPException(
                     status_code=403,
                     detail=detail_msg
                 )
@@ -893,7 +900,6 @@ async def update_invoice_status(
     # SAVE INVOICE
     # =====================================================
     invoice.status = main_status
-    invoice.is_parallel = is_parallel
     
     validation_results = deserialize_json_field(invoice.validation_results) or {}
     validation_results.update({
@@ -906,35 +912,14 @@ async def update_invoice_status(
     
     invoice.status_history.append(new_status_entry)
 
-    # Determine the status after this action
-    main_status = InvoiceStatusEnum.WAITING_APPROVAL
     if status == InvoiceStatusEnum.APPROVED:
-        if current_level >= len(assigned_approvers):
-            main_status = InvoiceStatusEnum.APPROVED
-        else:
-            main_status = InvoiceStatusEnum.WAITING_APPROVAL
-    elif status == InvoiceStatusEnum.REJECTED:
-        main_status = InvoiceStatusEnum.REJECTED
-    elif status == InvoiceStatusEnum.REWORKED:
-        main_status = InvoiceStatusEnum.REWORKED
-    elif status == InvoiceStatusEnum.WAITING_CODING:
-        main_status = InvoiceStatusEnum.WAITING_CODING
-
-    # [AUDIT] Log Approval Action 
-    # (Note: we log it before updating the main status if we want to capture the transition)
-    
-    # Update main invoice status
-    invoice.status = main_status
-    
-    if status == InvoiceStatusEnum.APPROVED:
-        # Add to approved_by_list for tracking
+        # Avoid duplicate approvals in the list
         if not any(a.approver_email == current_user.email for a in invoice.approved_by_list):
             from app.models.db_models import InvoiceApprovedBy
             invoice.approved_by_list.append(InvoiceApprovedBy(approver_email=current_user.email))
         
-        # If not final level, increment level for next group
         if main_status == InvoiceStatusEnum.WAITING_APPROVAL:
-            invoice.current_approver_level = current_level + 1
+            invoice.current_approver_level = approvals + 1
             
     elif status in [InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED, InvoiceStatusEnum.WAITING_CODING]:
         invoice.approved_by_list = []
@@ -942,10 +927,15 @@ async def update_invoice_status(
 
         # TRIGGER NOTIFICATION TO CODER (REJECTED/REWORKED)
         if status in [InvoiceStatusEnum.REJECTED, InvoiceStatusEnum.REWORKED]:
+            # Find the coder from WorkflowStep (most recent coding step)
+
+            
             coding_step = db.query(WorkflowStep).filter(
                 WorkflowStep.invoice_id == invoice_id,
                 WorkflowStep.step_type == WorkflowStepTypeEnum.CODING
             ).order_by(WorkflowStep.timestamp.desc()).first()
+
+            # Removed db.refresh(invoice) which was reverting status/level changes
             
             if coding_step:
                 coder_username = coding_step.user
@@ -965,18 +955,16 @@ async def update_invoice_status(
                         comment=comment
                     )
 
-
     db.commit()
 
 
     # 8. TRIGGER NEXT APPROVER EMAIL
     if status == InvoiceStatusEnum.APPROVED and main_status == InvoiceStatusEnum.WAITING_APPROVAL:
         # We need the next approver's email
-        # assigned_approvers is a list of lists. If current_level was 1, index 1 is next.
-        if assigned_approvers and current_level < len(assigned_approvers):
-            next_level_approvers = assigned_approvers[current_level]
+        # assigned_approvers is a list of lists
+        if assigned_approvers and (approvals) < len(assigned_approvers):
+            next_level_approvers = assigned_approvers[approvals]
             emails = [next_level_approvers] if isinstance(next_level_approvers, str) else next_level_approvers
-
             
             for next_approver_email in emails:
                 if not next_approver_email: continue
