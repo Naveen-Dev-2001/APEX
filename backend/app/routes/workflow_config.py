@@ -54,7 +54,6 @@ def transform_workflow_response(w):
         "is_threshold_enabled": getattr(w, 'is_threshold_enabled', False),
         "amount_threshold": w.amount_threshold,
         "threshold_approver": deserialize_approver(w.threshold_approver),
-        "optional_approver": deserialize_approver(getattr(w, 'optional_approver', None)),
         "approver_count": w.approver_count or 1,
         "is_parallel": getattr(w, 'is_parallel', False),
         "entity": getattr(w, 'entity', 'Consolidated Analytics Inc'),
@@ -109,7 +108,6 @@ async def create_vendor_workflow(
             "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
             "amount_threshold": workflow.amount_threshold,
             "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "optional_approver": serialize_approver(getattr(workflow, 'optional_approver', None)),
             "is_parallel": workflow.is_parallel,
             "created_at": datetime.utcnow()
         }
@@ -151,7 +149,6 @@ async def update_vendor_workflow(
             "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
             "amount_threshold": workflow.amount_threshold,
             "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "optional_approver": serialize_approver(getattr(workflow, 'optional_approver', None)),
             "is_parallel": workflow.is_parallel,
             "entity": entity,
             "updated_at": datetime.utcnow()
@@ -255,7 +252,6 @@ async def create_codification_workflow(
             "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
             "amount_threshold": workflow.amount_threshold,
             "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "optional_approver": serialize_approver(getattr(workflow, 'optional_approver', None)),
             "is_parallel": workflow.is_parallel,
             "created_at": datetime.utcnow()
         }
@@ -294,7 +290,6 @@ async def update_codification_workflow(
             "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
             "amount_threshold": workflow.amount_threshold,
             "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "optional_approver": serialize_approver(getattr(workflow, 'optional_approver', None)),
             "is_parallel": workflow.is_parallel,
             "entity": entity,
             "updated_at": datetime.utcnow()
@@ -356,3 +351,4 @@ async def get_approvers(db: Session = Depends(get_db)):
         "value": a.email,
         "label": f"{a.username or a.email.split('@')[0]} ({a.email})"
     } for a in approvers if a.email]
+

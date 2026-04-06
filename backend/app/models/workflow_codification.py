@@ -24,7 +24,7 @@ class CodificationWorkflow(BaseModel):
     @field_validator(
         'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3', 
         'mandatory_approver_4', 'mandatory_approver_5',
-        'threshold_approver', 'optional_approver', 
+        'threshold_approver', 
         mode='before'
     )
     @classmethod

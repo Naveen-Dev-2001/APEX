@@ -12,7 +12,6 @@ class VendorWorkflow(BaseModel):
     mandatory_approver_4: Optional[Union[EmailStr, List[EmailStr]]] = None
     mandatory_approver_5: Optional[Union[EmailStr, List[EmailStr]]] = None
     threshold_approver: Optional[Union[EmailStr, List[EmailStr]]] = None
-    optional_approver: Optional[Union[EmailStr, List[EmailStr]]] = None
     amount_threshold: Optional[float] = None
     approver_count: int = 1
     is_parallel: bool = False
@@ -24,7 +23,7 @@ class VendorWorkflow(BaseModel):
     @field_validator(
         'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3', 
         'mandatory_approver_4', 'mandatory_approver_5',
-        'threshold_approver', 'optional_approver', 
+        'threshold_approver', 
         mode='before'
     )
     @classmethod
@@ -47,7 +46,6 @@ class VendorWorkflowResponse(BaseModel):
     mandatory_approver_4: Optional[Union[str, List[str]]] = None
     mandatory_approver_5: Optional[Union[str, List[str]]] = None
     threshold_approver: Optional[Union[str, List[str]]] = None
-    optional_approver: Optional[Union[str, List[str]]] = None
     amount_threshold: Optional[float] = None
     approver_count: int
     is_parallel: bool = False
