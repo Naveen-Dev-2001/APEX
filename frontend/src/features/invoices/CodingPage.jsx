@@ -15,12 +15,12 @@ const CodingPage = () => {
         try {
             // Fetching a large batch to filter locally as the backend doesn't have a specific coding queue endpoint
             const data = await getInvoices({ skip: 0 });
-            
+
             // Filter for coding related statuses
             // Based on InvoiceStatusEnum: waiting_coding, waiting_approval, reworked
             const codingStatuses = ['waiting_coding', 'waiting_approval', 'reworked'];
             const filtered = data.filter(inv => codingStatuses.includes(inv.status));
-            
+
             setInvoices(filtered);
         } catch (error) {
             console.error('Error fetching invoices:', error);

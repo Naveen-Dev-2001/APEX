@@ -2,10 +2,35 @@ import CustomButton from "../../shared/components/CustomButton";
 import { icons } from "../../file";
 import { useInvoiceStore } from "../../store/invoice.store";
 import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
+import { useSaveInvoice } from "../hooks/useSaveInvoice";
+import toast from "../../utils/toast";
+import { saveInvoice } from "../../api/invoiceApi";
+import { useNavigate } from "react-router-dom";
 
 const InvoiceTopBar = ({ invoice = {} }) => {
-    const { setInvoiceSection, isDuplicate } = useInvoiceStore();
+    const navigate = useNavigate()
+    const { setInvoiceSection, isDuplicate, viewInvoiceId } = useInvoiceStore();
+    const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
+
+    const handleSendToCoding = async () => {
+        const response = await handleSave()
+        const payload = await saveInvoice(viewInvoiceId, { status: 'waiting_coding' })
+        console.log("Send to coding →", payload);
+        if (payload.status == "waiting_coding") {
+            toast.success("Invoice sent for coding successfully!")
+            navigate('/coding')
+        } else {
+            toast.error(payload?.message || "Something went wrong while sending for coding.");
+        }
+    };
+
+    const handleSaveInvoice = async () => {
+        const response = await handleSave()
+        if (response) {
+            toast.success("Invoice Saved Successfully!")
+        }
+    }
 
     return (
         <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4  flex items-center justify-between ">
@@ -39,7 +64,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                     <CustomButton
                         variant="primary"
                         className="w-24"
-                        onClick={() => {/* handle save */ }}
+                        onClick={handleSaveInvoice}
                     >
                         Save
                     </CustomButton>
@@ -51,7 +76,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                         variant="success"
                         className="w-40"
                         disabled={isDuplicate}
-                        onClick={() => {/* handle send to coding */ }}
+                        onClick={handleSendToCoding}
                     >
                         Send to Coding
                     </CustomButton>
