@@ -11,6 +11,10 @@ from app.models.db_models import (
     CodificationWorkflow as DBCodificationWorkflow,
     VendorMaster, LOBMaster, DepartmentMaster, User as DBUser
 )
+from app.repository.repositories import (
+    vendor_workflow_repo, codification_workflow_repo,
+    vendor_repo, lob_repo, dept_repo, user_repo
+)
 from app.auth.jwt import get_current_user
 from app.models.user import UserResponse
 from app.models.workflow_vendor import VendorWorkflow, VendorWorkflowResponse
@@ -31,6 +35,10 @@ def deserialize_approver(val):
         except: return [val]
     return [val] if val else []
 
+def retrieve_single_approver(val):
+    lst = deserialize_approver(val)
+    return lst[0] if lst else None
+
 def transform_workflow_response(w):
     return {
         "id": w.id,
@@ -43,10 +51,11 @@ def transform_workflow_response(w):
         "mandatory_approver_3": deserialize_approver(w.mandatory_approver_3),
         "mandatory_approver_4": deserialize_approver(w.mandatory_approver_4),
         "mandatory_approver_5": deserialize_approver(w.mandatory_approver_5),
-        "is_threshold_enabled": w.is_threshold_enabled or False,
+        "is_threshold_enabled": getattr(w, 'is_threshold_enabled', False),
         "amount_threshold": w.amount_threshold,
         "threshold_approver": deserialize_approver(w.threshold_approver),
         "approver_count": w.approver_count or 1,
+        "is_parallel": getattr(w, 'is_parallel', False),
         "entity": getattr(w, 'entity', 'Consolidated Analytics Inc'),
         "created_at": getattr(w, 'created_at', datetime.utcnow()),
         "updated_at": getattr(w, 'updated_at', None)
@@ -60,9 +69,11 @@ async def get_vendor_workflows(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    workflows = db.query(DBVendorWorkflow).filter(
-        DBVendorWorkflow.entity == entity
-    ).all()
+    workflows = vendor_workflow_repo.get_multi(
+        db, 
+        filters={"entity": entity},
+        limit=1000 # Assume reasonable number of workflows
+    )
     
     return [transform_workflow_response(w) for w in workflows]
 
@@ -73,33 +84,34 @@ async def create_vendor_workflow(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    existing = db.query(DBVendorWorkflow).filter(
-        DBVendorWorkflow.vendor_id == workflow.vendor_id,
-        DBVendorWorkflow.entity == entity
-    ).first()
+    existing_list = vendor_workflow_repo.get_multi(
+        db, 
+        filters={"vendor_id": workflow.vendor_id, "entity": entity},
+        limit=1
+    )
+    existing = existing_list[0] if existing_list else None
     
     if existing:
         raise HTTPException(400, f"Workflow already exists for vendor '{workflow.vendor_id}'")
     
     try:
-        new_workflow = DBVendorWorkflow(
-            entity=entity,
-            vendor_id=workflow.vendor_id,
-            vendor_name=workflow.vendor_name,
-            approver_count=workflow.approver_count,
-            mandatory_approver_1=serialize_approver(workflow.mandatory_approver_1),
-            mandatory_approver_2=serialize_approver(workflow.mandatory_approver_2),
-            mandatory_approver_3=serialize_approver(workflow.mandatory_approver_3),
-            mandatory_approver_4=serialize_approver(workflow.mandatory_approver_4),
-            mandatory_approver_5=serialize_approver(workflow.mandatory_approver_5),
-            is_threshold_enabled=workflow.is_threshold_enabled,
-            amount_threshold=workflow.amount_threshold,
-            threshold_approver=serialize_approver(workflow.threshold_approver),
-            created_at=datetime.utcnow()
-        )
-        db.add(new_workflow)
-        db.commit()
-        db.refresh(new_workflow)
+        new_wf_data = {
+            "entity": entity,
+            "vendor_id": workflow.vendor_id,
+            "vendor_name": workflow.vendor_name,
+            "approver_count": workflow.approver_count,
+            "mandatory_approver_1": serialize_approver(workflow.mandatory_approver_1),
+            "mandatory_approver_2": serialize_approver(workflow.mandatory_approver_2),
+            "mandatory_approver_3": serialize_approver(workflow.mandatory_approver_3),
+            "mandatory_approver_4": serialize_approver(workflow.mandatory_approver_4),
+            "mandatory_approver_5": serialize_approver(workflow.mandatory_approver_5),
+            "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
+            "amount_threshold": workflow.amount_threshold,
+            "threshold_approver": serialize_approver(workflow.threshold_approver),
+            "is_parallel": workflow.is_parallel,
+            "created_at": datetime.utcnow()
+        }
+        new_workflow = vendor_workflow_repo.create(db, obj_in=new_wf_data)
         
         return transform_workflow_response(new_workflow)
     except Exception as e:
@@ -117,31 +129,33 @@ async def update_vendor_workflow(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    existing = db.query(DBVendorWorkflow).filter(
-        DBVendorWorkflow.id == workflow_id,
-        DBVendorWorkflow.entity == entity
-    ).first()
+    existing = vendor_workflow_repo.get(db, workflow_id)
+    if not existing or existing.entity != entity:
+        raise HTTPException(404, "Workflow not found")
     
     if not existing:
         raise HTTPException(404, "Workflow not found")
     
     try:
-        existing.vendor_id = workflow.vendor_id
-        existing.vendor_name = workflow.vendor_name
-        existing.approver_count = workflow.approver_count
-        existing.mandatory_approver_1 = serialize_approver(workflow.mandatory_approver_1)
-        existing.mandatory_approver_2 = serialize_approver(workflow.mandatory_approver_2)
-        existing.mandatory_approver_3 = serialize_approver(workflow.mandatory_approver_3)
-        existing.mandatory_approver_4 = serialize_approver(workflow.mandatory_approver_4)
-        existing.mandatory_approver_5 = serialize_approver(workflow.mandatory_approver_5)
-        existing.is_threshold_enabled = workflow.is_threshold_enabled
-        existing.amount_threshold = workflow.amount_threshold
-        existing.threshold_approver = serialize_approver(workflow.threshold_approver)
-        existing.entity = entity
+        update_data = {
+            "vendor_id": workflow.vendor_id,
+            "vendor_name": workflow.vendor_name,
+            "approver_count": workflow.approver_count,
+            "mandatory_approver_1": serialize_approver(workflow.mandatory_approver_1),
+            "mandatory_approver_2": serialize_approver(workflow.mandatory_approver_2),
+            "mandatory_approver_3": serialize_approver(workflow.mandatory_approver_3),
+            "mandatory_approver_4": serialize_approver(workflow.mandatory_approver_4),
+            "mandatory_approver_5": serialize_approver(workflow.mandatory_approver_5),
+            "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
+            "amount_threshold": workflow.amount_threshold,
+            "threshold_approver": serialize_approver(workflow.threshold_approver),
+            "is_parallel": workflow.is_parallel,
+            "entity": entity,
+            "updated_at": datetime.utcnow()
+        }
         
-        db.commit()
-        db.refresh(existing)
-        return transform_workflow_response(existing)
+        updated_wf = vendor_workflow_repo.update(db, db_obj=existing, obj_in=update_data)
+        return transform_workflow_response(updated_wf)
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Update Error: {str(e)}")
@@ -153,15 +167,11 @@ async def delete_vendor_workflow(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    result = db.query(DBVendorWorkflow).filter(
-        DBVendorWorkflow.id == workflow_id,
-        DBVendorWorkflow.entity == entity
-    ).delete()
-    
-    if result == 0:
+    existing = vendor_workflow_repo.get(db, workflow_id)
+    if not existing or existing.entity != entity:
         raise HTTPException(404, "Workflow not found")
     
-    db.commit()
+    vendor_workflow_repo.remove(db, id=workflow_id)
     return {"message": "Workflow deleted successfully"}
 
 @router.get("/vendor/vendors")
@@ -169,7 +179,7 @@ async def get_workflow_vendors(
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user)
 ):
-    vendors = db.query(VendorMaster).all()
+    vendors = vendor_repo.get_multi(db, limit=10000)
     workflow_vendors = []
     
     for v in vendors:
@@ -199,9 +209,11 @@ async def get_codification_workflows(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    workflows = db.query(DBCodificationWorkflow).filter(
-        DBCodificationWorkflow.entity == entity
-    ).all()
+    workflows = codification_workflow_repo.get_multi(
+        db, 
+        filters={"entity": entity},
+        limit=1000
+    )
     
     return [transform_workflow_response(w) for w in workflows]
 
@@ -212,34 +224,38 @@ async def create_codification_workflow(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    existing = db.query(DBCodificationWorkflow).filter(
-        DBCodificationWorkflow.lob == workflow.lob,
-        DBCodificationWorkflow.department_id == workflow.department_id,
-        DBCodificationWorkflow.entity == entity
-    ).first()
+    existing_list = codification_workflow_repo.get_multi(
+        db,
+        filters={
+            "lob": workflow.lob,
+            "department_id": workflow.department_id,
+            "entity": entity
+        },
+        limit=1
+    )
+    existing = existing_list[0] if existing_list else None
     
     if existing:
         raise HTTPException(400, f"Workflow already exists for LOB '{workflow.lob}' and Department '{workflow.department_id}'")
         
     try:
-        new_workflow = DBCodificationWorkflow(
-            entity=entity,
-            lob=workflow.lob,
-            department_id=workflow.department_id,
-            approver_count=workflow.approver_count,
-            mandatory_approver_1=serialize_approver(workflow.mandatory_approver_1),
-            mandatory_approver_2=serialize_approver(workflow.mandatory_approver_2),
-            mandatory_approver_3=serialize_approver(workflow.mandatory_approver_3),
-            mandatory_approver_4=serialize_approver(workflow.mandatory_approver_4),
-            mandatory_approver_5=serialize_approver(workflow.mandatory_approver_5),
-            is_threshold_enabled=workflow.is_threshold_enabled,
-            amount_threshold=workflow.amount_threshold,
-            threshold_approver=serialize_approver(workflow.threshold_approver),
-            created_at=datetime.utcnow()
-        )
-        db.add(new_workflow)
-        db.commit()
-        db.refresh(new_workflow)
+        new_wf_data = {
+            "entity": entity,
+            "lob": workflow.lob,
+            "department_id": workflow.department_id,
+            "approver_count": workflow.approver_count,
+            "mandatory_approver_1": serialize_approver(workflow.mandatory_approver_1),
+            "mandatory_approver_2": serialize_approver(workflow.mandatory_approver_2),
+            "mandatory_approver_3": serialize_approver(workflow.mandatory_approver_3),
+            "mandatory_approver_4": serialize_approver(workflow.mandatory_approver_4),
+            "mandatory_approver_5": serialize_approver(workflow.mandatory_approver_5),
+            "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
+            "amount_threshold": workflow.amount_threshold,
+            "threshold_approver": serialize_approver(workflow.threshold_approver),
+            "is_parallel": workflow.is_parallel,
+            "created_at": datetime.utcnow()
+        }
+        new_workflow = codification_workflow_repo.create(db, obj_in=new_wf_data)
         
         return transform_workflow_response(new_workflow)
     except Exception as e:
@@ -254,31 +270,33 @@ async def update_codification_workflow(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    existing = db.query(DBCodificationWorkflow).filter(
-        DBCodificationWorkflow.id == workflow_id,
-        DBCodificationWorkflow.entity == entity
-    ).first()
+    existing = codification_workflow_repo.get(db, workflow_id)
+    if not existing or existing.entity != entity:
+        raise HTTPException(404, "Workflow not found")
     
     if not existing:
         raise HTTPException(404, "Workflow not found")
         
     try:
-        existing.lob = workflow.lob
-        existing.department_id = workflow.department_id
-        existing.approver_count = workflow.approver_count
-        existing.mandatory_approver_1 = serialize_approver(workflow.mandatory_approver_1)
-        existing.mandatory_approver_2 = serialize_approver(workflow.mandatory_approver_2)
-        existing.mandatory_approver_3 = serialize_approver(workflow.mandatory_approver_3)
-        existing.mandatory_approver_4 = serialize_approver(workflow.mandatory_approver_4)
-        existing.mandatory_approver_5 = serialize_approver(workflow.mandatory_approver_5)
-        existing.is_threshold_enabled = workflow.is_threshold_enabled
-        existing.amount_threshold = workflow.amount_threshold
-        existing.threshold_approver = serialize_approver(workflow.threshold_approver)
-        existing.entity = entity
+        update_data = {
+            "lob": workflow.lob,
+            "department_id": workflow.department_id,
+            "approver_count": workflow.approver_count,
+            "mandatory_approver_1": serialize_approver(workflow.mandatory_approver_1),
+            "mandatory_approver_2": serialize_approver(workflow.mandatory_approver_2),
+            "mandatory_approver_3": serialize_approver(workflow.mandatory_approver_3),
+            "mandatory_approver_4": serialize_approver(workflow.mandatory_approver_4),
+            "mandatory_approver_5": serialize_approver(workflow.mandatory_approver_5),
+            "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
+            "amount_threshold": workflow.amount_threshold,
+            "threshold_approver": serialize_approver(workflow.threshold_approver),
+            "is_parallel": workflow.is_parallel,
+            "entity": entity,
+            "updated_at": datetime.utcnow()
+        }
         
-        db.commit()
-        db.refresh(existing)
-        return transform_workflow_response(existing)
+        updated_wf = codification_workflow_repo.update(db, db_obj=existing, obj_in=update_data)
+        return transform_workflow_response(updated_wf)
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Update Error: {str(e)}")
@@ -290,20 +308,16 @@ async def delete_codification_workflow(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    result = db.query(DBCodificationWorkflow).filter(
-        DBCodificationWorkflow.id == workflow_id,
-        DBCodificationWorkflow.entity == entity
-    ).delete()
-    
-    if result == 0:
+    existing = codification_workflow_repo.get(db, workflow_id)
+    if not existing or existing.entity != entity:
         raise HTTPException(404, "Workflow not found")
-    
-    db.commit()
+        
+    codification_workflow_repo.remove(db, id=workflow_id)
     return {"message": "Workflow deleted successfully"}
 
 @router.get("/codification/lobs")
 async def get_lobs(db: Session = Depends(get_db)):
-    lobs = db.query(LOBMaster).all()
+    lobs = lob_repo.get_multi(db, limit=1000)
     result = []
     # lob_id and name are correct for LOBMaster
     for w in sorted(lobs, key=lambda x: str(x.lob_id or "")):
@@ -316,7 +330,7 @@ async def get_lobs(db: Session = Depends(get_db)):
 
 @router.get("/codification/departments")
 async def get_departments(db: Session = Depends(get_db)):
-    depts = db.query(DepartmentMaster).all()
+    depts = dept_repo.get_multi(db, limit=1000)
     result = []
     # DepartmentMaster uses department_name, not name
     for w in sorted(depts, key=lambda x: str(x.department_id or "")):
@@ -332,8 +346,9 @@ async def get_departments(db: Session = Depends(get_db)):
 async def get_approvers(db: Session = Depends(get_db)):
     # Query all users with role 'approver' regardless of status for debugging/robustness
     # or at least include 'pending' if 'active' is too restrictive
-    approvers = db.query(DBUser).filter(DBUser.role == "approver").all()
+    approvers = user_repo.get_multi(db, filters={"role": "approver"}, limit=1000)
     return [{
         "value": a.email,
         "label": f"{a.username or a.email.split('@')[0]} ({a.email})"
     } for a in approvers if a.email]
+

@@ -12,6 +12,12 @@ from app.models.db_models import (
     VendorMaster, Coding as DBCoding,
     ApproverAmount, ApproverGL, ApproverNumber, ApproverDefault
 )
+from app.repository.repositories import (
+    invoice_repo, workflow_step_repo, vendor_workflow_repo,
+    codification_workflow_repo, vendor_master_repo, coding_repo,
+    approver_amount_repo, approver_gl_repo, approver_number_repo,
+    approver_default_repo
+)
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
 from app.models.user import UserResponse
@@ -29,7 +35,7 @@ router = APIRouter()
 
 def get_vendor_data_from_invoice(db: Session, invoice_id: int):
     """Helper to extract vendor name and ID from invoice using SQLAlchemy"""
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         return None, None
     
@@ -79,7 +85,7 @@ def get_vendor_data_from_invoice(db: Session, invoice_id: int):
 
 def get_invoice_total_from_invoice(db: Session, invoice_id: int):
     """Helper to extract total amount from invoice using SQLAlchemy"""
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         return None
         
@@ -151,6 +157,7 @@ def get_required_approver_count(
     workflow_found = False
     workflow_type = None
     vendor_eligible = False
+    is_parallel = False
     
     # Resolve vendor identity
     if force_vendor_name or force_vendor_id:
@@ -191,11 +198,14 @@ def get_required_approver_count(
     if entity:
         v_workflow = None
         if v_id_resolved:
-            v_workflow = db.query(VendorWorkflow).filter(VendorWorkflow.vendor_id == v_id_resolved, VendorWorkflow.entity == entity).first()
+            v_workflow_list = vendor_workflow_repo.get_multi(db, filters={"vendor_id": v_id_resolved, "entity": entity}, limit=1)
+            v_workflow = v_workflow_list[0] if v_workflow_list else None
         
         if not v_workflow and v_name_resolved:
-            v_workflow = db.query(VendorWorkflow).filter(VendorWorkflow.vendor_name == v_name_resolved, VendorWorkflow.entity == entity).first()
+            v_workflow_list = vendor_workflow_repo.get_multi(db, filters={"vendor_name": v_name_resolved, "entity": entity}, limit=1)
+            v_workflow = v_workflow_list[0] if v_workflow_list else None
             if not v_workflow:
+                # Still use LIKE for name matching
                 v_workflow = db.query(VendorWorkflow).filter(VendorWorkflow.vendor_name.like(f"%{v_name_resolved}%"), VendorWorkflow.entity == entity).first()
             
         if v_workflow:
@@ -218,6 +228,7 @@ def get_required_approver_count(
                 parse_approvers(v_workflow.mandatory_approver_5)
             ]
             assigned_approvers = [a for a in mandatory_fields[:count] if a]
+            is_parallel = getattr(v_workflow, 'is_parallel', False)
             
             # Threshold Approver
             if getattr(v_workflow, 'is_threshold_enabled', False):
@@ -228,7 +239,8 @@ def get_required_approver_count(
 
     # 3. Try Codification Based Workflow
     if not workflow_found and invoice_id and entity:
-        coding = db.query(DBCoding).filter(DBCoding.invoice_id == invoice_id).first()
+        coding_list = coding_repo.get_multi(db, filters={"invoice_id": invoice_id}, limit=1)
+        coding = coding_list[0] if coding_list else None
         if coding and coding.line_items:
             items = json.loads(coding.line_items)
             for item in items:
@@ -238,11 +250,16 @@ def get_required_approver_count(
                 dept = dept_raw.split(" - ")[0].strip() if dept_raw and " - " in str(dept_raw) else dept_raw
 
                 if lob and dept:
-                    cod_workflow = db.query(CodificationWorkflow).filter(
-                        CodificationWorkflow.lob == lob,
-                        CodificationWorkflow.department_id == dept,
-                        CodificationWorkflow.entity == entity
-                    ).first()
+                    cod_workflow_list = codification_workflow_repo.get_multi(
+                        db,
+                        filters={
+                            "lob": lob,
+                            "department_id": dept,
+                            "entity": entity
+                        },
+                        limit=1
+                    )
+                    cod_workflow = cod_workflow_list[0] if cod_workflow_list else None
                     
                     if cod_workflow:
                         workflow_found = True
@@ -263,6 +280,7 @@ def get_required_approver_count(
                             parse_approvers(cod_workflow.mandatory_approver_5)
                         ]
                         assigned_approvers = [a for a in mandatory_fields[:count] if a]
+                        is_parallel = getattr(cod_workflow, 'is_parallel', False)
                         
                         # Threshold Approver
                         if getattr(cod_workflow, 'is_threshold_enabled', False):
@@ -273,12 +291,14 @@ def get_required_approver_count(
     # 4. Fallback Logic (Progressive check of other config tables)
     if not workflow_found and entity:
         # A. Check GL based configuration
-        coding = db.query(DBCoding).filter(DBCoding.invoice_id == invoice_id).first() if invoice_id else None
+        coding_list = coding_repo.get_multi(db, filters={"invoice_id": invoice_id}, limit=1) if invoice_id else []
+        coding = coding_list[0] if coding_list else None
         if coding and coding.header_coding:
             hc = json.loads(coding.header_coding)
             gl_code = hc.get("gl_code")
             if gl_code:
-                approver_gl = db.query(ApproverGL).filter(ApproverGL.gl_code == gl_code, ApproverGL.entity == entity).first()
+                approver_gl_list = approver_gl_repo.get_multi(db, filters={"gl_code": gl_code, "entity": entity}, limit=1)
+                approver_gl = approver_gl_list[0] if approver_gl_list else None
                 if approver_gl:
                     workflow_found = True
                     workflow_type = "approver_gl"
@@ -288,11 +308,16 @@ def get_required_approver_count(
 
         # B. Check Amount based configuration
         if not workflow_found and amount is not None:
-            approver_amt = db.query(ApproverAmount).filter(
-                ApproverAmount.entity == entity,
-                ApproverAmount.min_amount <= amount,
-                ApproverAmount.max_amount >= amount
-            ).first()
+            approver_amt_list = approver_amount_repo.get_multi(
+                db, 
+                filters={"entity": entity},
+                expressions=[
+                    ApproverAmount.min_amount <= amount,
+                    ApproverAmount.max_amount >= amount
+                ],
+                limit=1
+            )
+            approver_amt = approver_amt_list[0] if approver_amt_list else None
             if approver_amt:
                 workflow_found = True
                 workflow_type = "approver_amount"
@@ -302,7 +327,8 @@ def get_required_approver_count(
 
         # C. Check Approver Number (Count based)
         if not workflow_found:
-            approver_num = db.query(ApproverNumber).filter(ApproverNumber.entity == entity).first()
+            approver_num_list = approver_number_repo.get_multi(db, filters={"entity": entity}, limit=1)
+            approver_num = approver_num_list[0] if approver_num_list else None
             if approver_num:
                 workflow_found = True
                 workflow_type = "approver_number"
@@ -312,7 +338,8 @@ def get_required_approver_count(
 
         # D. Check Default configuration
         if not workflow_found:
-            approver_def = db.query(ApproverDefault).filter(ApproverDefault.entity == entity).first()
+            approver_def_list = approver_default_repo.get_multi(db, filters={"entity": entity}, limit=1)
+            approver_def = approver_def_list[0] if approver_def_list else None
             if approver_def:
                 workflow_found = True
                 workflow_type = "approver_default"
@@ -331,7 +358,8 @@ def get_required_approver_count(
     assigned_approvers = [a for a in assigned_approvers if a]
     
     # total required = number of levels
-    # assigned_approvers might still be lists of 1
+    # each level is a parallel group if is_parallel is true
+    # If is_parallel is false, assigned_approvers might still be lists of 1
     # We should flatten if not parallel, or keep as is.
     
     # Clean assigned_approvers (ensure no empty lists)
@@ -346,7 +374,8 @@ def get_required_approver_count(
         "required": req_count,
         "assigned_approvers": assigned_approvers,
         "workflow_type": workflow_type,
-        "breakdown": {"type": workflow_type, "vendor_eligible": vendor_eligible}
+        "is_parallel": is_parallel,
+        "breakdown": {"type": workflow_type, "vendor_eligible": vendor_eligible, "is_parallel": is_parallel}
     }
 
 @router.get("/{invoice_id}", response_model=WorkflowHistoryResponse)
@@ -358,7 +387,7 @@ async def get_workflow_history(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         raise HTTPException(404, "Invoice not found")
     
@@ -382,7 +411,12 @@ async def get_workflow_history(
         currency=currency, entity=entity, force_vendor_id=vendor_id, force_vendor_name=vendor_name
     )
     
-    steps = db.query(WorkflowStep).filter(WorkflowStep.invoice_id == invoice_id).order_by(asc(WorkflowStep.timestamp)).all()
+    steps = workflow_step_repo.get_multi(
+        db, 
+        filters={"invoice_id": invoice_id}, 
+        order_by="timestamp", 
+        limit=500
+    )
     
     # Fetch Delegations
     delegations_map = {}
@@ -451,7 +485,12 @@ async def get_approver_status(
     Get the workflow status/history for an invoice.
     This is called by the frontend to show the approval timeline.
     """
-    steps = db.query(WorkflowStep).filter(WorkflowStep.invoice_id == invoice_id).order_by(asc(WorkflowStep.timestamp)).all()
+    steps = workflow_step_repo.get_multi(
+        db, 
+        filters={"invoice_id": invoice_id}, 
+        order_by="timestamp", 
+        limit=500
+    )
     
     return {
         "approvers": [
