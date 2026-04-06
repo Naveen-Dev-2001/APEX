@@ -93,15 +93,15 @@ const CodingTab = () => {
 
     // ── Transform data for dropdowns (ID - Name) ──
     const glOptions = useMemo(() =>
-        (glData || []).map(i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number })), [glData]);
+        (glData?.data || glData || []).map(i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number })), [glData]);
     const lobOptions = useMemo(() =>
-        (lobData || []).map(i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id })), [lobData]);
+        (lobData?.data || lobData || []).map(i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id })), [lobData]);
     const deptOptions = useMemo(() =>
-        (deptData || []).map(i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id })), [deptData]);
+        (deptData?.data || deptData || []).map(i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id })), [deptData]);
     const customerOptions = useMemo(() =>
-        (customerData || []).map(i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id })), [customerData]);
+        (customerData?.data || customerData || []).map(i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id })), [customerData]);
     const itemOptions = useMemo(() =>
-        (itemData || []).map(i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })), [itemData]);
+        (itemData?.data || itemData || []).map(i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })), [itemData]);
 
     const handleUpdate = useCallback((id, key, value) => {
         updateQuickViewLineItem(id, key, value);
