@@ -35,6 +35,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         skip: int = 0, 
         limit: int = 100, 
         filters: Dict[str, Any] = None,
+        expressions: List[Any] = None,
         order_by: str = None,
         descending: bool = False
     ) -> List[ModelType]:
@@ -43,6 +44,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             for field, value in filters.items():
                 if hasattr(self.model, field):
                     query = query.filter(getattr(self.model, field) == value)
+        
+        if expressions:
+            for expr in expressions:
+                query = query.filter(expr)
         
         if order_by and hasattr(self.model, order_by):
             column = getattr(self.model, order_by)
@@ -63,6 +68,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         skip: int = 0,
         limit: int = 100,
         filters: Dict[str, Any] = None,
+        expressions: List[Any] = None,
         search: str = None,
         search_fields: List[str] = None,
         order_by: str = None,
@@ -79,6 +85,11 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             for field, value in filters.items():
                 if hasattr(self.model, field):
                     query = query.filter(getattr(self.model, field) == value)
+
+        # Complex expressions
+        if expressions:
+            for expr in expressions:
+                query = query.filter(expr)
 
         # Search (ILIKE across multiple fields)
         if search and search_fields:
