@@ -33,7 +33,6 @@ export const useInvoiceStore = create((set, get) => ({
     fileName: "",
     setFileName: (name) => set({ fileName: name }),
 
-
     isModalOpen: false,
     setIsModalOpen: (open) => set({ isModalOpen: open }),
 
@@ -50,7 +49,6 @@ export const useInvoiceStore = create((set, get) => ({
     //  QUICK VIEW - FORM DATA
     // =============================
     quickViewFormData: {
-        // Header
         vendorId: "",
         vendorName: "",
         invoiceNumber: "",
@@ -69,8 +67,6 @@ export const useInvoiceStore = create((set, get) => ({
         costCenter: "",
         serviceStartDate: "",
         serviceEndDate: "",
-
-        // Vendor Level
         vendorAddress: "",
         vendorCountry: "",
         vendorTaxId: "",
@@ -79,8 +75,6 @@ export const useInvoiceStore = create((set, get) => ({
         vendorBankName: "",
         vendorBankAccount: "",
         vendorContactPerson: "",
-
-        // Buyer
         clientName: "",
         billingAddress: "",
         shippingAddress: "",
@@ -88,27 +82,19 @@ export const useInvoiceStore = create((set, get) => ({
         email: "",
         clientTaxId: "",
         contactPerson: "",
-
-        // Taxes
         totalTaxAmount: "",
         cgst: "",
         sgst: "",
         igst: "",
         withholdingTax: "",
-
-        // Totals
         subtotal: "",
         shippingFees: "",
         surcharges: "",
         totalInvoiceAmount: "",
         amountDue: "",
-
-        // Compliance
         notes: "",
         qrOrIrn: "",
         companyRegistrationNumber: "",
-
-        // Vendor master
         gstEligibility: "",
         tdsApplicability: "",
         tdsRate: "",
@@ -122,35 +108,77 @@ export const useInvoiceStore = create((set, get) => ({
     duplicateMessage: "",
     setDuplicateMessage: (msg) => set({ duplicateMessage: msg }),
 
-    // ── Update single field (used by debounced FieldRenderer) ──────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helper: recalculate GST & TDS system rows based on current formData
+    // Called internally whenever formData fields that affect these rows change.
+    // ─────────────────────────────────────────────────────────────────────────
+    _syncSystemRows: (formData, lineItems) => {
+        const gstValue = parseFloat(formData?.totalTaxAmount || 0);
+        const tdsRate = parseFloat(formData?.tdsRate || 0);
+        const totalInvoiceAmount = parseFloat(formData?.totalInvoiceAmount || formData?.total_invoice_amount || 0);
+        // TDS deduction is negative
+        const tdsValue = -Math.abs((tdsRate / 100) * totalInvoiceAmount);
+
+        return lineItems.map((item) => {
+            if (item.type === "GST") {
+                return { ...item, unitPrice: gstValue, netAmount: gstValue };
+            }
+            if (item.type === "TDS") {
+                return { ...item, unitPrice: tdsValue, netAmount: tdsValue };
+            }
+            return item;
+        });
+    },
+
+    // ── Update single field ──────────────────────────────────────────────────
     setQuickViewField: (key, value) =>
-        set((state) => ({
-            quickViewFormData: {
+        set((state) => {
+            const updatedFormData = {
                 ...state.quickViewFormData,
                 [key]: value,
-            },
-        })),
+            };
+            // Re-sync system rows if a relevant field changed
+            const triggerKeys = ["totalTaxAmount", "tdsRate", "totalInvoiceAmount", "total_invoice_amount"];
+            const updatedLineItems = triggerKeys.includes(key)
+                ? get()._syncSystemRows(updatedFormData, state.quickViewLineItems)
+                : state.quickViewLineItems;
 
-    // ── Update multiple fields in ONE set() call (avoids cascading re-renders) ──
+            return { quickViewFormData: updatedFormData, quickViewLineItems: updatedLineItems };
+        }),
+
+    // ── Batch update multiple fields ─────────────────────────────────────────
     batchUpdateQuickViewFields: (updates) =>
-        set((state) => ({
-            quickViewFormData: {
+        set((state) => {
+            const updatedFormData = {
                 ...state.quickViewFormData,
                 ...updates,
-            },
-        })),
+            };
+            const triggerKeys = ["totalTaxAmount", "tdsRate", "totalInvoiceAmount", "total_invoice_amount"];
+            const hasTrigger = Object.keys(updates).some(k => triggerKeys.includes(k));
+            const updatedLineItems = hasTrigger
+                ? get()._syncSystemRows(updatedFormData, state.quickViewLineItems)
+                : state.quickViewLineItems;
 
-    // ── Replace full form or functional update (used by vendor sync) ────────
+            return { quickViewFormData: updatedFormData, quickViewLineItems: updatedLineItems };
+        }),
+
+    // ── Replace full form or functional update (used by vendor sync) ─────────
     setQuickViewFormData: (dataOrUpdater) =>
-        set((state) => ({
-            quickViewFormData:
+        set((state) => {
+            const updatedFormData =
                 typeof dataOrUpdater === "function"
                     ? dataOrUpdater(state.quickViewFormData)
-                    : dataOrUpdater,
-        })),
+                    : dataOrUpdater;
+
+            // Always re-sync system rows when entire formData is replaced
+            const updatedLineItems = get()._syncSystemRows(updatedFormData, state.quickViewLineItems);
+
+            return { quickViewFormData: updatedFormData, quickViewLineItems: updatedLineItems };
+        }),
 
     // =============================
     //  QUICK VIEW - LINE ITEMS
+    // Default includes GST & TDS system rows
     // =============================
     quickViewLineItems: [
         {
@@ -183,41 +211,80 @@ export const useInvoiceStore = create((set, get) => ({
             taxAmt: 0,
             isNetAmountOverridden: false,
         },
+        // ── System rows — always kept at the bottom ──────────────────────────
+        {
+            id: "gst-row",
+            type: "GST",
+            description: "Total GST",
+            qty: 1,
+            unitPrice: 0,
+            discount: 0,
+            netAmount: 0,
+            taxAmt: 0,
+            isSystemRow: true,
+            isNetAmountOverridden: false,
+        },
+        {
+            id: "tds-row",
+            type: "TDS",
+            description: "TDS Deduction",
+            qty: 1,
+            unitPrice: 0,
+            discount: 0,
+            netAmount: 0,
+            taxAmt: 0,
+            isSystemRow: true,
+            isNetAmountOverridden: false,
+        },
     ],
 
-    // ── Update table cell + auto-calculation ────────────────────────────────
+    // ── Update table cell + auto-calculation ─────────────────────────────────
     updateQuickViewLineItem: (id, key, value) =>
-        set((state) => ({
-            quickViewLineItems: state.quickViewLineItems.map((item) => {
-                if (item.id !== id) return item;   // ← unchanged items keep same reference
+        set((state) => {
+            const updatedItems = state.quickViewLineItems.map((item) => {
+                if (item.id !== id) return item;
 
                 let updated = { ...item, [key]: value };
 
-                const qty = Number(updated.qty) || 0;
-                const price = Number(updated.unitPrice) || 0;
-                const discount = Number(updated.discount) || 0;
+                // ── Normal row calculation ───────────────────────────────────
+                if (!item.isSystemRow) {
+                    if (key === "netAmount") {
+                        updated.isNetAmountOverridden = true;
+                    }
+                    if (["qty", "unitPrice", "discount"].includes(key)) {
+                        updated.isNetAmountOverridden = false;
+                    }
+                    if (!updated.isNetAmountOverridden) {
+                        const qty = Number(updated.qty) || 0;
+                        const price = Number(updated.unitPrice) || 0;
+                        const discount = Number(updated.discount) || 0;
+                        updated.netAmount = qty * price - discount;
+                    }
+                }
 
-                if (key === "netAmount") {
-                    updated.isNetAmountOverridden = true;
+                // ── GST system row: unitPrice drives netAmount ────────────────
+                if (item.type === "GST") {
+                    updated.netAmount = Number(updated.unitPrice) || 0;
                 }
-                if (["qty", "unitPrice", "discount"].includes(key)) {
-                    updated.isNetAmountOverridden = false;
-                }
-                if (!updated.isNetAmountOverridden) {
-                    updated.netAmount = qty * price - discount;
+
+                // ── TDS system row: unitPrice drives netAmount ────────────────
+                if (item.type === "TDS") {
+                    updated.netAmount = Number(updated.unitPrice) || 0;
                 }
 
                 return updated;
-            }),
-        })),
+            });
 
-    // ── Delete row ───────────────────────────────────────────────────────────
+            return { quickViewLineItems: updatedItems };
+        }),
+
+    // ── Delete row (system rows can also be deleted if TDS toggled off) ──────
     deleteQuickViewLineItem: (id) =>
         set((state) => ({
             quickViewLineItems: state.quickViewLineItems.filter(i => i.id !== id),
         })),
 
-    // ── Add new row (always before Total GST row) ───────────────────────────
+    // ── Add new regular row — always inserted before system rows ─────────────
     addQuickViewLineItem: () =>
         set((state) => {
             const newItem = {
@@ -236,13 +303,9 @@ export const useInvoiceStore = create((set, get) => ({
                 item: "",
                 isNetAmountOverridden: false,
             };
-            const regularItems = state.quickViewLineItems.filter(
-                row => row.description !== "Total GST"
-            );
-            const gstRow = state.quickViewLineItems.filter(
-                row => row.description === "Total GST"
-            );
-            return { quickViewLineItems: [...regularItems, newItem, ...gstRow] };
+            const regularItems = state.quickViewLineItems.filter(row => !row.isSystemRow);
+            const systemRows = state.quickViewLineItems.filter(row => row.isSystemRow);
+            return { quickViewLineItems: [...regularItems, newItem, ...systemRows] };
         }),
 
     setQuickViewLineItems: (items) => set({ quickViewLineItems: items }),
@@ -252,10 +315,9 @@ export const useInvoiceStore = create((set, get) => ({
     // =============================
     recalculateQuickViewTotals: () => {
         const { quickViewLineItems } = get();
-        const total = quickViewLineItems.reduce(
-            (sum, item) => sum + (Number(item.netAmount) || 0),
-            0
-        );
+        const total = quickViewLineItems
+            .filter(item => !item.isSystemRow)
+            .reduce((sum, item) => sum + (Number(item.netAmount) || 0), 0);
         set((state) => ({
             quickViewFormData: {
                 ...state.quickViewFormData,
@@ -266,7 +328,7 @@ export const useInvoiceStore = create((set, get) => ({
     },
 
     // =============================
-    // PDF HIGHLIGHT (FUTURE)
+    // PDF HIGHLIGHT
     // =============================
     highlightedField: null,
     setHighlightedField: (field) => set({ highlightedField: field }),

@@ -73,6 +73,14 @@ export const useSaveInvoice = () => {
                 SGST: { value: f.sgst },
                 IGST: { value: f.igst },
                 withholding_tax: { value: f.withholdingTax },
+
+                // ── ADD THESE ──────────────────────────────────────────────
+                tds_rate: { value: f.tdsRate },
+                tds_section: { value: f.tdsSection },
+                tds_applicability: { value: f.tdsApplicability },
+                tds_deduction: {
+                    value: -(Math.abs(parseFloat(f.tdsRate || 0) * parseFloat(f.total_invoice_amount || 0)))
+                },
             },
 
             additional_info: {
@@ -85,22 +93,33 @@ export const useSaveInvoice = () => {
             // Reverse-map quickViewLineItems → Items shape
             Items: {
                 ...activeInvoiceData.extracted_data?.Items,
-                value: quickViewLineItems
-                    .filter(row =>
-                        row.description !== "Total GST" &&
-                        row.description !== "Total Tax" &&
-                        row.description !== "TDS Deduction"
-                    )
-                    .map((item, index) => ({
-                        item_number: { value: index + 1, source: "system" },
-                        description: { value: item.description, source: "user" },
-                        amount: { value: Number(item.netAmount) || 0, source: "user" },
-                        // Add qty/unitPrice/discount as extra fields if your backend accepts them
-                        qty: { value: Number(item.qty) || 1, source: "user" },
-                        unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
-                        discount: { value: Number(item.discount) || 0, source: "user" },
-                        tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
-                    })),
+                value: [
+                    ...quickViewLineItems,
+                    {
+                        description: "Total GST",
+                        qty: 1,
+                        unitPrice: parseFloat(f.totalTaxAmount || 0),
+                        discount: 0,
+                        netAmount: parseFloat(f.totalTaxAmount || 0),
+                        taxAmt: 0,
+                    },
+                    {
+                        description: "TDS Deduction",
+                        qty: 1,
+                        unitPrice: -(Math.abs(parseFloat(f.tdsRate || 0) * parseFloat(f.total_invoice_amount || f.totalInvoiceAmount || 0))),
+                        discount: 0,
+                        netAmount: -(Math.abs(parseFloat(f.tdsRate || 0) * parseFloat(f.total_invoice_amount || f.totalInvoiceAmount || 0))),
+                        taxAmt: 0,
+                    },
+                ].map((item, index) => ({
+                    item_number: { value: index + 1, source: "system" },
+                    description: { value: item.description, source: "user" },
+                    amount: { value: Number(item.netAmount) || 0, source: "user" },
+                    qty: { value: Number(item.qty) || 1, source: "user" },
+                    unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
+                    discount: { value: Number(item.discount) || 0, source: "user" },
+                    tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
+                })),
             },
         };
 
