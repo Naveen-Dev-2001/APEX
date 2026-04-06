@@ -14,7 +14,8 @@ const CodingPage = () => {
         setLoading(true);
         try {
             // Fetching a large batch to filter locally as the backend doesn't have a specific coding queue endpoint
-            const data = await getInvoices({ skip: 0 });
+            const response = await getInvoices({ skip: 0, limit: 1000 }); // Increase limit to get more for local filtering if needed
+            const data = response.data || [];
 
             // Filter for coding related statuses
             // Based on InvoiceStatusEnum: waiting_coding, waiting_approval, reworked
