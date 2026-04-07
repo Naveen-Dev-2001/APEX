@@ -242,11 +242,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         // Step 3: update TDS fields via batchUpdateQuickViewFields
         // This ALWAYS recalculates _syncSystemRows (isModified = false path),
         // so the TDS row appears/disappears correctly regardless of isModified.
-        // batchUpdateQuickViewFields({
-        //     tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
-        //     tdsRate: vendor?.tds_percentage ?? 0,
-        //     tdsSection: vendor?.tds_section_code ?? "NA",
-        // });
+        batchUpdateQuickViewFields({
+            tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
+            tdsRate: vendor?.tds_percentage ?? 0,
+            tdsSection: vendor?.tds_section_code ?? "NA",
+        });
 
         setQuickViewFormData((p) => ({
             ...p,

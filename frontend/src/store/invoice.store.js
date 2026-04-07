@@ -240,13 +240,18 @@ export const useInvoiceStore = create((set, get) => ({
 
             const hasTrigger = Object.keys(updates).some(k => triggerKeys.includes(k));
 
+            // Get isModified from form
+            const isModified = updatedFormData?.isModified;
+
             const updatedLineItems = hasTrigger
-                ? get()._syncSystemRows(updatedFormData, state.quickViewLineItems, false)
+                ? get()._syncSystemRows(updatedFormData, state.quickViewLineItems, isModified)
                 : state.quickViewLineItems;
 
-            return { quickViewFormData: updatedFormData, quickViewLineItems: updatedLineItems };
+            return {
+                quickViewFormData: updatedFormData,
+                quickViewLineItems: updatedLineItems
+            };
         }),
-
     // ── Replace full form (used on initial load & vendor sync) ───────────────
     // Passes isModified through so the guard is respected on initial load.
     setQuickViewFormData: (dataOrUpdater, isModified = false) =>
