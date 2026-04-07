@@ -25,9 +25,9 @@ export const useSaveInvoice = () => {
 
         // Build the ordered list: regular → GST → TDS (if present)
         const allRows = [
-            ...regularRows,
-            ...(gstRow ? [gstRow] : []),
-            ...(tdsRow ? [tdsRow] : []),
+            ...quickViewLineItems,
+            // ...(gstRow ? [gstRow] : []),
+            // ...(tdsRow ? [tdsRow] : []),
         ];
 
         // ── Map to the server Items shape ─────────────────────────────────────

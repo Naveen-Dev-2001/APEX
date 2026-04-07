@@ -84,6 +84,38 @@ const CodingTab = () => {
         addQuickViewLineItem
     } = useInvoiceStore();
 
+    // ── Selection state ──
+    const [selectedIds, setSelectedIds] = useState(new Set());
+
+    const allSelected = rows.length > 0 && selectedIds.size === rows.length;
+    const someSelected = selectedIds.size > 0 && !allSelected;
+
+    const toggleSelectAll = useCallback(() => {
+        if (allSelected) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(rows.map((r) => r.id)));
+        }
+    }, [allSelected, rows]);
+
+    const toggleSelectRow = useCallback((id) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    // Clean up stale selected IDs when rows change (e.g. after delete)
+    useEffect(() => {
+        const rowIds = new Set(rows.map((r) => r.id));
+        setSelectedIds((prev) => {
+            const next = new Set([...prev].filter((id) => rowIds.has(id)));
+            return next.size === prev.size ? prev : next;
+        });
+    }, [rows]);
+
     // ── Master Data Hooks ──
     const { data: glData, isLoading: glLoading } = useGLMasterSync();
     const { data: lobData, isLoading: lobLoading } = useLOBMasterSync();
@@ -103,13 +135,47 @@ const CodingTab = () => {
     const itemOptions = useMemo(() =>
         (itemData?.data || itemData || []).map(i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })), [itemData]);
 
+    /**
+     * handleUpdate — if the row being changed is selected AND there are other
+     * selected rows, propagate the new value to all selected rows for that key.
+     * If the row is NOT selected, just update that one row normally.
+     */
     const handleUpdate = useCallback((id, key, value) => {
+        // Always update the row that triggered the change
         updateQuickViewLineItem(id, key, value);
-    }, [updateQuickViewLineItem]);
+
+        // If this row is selected, bulk-update all OTHER selected rows for the same column
+        if (selectedIds.has(id) && selectedIds.size > 1) {
+            selectedIds.forEach((selectedId) => {
+                if (selectedId !== id) {
+                    updateQuickViewLineItem(selectedId, key, value);
+                }
+            });
+        }
+    }, [updateQuickViewLineItem, selectedIds]);
 
     // Fuzzy search logic for dropdowns
     const filterOption = useCallback((input, option) =>
         (option?.label ?? "").toLowerCase().includes(input.toLowerCase()), []);
+
+    // ── Sticky column style helpers ──
+    // background must be explicit (never "inherit") so cells don't bleed through on scroll
+    const stickyCheckbox = (bg = "#ffffff") => ({
+        position: "sticky",
+        left: 0,
+        zIndex: 3,
+        backgroundColor: bg,
+        boxShadow: "none",
+    });
+
+    const stickySNo = (bg = "#ffffff") => ({
+        position: "sticky",
+        left: "44px",   // exact width of checkbox column
+        zIndex: 3,
+        backgroundColor: bg,
+        // subtle right shadow to visually separate sticky area from scrolling columns
+        boxShadow: "2px 0 4px -1px rgba(0,0,0,0.08)",
+    });
 
     return (
         <div className="flex flex-col gap-4">
@@ -122,6 +188,11 @@ const CodingTab = () => {
                     <div className="flex items-center gap-2 text-[14px] font-semibold text-[#2F5D7C]">
                         <CaretUpOutlined className="text-[#2F5D7C] text-[11px]" />
                         LINE ITEMS CODING
+                        {selectedIds.size > 0 && (
+                            <span className="ml-2 px-2 py-0.5 bg-[#2F5D7C]/10 text-[#2F5D7C] rounded-full text-[11px] font-medium">
+                                {selectedIds.size} selected
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <button className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors font-medium">
@@ -137,10 +208,34 @@ const CodingTab = () => {
 
                 {/* ── Table Container ── */}
                 <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border-spacing-0 min-w-[1400px]">
+                    <table className="w-full border-collapse border-spacing-0 min-w-[1460px]">
                         <thead className="bg-[#2F5D7C] text-white">
                             <tr>
-                                <th className="p-2 text-center text-[12px] font-medium w-[50px] border-r border-[#ffffff1a]">S.No</th>
+                                {/* ── Checkbox Header (sticky) ── */}
+                                <th
+                                    className="p-2 text-center text-[12px] font-medium w-[44px] border-none border-[#ffffff1a]"
+                                    style={stickyCheckbox("#2F5D7C")}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={allSelected}
+                                        ref={(el) => {
+                                            if (el) el.indeterminate = someSelected;
+                                        }}
+                                        onChange={toggleSelectAll}
+                                        className="w-[14px] h-[14px] rounded cursor-pointer accent-white"
+                                        title="Select all"
+                                    />
+                                </th>
+
+                                {/* ── S.No Header (sticky) ── */}
+                                <th
+                                    className="p-2 text-center text-[12px] font-medium w-[50px] border-r border-[#ffffff1a]"
+                                    style={stickySNo("#2F5D7C")}
+                                >
+                                    S.No
+                                </th>
+
                                 <th className="p-2 text-left text-[12px] font-medium min-w-[200px] border-r border-[#ffffff1a]">Description</th>
                                 <th className="p-2 text-left text-[12px] font-medium w-[130px] border-r border-[#ffffff1a]">Line Type</th>
                                 <th className="p-2 text-right text-[12px] font-medium w-[80px] border-r border-[#ffffff1a]">Qty</th>
@@ -155,100 +250,129 @@ const CodingTab = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {rows.map((row, index) => (
-                                <tr key={row.id} className="hover:bg-blue-50/30 transition-colors group">
-                                    <td className="p-2 text-center text-[13px] text-gray-500 border-r border-gray-100">{index + 1}</td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <EditableCell
-                                            value={row.description}
-                                            onChange={(v) => handleUpdate(row.id, "description", v)}
-                                            placeholder="Description"
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <DropdownCell
-                                            value={row.lineType}
-                                            onChange={(v) => handleUpdate(row.id, "lineType", v)}
-                                            options={LINE_TYPE_OPTIONS}
-                                            filterOption={filterOption}
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <EditableCell
-                                            value={row.qty}
-                                            onChange={(v) => handleUpdate(row.id, "qty", v)}
-                                            type="number"
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <EditableCell
-                                            value={row.unitPrice}
-                                            onChange={(v) => handleUpdate(row.id, "unitPrice", v)}
-                                            type="number"
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <EditableCell
-                                            value={row.netAmount}
-                                            onChange={(v) => handleUpdate(row.id, "netAmount", v)}
-                                            type="number"
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <DropdownCell
-                                            value={row.glCode}
-                                            onChange={(v) => handleUpdate(row.id, "glCode", v)}
-                                            options={glOptions}
-                                            isLoading={glLoading}
-                                            filterOption={filterOption}
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <DropdownCell
-                                            value={row.lob}
-                                            onChange={(v) => handleUpdate(row.id, "lob", v)}
-                                            options={lobOptions}
-                                            isLoading={lobLoading}
-                                            filterOption={filterOption}
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <DropdownCell
-                                            value={row.department}
-                                            onChange={(v) => handleUpdate(row.id, "department", v)}
-                                            options={deptOptions}
-                                            isLoading={deptLoading}
-                                            filterOption={filterOption}
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <DropdownCell
-                                            value={row.customer}
-                                            onChange={(v) => handleUpdate(row.id, "customer", v)}
-                                            options={customerOptions}
-                                            isLoading={customerLoading}
-                                            filterOption={filterOption}
-                                        />
-                                    </td>
-                                    <td className="p-2 border-r border-gray-100">
-                                        <DropdownCell
-                                            value={row.item}
-                                            onChange={(v) => handleUpdate(row.id, "item", v)}
-                                            options={itemOptions}
-                                            isLoading={itemLoading}
-                                            filterOption={filterOption}
-                                        />
-                                    </td>
-                                    <td className="p-2 text-center group-hover:bg-red-50/50">
-                                        <button
-                                            onClick={() => deleteQuickViewLineItem(row.id)}
-                                            className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                            {rows.map((row, index) => {
+                                const isSelected = selectedIds.has(row.id);
+                                return (
+                                    <tr
+                                        key={row.id}
+                                        className={`transition-colors group ${isSelected
+                                            ? "bg-blue-50/60 hover:bg-blue-50/80"
+                                            : "hover:bg-blue-50/30"
+                                            }`}
+                                    >
+                                        {/* ── Checkbox Cell (sticky) ── */}
+                                        <td
+                                            className="p-2 text-center border-r border-gray-100"
+                                            style={stickyCheckbox(isSelected ? "#dbeafe" : "#ffffff")}
                                         >
-                                            <DeleteOutlined style={{ fontSize: 13 }} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelectRow(row.id)}
+                                                className="w-[14px] h-[14px] rounded cursor-pointer accent-[#2F5D7C]"
+                                            />
+                                        </td>
+
+                                        {/* ── S.No Cell (sticky) ── */}
+                                        <td
+                                            className="p-2 text-center text-[13px] text-gray-500 border-r border-gray-100"
+                                            style={stickySNo(isSelected ? "#dbeafe" : "#ffffff")}
+                                        >
+                                            {index + 1}
+                                        </td>
+
+                                        <td className="p-2 border-r border-gray-100">
+                                            <EditableCell
+                                                value={row.description}
+                                                onChange={(v) => handleUpdate(row.id, "description", v)}
+                                                placeholder="Description"
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <DropdownCell
+                                                value={row.lineType}
+                                                onChange={(v) => handleUpdate(row.id, "lineType", v)}
+                                                options={LINE_TYPE_OPTIONS}
+                                                filterOption={filterOption}
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <EditableCell
+                                                value={row.qty}
+                                                onChange={(v) => handleUpdate(row.id, "qty", v)}
+                                                type="number"
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <EditableCell
+                                                value={row.unitPrice}
+                                                onChange={(v) => handleUpdate(row.id, "unitPrice", v)}
+                                                type="number"
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <EditableCell
+                                                value={row.netAmount}
+                                                onChange={(v) => handleUpdate(row.id, "netAmount", v)}
+                                                type="number"
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <DropdownCell
+                                                value={row.glCode}
+                                                onChange={(v) => handleUpdate(row.id, "glCode", v)}
+                                                options={glOptions}
+                                                isLoading={glLoading}
+                                                filterOption={filterOption}
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <DropdownCell
+                                                value={row.lob}
+                                                onChange={(v) => handleUpdate(row.id, "lob", v)}
+                                                options={lobOptions}
+                                                isLoading={lobLoading}
+                                                filterOption={filterOption}
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <DropdownCell
+                                                value={row.department}
+                                                onChange={(v) => handleUpdate(row.id, "department", v)}
+                                                options={deptOptions}
+                                                isLoading={deptLoading}
+                                                filterOption={filterOption}
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <DropdownCell
+                                                value={row.customer}
+                                                onChange={(v) => handleUpdate(row.id, "customer", v)}
+                                                options={customerOptions}
+                                                isLoading={customerLoading}
+                                                filterOption={filterOption}
+                                            />
+                                        </td>
+                                        <td className="p-2 border-r border-gray-100">
+                                            <DropdownCell
+                                                value={row.item}
+                                                onChange={(v) => handleUpdate(row.id, "item", v)}
+                                                options={itemOptions}
+                                                isLoading={itemLoading}
+                                                filterOption={filterOption}
+                                            />
+                                        </td>
+                                        <td className="p-2 text-center group-hover:bg-red-50/50">
+                                            <button
+                                                onClick={() => deleteQuickViewLineItem(row.id)}
+                                                className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                            >
+                                                <DeleteOutlined style={{ fontSize: 13 }} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
