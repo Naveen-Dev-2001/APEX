@@ -162,6 +162,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const {
         quickViewFormData,
         setQuickViewField,
+        activeInvoiceData,
         quickViewLineItems,
         updateQuickViewLineItem,
         deleteQuickViewLineItem,
@@ -172,6 +173,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         addQuickViewLineItem,
         entityMaster,
         isDuplicate,
+        batchUpdateQuickViewFields,
         duplicateMessage,
     } = useInvoiceStore();
 
@@ -182,70 +184,118 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     // ── Vendor sync ───────────────────────────────────────────────────────────
     useEffect(() => {
         if (!vendor || !selectedVendorId) return;
+        if (vendor.vendor_id !== selectedVendorId) return;
 
         const TERMS = ['NET 7', 'NET 8', 'NET 12', 'NET 15', 'NET 20', 'NET 30', 'NET 45', 'NET 60', 'NET 90'];
 
-        const getDueDate = (invoiceDate, payTerms) => {
-            if (!invoiceDate || !payTerms) return "";
-            const days = parseInt(payTerms.match(/\d+/)?.[0] || 0, 10);
-            return dayjs(invoiceDate).add(days, "day").format("YYYY-MM-DD");
+        const parseDateFlexible = (dateStr) => {
+            if (!dateStr) return null;
+            const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
+            for (const fmt of formats) {
+                const d = dayjs(dateStr, fmt, true);
+                if (d.isValid()) return d;
+            }
+            const d = dayjs(dateStr);
+            return d.isValid() ? d : null;
         };
 
-        // setQuickViewFormData triggers _syncSystemRows internally in the store
-        setQuickViewFormData((prev) => {
-            const extracted = prev?.paymentTerms;
-            return {
-                ...prev,
-                gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
-                tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
-                tdsRate: vendor?.tds_percentage ?? 0,
-                tdsSection: vendor?.tds_section_code ?? "NA",
-                lineGrouping: vendor?.line_grouping ? "Yes" : "No",
-                paymentTerms: TERMS.includes(extracted) ? extracted : vendor?.pay_terms || "",
-                dueDate: getDueDate(prev?.invoiceDate, vendor?.pay_terms),
-                gst_eligibility: vendor?.gst_eligibility,
-            };
-        });
-    }, [vendor, selectedVendorId, setQuickViewFormData]);
+        const extractDays = (payTerms) => {
+            if (!payTerms) return null;
+            const match = payTerms.match(/\d+/);
+            return match ? parseInt(match[0], 10) : null;
+        };
+
+        const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
+            if (existingDueDate) {
+                const d = parseDateFlexible(existingDueDate);
+                if (d) return d.format("MM-DD-YYYY");
+            }
+            const baseDate = parseDateFlexible(invoiceDate);
+            if (!baseDate) return "";
+            const invoiceDays = extractDays(invoicePayTerms);
+            if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
+            const vendorDays = extractDays(vendorPayTerms);
+            if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
+            return "";
+        };
+
+        // Step 1: read current state snapshot for date calculations
+        const prev = useInvoiceStore.getState().quickViewFormData;
+        const extractedPayTerms = prev?.paymentTerms;
+        const computedDueDate = getDueDate(
+            prev?.dueDate,
+            prev?.invoiceDate,
+            extractedPayTerms,
+            vendor?.pay_terms
+        );
+
+        // Step 2: update non-TDS fields via setQuickViewFormData (preserves isModified guard)
+        setQuickViewFormData((p) => ({
+            ...p,
+            gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
+            lineGrouping: vendor?.line_grouping ? "Yes" : "No",
+            paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || "",
+            dueDate: computedDueDate,
+            gst_eligibility: vendor?.gst_eligibility,
+        }));
+
+        // Step 3: update TDS fields via batchUpdateQuickViewFields
+        // This ALWAYS recalculates _syncSystemRows (isModified = false path),
+        // so the TDS row appears/disappears correctly regardless of isModified.
+        // batchUpdateQuickViewFields({
+        //     tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
+        //     tdsRate: vendor?.tds_percentage ?? 0,
+        //     tdsSection: vendor?.tds_section_code ?? "NA",
+        // });
+
+        setQuickViewFormData((p) => ({
+            ...p,
+            tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
+            tdsRate: vendor?.tds_percentage ?? 0,
+            tdsSection: vendor?.tds_section_code ?? "NA",
+        }));
+
+    }, [vendor, selectedVendorId]);
+
 
     // ── TDS row visibility: add/remove based on tdsApplicability + tdsRate ───
     // The store always keeps GST row. TDS row is conditional.
-    useEffect(() => {
-        const items = quickViewLineItems;
-        const hasTDS = items.some(i => i.type === "TDS");
-        const isTdsApplicable =
-            quickViewFormData?.tdsApplicability === "Yes" &&
-            Number(quickViewFormData?.tdsRate) > 0;
+    // useEffect(() => {
+    //     const items = quickViewLineItems;
+    //     const hasTDS = items.some(i => i.type === "TDS");
+    //     const isTdsApplicable =
+    //         quickViewFormData?.tdsApplicability === "Yes" &&
+    //         Number(quickViewFormData?.tdsRate) > 0;
 
-        if (isTdsApplicable && !hasTDS) {
-            // Re-calculate TDS value immediately on add
-            const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
-            const totalInvoiceAmount = parseFloat(
-                quickViewFormData?.totalInvoiceAmount || quickViewFormData?.total_invoice_amount || 0
-            );
-            const tdsValue = -Math.abs((tdsRate / 100) * totalInvoiceAmount);
+    //     if (isTdsApplicable && !hasTDS) {
+    //         // Re-calculate TDS value immediately on add
+    //         const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
+    //         const totalInvoiceAmount = parseFloat(
+    //             quickViewFormData?.totalInvoiceAmount || quickViewFormData?.total_invoice_amount || 0
+    //         );
+    //         const tdsValue = -Math.abs((tdsRate / 100) * totalInvoiceAmount);
 
-            useInvoiceStore.getState().setQuickViewLineItems([
-                ...items,
-                {
-                    id: "tds-row",
-                    type: "TDS",
-                    description: "TDS Deduction",
-                    qty: 1,
-                    unitPrice: tdsValue,
-                    discount: 0,
-                    netAmount: tdsValue,
-                    taxAmt: 0,
-                    isSystemRow: true,
-                    isNetAmountOverridden: false,
-                },
-            ]);
-        }
+    //         useInvoiceStore.getState().setQuickViewLineItems([
+    //             ...items,
+    //             {
+    //                 id: "tds-row",
+    //                 type: "TDS",
+    //                 description: "TDS Deduction",
+    //                 qty: 1,
+    //                 unitPrice: tdsValue,
+    //                 discount: 0,
+    //                 netAmount: tdsValue,
+    //                 taxAmt: 0,
+    //                 isSystemRow: true,
+    //                 isNetAmountOverridden: false,
+    //             },
+    //         ]);
+    //     }
 
-        if (!isTdsApplicable && hasTDS) {
-            deleteQuickViewLineItem("tds-row");
-        }
-    }, [quickViewFormData?.tdsApplicability, quickViewFormData?.tdsRate]);
+    //     if (!isTdsApplicable && hasTDS) {
+    //         deleteQuickViewLineItem("tds-row");
+    //     }
+    // }, [quickViewFormData?.tdsApplicability, quickViewFormData?.tdsRate]);
 
     const vendorOptions = useMemo(() => {
         if (!vendorsList?.length) return [];
@@ -406,24 +456,32 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                     <td key={col.key} className="p-2 min-w-[150px]">
                                                                         {isSystem ? (
                                                                             // System rows: render read-only CustomInput
-                                                                            <CustomInput
+                                                                            <LineItemCell
                                                                                 value={
                                                                                     colIndex === 0
                                                                                         ? rowLabel
                                                                                         : col.key === "qty"
                                                                                             ? "1"
                                                                                             : col.key === "unitPrice"
-                                                                                                ? Number(row.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                                ? Number((row.unitPrice || 0).toString().replace(/,/g, ""))
+                                                                                                    .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                                                                                 : col.key === "discount"
                                                                                                     ? "0"
                                                                                                     : col.key === "netAmount"
-                                                                                                        ? Number(row.netAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                                        ? Number((row.netAmount || 0).toString().replace(/,/g, ""))
+                                                                                                            .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                                                                                         : col.key === "taxAmt"
                                                                                                             ? "0"
                                                                                                             : ""
                                                                                 }
+
                                                                                 disabled={false}
                                                                                 onChange={() => { }}
+                                                                                rowId={row.id}
+                                                                                colKey={col.key}
+                                                                                onUpdate={handleUpdateLineItem}
+                                                                                onHover={handleHoverLineItem}
+                                                                                onLeave={handleLeaveField}
                                                                             />
                                                                         ) : (
                                                                             // Regular rows: editable via LineItemCell
