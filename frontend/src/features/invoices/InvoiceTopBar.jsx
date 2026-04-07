@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate()
-    const { setInvoiceSection, isDuplicate, viewInvoiceId } = useInvoiceStore();
+    const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView } = useInvoiceStore();
     const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
 
@@ -32,12 +32,17 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         }
     }
 
+    const Back = () => {
+        resetQuickView();
+        setInvoiceSection(1)
+    }
+
     return (
         <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4  flex items-center justify-between ">
 
             {/* Left — back + title */}
             <div
-                onClick={() => setInvoiceSection(1)}
+                onClick={Back}
                 className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
             >
                 <img src={icons.arrowLeft} alt="Back" />

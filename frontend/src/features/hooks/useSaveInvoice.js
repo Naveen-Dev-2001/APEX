@@ -15,9 +15,44 @@ export const useSaveInvoice = () => {
     const buildPayload = useCallback(() => {
         const f = quickViewFormData;
 
-        // Reverse-map flat quickViewFormData → extracted_data shape
+        // ── Separate regular rows from system rows ────────────────────────────
+        // System rows (GST / TDS) are already in quickViewLineItems with their
+        // calculated values. We save ALL rows — regular first, then system — so
+        // on the next load handleView can reconstruct them with isSystemRow.
+        const regularRows = quickViewLineItems.filter(i => !i.isSystemRow);
+        const gstRow = quickViewLineItems.find(i => i.type === "GST");
+        const tdsRow = quickViewLineItems.find(i => i.type === "TDS");
+
+        // Build the ordered list: regular → GST → TDS (if present)
+        const allRows = [
+            ...regularRows,
+            ...(gstRow ? [gstRow] : []),
+            ...(tdsRow ? [tdsRow] : []),
+        ];
+
+        // ── Map to the server Items shape ─────────────────────────────────────
+        const mappedItems = allRows.map((item, index) => ({
+            item_number: { value: index + 1, source: "system" },
+            description: { value: item.description, source: "user" },
+            amount: { value: Number(item.netAmount) || 0, source: "user" },
+            qty: { value: Number(item.qty) || 1, source: "user" },
+            unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
+            discount: { value: Number(item.discount) || 0, source: "user" },
+            tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
+        }));
+
+        // ── Derived TDS deduction amount ──────────────────────────────────────
+        // tdsRate is a decimal (e.g. 0.10), totalInvoiceAmount is a number.
+        const tdsRate = parseFloat(f.tdsRate || 0);
+        const totalInvoiceAmount = parseFloat(f.totalInvoiceAmount || f.total_invoice_amount || 0);
+        const tdsDeductionValue = -Math.abs(tdsRate * totalInvoiceAmount);
+
+        // ── Reverse-map flat quickViewFormData → extracted_data shape ─────────
         const updatedExtractedData = {
             ...activeInvoiceData.extracted_data,
+
+            // Mark as saved so the next load skips recalculation
+            isModified: true,
 
             vendor_info: {
                 ...activeInvoiceData.extracted_data?.vendor_info,
@@ -73,14 +108,11 @@ export const useSaveInvoice = () => {
                 SGST: { value: f.sgst },
                 IGST: { value: f.igst },
                 withholding_tax: { value: f.withholdingTax },
-
-                // ── ADD THESE ──────────────────────────────────────────────
+                // TDS fields — persisted so they survive the isModified load path
+                tds_applicability: { value: f.tdsApplicability },
                 tds_rate: { value: f.tdsRate },
                 tds_section: { value: f.tdsSection },
-                tds_applicability: { value: f.tdsApplicability },
-                tds_deduction: {
-                    value: -(Math.abs(parseFloat(f.tdsRate || 0) * parseFloat(f.total_invoice_amount || 0)))
-                },
+                tds_deduction: { value: tdsDeductionValue },
             },
 
             additional_info: {
@@ -90,40 +122,13 @@ export const useSaveInvoice = () => {
                 company_registration_number: { value: f.companyRegistrationNumber },
             },
 
-            // Reverse-map quickViewLineItems → Items shape
+            // All rows (regular + GST + TDS) saved together
             Items: {
                 ...activeInvoiceData.extracted_data?.Items,
-                value: [
-                    ...quickViewLineItems,
-                    {
-                        description: "Total GST",
-                        qty: 1,
-                        unitPrice: parseFloat(f.totalTaxAmount || 0),
-                        discount: 0,
-                        netAmount: parseFloat(f.totalTaxAmount || 0),
-                        taxAmt: 0,
-                    },
-                    {
-                        description: "TDS Deduction",
-                        qty: 1,
-                        unitPrice: -(Math.abs(parseFloat(f.tdsRate || 0) * parseFloat(f.total_invoice_amount || f.totalInvoiceAmount || 0))),
-                        discount: 0,
-                        netAmount: -(Math.abs(parseFloat(f.tdsRate || 0) * parseFloat(f.total_invoice_amount || f.totalInvoiceAmount || 0))),
-                        taxAmt: 0,
-                    },
-                ].map((item, index) => ({
-                    item_number: { value: index + 1, source: "system" },
-                    description: { value: item.description, source: "user" },
-                    amount: { value: Number(item.netAmount) || 0, source: "user" },
-                    qty: { value: Number(item.qty) || 1, source: "user" },
-                    unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
-                    discount: { value: Number(item.discount) || 0, source: "user" },
-                    tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
-                })),
+                value: mappedItems,
             },
         };
 
-        // Final payload — mirrors the shape of your original document JSON
         const payload = {
             ...activeInvoiceData,
             vendor_id: f.vendorId,
@@ -137,28 +142,22 @@ export const useSaveInvoice = () => {
     }, [quickViewFormData, quickViewLineItems, activeInvoiceData]);
 
     const handleSave = useCallback(async () => {
-        debugger
         const payload = buildPayload();
 
         // Optimistically update the store so UI stays in sync
         setActiveInvoiceData(payload);
 
-        // TODO: swap with your real API call, e.g.:
-        // await updateInvoice(activeInvoiceData.id, payload);
-        console.log("Save payload →", payload);
         const object = {
-            extracted_data: { ...payload.extracted_data, isModified: true, },
+            extracted_data: payload.extracted_data,   // already has isModified: true
             exchange_rate: null,
             vender_id: payload.vendor_id,
-        }
-        const response = await saveInvoice(viewInvoiceId, object)
-        console.log("response", response);
+        };
 
+        const response = await saveInvoice(viewInvoiceId, object);
+        console.log("Save response →", response);
 
-        return response; // return in case caller (Send to Coding) needs it
+        return response;
     }, [buildPayload, setActiveInvoiceData]);
 
-
     return { handleSave, buildPayload };
-
 };
