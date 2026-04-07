@@ -98,8 +98,15 @@ const CustomDropdown = ({ label, value, options, onChange, disabled = false }) =
 const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
-    const { masters } = useMasterDataStore();
-    
+    const { masters, fetchTDSRatesData } = useMasterDataStore();
+
+    // Ensure TDS Rates are loaded regardless of active tab
+    useEffect(() => {
+        if (!masters['TDS Rates']?.data?.length) {
+            fetchTDSRatesData();
+        }
+    }, []);
+
     const tdsRates = masters['TDS Rates']?.data || [];
 
     useEffect(() => {
@@ -155,14 +162,16 @@ const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const handleTdsSectionChange = (val) => {
         const matched = tdsRates.find(r => {
             const code = r.section || '';
-            const nature = r.nature || '';
+            const nature = r.nature_of_payment || '';
             return `${code} - ${nature}` === val;
         });
-        
+
         setForm(prev => ({
             ...prev,
             tds_section_code: val,
-            tds_percentage: matched ? (matched.individualRate || matched.companyRate || '') : prev.tds_percentage
+            tds_percentage: matched
+                ? String(matched.tds_rate ?? '')
+                : prev.tds_percentage
         }));
     };
 
@@ -361,21 +370,21 @@ const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
                     <div className="grid grid-cols-2 gap-6">
                         <CustomDropdown
                             label="TDS Percentage"
-                            value={form.tds_percentage}
+                            value={String(form.tds_percentage ?? '')}
                             disabled={!form.tds_applicability}
                             options={tdsRates.map(r => ({
-                                value: r.individualRate || r.companyRate || '',
-                                label: r.individualRate || r.companyRate || ''
+                                value: String(r.tds_rate ?? ''),
+                                label: String(r.tds_rate ?? '')
                             }))}
                             onChange={(val) => setForm(prev => ({ ...prev, tds_percentage: val }))}
                         />
                         <CustomDropdown
                             label="TDS Section Code and Description"
-                            value={form.tds_section_code}
+                            value={form.tds_section_code || ''}
                             disabled={!form.tds_applicability}
                             options={tdsRates.map(r => {
                                 const code = r.section || '';
-                                const nature = r.nature || '';
+                                const nature = r.nature_of_payment || '';
                                 const combined = `${code} - ${nature}`;
                                 return { value: combined, label: combined };
                             })}
