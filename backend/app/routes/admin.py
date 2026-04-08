@@ -16,6 +16,7 @@ router = APIRouter()
 class UserRoleUpdate(BaseModel):
     role: str
     status: str
+    department: str = "Non-Finance"
 
 # Helper to check if user is admin
 def get_current_admin(current_user: UserResponse = Depends(get_current_user)):
@@ -31,6 +32,7 @@ class UserCreate(BaseModel):
     email: str
     role: str
     status: str
+    department: str = "Non-Finance"
 
 @router.post("/", response_model=UserResponse)
 async def create_new_user(
@@ -57,6 +59,7 @@ async def create_new_user(
         "password": hashed_password,
         "role": user_data.role,
         "status": user_data.status,
+        "department": user_data.department,
         "isCreatedByUser": False,
         "createdby": "admin",
         "ispasswordchange": False,
@@ -133,7 +136,8 @@ async def update_user_role(
     old_status = user.status
     user_repo.update(db, db_obj=user, obj_in={
         "role": update_data.role,
-        "status": update_data.status
+        "status": update_data.status,
+        "department": update_data.department
     })
 
     # If user is approved (status changed to active), send notification

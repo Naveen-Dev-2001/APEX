@@ -9,9 +9,9 @@ import toast from '../../utils/toast';
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
     const [editingUser, setEditingUser] = useState(null);
-    const [editForm, setEditForm] = useState({ role: '', status: '' });
+    const [editForm, setEditForm] = useState({ role: '', status: '', department: '' });
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'approver' });
+    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'approver', department: 'Non-Finance' });
 
     const {
         searchQuery, setSearchQuery, setCurrentPage,
@@ -22,6 +22,11 @@ const AdminPage = () => {
     // Use dynamic options from store
     const roleOptions = roles?.map(r => ({ label: r.charAt(0).toUpperCase() + r.slice(1), value: r }));
     const statusOptions = statuses?.map(s => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }));
+    
+    const departmentOptions = [
+        { label: 'Non-Finance', value: 'Non-Finance' },
+        { label: 'Finance', value: 'Finance' }
+    ];
 
     const tabs = ['User Management', 'Global Config', 'Delegations'];
 
@@ -30,12 +35,12 @@ const AdminPage = () => {
             return;
         }
         setEditingUser(user);
-        setEditForm({ role: user.role, status: user.status });
+        setEditForm({ role: user.role, status: user.status, department: user.department || 'Non-Finance' });
     };
 
     const handleSaveEdit = async () => {
         if (!editingUser) return;
-        const success = await updateUserRole(editingUser.id, editForm.role, editForm.status);
+        const success = await updateUserRole(editingUser.id, editForm.role, editForm.status, editForm.department);
         if (success) {
             setEditingUser(null);
         } else {
@@ -47,7 +52,7 @@ const AdminPage = () => {
         const success = await addUser(addForm);
         if (success) {
             setIsAddModalOpen(false);
-            setAddForm({ username: '', email: '', password: '', role: 'approver' });
+            setAddForm({ username: '', email: '', password: '', role: 'approver', department: 'Non-Finance' });
         } else {
             toast.error('Failed to create user. Please try again.');
         }
@@ -81,6 +86,12 @@ const AdminPage = () => {
                                     value={editForm.status}
                                     options={statusOptions}
                                     onChange={(val) => setEditForm({ ...editForm, status: val })}
+                                />
+                                <Dropdown
+                                    label="Department"
+                                    value={editForm.department}
+                                    options={departmentOptions}
+                                    onChange={(val) => setEditForm({ ...editForm, department: val })}
                                 />
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
@@ -147,6 +158,12 @@ const AdminPage = () => {
                                     value={addForm.role}
                                     options={roleOptions}
                                     onChange={(val) => setAddForm({ ...addForm, role: val })}
+                                />
+                                <Dropdown
+                                    label="Department"
+                                    value={addForm.department}
+                                    options={departmentOptions}
+                                    onChange={(val) => setAddForm({ ...addForm, department: val })}
                                 />
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">

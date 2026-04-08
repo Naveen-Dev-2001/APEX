@@ -57,6 +57,17 @@ const UserManagementTab = ({ onEdit }) => {
             )
         },
         {
+            header: 'Department',
+            accessor: 'department',
+            sortable: true,
+            onClick: () => setSort('department'),
+            render: (department) => (
+                <span className={`text-[13px] font-medium text-gray-700 capitalize`}>
+                    {department || 'Non-Finance'}
+                </span>
+            )
+        },
+        {
             header: 'Status',
             accessor: 'status',
             sortable: true,

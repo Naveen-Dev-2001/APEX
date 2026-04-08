@@ -195,10 +195,10 @@ const useAdminStore = create((set, get) => ({
         }
     },
 
-    updateUserRole: async (userId, role, status) => {
+    updateUserRole: async (userId, role, status, department) => {
         set({ isUpdating: true });
         try {
-            await adminService.updateUserRole(userId, role, status);
+            await adminService.updateUserRole(userId, role, status, department);
             await get().fetchUsers();
             toast.success('User updated successfully');
             return true;
@@ -220,7 +220,7 @@ const useAdminStore = create((set, get) => ({
                 set({ 
                     users: oldUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u) 
                 });
-                await adminService.updateUserRole(userId, user.role, newStatus);
+                await adminService.updateUserRole(userId, user.role, newStatus, user.department || 'Non-Finance');
                 toast.success('User status updated');
             }
         } catch (error) {
