@@ -219,7 +219,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             return "";
         };
 
-        // Step 1: read current state snapshot for date calculations
         const prev = useInvoiceStore.getState().quickViewFormData;
         const extractedPayTerms = prev?.paymentTerms;
         const computedDueDate = getDueDate(
@@ -229,7 +228,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             vendor?.pay_terms
         );
 
-        // Step 2: update non-TDS fields via setQuickViewFormData (preserves isModified guard)
         setQuickViewFormData((p) => ({
             ...p,
             gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
@@ -239,9 +237,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             gst_eligibility: vendor?.gst_eligibility,
         }));
 
-        // Step 3: update TDS fields via batchUpdateQuickViewFields
-        // This ALWAYS recalculates _syncSystemRows (isModified = false path),
-        // so the TDS row appears/disappears correctly regardless of isModified.
         batchUpdateQuickViewFields({
             tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
             tdsRate: vendor?.tds_percentage ?? 0,
@@ -257,46 +252,22 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
 
     }, [vendor, selectedVendorId]);
 
+    useEffect(() => {
+        const { quickViewLineItems, quickViewFormData } = useInvoiceStore.getState();
 
-    // ── TDS row visibility: add/remove based on tdsApplicability + tdsRate ───
-    // The store always keeps GST row. TDS row is conditional.
-    // useEffect(() => {
-    //     const items = quickViewLineItems;
-    //     const hasTDS = items.some(i => i.type === "TDS");
-    //     const isTdsApplicable =
-    //         quickViewFormData?.tdsApplicability === "Yes" &&
-    //         Number(quickViewFormData?.tdsRate) > 0;
+        if (quickViewFormData?.lineGrouping === "Yes" && !quickViewFormData?.isModified) {
+            const grouped = useInvoiceStore.getState()._applyLineGrouping(
+                quickViewLineItems,
+                quickViewFormData
+            );
 
-    //     if (isTdsApplicable && !hasTDS) {
-    //         // Re-calculate TDS value immediately on add
-    //         const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
-    //         const totalInvoiceAmount = parseFloat(
-    //             quickViewFormData?.totalInvoiceAmount || quickViewFormData?.total_invoice_amount || 0
-    //         );
-    //         const tdsValue = -Math.abs((tdsRate / 100) * totalInvoiceAmount);
+            useInvoiceStore.setState({
+                quickViewLineItems: grouped
+            });
+        }
+    }, [quickViewFormData?.lineGrouping]);
 
-    //         useInvoiceStore.getState().setQuickViewLineItems([
-    //             ...items,
-    //             {
-    //                 id: "tds-row",
-    //                 type: "TDS",
-    //                 description: "TDS Deduction",
-    //                 qty: 1,
-    //                 unitPrice: tdsValue,
-    //                 discount: 0,
-    //                 netAmount: tdsValue,
-    //                 taxAmt: 0,
-    //                 isSystemRow: true,
-    //                 isNetAmountOverridden: false,
-    //             },
-    //         ]);
-    //     }
-
-    //     if (!isTdsApplicable && hasTDS) {
-    //         deleteQuickViewLineItem("tds-row");
-    //     }
-    // }, [quickViewFormData?.tdsApplicability, quickViewFormData?.tdsRate]);
-
+    // ── Vendor options ─────────────────────────────────────────────────────────
     const vendorOptions = useMemo(() => {
         if (!vendorsList?.length) return [];
         return vendorsList.map(v => ({
@@ -341,47 +312,28 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         setHighlightedField(null);
     }, [setHighlightedField]);
 
-    // ── Derived display values ─────────────────────────────────────────────────
-    // All values come directly from the store — GST/TDS rows are kept in sync
-    // by the store's _syncSystemRows helper, so we just read them here.
-    const { processedItems, totalAmountPayable } = useMemo(() => {
+    // ── Totals — derived directly from quickViewLineItems (single source of truth) ──
+    //
+    // regularItemsSum: sum of all non-system rows (used for "Total Sum Excl GST" label)
+    // totalAmountPayable: regularItemsSum + GST row + TDS row
+    //
+    // Because quickViewLineItems always reflects exactly what is on screen
+    // (grouping was applied at load time, edits mutate the state directly),
+    // these values are always correct.
+    const { regularItemsSum, totalAmountPayable } = useMemo(() => {
         const regularItems = quickViewLineItems.filter(row => !row.isSystemRow);
-        const systemRows = quickViewLineItems.filter(row => row.isSystemRow);
-        const isLineGrouped = quickViewFormData?.lineGrouping === "Yes";
+        const gstRow = quickViewLineItems.find(r => r.type === "GST");
+        const tdsRow = quickViewLineItems.find(r => r.type === "TDS");
 
-        const groupedRegular = isLineGrouped
-            ? (regularItems.length
-                ? [regularItems.reduce((acc, row) => ({
-                    id: "grouped-1",
-                    description: regularItems[0].description,
-                    qty: (acc.qty || 0) + (Number(row.qty) || 0),
-                    unitPrice: (acc.unitPrice || 0) + (Number(row.unitPrice) || 0),
-                    discount: (acc.discount || 0) + (Number(row.discount) || 0),
-                    netAmount: (acc.netAmount || 0) + (Number(row.netAmount) || 0),
-                    taxAmt: (acc.taxAmt || 0) + (Number(row.taxAmt) || 0),
-                }), {})]
-                : [])
-            : regularItems;
+        const regularItemsSum = regularItems.reduce(
+            (sum, row) => sum + (Number(row.netAmount) || 0),
+            0
+        );
+        const totalAmountPayable =
+            regularItemsSum + (Number(gstRow?.netAmount) || 0) + (Number(tdsRow?.netAmount) || 0);
 
-        // System rows always appear at the bottom
-        const processedItems = [...groupedRegular, ...systemRows];
-
-        // Total = sum of regular items + GST row netAmount + TDS row netAmount
-        const regularSum = regularItems.reduce((sum, row) => sum + Number(row.netAmount || 0), 0);
-        const gstRow = systemRows.find(r => r.type === "GST");
-        const tdsRow = systemRows.find(r => r.type === "TDS");
-        const totalAmountPayable = regularSum + (gstRow?.netAmount || 0) + (tdsRow?.netAmount || 0);
-
-        return { processedItems, totalAmountPayable };
-    }, [quickViewLineItems, quickViewFormData?.lineGrouping]);
-
-    // For the summary line "Total Sum of Line Items (Excl GST)"
-    const regularItemsSum = useMemo(() =>
-        quickViewLineItems
-            .filter(row => !row.isSystemRow)
-            .reduce((sum, row) => sum + parseFloat(row.netAmount || 0), 0),
-        [quickViewLineItems]
-    );
+        return { regularItemsSum, totalAmountPayable };
+    }, [quickViewLineItems]);
 
     // Label for the GST system row
     const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
@@ -440,9 +392,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {processedItems.map((row, index) => {
-                                                        // System rows (GST / TDS) use the label from the row itself.
-                                                        // For GST row specifically, override the label with gstTaxLabel.
+                                                    {/* ── Render quickViewLineItems directly — no derived processedItems ── */}
+                                                    {quickViewLineItems.map((row, index) => {
                                                         const isSystem = !!row.isSystemRow;
                                                         const rowLabel = row.type === "GST" ? gstTaxLabel : row.description;
 
@@ -455,7 +406,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                 {section.columns.map((col, colIndex) => (
                                                                     <td key={col.key} className="p-2 min-w-[150px]">
                                                                         {isSystem ? (
-                                                                            // System rows: render read-only CustomInput
+                                                                            // System rows: read-only display
                                                                             <LineItemCell
                                                                                 value={
                                                                                     colIndex === 0
@@ -474,9 +425,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                                                             ? "0"
                                                                                                             : ""
                                                                                 }
-
                                                                                 disabled={false}
-                                                                                onChange={() => { }}
                                                                                 rowId={row.id}
                                                                                 colKey={col.key}
                                                                                 onUpdate={handleUpdateLineItem}
@@ -484,7 +433,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                                 onLeave={handleLeaveField}
                                                                             />
                                                                         ) : (
-                                                                            // Regular rows: editable via LineItemCell
+                                                                            // Regular / grouped rows: fully editable
                                                                             <LineItemCell
                                                                                 value={row[col.key]}
                                                                                 disabled={!col.editable}
@@ -498,7 +447,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                     </td>
                                                                 ))}
                                                                 <td className="p-2 w-[60px]">
-                                                                    {/* Don't allow deleting system rows from UI */}
                                                                     {!isSystem && (
                                                                         <span
                                                                             className="text-red-500 cursor-pointer flex justify-center"

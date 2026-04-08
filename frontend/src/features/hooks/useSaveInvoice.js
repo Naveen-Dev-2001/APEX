@@ -15,34 +15,25 @@ export const useSaveInvoice = () => {
     const buildPayload = useCallback(() => {
         const f = quickViewFormData;
 
-        // ── Separate regular rows from system rows ────────────────────────────
-        // System rows (GST / TDS) are already in quickViewLineItems with their
-        // calculated values. We save ALL rows — regular first, then system — so
-        // on the next load handleView can reconstruct them with isSystemRow.
-        const regularRows = quickViewLineItems.filter(i => !i.isSystemRow);
-        const gstRow = quickViewLineItems.find(i => i.type === "GST");
-        const tdsRow = quickViewLineItems.find(i => i.type === "TDS");
-
-        // Build the ordered list: regular → GST → TDS (if present)
-        const allRows = [
-            ...quickViewLineItems,
-            // ...(gstRow ? [gstRow] : []),
-            // ...(tdsRow ? [tdsRow] : []),
-        ];
+        // ── Save exactly what is on screen ────────────────────────────────────
+        // getLineItemsForSave() returns quickViewLineItems as-is.
+        // No re-grouping, no re-calculation — what you see is what you save.
+        const lineItemsToSave = useInvoiceStore.getState().getLineItemsForSave();
 
         // ── Map to the server Items shape ─────────────────────────────────────
-        const mappedItems = allRows.map((item, index) => ({
+        const mappedItems = lineItemsToSave.map((item, index) => ({
             item_number: { value: index + 1, source: "system" },
-            description: { value: item.description, source: "user" },
+            description: { value: item.description ?? "", source: "user" },
             amount: { value: Number(item.netAmount) || 0, source: "user" },
             qty: { value: Number(item.qty) || 1, source: "user" },
             unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
             discount: { value: Number(item.discount) || 0, source: "user" },
             tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
+            // Preserve system-row metadata so on next load we can identify them
+            ...(item.isSystemRow ? { is_system_row: true, row_type: item.type } : {}),
         }));
 
         // ── Derived TDS deduction amount ──────────────────────────────────────
-        // tdsRate is a decimal (e.g. 0.10), totalInvoiceAmount is a number.
         const tdsRate = parseFloat(f.tdsRate || 0);
         const totalInvoiceAmount = parseFloat(f.totalInvoiceAmount || f.total_invoice_amount || 0);
         const tdsDeductionValue = -Math.abs(tdsRate * totalInvoiceAmount);
@@ -51,7 +42,7 @@ export const useSaveInvoice = () => {
         const updatedExtractedData = {
             ...activeInvoiceData.extracted_data,
 
-            // Mark as saved so the next load skips recalculation
+            // Mark as saved so the next load skips recalculation and grouping
             isModified: true,
 
             vendor_info: {
@@ -108,7 +99,6 @@ export const useSaveInvoice = () => {
                 SGST: { value: f.sgst },
                 IGST: { value: f.igst },
                 withholding_tax: { value: f.withholdingTax },
-                // TDS fields — persisted so they survive the isModified load path
                 tds_applicability: { value: f.tdsApplicability },
                 tds_rate: { value: f.tdsRate },
                 tds_section: { value: f.tdsSection },
@@ -122,7 +112,7 @@ export const useSaveInvoice = () => {
                 company_registration_number: { value: f.companyRegistrationNumber },
             },
 
-            // All rows (regular + GST + TDS) saved together
+            // Exactly what is on screen — regular rows + system rows
             Items: {
                 ...activeInvoiceData.extracted_data?.Items,
                 value: mappedItems,
@@ -157,7 +147,7 @@ export const useSaveInvoice = () => {
         console.log("Save response →", response);
 
         return response;
-    }, [buildPayload, setActiveInvoiceData]);
+    }, [buildPayload, setActiveInvoiceData, viewInvoiceId]);
 
     return { handleSave, buildPayload };
 };

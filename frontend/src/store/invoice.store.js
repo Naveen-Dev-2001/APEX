@@ -111,33 +111,26 @@ export const useInvoiceStore = create((set, get) => ({
     // ─────────────────────────────────────────────────────────────────────────
     // _syncSystemRows
     //
-    // Rebuilds the GST and (conditionally) TDS system rows at the bottom of
+    // Rebuilds the GST and (conditionally) TDS system rows at the END of
     // the line-items list.
     //
     // GUARD: if isModified === true the invoice was already saved with
-    // calculated values, so we preserve whatever is already in the system
-    // rows and do NOT recalculate. Recalculation only happens when the user
-    // explicitly edits a relevant field (isModified will be false/undefined
-    // in that path because we strip the flag on first user edit — see
-    // setQuickViewField / batchUpdateQuickViewFields).
+    // calculated values, so we preserve whatever is in the system rows
+    // and do NOT recalculate.
+    //
+    // NOTE: This function never touches regular rows or applies line grouping.
+    // Line grouping is handled exclusively in setQuickViewLineItems (load time).
     // ─────────────────────────────────────────────────────────────────────────
     _syncSystemRows: (formData, lineItems, isModified = false) => {
-        if (isModified) return lineItems;
-        if (!formData || !lineItems?.length) return lineItems;
-        const regularItems = lineItems.filter(i => !i.isSystemRow);
+        if (!formData || !lineItems?.length) return lineItems ?? [];
 
+        const regularItems = lineItems.filter(i => !i.isSystemRow);
         const existingGstRow = lineItems.find(i => i.type === "GST");
         const existingTdsRow = lineItems.find(i => i.type === "TDS");
 
-        let gstRow;
-        let tdsRow;
-        let isTdsApplicable;
         if (isModified) {
-
-            // ── Preserve the entire saved row as-is — no reconstruction ──────
-            // User may have manually edited qty / unitPrice / netAmount / taxAmt,
-            // so we keep the full existing object instead of rebuilding it.
-            gstRow = existingGstRow ?? {
+            // Preserve saved system rows exactly as-is
+            const gstRow = existingGstRow ?? {
                 id: "gst-row",
                 type: "GST",
                 description: "Total GST",
@@ -149,55 +142,88 @@ export const useInvoiceStore = create((set, get) => ({
                 isSystemRow: true,
                 isNetAmountOverridden: false,
             };
-
-            // TDS row: keep if it existed in the saved data
-            tdsRow = existingTdsRow ?? null;
-            isTdsApplicable = !!existingTdsRow;
-
-        } else {
-            // ── Recalculate from form fields ──────────────────────────────────
-            const gstValue = parseFloat(formData?.totalTaxAmount || 0);
-
-            const tdsRate = parseFloat(formData?.tdsRate || 0);
-            const totalInvoiceAmount = parseFloat(
-                formData?.totalInvoiceAmount || formData?.total_invoice_amount || 0
-            );
-            const tdsValue = -Math.abs(tdsRate * totalInvoiceAmount);
-            isTdsApplicable = formData?.tdsApplicability === "Yes";
-
-            gstRow = {
-                id: "gst-row",
-                type: "GST",
-                description: "Total GST",
-                qty: 1,
-                unitPrice: gstValue,
-                discount: 0,
-                netAmount: gstValue,
-                taxAmt: 0,
-                isSystemRow: true,
-                isNetAmountOverridden: false,
-            };
-
-            tdsRow = {
-                id: "tds-row",
-                type: "TDS",
-                description: "TDS Deduction",
-                qty: 1,
-                unitPrice: tdsValue,
-                discount: 0,
-                netAmount: tdsValue,
-                taxAmt: 0,
-                isSystemRow: true,
-                isNetAmountOverridden: false,
-            };
+            const systemRows = [gstRow, ...(existingTdsRow ? [existingTdsRow] : [])];
+            return [...regularItems, ...systemRows];
         }
 
-        const systemRows = [gstRow, ...(isTdsApplicable && tdsRow ? [tdsRow] : [])];
+        // Recalculate from form fields
+        const gstValue = parseFloat(formData?.totalTaxAmount || 0);
+        const tdsRate = parseFloat(formData?.tdsRate || 0);
+        const totalInvoiceAmount = parseFloat(
+            formData?.totalInvoiceAmount || formData?.total_invoice_amount || 0
+        );
+        const tdsValue = -Math.abs(tdsRate * totalInvoiceAmount);
+        const isTdsApplicable = formData?.tdsApplicability === "Yes";
+
+        const gstRow = {
+            id: "gst-row",
+            type: "GST",
+            description: "Total GST",
+            qty: 1,
+            unitPrice: gstValue,
+            discount: 0,
+            netAmount: gstValue,
+            taxAmt: 0,
+            isSystemRow: true,
+            isNetAmountOverridden: false,
+        };
+
+        const tdsRow = {
+            id: "tds-row",
+            type: "TDS",
+            description: "TDS Deduction",
+            qty: 1,
+            unitPrice: tdsValue,
+            discount: 0,
+            netAmount: tdsValue,
+            taxAmt: 0,
+            isSystemRow: true,
+            isNetAmountOverridden: false,
+        };
+
+        const systemRows = [gstRow, ...(isTdsApplicable ? [tdsRow] : [])];
         return [...regularItems, ...systemRows];
     },
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // _applyLineGrouping
+    //
+    // Merges all regular rows into a single grouped row (first row's
+    // description, summed numeric fields). Only called at initial load
+    // when isModified === false and lineGrouping === "Yes".
+    //
+    // System rows are always passed through untouched.
+    // ─────────────────────────────────────────────────────────────────────────
+    _applyLineGrouping: (items, formData) => {
+        const isLineGrouped = formData?.lineGrouping === "Yes";
+        const isModified = formData?.isModified;
+
+        // ❌ DO NOT group if already saved
+        if (!isLineGrouped || isModified) return items;
+
+        const regularItems = items.filter(i => !i.isSystemRow);
+        const systemRows = items.filter(i => i.isSystemRow);
+
+        if (regularItems.length === 0) return items;
+
+        const firstRow = regularItems[0];
+
+        const groupedRow = {
+            ...firstRow,
+            id: "grouped-1",
+            description: firstRow.description, // ✅ keep first row desc
+            qty: regularItems.reduce((s, r) => s + (Number(r.qty) || 0), 0),
+            unitPrice: regularItems.reduce((s, r) => s + (Number(r.unitPrice) || 0), 0),
+            discount: regularItems.reduce((s, r) => s + (Number(r.discount) || 0), 0),
+            netAmount: regularItems.reduce((s, r) => s + (Number(r.netAmount) || 0), 0),
+            taxAmt: regularItems.reduce((s, r) => s + (Number(r.taxAmt) || 0), 0),
+            isNetAmountOverridden: false,
+        };
+
+        return [groupedRow, ...systemRows];
+    },
+
     // ── Update single field ──────────────────────────────────────────────────
-    // Any user edit clears the isModified guard so recalculation runs.
     setQuickViewField: (key, value) =>
         set((state) => {
             const updatedFormData = {
@@ -213,9 +239,7 @@ export const useInvoiceStore = create((set, get) => ({
                 "total_invoice_amount",
             ];
 
-
             const updatedLineItems = triggerKeys.includes(key)
-                // User edited a relevant field → always recalculate (isModified = false)
                 ? get()._syncSystemRows(updatedFormData, state.quickViewLineItems, false)
                 : state.quickViewLineItems;
 
@@ -239,8 +263,6 @@ export const useInvoiceStore = create((set, get) => ({
             ];
 
             const hasTrigger = Object.keys(updates).some(k => triggerKeys.includes(k));
-
-            // Get isModified from form
             const isModified = updatedFormData?.isModified;
 
             const updatedLineItems = hasTrigger
@@ -249,46 +271,24 @@ export const useInvoiceStore = create((set, get) => ({
 
             return {
                 quickViewFormData: updatedFormData,
-                quickViewLineItems: updatedLineItems
+                quickViewLineItems: updatedLineItems,
             };
         }),
+
     // ── Replace full form (used on initial load & vendor sync) ───────────────
-    // Passes isModified through so the guard is respected on initial load.
-    setQuickViewFormData: (dataOrUpdater, isModified = false) =>
+    setQuickViewFormData: (dataOrUpdater) =>
         set((state) => {
             const updatedFormData =
                 typeof dataOrUpdater === "function"
                     ? dataOrUpdater(state.quickViewFormData)
                     : dataOrUpdater;
 
-            // Read isModified from the incoming formData.
-            // On initial load this comes from extracted_data.isModified (set by
-            // the caller in Invoice.jsx → handleView). On vendor-sync updates
-            // (useEffect in QuickViewTab) the functional updater preserves
-            // whatever isModified value was already in state, so the guard
-            // stays active until the user edits a trigger field.
-            const triggerKeys = [
-                "totalTaxAmount",
-                "tdsRate",
-                "tdsApplicability",
-                "totalInvoiceAmount",
-                "total_invoice_amount",
-            ];
-
-            const hasTrigger = Object.keys(updatedFormData).some(key =>
-                triggerKeys.includes(key)
-            );
-
-            // const updatedLineItems = hasTrigger
-            //     ? get()._syncSystemRows(updatedFormData, state.quickViewLineItems, isModified)
-            //     : state.quickViewLineItems;
-
             return { quickViewFormData: updatedFormData, quickViewLineItems: state.quickViewLineItems };
         }),
 
     // =============================
     //  QUICK VIEW - LINE ITEMS
-    // Default includes GST system row only (TDS hidden until applicable)
+    // Default includes GST system row only
     // =============================
     quickViewLineItems: [
         {
@@ -321,7 +321,6 @@ export const useInvoiceStore = create((set, get) => ({
             taxAmt: 0,
             isNetAmountOverridden: false,
         },
-        // ── System rows ──────────────────────────────────────────────────────
         {
             id: "gst-row",
             type: "GST",
@@ -334,11 +333,39 @@ export const useInvoiceStore = create((set, get) => ({
             isSystemRow: true,
             isNetAmountOverridden: false,
         },
-        // TDS row is NOT in the default list — it is added dynamically by
-        // _syncSystemRows only when tdsApplicability === "Yes" && tdsRate > 0
     ],
 
+    // ── Replace all line items (called from Invoice.jsx on initial load) ──────
+    //
+    // Rules:
+    //   • isModified === true  → saved invoice: store items exactly as-is,
+    //                            only rebuild system rows to ensure GST/TDS
+    //                            objects are correct, NO grouping.
+    //   • isModified === false → fresh/unsaved invoice: apply line grouping
+    //                            if lineGrouping === "Yes", then sync system rows.
+    // ─────────────────────────────────────────────────────────────────────────
+    setQuickViewLineItems: (items, isModified = false) =>
+        set((state) => {
+
+            const formData = {
+                ...state.quickViewFormData,
+                isModified
+            };
+
+            const grouped = get()._applyLineGrouping(items, formData);
+
+            return {
+                quickViewLineItems: get()._syncSystemRows(
+                    formData,
+                    grouped,
+                    isModified
+                ),
+            };
+        }),
+
     // ── Update table cell + auto-calculation ─────────────────────────────────
+    // quickViewLineItems is always the source of truth.
+    // Any edit (including on the grouped row) updates state directly.
     updateQuickViewLineItem: (id, key, value) =>
         set((state) => {
             const updatedItems = state.quickViewLineItems.map((item) => {
@@ -347,22 +374,29 @@ export const useInvoiceStore = create((set, get) => ({
                 let updated = { ...item, [key]: value };
 
                 if (!item.isSystemRow) {
-                    // ── Regular row ───────────────────────────────────────
+                    // ── Regular / grouped row ──────────────────────────────
                     if (key === "netAmount") {
                         updated.isNetAmountOverridden = true;
+                        if (value === "") {
+                            updated.netAmount = "";
+                            return updated;
+                        }
                     }
                     if (["qty", "unitPrice", "discount"].includes(key)) {
                         updated.isNetAmountOverridden = false;
                     }
                     if (!updated.isNetAmountOverridden) {
-                        const qty = Number((updated.qty || 0).toString().replace(/,/g, ""));
-                        const price = Number((updated.unitPrice || 0).toString().replace(/,/g, ""));
-                        const discount = Number((updated.discount || 0).toString().replace(/,/g, ""));
-                        updated.netAmount = qty * price - discount;
+                        const qty = Number((updated.qty ?? "").toString().replace(/,/g, ""));
+                        const price = Number((updated.unitPrice ?? "").toString().replace(/,/g, ""));
+                        const discount = Number((updated.discount ?? "").toString().replace(/,/g, ""));
+                        if (updated.qty === "" || updated.unitPrice === "" || updated.discount === "") {
+                            updated.netAmount = "";
+                        } else {
+                            updated.netAmount = qty * price - discount;
+                        }
                     }
                 } else {
-                    // ── System row (GST / TDS) ────────────────────────────
-                    // Keep unitPrice and netAmount in sync whichever is edited
+                    // ── System row (GST / TDS) ─────────────────────────────
                     if (key === "unitPrice") {
                         updated.netAmount = Number((value || 0).toString().replace(/,/g, ""));
                     } else if (key === "netAmount") {
@@ -376,7 +410,7 @@ export const useInvoiceStore = create((set, get) => ({
             return { quickViewLineItems: updatedItems };
         }),
 
-    // ── Delete row (only regular rows; system rows are not deletable from UI) ─
+    // ── Delete row (regular rows only) ────────────────────────────────────────
     deleteQuickViewLineItem: (id) =>
         set((state) => ({
             quickViewLineItems: state.quickViewLineItems.filter(i => i.id !== id),
@@ -400,22 +434,12 @@ export const useInvoiceStore = create((set, get) => ({
                 customer: "",
                 item: "",
                 isNetAmountOverridden: false,
+                isNewRow: true,
             };
             const regularItems = state.quickViewLineItems.filter(row => !row.isSystemRow);
             const systemRows = state.quickViewLineItems.filter(row => row.isSystemRow);
             return { quickViewLineItems: [...regularItems, newItem, ...systemRows] };
         }),
-
-    // ── Replace all line items (called from Invoice.jsx on initial load) ──────
-    // isModified is passed so the guard is respected.
-    setQuickViewLineItems: (items, isModified = false) =>
-        set((state) => ({
-            quickViewLineItems: get()._syncSystemRows(
-                state.quickViewFormData,
-                items,
-                isModified
-            ),
-        })),
 
     // =============================
     // TOTAL CALCULATION
@@ -438,8 +462,17 @@ export const useInvoiceStore = create((set, get) => ({
         quickViewFormData: {},
         quickViewLineItems: [],
         selectedVendorId: null,
-        activeInvoiceData: null
+        activeInvoiceData: null,
     }),
+
+    // ── Build final items for save ────────────────────────────────────────────
+    // Returns exactly what is visible on screen — no re-grouping.
+    // What the user sees is what gets saved.
+    getLineItemsForSave: () => {
+        const { quickViewLineItems } = get();
+        // Return all items (regular + system) exactly as they are in state
+        return quickViewLineItems;
+    },
 
     // =============================
     // PDF HIGHLIGHT
