@@ -7,6 +7,7 @@ import { AutoComplete } from "antd";
 import CustomInput from "../../../shared/components/CustomInput";
 import CustomDatePicker from "../../../shared/components/CustomDatePicker";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
+import { masterDataService } from "../../../api/masterdataAPI";
 import InvoiceCalculationModal from "./InvoiceCalculationModal";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -16,7 +17,7 @@ dayjs.extend(customParseFormat);
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
-const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, forceDisabled = false }) => {
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading }) => {
     const [localValue, setLocalValue] = useState(storeValue ?? "");
     const debounceRef = useRef(null);
 
@@ -70,18 +71,33 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
                         height="40px"
                     />
                 );
-            case "dropdown":
+            case "dropdown": {
+                let options = field.options || [];
+                let loading = false;
+                let onDropdownVisibleChange = undefined;
+                if (field.key === "invoiceCurrency") {
+                    options = currencyOptions;
+                    loading = currencyLoading;
+                    onDropdownVisibleChange = (open) => {
+                        if (open && options.length === 0 && !loading) {
+                            fetchCurrencyOptions();
+                        }
+                    };
+                }
                 return (
                     <CustomDropdown
                         {...commonProps}
                         label={null}
-                        options={field.options || []}
+                        options={options}
+                        loading={loading}
                         style={{ width: "100%", borderRadius: "8px", height: "40px" }}
                         onChange={(val) => handleChange(val)}
                         filterOption={filterVendors}
                         placement="bottomLeft"
+                        onDropdownVisibleChange={onDropdownVisibleChange}
                     />
                 );
+            }
             case "date":
                 return (
                     <CustomDatePicker
@@ -159,6 +175,19 @@ LineItemCell.displayName = "LineItemCell";
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
+    const [currencyOptions, setCurrencyOptions] = useState([]);
+    const [currencyLoading, setCurrencyLoading] = useState(false);
+    const fetchCurrencyOptions = useCallback(async () => {
+        setCurrencyLoading(true);
+        try {
+            const data = await masterDataService.getCurrencyData();
+            // Expecting data as array of { code, name, ... }
+            const options = (data || []).map(c => ({ label: `${c.symbol ? c.symbol + ' ' : ''}${c.code}`, value: c.code }));
+            setCurrencyOptions(options);
+        } finally {
+            setCurrencyLoading(false);
+        }
+    }, []);
     const {
         quickViewFormData,
         setQuickViewField,
@@ -277,7 +306,43 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [vendorsList]);
 
     const handleCommit = useCallback((key, value) => {
-        setQuickViewField(key, value);
+        if (key === "invoiceDate") {
+            // Get current form data and vendor info
+            const state = useInvoiceStore.getState();
+            const prev = state.quickViewFormData;
+            const vendor = state.vendor || {};
+            // Helper functions (copied from above)
+            const parseDateFlexible = (dateStr) => {
+                if (!dateStr) return null;
+                const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
+                for (const fmt of formats) {
+                    const d = dayjs(dateStr, fmt, true);
+                    if (d.isValid()) return d;
+                }
+                const d = dayjs(dateStr);
+                return d.isValid() ? d : null;
+            };
+            const extractDays = (payTerms) => {
+                if (!payTerms) return null;
+                const match = payTerms.match(/\d+/);
+                return match ? parseInt(match[0], 10) : null;
+            };
+            const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
+                // Always recalculate due date on invoiceDate change
+                const baseDate = parseDateFlexible(invoiceDate);
+                if (!baseDate) return "";
+                const invoiceDays = extractDays(prev?.paymentTerms);
+                if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
+                const vendorDays = extractDays(vendor?.pay_terms);
+                if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
+                return "";
+            };
+            const newDueDate = getDueDate(null, value, prev?.paymentTerms, vendor?.pay_terms);
+            setQuickViewField("invoiceDate", value);
+            setQuickViewField("dueDate", newDueDate);
+        } else {
+            setQuickViewField(key, value);
+        }
     }, [setQuickViewField]);
 
     const filterVendors = useCallback((input, option) =>
@@ -358,19 +423,27 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                         })
                                         .map(field => (
                                             <div key={field.key} className="flex flex-col justify-start">
-                                                <FieldRenderer
-                                                    field={field}
-                                                    storeValue={quickViewFormData?.[field.key] ?? ""}
-                                                    onCommit={handleCommit}
-                                                    vendorOptions={vendorOptions}
-                                                    filterVendors={filterVendors}
-                                                    onVendorSelect={handleVendorSelect}
-                                                    onHover={handleHoverField}
-                                                    onLeave={handleLeaveField}
-                                                    isDuplicate={isDuplicate}
-                                                    duplicateMessage={duplicateMessage}
-                                                    forceDisabled={showOnlyHeader}
-                                                />
+                                                {field.key === "exchangeRate" && (quickViewFormData?.invoiceCurrency ?? "USD") === "USD"
+                                                    ? null
+                                                    : (
+                                                        <FieldRenderer
+                                                            field={field}
+                                                            storeValue={quickViewFormData?.[field.key] ?? ""}
+                                                            onCommit={handleCommit}
+                                                            vendorOptions={vendorOptions}
+                                                            filterVendors={filterVendors}
+                                                            onVendorSelect={handleVendorSelect}
+                                                            onHover={handleHoverField}
+                                                            onLeave={handleLeaveField}
+                                                            isDuplicate={isDuplicate}
+                                                            duplicateMessage={duplicateMessage}
+                                                            forceDisabled={showOnlyHeader}
+                                                            currencyOptions={currencyOptions}
+                                                            fetchCurrencyOptions={fetchCurrencyOptions}
+                                                            currencyLoading={currencyLoading}
+                                                        />
+                                                    )
+                                                }
                                             </div>
                                         ))}
                                 </div>

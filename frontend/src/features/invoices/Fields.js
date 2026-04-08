@@ -10,15 +10,8 @@ export const QUICK_VIEW_CONFIG = [
             { key: "dueDate", label: "Due Date", type: "date", editable: true },
             { key: "paymentTerms", label: "Payment Terms", type: "input", editable: true },
             {
-                key: "invoiceCurrency", label: "Invoice Currency", type: "dropdown", editable: true,
-                options: [
-                    { label: "$ USD", value: "USD" },
-                    { label: "€ EUR", value: "EUR" },
-                    { label: "£ GBP", value: "GBP" },
-                    { label: "₹ INR", value: "INR" },
-                    { label: "C$ CAD", value: "CAD" },
-                    { label: "A$ AUD", value: "AUD" },
-                ]
+                key: "invoiceCurrency", label: "Invoice Currency", type: "dropdown", editable: true
+                // options will be injected dynamically
             },
             {
                 key: "exchangeRate", label: "Exchange Rate", type: "input", editable: true,

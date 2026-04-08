@@ -26,8 +26,8 @@ def create_database_if_not_exists():
     # Handles both formats:
     #   mssql+pymssql://user:pass@host:port/accounts_payable
     #   mssql+pymssql://user:pass@host:port/accounts_payable?...
-    if "/accounts_payable" in db_url:
-        master_url = db_url.replace("/accounts_payable", "/master", 1)
+    if "/apex" in db_url:
+        master_url = db_url.replace("/apex", "/master", 1)
     else:
         # Fallback: append /master
         master_url = db_url.rsplit("/", 1)[0] + "/master"
@@ -38,12 +38,12 @@ def create_database_if_not_exists():
         master_engine = create_engine(master_url, isolation_level="AUTOCOMMIT")
         with master_engine.connect() as conn:
             result = conn.execute(
-                text("SELECT COUNT(*) FROM sys.databases WHERE name = 'accounts_payable'")
+                text("SELECT COUNT(*) FROM sys.databases WHERE name = 'apex'")
             )
             count = result.scalar()
             if count == 0:
-                conn.execute(text("CREATE DATABASE accounts_payable"))
-                print("✓ Database 'accounts_payable' created successfully")
+                conn.execute(text("CREATE DATABASE apex"))
+                print("✓ Database 'apex' created successfully")
             else:
                 print("✓ Database 'accounts_payable' already exists")
         master_engine.dispose()
