@@ -99,18 +99,6 @@ const SettingsPage = () => {
 
     const vendorColumns = [
         { header: 'Vendor Name', accessor: 'vendor_name', sortable: true },
-        {
-            header: 'Type',
-            accessor: 'is_parallel',
-            render: (val) => (
-                <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
-                    ${val 
-                        ? 'bg-blue-50 text-blue-600 border-blue-100' 
-                        : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
-                    {val ? 'Parallel' : 'Sequential'}
-                </span>
-            )
-        },
         { 
             header: 'Approver 1', 
             accessor: 'mandatory_approver_1',

@@ -108,7 +108,6 @@ async def create_vendor_workflow(
             "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
             "amount_threshold": workflow.amount_threshold,
             "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "is_parallel": workflow.is_parallel,
             "created_at": datetime.utcnow()
         }
         new_workflow = vendor_workflow_repo.create(db, obj_in=new_wf_data)
@@ -149,7 +148,6 @@ async def update_vendor_workflow(
             "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
             "amount_threshold": workflow.amount_threshold,
             "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "is_parallel": workflow.is_parallel,
             "entity": entity,
             "updated_at": datetime.utcnow()
         }

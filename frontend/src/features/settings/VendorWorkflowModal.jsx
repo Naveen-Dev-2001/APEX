@@ -15,8 +15,7 @@ const EMPTY_FORM = {
     threshold_approver: [],
     amount_threshold: '',
     approver_count: 1,
-    enableThreshold: 'No',
-    is_parallel: true
+    enableThreshold: 'No'
 };
 
 const FormField = ({ label, id, value, onChange, type = "text", placeholder = '', required = false }) => (
@@ -87,8 +86,7 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
                 threshold_approver: Array.isArray(rowData.threshold_approver) ? rowData.threshold_approver : (rowData.threshold_approver ? [rowData.threshold_approver] : []),
                 amount_threshold: rowData.amount_threshold || '',
                 approver_count: rowData.approver_count || 1,
-                enableThreshold: (rowData.threshold_approver && rowData.threshold_approver.length > 0) ? 'Yes' : 'No',
-                is_parallel: true
+                enableThreshold: (rowData.threshold_approver && rowData.threshold_approver.length > 0) ? 'Yes' : 'No'
             });
         }
     }, [isEdit, rowData]);

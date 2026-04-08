@@ -14,7 +14,6 @@ class VendorWorkflow(BaseModel):
     threshold_approver: Optional[Union[EmailStr, List[EmailStr]]] = None
     amount_threshold: Optional[float] = None
     approver_count: int = 1
-    is_parallel: bool = False
 
     entity: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -48,7 +47,6 @@ class VendorWorkflowResponse(BaseModel):
     threshold_approver: Optional[Union[str, List[str]]] = None
     amount_threshold: Optional[float] = None
     approver_count: int
-    is_parallel: bool = False
 
     entity: str
     created_at: datetime
