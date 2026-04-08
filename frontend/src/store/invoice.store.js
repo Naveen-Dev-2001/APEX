@@ -213,7 +213,7 @@ export const useInvoiceStore = create((set, get) => ({
         const groupedRow = {
             ...firstRow,
             id: "grouped-1",
-            description: firstRow.description, // ✅ keep first row desc
+            description: firstRow.description, //  keep first row desc
             qty: regularItems.reduce((s, r) => s + (Number(r.qty) || 0), 0),
             unitPrice: regularItems.reduce((s, r) => s + (Number(r.unitPrice) || 0), 0),
             discount: regularItems.reduce((s, r) => s + (Number(r.discount) || 0), 0),
@@ -267,8 +267,11 @@ export const useInvoiceStore = create((set, get) => ({
             const hasTrigger = Object.keys(updates).some(k => triggerKeys.includes(k));
             const isModified = updatedFormData?.isModified;
 
+            // ── IMPORTANT: when trigger keys are being updated (vendor sync),
+            // always recalculate system rows regardless of isModified.
+            // isModified only guards the initial load, not vendor changes.
             const updatedLineItems = hasTrigger
-                ? get()._syncSystemRows(updatedFormData, state.quickViewLineItems, isModified)
+                ? get()._syncSystemRows(updatedFormData, state.quickViewLineItems, false)
                 : state.quickViewLineItems;
 
             return {
