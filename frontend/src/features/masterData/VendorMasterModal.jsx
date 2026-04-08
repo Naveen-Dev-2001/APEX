@@ -53,7 +53,7 @@ const FormField = ({ label, id, value, onChange, readOnly = false, placeholder =
 const ToggleSwitch = ({ label, checked, onChange, activeLabel = "Yes", inactiveLabel = "No" }) => (
     <div className="flex flex-col gap-2 w-full">
         <label className="text-[13px] font-medium text-[#666666]">{label}</label>
-        <div 
+        <div
             onClick={() => onChange(!checked)}
             className={`relative w-[64px] h-[24px] rounded-full cursor-pointer transition-all duration-200 flex items-center px-1
                 ${checked ? 'bg-[#24A1DD]' : 'bg-[#D1D5DB]'}`}
@@ -67,7 +67,7 @@ const ToggleSwitch = ({ label, checked, onChange, activeLabel = "Yes", inactiveL
                 {inactiveLabel}
             </div>
             <div className={`w-[18px] h-[18px] bg-white rounded-full shadow-sm transition-all duration-200 transform
-                ${checked ? 'translate-x-[36px]' : 'translate-x-0'}`} 
+                ${checked ? 'translate-x-[36px]' : 'translate-x-0'}`}
             />
         </div>
     </div>
