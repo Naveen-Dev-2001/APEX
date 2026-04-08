@@ -89,8 +89,8 @@ const Invoice = () => {
             isModified,
 
             // Header
-            vendorId: data.vendor_id ?? "",
-            vendorName: data.vendor_name ?? "",
+            vendorId: data.extracted_data.vendor_info.vendor_id.value ?? "",
+            vendorName: data.extracted_data.vendor_info.name.value ?? "",
             invoiceNumber: data.invoice_number ?? "",
             invoiceDate: data.extracted_data?.invoice_details?.invoice_date?.value ?? "",
             dueDate: data.extracted_data?.invoice_details?.due_date?.value ?? "",
@@ -160,9 +160,6 @@ const Invoice = () => {
         });
 
         // ── Line items ───────────────────────────────────────────────────────
-        // The saved Items array already includes the GST and TDS system rows
-        // (saved by useSaveInvoice). We map them back, preserving isSystemRow
-        // so _syncSystemRows can identify and keep them as-is when isModified.
         const items = data?.extracted_data?.Items?.value || [];
         const mappedItems = items.map((item, index) => {
             const desc = item.description?.value || "";
@@ -172,7 +169,6 @@ const Invoice = () => {
             const discount = Number(item.discount?.value) || 0;
             const taxAmt = Number(item.tax_amount?.value) || 0;
 
-            // Re-attach isSystemRow so the store knows which rows are system rows
             const isGst = desc === "Total GST" || desc === "Total Tax";
             const isTds = desc === "TDS Deduction";
 
@@ -189,9 +185,29 @@ const Invoice = () => {
                 isNetAmountOverridden: false,
             };
         });
-        // setQuickViewLineItems([], false);
-        // Pass isModified so _syncSystemRows skips recalculation on saved invoices
+
+        // ── Original items (pre-grouping source of truth) ──────────────────────
+        // OriginalItems is saved separately by useSaveInvoice — always holds the
+        // raw ungrouped rows without system rows.
+        // Falls back to regular rows from Items for invoices saved before this feature.
+        const originalItems = data?.extracted_data?.OriginalItems?.value || [];
+        const mappedOriginalItems = originalItems.length
+            ? originalItems.map((item, index) => ({
+                id: index + 1,
+                description: item.description?.value || "",
+                qty: Number(item.qty?.value) || 1,
+                unitPrice: Number(item.unit_price?.value) || 0,
+                discount: Number(item.discount?.value) || 0,
+                netAmount: Number(item.amount?.value) || 0,
+                taxAmt: Number(item.tax_amount?.value) || 0,
+                isNetAmountOverridden: false,
+            }))
+            : mappedItems.filter(i => !i.isSystemRow); // fallback for legacy saved invoices
+
+        // mappedItems drives the visible table (may be grouped),
+        // mappedOriginalItems is the restore source for lineGrouping toggles.
         setQuickViewLineItems(mappedItems, isModified);
+        useInvoiceStore.setState({ originalLineItems: mappedOriginalItems });
         setViewInvoiceId(id);
         setSelectedVendorId(data.vendor_id);
         setInvoiceSection(2);

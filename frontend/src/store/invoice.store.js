@@ -185,6 +185,8 @@ export const useInvoiceStore = create((set, get) => ({
         return [...regularItems, ...systemRows];
     },
 
+    originalLineItems: [],
+
     // ─────────────────────────────────────────────────────────────────────────
     // _applyLineGrouping
     //
@@ -198,8 +200,8 @@ export const useInvoiceStore = create((set, get) => ({
         const isLineGrouped = formData?.lineGrouping === "Yes";
         const isModified = formData?.isModified;
 
-        // ❌ DO NOT group if already saved
-        if (!isLineGrouped || isModified) return items;
+        // DO NOT group if already saved
+        if (!isLineGrouped) return items;
 
         const regularItems = items.filter(i => !i.isSystemRow);
         const systemRows = items.filter(i => i.isSystemRow);
@@ -346,15 +348,14 @@ export const useInvoiceStore = create((set, get) => ({
     // ─────────────────────────────────────────────────────────────────────────
     setQuickViewLineItems: (items, isModified = false) =>
         set((state) => {
-
             const formData = {
                 ...state.quickViewFormData,
                 isModified
             };
-
             const grouped = get()._applyLineGrouping(items, formData);
-
             return {
+                // Save raw items (before grouping) so vendor change can restore them
+                originalLineItems: items,
                 quickViewLineItems: get()._syncSystemRows(
                     formData,
                     grouped,
@@ -461,6 +462,7 @@ export const useInvoiceStore = create((set, get) => ({
     resetQuickView: () => set({
         quickViewFormData: {},
         quickViewLineItems: [],
+        originalLineItems: [],
         selectedVendorId: null,
         activeInvoiceData: null,
     }),

@@ -164,6 +164,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         setQuickViewField,
         activeInvoiceData,
         quickViewLineItems,
+        originalLineItems,
+        setQuickViewLineItems,
         updateQuickViewLineItem,
         deleteQuickViewLineItem,
         selectedVendorId,
@@ -253,16 +255,35 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [vendor, selectedVendorId]);
 
     useEffect(() => {
-        const { quickViewLineItems, quickViewFormData } = useInvoiceStore.getState();
+        debugger
+        const state = useInvoiceStore.getState();
+        const { quickViewFormData: fd, originalLineItems } = state;
 
-        if (quickViewFormData?.lineGrouping === "Yes" && !quickViewFormData?.isModified) {
+        if (!originalLineItems?.length) return;
+
+        const isModified = !!fd?.isModified;
+
+        if (fd?.lineGrouping === "Yes") {
+            // Apply grouping — works for both fresh and saved invoices
             const grouped = useInvoiceStore.getState()._applyLineGrouping(
-                quickViewLineItems,
-                quickViewFormData
+                originalLineItems,
+                fd
             );
-
             useInvoiceStore.setState({
-                quickViewLineItems: grouped
+                quickViewLineItems: useInvoiceStore.getState()._syncSystemRows(
+                    fd,
+                    grouped,
+                    isModified
+                ),
+            });
+        } else {
+            // lineGrouping changed to "No" — restore original rows with system rows synced
+            useInvoiceStore.setState({
+                quickViewLineItems: useInvoiceStore.getState()._syncSystemRows(
+                    fd,
+                    originalLineItems,
+                    isModified
+                ),
             });
         }
     }, [quickViewFormData?.lineGrouping]);
