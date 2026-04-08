@@ -208,6 +208,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         duplicateMessage,
     } = useInvoiceStore();
 
+    const VIEW_ONLY_STATUSES = ["WAITING_CODING"];
+
     const { vendorsList } = useVendersListSync();
     const { vendor } = useVendorDetailSync(selectedVendorId);
     const [showCalcModal, setShowCalcModal] = useState(false);
@@ -284,16 +286,15 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [vendor, selectedVendorId]);
 
     useEffect(() => {
-        debugger
         const state = useInvoiceStore.getState();
         const { quickViewFormData: fd, originalLineItems } = state;
 
         if (!originalLineItems?.length) return;
 
-        const isModified = !!fd?.isModified;
-
+        // Always pass isModified: false here — lineGrouping change is triggered by
+        // vendor sync, which means system rows must recalculate from current form
+        // values (tdsApplicability, tdsRate, totalTaxAmount) regardless of save state.
         if (fd?.lineGrouping === "Yes") {
-            // Apply grouping — works for both fresh and saved invoices
             const grouped = useInvoiceStore.getState()._applyLineGrouping(
                 originalLineItems,
                 fd
@@ -302,16 +303,15 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 quickViewLineItems: useInvoiceStore.getState()._syncSystemRows(
                     fd,
                     grouped,
-                    isModified
+                    false  // ← recalculate always on vendor change
                 ),
             });
         } else {
-            // lineGrouping changed to "No" — restore original rows with system rows synced
             useInvoiceStore.setState({
                 quickViewLineItems: useInvoiceStore.getState()._syncSystemRows(
                     fd,
                     originalLineItems,
-                    isModified
+                    false  // ← recalculate always on vendor change
                 ),
             });
         }
@@ -424,6 +424,10 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     // Label for the GST system row
     const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
 
+    const isViewOnly = VIEW_ONLY_STATUSES
+        .map(s => s.toLowerCase())
+        .includes(activeInvoiceData?.status?.toLowerCase());
+
     return (
         <div className="p-2">
             {QUICK_VIEW_CONFIG
@@ -458,7 +462,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                             onLeave={handleLeaveField}
                                                             isDuplicate={isDuplicate}
                                                             duplicateMessage={duplicateMessage}
-                                                            forceDisabled={showOnlyHeader}
+                                                            forceDisabled={showOnlyHeader || isViewOnly}
                                                             currencyOptions={currencyOptions}
                                                             fetchCurrencyOptions={fetchCurrencyOptions}
                                                             currencyLoading={currencyLoading}
@@ -519,7 +523,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                                                             ? "0"
                                                                                                             : ""
                                                                                 }
-                                                                                disabled={false}
+                                                                                disabled={isViewOnly}
                                                                                 rowId={row.id}
                                                                                 colKey={col.key}
                                                                                 onUpdate={handleUpdateLineItem}
@@ -530,12 +534,13 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                             // Regular / grouped rows: fully editable
                                                                             <LineItemCell
                                                                                 value={row[col.key]}
-                                                                                disabled={!col.editable}
+                                                                                disabled={!col.editable || isViewOnly}
                                                                                 rowId={row.id}
                                                                                 colKey={col.key}
                                                                                 onUpdate={handleUpdateLineItem}
                                                                                 onHover={handleHoverLineItem}
                                                                                 onLeave={handleLeaveField}
+
                                                                             />
                                                                         )}
                                                                     </td>
