@@ -25,7 +25,7 @@ const CustomDatePicker = ({
                 value={value ? dayjs(value) : null}
                 format="MM-DD-YYYY"
                 onChange={(date, dateString) => {
-                    onChange(dateString);
+                    onChange(date, dateString);
                 }}
                 style={{ width: "100%", borderRadius: "8px", height: "40px" }}
                 status={error ? "error" : ""}
