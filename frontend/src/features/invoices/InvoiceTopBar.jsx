@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate()
-    const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView } = useInvoiceStore();
+    const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView, activeInvoiceData } = useInvoiceStore();
     const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
 
@@ -22,6 +22,20 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             navigate('/coding')
         } else {
             toast.error(payload?.message || "Something went wrong while sending for coding.");
+        }
+    };
+
+    const handleSendToApproval = async () => {
+        const response = await handleSave()
+        if (!response) return;
+
+        const payload = await saveInvoice(viewInvoiceId, { status: 'waiting_approval' })
+        console.log("Send to approval →", payload);
+        if (payload.status == "waiting_approval") {
+            toast.success("Invoice sent for approval successfully!")
+            navigate('/coding') // Or wherever appropriate
+        } else {
+            toast.error(payload?.message || "Something went wrong while sending for approval.");
         }
     };
 
@@ -74,18 +88,34 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                         Save
                     </CustomButton>
                 </div>
-                <div className="w-[180px]">
 
-                    {/* Send to Coding - Green button */}
-                    <CustomButton
-                        variant="success"
-                        className="w-40"
-                        disabled={isDuplicate}
-                        onClick={handleSendToCoding}
-                    >
-                        Send to Coding
-                    </CustomButton>
-                </div>
+                {activeInvoiceData?.status === "processed" && (
+                    <div className="w-[180px]">
+                        {/* Send to Coding - Green button */}
+                        <CustomButton
+                            variant="success"
+                            className="w-40"
+                            disabled={isDuplicate}
+                            onClick={handleSendToCoding}
+                        >
+                            Send to Coding
+                        </CustomButton>
+                    </div>
+                )}
+
+                {activeInvoiceData?.status === "waiting_coding" && (
+                    <div className="w-[180px]">
+                        {/* Send to Approval - Info/Blue button */}
+                        <CustomButton
+                            variant="primary"
+                            className="w-40 bg-blue-600 hover:bg-blue-700 border-none"
+                            disabled={isDuplicate}
+                            onClick={handleSendToApproval}
+                        >
+                            Send to Approval
+                        </CustomButton>
+                    </div>
+                )}
             </div>
         </div>
     );

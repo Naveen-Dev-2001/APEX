@@ -73,17 +73,6 @@ def update_coding_history(db: Session, vendor_name: str, line_items: List[LineIt
             if not item.gl_code:
                 continue
 
-            # Skip system-generated lines from polluting history
-            if item.gl_code in ["TDS_PAYABLE", "GST_INPUT", "GST_PAYABLE"]:
-                continue
-            
-            if item.description and (
-                item.description.startswith("TDS Deduction") or 
-                item.description.startswith("Total GST") or
-                item.description.startswith("GST for item")
-            ):
-                continue
-
             norm_desc = normalize_description(item.description)
             embedding = embed_text(norm_desc)
             

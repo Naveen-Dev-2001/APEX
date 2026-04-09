@@ -84,6 +84,13 @@ const CodingTab = () => {
         addQuickViewLineItem
     } = useInvoiceStore();
 
+    useEffect(() => {
+        console.log("rows", rows);
+    }, [rows]);
+
+    console.log("rows==============>", rows);
+
+
     // ── Selection state ──
     const [selectedIds, setSelectedIds] = useState(new Set());
 

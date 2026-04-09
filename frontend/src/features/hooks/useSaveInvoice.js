@@ -29,6 +29,11 @@ export const useSaveInvoice = () => {
             unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
             discount: { value: Number(item.discount) || 0, source: "user" },
             tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
+            gl_code: { value: item.glCode || "", source: "user" },
+            lob: { value: item.lob || "", source: "user" },
+            department: { value: item.department || "", source: "user" },
+            customer: { value: item.customer || "", source: "user" },
+            item: { value: item.item || "", source: "user" },
             ...(item.isSystemRow ? { is_system_row: true, row_type: item.type } : {}),
         }));
 
@@ -163,11 +168,15 @@ export const useSaveInvoice = () => {
         const object = {
             extracted_data: payload.extracted_data,   // already has isModified: true
             exchange_rate: null,
-            vender_id: payload.vendor_id,
+            vendor_id: payload.vendor_id,
         };
 
         const response = await saveInvoice(viewInvoiceId, object);
         console.log("Save response →", response);
+
+        if (response && response.status) {
+            setActiveInvoiceData(response);
+        }
 
         return response;
     }, [buildPayload, setActiveInvoiceData, viewInvoiceId]);

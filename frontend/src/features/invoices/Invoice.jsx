@@ -72,6 +72,7 @@ const Invoice = () => {
     };
 
     const handleView = useCallback((data) => {
+        console.log(".............", data);
         const id = Number(data.id);
         if (!id) return;
 
@@ -183,9 +184,14 @@ const Invoice = () => {
                 taxAmt,
                 isSystemRow: isGst || isTds,
                 isNetAmountOverridden: false,
+                // --- Coding Fields ---
+                glCode: item.gl_code?.value || "",
+                lob: item.lob?.value || "",
+                department: item.department?.value || "",
+                customer: item.customer?.value || "",
+                item: item.item?.value || "",
             };
         });
-
         // ── Original items (pre-grouping source of truth) ──────────────────────
         // OriginalItems is saved separately by useSaveInvoice — always holds the
         // raw ungrouped rows without system rows.
