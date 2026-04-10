@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate()
-    const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView } = useInvoiceStore();
+    const { setInvoiceSection, setInvoiceActiveTab, isDuplicate, viewInvoiceId, resetQuickView } = useInvoiceStore();
     const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
 
@@ -35,6 +35,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     const Back = () => {
         resetQuickView();
         setInvoiceSection(1)
+        setInvoiceActiveTab("Quick View")
     }
 
     return (
