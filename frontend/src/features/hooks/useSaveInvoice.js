@@ -6,10 +6,10 @@ import { useCallback } from "react";
 export const useSaveInvoice = () => {
     const {
         quickViewFormData,
-        quickViewLineItems,
         activeInvoiceData,
         setActiveInvoiceData,
         viewInvoiceId,
+        lineItems
     } = useInvoiceStore();
 
     const buildPayload = useCallback(() => {
@@ -17,7 +17,7 @@ export const useSaveInvoice = () => {
         const f = quickViewFormData;
 
         // ── Save exactly what is on screen ────────────────────────────────────
-        const lineItemsToSave = useInvoiceStore.getState().getLineItemsForSave();
+        const lineItemsToSave = lineItems;
         const originalLineItems = useInvoiceStore.getState().originalLineItems;
 
         // ── Map to the server Items shape ─────────────────────────────────────
@@ -64,6 +64,7 @@ export const useSaveInvoice = () => {
 
             // Mark as saved so the next load skips recalculation and grouping
             isModified: true,
+            lineItemsSnapshot: lineItems,
 
             vendor_info: {
                 ...activeInvoiceData.extracted_data?.vendor_info,
@@ -151,7 +152,7 @@ export const useSaveInvoice = () => {
         };
 
         return payload;
-    }, [quickViewFormData, quickViewLineItems, activeInvoiceData]);
+    }, [quickViewFormData, lineItems, activeInvoiceData]);
 
     const handleSave = useCallback(async () => {
         debugger

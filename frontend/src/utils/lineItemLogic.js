@@ -1,0 +1,164 @@
+
+const normalizeItems = (items) => {
+    return items.map((item, index) => ({
+        id: `${index}`,
+        qty: Number(item.quantity?.value || 0),
+        unitPrice: Number(item.unit_price?.value || 0),
+        discount: Number(0),
+        netAmount: Number(item.amount?.value || 0),
+        description: item.description?.value || "",
+        taxAmt: 0,
+
+        lineType: "",
+        glCode: "",
+        lob: "",
+        department: "",
+        customer: "",
+        item: "",
+    }));
+};
+
+const calculateNetAmount = (row) => {
+    const qty = Number(row.qty || 0);
+    const unitPrice = Number(row.unitPrice || 0);
+    const discount = Number(row.discount || 0);
+
+    return (qty * unitPrice) - discount;
+};
+
+const mergeIntoFirstRow = (data) => {
+    if (!data || data.length === 0) return [];
+
+    const updatedData = JSON.parse(JSON.stringify(data));
+
+    //  sum all rows
+    const totalNetAmount = updatedData.reduce((sum, row) => {
+        return sum + Number(row.netAmount || 0);
+    }, 0);
+
+    const totalQty = updatedData.reduce((sum, row) => {
+        return sum + Number(row.qty || 0);
+    }, 0);
+
+    const totalUnitPrice = updatedData.reduce((sum, row) => {
+        return sum + Number(row.unitPrice || 0);
+    }, 0);
+
+    const totalDiscount = updatedData.reduce((sum, row) => {
+        return sum + Number(row.discount || 0);
+    }, 0);
+
+    //  update first row
+    updatedData[0].netAmount = totalNetAmount;
+    updatedData[0].qty = totalQty;
+    updatedData[0].unitPrice = totalUnitPrice;
+    updatedData[0].discount = totalDiscount;
+
+    return [updatedData[0]]; // only one grouped row
+};
+
+const addSystemRows = (rows, formData) => {
+
+    let result = [...rows];
+
+    //  GST
+    const gstValue = Number(formData?.totalTaxAmount || 0);
+
+    const gstRow = {
+        id: "gst-row",
+        type: "GST",
+        description: "Total GST",
+        qty: 1,
+        unitPrice: gstValue,
+        discount: 0,
+        netAmount: gstValue,
+        taxAmt: 0,
+        isSystemRow: true,
+
+        lineType: "",
+        glCode: "",
+        lob: "",
+        department: "",
+        customer: "",
+        item: "",
+    };
+
+    result.push(gstRow);
+    //  TDS (only if applicable)
+    const isTdsApplicable = formData?.tds_applicability;
+    const tdsRate = Number(formData?.tds_percentage || 0);
+    const totalInvoiceAmount = rows.reduce(
+        (sum, r) => sum + Number(r.netAmount || 0),
+        0
+    );
+
+    if (isTdsApplicable) {
+        const tdsValue = -Math.abs(tdsRate * totalInvoiceAmount);
+
+        const tdsRow = {
+            id: "tds-row",
+            type: "TDS",
+            description: "TDS Deduction",
+            qty: 1,
+            unitPrice: tdsValue,
+            discount: 0,
+            netAmount: tdsValue,
+            taxAmt: 0,
+            isSystemRow: true,
+
+            lineType: "",
+            glCode: "",
+            lob: "",
+            department: "",
+            customer: "",
+            item: "",
+        };
+
+        result.push(tdsRow);
+    }
+    return result;
+};
+
+const loadLineItemTable = (props) => {
+    const { activeInvoiceData, quickViewFormData, vendor, isVendorChanged } = props;
+
+    const isSaved = activeInvoiceData?.extracted_data?.isModified || false;
+
+    let baseItems = [];
+    //  CASE 1: Saved + NO vendor change → return snapshot
+    if (isSaved && !isVendorChanged) {
+        const snapshot = activeInvoiceData?.extracted_data?.lineItemsSnapshot;
+        if (snapshot?.length) return snapshot;
+    }
+
+    //  CASE 2: Saved + vendor changed → recompute
+    if (isSaved && isVendorChanged) {
+        const snapshot = activeInvoiceData?.extracted_data?.OriginalItems?.value;
+        baseItems = normalizeItems(snapshot).map(row => ({
+            ...row,
+            netAmount: calculateNetAmount(row)
+        }));
+    }
+
+    //  CASE 3: Not saved → normal flow
+    if (!isSaved) {
+        const extracted_items = activeInvoiceData?.extracted_data?.Items?.value || [];
+
+        baseItems = normalizeItems(extracted_items).map(row => ({
+            ...row,
+            netAmount: calculateNetAmount(row)
+        }));
+    }
+
+    //  ALWAYS apply derived logic
+    let processedRows =
+        vendor?.line_grouping
+            ? mergeIntoFirstRow(baseItems)
+            : baseItems;
+
+    const finalData = addSystemRows(processedRows, quickViewFormData);
+
+    return finalData;
+};
+
+export default loadLineItemTable

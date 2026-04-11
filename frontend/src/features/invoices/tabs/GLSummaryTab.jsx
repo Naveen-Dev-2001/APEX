@@ -14,20 +14,24 @@ const GLSummaryTab = ({ invoice = {} }) => {
         new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 
     return (
-        <div className="p-2">
+        <div className="p-2 h-full overflow-y-auto">
             {/* Total Amount Banner */}
             <div
-                className="flex items-center justify-between px-6 py-4 rounded-xl mb-5"
+                className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 rounded-xl mb-5"
                 style={{ background: "#11699E" }}
             >
-                <span className="text-white text-[15px] font-normal">Total Amount Payable:</span>
+                <span className="text-white text-[15px] font-normal">
+                    Total Amount Payable:
+                </span>
                 <span className="text-white text-[26px] font-medium tracking-tight">
                     {formatCurrency(totalAmount)}
                 </span>
             </div>
 
             {/* Distribution Summary */}
-            <p className="text-[15px] font-medium text-gray-800 mb-2">Distribution Summary</p>
+            <p className="text-[15px] font-medium text-gray-800 mb-2">
+                Distribution Summary
+            </p>
 
             <div className="border border-gray-200 rounded-xl overflow-hidden">
                 {distributionRows.map((row, index) => (
@@ -37,8 +41,12 @@ const GLSummaryTab = ({ invoice = {} }) => {
                             }`}
                     >
                         <div className="flex flex-col gap-0.5">
-                            <span className="text-[14px] font-medium text-gray-800">{row.code}</span>
-                            <span className="text-[12px] text-gray-400">{row.description}</span>
+                            <span className="text-[14px] font-medium text-gray-800">
+                                {row.code}
+                            </span>
+                            <span className="text-[12px] text-gray-400">
+                                {row.description}
+                            </span>
                         </div>
                         <span className="text-[14px] font-medium text-gray-800">
                             {formatCurrency(row.amount)}

@@ -206,12 +206,12 @@ const Invoice = () => {
 
         // mappedItems drives the visible table (may be grouped),
         // mappedOriginalItems is the restore source for lineGrouping toggles.
-        setQuickViewLineItems(mappedItems, isModified);
+        // setQuickViewLineItems(mappedItems, isModified);
         useInvoiceStore.setState({ originalLineItems: mappedOriginalItems });
         setViewInvoiceId(id);
         setSelectedVendorId(data.vendor_id);
         setInvoiceSection(2);
-    }, [setQuickViewFormData, setViewInvoiceId, setSelectedVendorId, setQuickViewLineItems]);
+    }, [setQuickViewFormData, setViewInvoiceId, setSelectedVendorId]);
 
     const handleDelete = useCallback((data) => {
         deleteInvoice(data.id).then(() => {

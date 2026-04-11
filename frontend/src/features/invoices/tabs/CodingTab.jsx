@@ -18,9 +18,6 @@ import {
     useItemMasterSync
 } from "../../hooks/useMasterDataSync";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Line Type Options
-// ─────────────────────────────────────────────────────────────────────────────
 const LINE_TYPE_OPTIONS = [
     { label: "Expense", value: "Expense" },
     { label: "Liability", value: "Liability" },
@@ -28,20 +25,32 @@ const LINE_TYPE_OPTIONS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Isolated cell components for performance
+// EditableCell — local state with debounced propagation.
+// Only syncs from outside when user is NOT actively typing.
 // ─────────────────────────────────────────────────────────────────────────────
 const EditableCell = memo(({ value, onChange, placeholder, type = "text" }) => {
     const [local, setLocal] = useState(value ?? "");
     const debounceRef = useRef(null);
+    const isEditingRef = useRef(false);
 
-    useEffect(() => { setLocal(value ?? ""); }, [value]);
+    useEffect(() => {
+        if (!isEditingRef.current) {
+            setLocal(value ?? "");
+        }
+    }, [value]);
 
     const handleChange = (e) => {
         const v = e.target.value;
+        isEditingRef.current = true;
         setLocal(v);
         clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => onChange(v), 300);
+        debounceRef.current = setTimeout(() => {
+            isEditingRef.current = false;
+            onChange(v);
+        }, 300);
     };
+
+    useEffect(() => () => clearTimeout(debounceRef.current), []);
 
     return (
         <CustomInput
@@ -53,50 +62,136 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text" }) => {
             type={type}
         />
     );
-});
+},
+    (prev, next) =>
+        prev.value === next.value &&
+        prev.type === next.type &&
+        prev.placeholder === next.placeholder &&
+        prev.onChange === next.onChange
+);
 
 const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption }) => (
-    <CustomDropdown
-        value={value}
-        onChange={onChange}
-        options={options}
-        loading={isLoading}
-        className="mb-0 w-full"
-        showSearch
-        filterOption={filterOption}
-        placeholder="Select"
-        size="small"
-        style={{ height: "32px", fontSize: "13px" }}
-    />
-));
+    <div style={{ width: "100%" }}>
+        <CustomDropdown
+            value={value}
+            onChange={onChange}
+            options={options}
+            loading={isLoading}
+            className="mb-0"
+            showSearch
+            filterOption={filterOption}
+            placeholder="Select"
+            size="small"
+            style={{ width: "100%", height: "32px", fontSize: "13px", display: "block" }}
+        />
+    </div>
+),
+    (prev, next) =>
+        prev.value === next.value &&
+        prev.isLoading === next.isLoading &&
+        prev.options === next.options &&
+        prev.onChange === next.onChange
+);
 
 EditableCell.displayName = "EditableCell";
 DropdownCell.displayName = "DropdownCell";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Coding Tab Component
+// Custom Checkbox — polished UI with checkmark + indeterminate state
 // ─────────────────────────────────────────────────────────────────────────────
+const Checkbox = memo(({ checked, indeterminate, onChange, title }) => {
+    const ref = useRef(null);
+
+    useEffect(() => {
+        if (ref.current) ref.current.indeterminate = !!indeterminate;
+    }, [indeterminate]);
+
+    return (
+        <label
+            title={title}
+            className="inline-flex items-center justify-center cursor-pointer select-none"
+            style={{ width: 18, height: 18 }}
+        >
+            <input
+                ref={ref}
+                type="checkbox"
+                checked={checked}
+                onChange={onChange}
+                className="sr-only"
+            />
+            <span
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 16,
+                    height: 16,
+                    borderRadius: 4,
+                    border: checked || indeterminate ? "2px solid #2F5D7C" : "2px solid #cbd5e1",
+                    background: checked || indeterminate ? "#2F5D7C" : "#ffffff",
+                    transition: "border-color 0.15s ease, background 0.15s ease",
+                    flexShrink: 0,
+                }}
+            >
+                {indeterminate && !checked ? (
+                    <svg width="8" height="2" viewBox="0 0 8 2" fill="none">
+                        <rect width="8" height="2" rx="1" fill="white" />
+                    </svg>
+                ) : checked ? (
+                    <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                        <path
+                            d="M1 3.5L3.5 6L8 1"
+                            stroke="white"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                    </svg>
+                ) : null}
+            </span>
+        </label>
+    );
+});
+Checkbox.displayName = "Checkbox";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// applyCalculation — unchanged from original
+// ─────────────────────────────────────────────────────────────────────────────
+const applyCalculation = (item, key, value) => {
+    let updated = { ...item, [key]: value };
+    if (key === "netAmount") {
+        updated.isNetAmountOverridden = true;
+    } else if (["qty", "unitPrice", "discount"].includes(key)) {
+        updated.isNetAmountOverridden = false;
+        const qty = parseFloat(updated.qty) || 0;
+        const price = parseFloat(updated.unitPrice) || 0;
+        const discount = parseFloat(updated.discount) || 0;
+        updated.netAmount = qty * price - discount;
+    }
+    return updated;
+};
+
 const CodingTab = () => {
-    const {
-        quickViewLineItems: rows,
-        updateQuickViewLineItem,
-        deleteQuickViewLineItem,
-        addQuickViewLineItem
-    } = useInvoiceStore();
+    const { lineItems, setLineItems } = useInvoiceStore();
+    const rows = lineItems;
 
-    // ── Selection state ──
     const [selectedIds, setSelectedIds] = useState(new Set());
+    const [collapsed, setCollapsed] = useState(false);
 
-    const allSelected = rows.length > 0 && selectedIds.size === rows.length;
+    // FIX: only count non-system rows so GST/TDS rows don't break allSelected
+    const selectableRows = useMemo(() => rows.filter((r) => !r.isSystemRow), [rows]);
+
+    const allSelected = selectableRows.length > 0 && selectedIds.size === selectableRows.length;
     const someSelected = selectedIds.size > 0 && !allSelected;
 
     const toggleSelectAll = useCallback(() => {
         if (allSelected) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(rows.map((r) => r.id)));
+            // FIX: only select non-system rows
+            setSelectedIds(new Set(selectableRows.map((r) => r.id)));
         }
-    }, [allSelected, rows]);
+    }, [allSelected, selectableRows]);
 
     const toggleSelectRow = useCallback((id) => {
         setSelectedIds((prev) => {
@@ -107,7 +202,6 @@ const CodingTab = () => {
         });
     }, []);
 
-    // Clean up stale selected IDs when rows change (e.g. after delete)
     useEffect(() => {
         const rowIds = new Set(rows.map((r) => r.id));
         setSelectedIds((prev) => {
@@ -116,14 +210,12 @@ const CodingTab = () => {
         });
     }, [rows]);
 
-    // ── Master Data Hooks ──
     const { data: glData, isLoading: glLoading } = useGLMasterSync();
     const { data: lobData, isLoading: lobLoading } = useLOBMasterSync();
     const { data: deptData, isLoading: deptLoading } = useDepartmentMasterSync();
     const { data: customerData, isLoading: customerLoading } = useCustomerMasterSync();
     const { data: itemData, isLoading: itemLoading } = useItemMasterSync();
 
-    // ── Transform data for dropdowns (ID - Name) ──
     const glOptions = useMemo(() =>
         (glData?.data || glData || []).map(i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number })), [glData]);
     const lobOptions = useMemo(() =>
@@ -135,256 +227,281 @@ const CodingTab = () => {
     const itemOptions = useMemo(() =>
         (itemData?.data || itemData || []).map(i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })), [itemData]);
 
-    /**
-     * handleUpdate — if the row being changed is selected AND there are other
-     * selected rows, propagate the new value to all selected rows for that key.
-     * If the row is NOT selected, just update that one row normally.
-     */
+    // selectedIds ref — avoids stale closure in handleUpdate
+    const selectedIdsRef = useRef(selectedIds);
+    useEffect(() => {
+        selectedIdsRef.current = selectedIds;
+    }, [selectedIds]);
+
+    // ── handleUpdate — original logic, zero changes ───────────────────────────
     const handleUpdate = useCallback((id, key, value) => {
-        // Always update the row that triggered the change
-        updateQuickViewLineItem(id, key, value);
+        const currentSelectedIds = selectedIdsRef.current;
+        const isBulk = currentSelectedIds.has(id) && currentSelectedIds.size > 1;
 
-        // If this row is selected, bulk-update all OTHER selected rows for the same column
-        if (selectedIds.has(id) && selectedIds.size > 1) {
-            selectedIds.forEach((selectedId) => {
-                if (selectedId !== id) {
-                    updateQuickViewLineItem(selectedId, key, value);
-                }
-            });
-        }
-    }, [updateQuickViewLineItem, selectedIds]);
+        setLineItems(prev =>
+            prev.map(item => {
+                const isEditedRow = item.id === id;
+                const isOtherSelectedRow = isBulk && currentSelectedIds.has(item.id) && !item.isSystemRow;
 
-    // Fuzzy search logic for dropdowns
+                if (!isEditedRow && !isOtherSelectedRow) return item;
+
+                return applyCalculation(item, key, value);
+            })
+        );
+    }, [setLineItems]);
+
+    // ── handleDelete — original logic, zero changes ───────────────────────────
+    const handleDelete = useCallback((id) => {
+        setLineItems(prev => prev.filter(item => item.id !== id));
+    }, [setLineItems]);
+
+    // ── handleAdd — original logic, zero changes ──────────────────────────────
+    const handleAdd = useCallback(() => {
+        const newItem = {
+            id: Date.now(),
+            description: "",
+            qty: 0,
+            unitPrice: 0,
+            discount: 0,
+            netAmount: 0,
+            taxAmt: 0,
+            isNetAmountOverridden: false,
+            lineType: "",
+            glCode: "",
+            lob: "",
+            department: "",
+            customer: "",
+            item: "",
+        };
+        setLineItems(prev => {
+            const systemRows = prev.filter(r => r.isSystemRow);
+            const normalRows = prev.filter(r => !r.isSystemRow);
+            return [...normalRows, newItem, ...systemRows];
+        });
+    }, [setLineItems]);
+
     const filterOption = useCallback((input, option) =>
         (option?.label ?? "").toLowerCase().includes(input.toLowerCase()), []);
 
-    // ── Sticky column style helpers ──
-    // background must be explicit (never "inherit") so cells don't bleed through on scroll
     const stickyCheckbox = (bg = "#ffffff") => ({
-        position: "sticky",
-        left: 0,
-        zIndex: 3,
-        backgroundColor: bg,
-        boxShadow: "none",
+        position: "sticky", left: 0, zIndex: 3, backgroundColor: bg, boxShadow: "none",
     });
-
     const stickySNo = (bg = "#ffffff") => ({
-        position: "sticky",
-        left: "44px",   // exact width of checkbox column
-        zIndex: 3,
-        backgroundColor: bg,
-        // subtle right shadow to visually separate sticky area from scrolling columns
-        boxShadow: "2px 0 4px -1px rgba(0,0,0,0.08)",
+        position: "sticky", left: "44px", zIndex: 3, backgroundColor: bg,
+        boxShadow: "2px 0 5px -1px rgba(0,0,0,0.10)",
     });
 
     return (
         <div className="flex flex-col gap-4">
-            {/* ── Header Summary (Reused from QuickView) ── */}
             <QuickViewTab showOnlyHeader={true} />
 
-            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                {/* ── Section header ── */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-[#f8fafc]">
+            <div
+                className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm"
+                style={{ display: "flex", flexDirection: "column" }}
+            >
+                {/* ── Header bar ─────────────────────────────────────────── */}
+                <div
+                    className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] flex-shrink-0 cursor-pointer select-none"
+                    style={{ borderBottom: collapsed ? "none" : "1px solid #e5e7eb" }}
+                    onClick={() => setCollapsed(c => !c)}
+                >
                     <div className="flex items-center gap-2 text-[14px] font-semibold text-[#2F5D7C]">
-                        <CaretUpOutlined className="text-[#2F5D7C] text-[11px]" />
+                        <CaretUpOutlined
+                            className="text-[#2F5D7C] text-[11px]"
+                            style={{
+                                transition: "transform 0.2s ease",
+                                transform: collapsed ? "rotate(180deg)" : "rotate(0deg)",
+                                display: "inline-block",
+                            }}
+                        />
                         LINE ITEMS CODING
-                        {selectedIds.size > 0 && (
+                        {selectedIds.size > 0 && !collapsed && (
                             <span className="ml-2 px-2 py-0.5 bg-[#2F5D7C]/10 text-[#2F5D7C] rounded-full text-[11px] font-medium">
                                 {selectedIds.size} selected
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                         <button className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors font-medium">
-                            <DownloadOutlined style={{ fontSize: 12 }} />
-                            Export
+                            <DownloadOutlined style={{ fontSize: 12 }} /> Export
                         </button>
                         <button className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors font-medium">
-                            <UploadOutlined style={{ fontSize: 12 }} />
-                            Import
+                            <UploadOutlined style={{ fontSize: 12 }} /> Import
                         </button>
                     </div>
                 </div>
 
-                {/* ── Table Container ── */}
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border-spacing-0 min-w-[1460px]">
-                        <thead className="bg-[#2F5D7C] text-white">
-                            <tr>
-                                {/* ── Checkbox Header (sticky) ── */}
-                                <th
-                                    className="p-2 text-center text-[12px] font-medium w-[44px] border-none border-[#ffffff1a]"
-                                    style={stickyCheckbox("#2F5D7C")}
+                {/* ── Collapsible body: table + add button ────────────────── */}
+                {!collapsed && (
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+
+                        {/* ── Scrollable table: both horizontal & vertical ────────── */}
+                        <div
+                            style={{
+                                overflowX: "auto",
+                                overflowY: "auto",
+                                maxHeight: "420px",
+                                flex: 1,
+                            }}
+                        >
+                            <table
+                                className="border-collapse border-spacing-0"
+                                style={{ width: "100%", minWidth: 1597, tableLayout: "fixed" }}
+                            >
+                                {/* Fixed column widths — tableLayout:fixed requires width not minWidth */}
+                                <colgroup>
+                                    <col style={{ width: 44 }} />    {/* checkbox */}
+                                    <col style={{ width: 52 }} />    {/* S.No */}
+                                    <col style={{ width: 220 }} />   {/* description */}
+                                    <col style={{ width: 140 }} />   {/* line type */}
+                                    <col style={{ width: 90 }} />    {/* qty */}
+                                    <col style={{ width: 110 }} />   {/* unit price */}
+                                    <col style={{ width: 120 }} />   {/* net amount */}
+                                    <col style={{ width: 170 }} />   {/* GL code */}
+                                    <col style={{ width: 140 }} />   {/* LOB */}
+                                    <col style={{ width: 155 }} />   {/* department */}
+                                    <col style={{ width: 155 }} />   {/* customer */}
+                                    <col style={{ width: 145 }} />   {/* item */}
+                                    <col style={{ width: 56 }} />    {/* action */}
+                                </colgroup>
+
+                                {/* Sticky thead stays visible on vertical scroll */}
+                                <thead
+                                    style={{ position: "sticky", top: 0, zIndex: 10 }}
+                                    className="bg-[#2F5D7C] text-white"
                                 >
-                                    <input
-                                        type="checkbox"
-                                        checked={allSelected}
-                                        ref={(el) => {
-                                            if (el) el.indeterminate = someSelected;
-                                        }}
-                                        onChange={toggleSelectAll}
-                                        className="w-[14px] h-[14px] rounded cursor-pointer accent-white"
-                                        title="Select all"
-                                    />
-                                </th>
-
-                                {/* ── S.No Header (sticky) ── */}
-                                <th
-                                    className="p-2 text-center text-[12px] font-medium w-[50px] border-r border-[#ffffff1a]"
-                                    style={stickySNo("#2F5D7C")}
-                                >
-                                    S.No
-                                </th>
-
-                                <th className="p-2 text-left text-[12px] font-medium min-w-[200px] border-r border-[#ffffff1a]">Description</th>
-                                <th className="p-2 text-left text-[12px] font-medium w-[130px] border-r border-[#ffffff1a]">Line Type</th>
-                                <th className="p-2 text-right text-[12px] font-medium w-[80px] border-r border-[#ffffff1a]">Qty</th>
-                                <th className="p-2 text-right text-[12px] font-medium w-[100px] border-r border-[#ffffff1a]">Unit Price</th>
-                                <th className="p-2 text-right text-[12px] font-medium w-[110px] border-r border-[#ffffff1a]">Net Amount</th>
-                                <th className="p-2 text-left text-[12px] font-medium w-[150px] border-r border-[#ffffff1a]">GL Code</th>
-                                <th className="p-2 text-left text-[12px] font-medium w-[120px] border-r border-[#ffffff1a]">LOB</th>
-                                <th className="p-2 text-left text-[12px] font-medium w-[140px] border-r border-[#ffffff1a]">Department</th>
-                                <th className="p-2 text-left text-[12px] font-medium w-[140px] border-r border-[#ffffff1a]">Customer</th>
-                                <th className="p-2 text-left text-[12px] font-medium w-[130px] border-r border-[#ffffff1a]">Item</th>
-                                <th className="p-2 text-center text-[12px] font-medium w-[60px]">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {rows.map((row, index) => {
-                                const isSelected = selectedIds.has(row.id);
-                                return (
-                                    <tr
-                                        key={row.id}
-                                        className={`transition-colors group ${isSelected
-                                            ? "bg-blue-50/60 hover:bg-blue-50/80"
-                                            : "hover:bg-blue-50/30"
-                                            }`}
-                                    >
-                                        {/* ── Checkbox Cell (sticky) ── */}
-                                        <td
-                                            className="p-2 text-center border-r border-gray-100"
-                                            style={stickyCheckbox(isSelected ? "#dbeafe" : "#ffffff")}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={() => toggleSelectRow(row.id)}
-                                                className="w-[14px] h-[14px] rounded cursor-pointer accent-[#2F5D7C]"
+                                    <tr>
+                                        <th className="p-2 text-center text-[12px] font-medium" style={stickyCheckbox("#2F5D7C")}>
+                                            <Checkbox
+                                                checked={allSelected}
+                                                indeterminate={someSelected}
+                                                onChange={toggleSelectAll}
+                                                title="Select all"
                                             />
-                                        </td>
-
-                                        {/* ── S.No Cell (sticky) ── */}
-                                        <td
-                                            className="p-2 text-center text-[13px] text-gray-500 border-r border-gray-100"
-                                            style={stickySNo(isSelected ? "#dbeafe" : "#ffffff")}
-                                        >
-                                            {index + 1}
-                                        </td>
-
-                                        <td className="p-2 border-r border-gray-100">
-                                            <EditableCell
-                                                value={row.description}
-                                                onChange={(v) => handleUpdate(row.id, "description", v)}
-                                                placeholder="Description"
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <DropdownCell
-                                                value={row.lineType}
-                                                onChange={(v) => handleUpdate(row.id, "lineType", v)}
-                                                options={LINE_TYPE_OPTIONS}
-                                                filterOption={filterOption}
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <EditableCell
-                                                value={row.qty}
-                                                onChange={(v) => handleUpdate(row.id, "qty", v)}
-                                                type="number"
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <EditableCell
-                                                value={row.unitPrice}
-                                                onChange={(v) => handleUpdate(row.id, "unitPrice", v)}
-                                                type="number"
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <EditableCell
-                                                value={row.netAmount}
-                                                onChange={(v) => handleUpdate(row.id, "netAmount", v)}
-                                                type="number"
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <DropdownCell
-                                                value={row.glCode}
-                                                onChange={(v) => handleUpdate(row.id, "glCode", v)}
-                                                options={glOptions}
-                                                isLoading={glLoading}
-                                                filterOption={filterOption}
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <DropdownCell
-                                                value={row.lob}
-                                                onChange={(v) => handleUpdate(row.id, "lob", v)}
-                                                options={lobOptions}
-                                                isLoading={lobLoading}
-                                                filterOption={filterOption}
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <DropdownCell
-                                                value={row.department}
-                                                onChange={(v) => handleUpdate(row.id, "department", v)}
-                                                options={deptOptions}
-                                                isLoading={deptLoading}
-                                                filterOption={filterOption}
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <DropdownCell
-                                                value={row.customer}
-                                                onChange={(v) => handleUpdate(row.id, "customer", v)}
-                                                options={customerOptions}
-                                                isLoading={customerLoading}
-                                                filterOption={filterOption}
-                                            />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-100">
-                                            <DropdownCell
-                                                value={row.item}
-                                                onChange={(v) => handleUpdate(row.id, "item", v)}
-                                                options={itemOptions}
-                                                isLoading={itemLoading}
-                                                filterOption={filterOption}
-                                            />
-                                        </td>
-                                        <td className="p-2 text-center group-hover:bg-red-50/50">
-                                            <button
-                                                onClick={() => deleteQuickViewLineItem(row.id)}
-                                                className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                                            >
-                                                <DeleteOutlined style={{ fontSize: 13 }} />
-                                            </button>
-                                        </td>
+                                        </th>
+                                        <th className="p-2 text-center text-[12px] font-medium border-r border-[#ffffff1a]" style={stickySNo("#2F5D7C")}>S.No</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">Description</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">Line Type</th>
+                                        <th className="p-2 text-right text-[12px] font-medium border-r border-[#ffffff1a]">Qty</th>
+                                        <th className="p-2 text-right text-[12px] font-medium border-r border-[#ffffff1a]">Unit Price</th>
+                                        <th className="p-2 text-right text-[12px] font-medium border-r border-[#ffffff1a]">Net Amount</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">GL Code</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">LOB</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">Department</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">Customer</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">Item</th>
+                                        <th className="p-2 text-center text-[12px] font-medium">Action</th>
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                                </thead>
 
-                {/* ── Add Line Item footer ── */}
-                <button
-                    onClick={addQuickViewLineItem}
-                    className="w-full flex items-center justify-center gap-2 py-3 border-t border-gray-100 text-[13px] text-[#2F5D7C] hover:bg-[#f1f5f9] transition-all font-medium"
-                >
-                    <PlusOutlined style={{ fontSize: 13 }} />
-                    ADD NEW CODING LINE
-                </button>
+                                <tbody className="divide-y divide-gray-100">
+                                    {lineItems.map((row, index) => {
+                                        const isSelected = selectedIds.has(row.id);
+                                        const isSystem = !!row.isSystemRow;
+
+                                        return (
+                                            <tr
+                                                key={row.id}
+                                                className={`transition-colors group ${isSelected ? "bg-blue-50/60 hover:bg-blue-50/80" : "hover:bg-blue-50/30"}`}
+                                            >
+                                                {/* Checkbox hidden for system rows */}
+                                                <td className="p-2 text-center border-r border-gray-100" style={stickyCheckbox(isSelected ? "#dbeafe" : "#ffffff")}>
+                                                    {!isSystem && (
+                                                        <Checkbox
+                                                            checked={isSelected}
+                                                            onChange={() => toggleSelectRow(row.id)}
+                                                        />
+                                                    )}
+                                                </td>
+                                                <td className="p-2 text-center text-[13px] text-gray-500 border-r border-gray-100" style={stickySNo(isSelected ? "#dbeafe" : "#ffffff")}>
+                                                    {index + 1}
+                                                </td>
+
+                                                {/* All cells below are IDENTICAL to original — no isSystem branching */}
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <EditableCell value={row.description} onChange={(v) => handleUpdate(row.id, "description", v)} placeholder="Description" />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <DropdownCell value={row.lineType} onChange={(v) => handleUpdate(row.id, "lineType", v)} options={LINE_TYPE_OPTIONS} filterOption={filterOption} />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <EditableCell value={row.qty} onChange={(v) => handleUpdate(row.id, "qty", v)} type="number" />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <EditableCell value={row.unitPrice} onChange={(v) => handleUpdate(row.id, "unitPrice", v)} type="number" />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <EditableCell value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="number" />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <DropdownCell value={row.glCode} onChange={(v) => handleUpdate(row.id, "glCode", v)} options={glOptions} isLoading={glLoading} filterOption={filterOption} />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <DropdownCell value={row.lob} onChange={(v) => handleUpdate(row.id, "lob", v)} options={lobOptions} isLoading={lobLoading} filterOption={filterOption} />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <DropdownCell value={row.department} onChange={(v) => handleUpdate(row.id, "department", v)} options={deptOptions} isLoading={deptLoading} filterOption={filterOption} />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <DropdownCell value={row.customer} onChange={(v) => handleUpdate(row.id, "customer", v)} options={customerOptions} isLoading={customerLoading} filterOption={filterOption} />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-100">
+                                                    <DropdownCell value={row.item} onChange={(v) => handleUpdate(row.id, "item", v)} options={itemOptions} isLoading={itemLoading} filterOption={filterOption} />
+                                                </td>
+                                                <td className="p-2 text-center" style={{ overflow: "visible" }}>
+                                                    <button
+                                                        onClick={() => handleDelete(row.id)}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors"
+                                                        style={{
+                                                            display: "inline-flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            width: 28,
+                                                            height: 28,
+                                                            borderRadius: 6,
+                                                            border: "1px solid #e5e7eb",
+                                                            background: "#fafafa",
+                                                            cursor: "pointer",
+                                                            flexShrink: 0,
+                                                        }}
+                                                        onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.borderColor = "#fca5a5"; }}
+                                                        onMouseLeave={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.borderColor = "#e5e7eb"; }}
+                                                    >
+                                                        <DeleteOutlined style={{ fontSize: 12, color: "inherit" }} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* ── Add row button — fixed footer, never scrolls horizontally ── */}
+                        <div
+                            className="flex-shrink-0 border-t border-gray-100 bg-white px-3 py-2"
+                            style={{ position: "sticky", left: 0 }}
+                        >
+                            <button
+                                onClick={handleAdd}
+                                className="flex items-center gap-1.5 text-[12px] font-medium text-[#2F5D7C] transition-all"
+                                style={{
+                                    padding: "5px 12px",
+                                    borderRadius: 6,
+                                    border: "1.5px dashed #2F5D7C",
+                                    background: "transparent",
+                                    cursor: "pointer",
+                                    letterSpacing: "0.01em",
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background = "#f0f7ff"; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                            >
+                                <PlusOutlined style={{ fontSize: 11 }} />
+                                Add Line
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
