@@ -18,14 +18,29 @@ const normalizeItems = (items) => {
     }));
 };
 
+// const calculateNetAmount = (row) => {
+//     const qty = Number(row.qty || 0);
+//     const unitPrice = Number(row.unitPrice || 0);
+//     const discount = Number(row.discount || 0);
+
+//     return (qty * unitPrice) - discount;
+// };
+
+
 const calculateNetAmount = (row) => {
     const qty = Number(row.qty || 0);
     const unitPrice = Number(row.unitPrice || 0);
     const discount = Number(row.discount || 0);
+    const netAmount = Number(row.netAmount || 0);
 
-    return (qty * unitPrice) - discount;
+    //  Case 1: Only when both exist → calculate
+    if (qty > 0 && unitPrice > 0) {
+        return (qty * unitPrice) - discount;
+    }
+
+    //  Case 2: Everything missing → trust invoice value
+    return netAmount;
 };
-
 const mergeIntoFirstRow = (data) => {
     if (!data || data.length === 0) return [];
 

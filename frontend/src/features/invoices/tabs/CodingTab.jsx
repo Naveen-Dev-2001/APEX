@@ -17,6 +17,7 @@ import {
     useCustomerMasterSync,
     useItemMasterSync
 } from "../../hooks/useMasterDataSync";
+import { fetchCodingSuggestions } from "../../../api/invoiceApi";
 
 const LINE_TYPE_OPTIONS = [
     { label: "Expense", value: "Expense" },
@@ -172,14 +173,65 @@ const applyCalculation = (item, key, value) => {
 };
 
 const CodingTab = () => {
-    const { lineItems, setLineItems } = useInvoiceStore();
+    const { lineItems, setLineItems, viewInvoiceId, selectedVendorId } = useInvoiceStore();
     const rows = lineItems;
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);
 
+    // ── Sugggestions Logic ───────────────────────────────────────────────────
+    useEffect(() => {
+        if (!viewInvoiceId) return;
+
+        const applySuggestions = async () => {
+            try {
+                const suggestions = await fetchCodingSuggestions(viewInvoiceId, selectedVendorId);
+                if (!suggestions?.length) return;
+
+                // Build a map: normalised description → suggestion
+                const suggestionMap = {};
+                suggestions.forEach((s) => {
+                    if (s.description) {
+                        suggestionMap[s.description.trim().toLowerCase()] = s;
+                    }
+                });
+
+                setLineItems(prev => prev.map((row, rowIndex) => {
+                    if (row.glCode) return row; // skip system or already filled
+
+                    const key = (row.description || "").trim().toLowerCase();
+
+                    // 1) Try exact description match
+                    let match = suggestionMap[key];
+
+                    // 2) Positional fallback: use the suggestion at the same index
+                    if (!match && rowIndex < suggestions.length) {
+                        match = suggestions[rowIndex];
+                    }
+
+                    if (match) {
+                        return {
+                            ...row,
+                            glCode: row.glCode || match.gl_code || "",
+                            lob: row.lob || match.lob || "",
+                            department: row.department || match.department || "",
+                            customer: row.customer || match.customer || "",
+                            item: row.item || match.item || "",
+                            lineType: row.lineType || match.line_type || "Expense"
+                        };
+                    }
+                    return row;
+                }));
+            } catch (err) {
+                console.warn("[CodingTab] Failed to fetch suggestions:", err);
+            }
+        };
+
+        applySuggestions();
+    }, [viewInvoiceId, selectedVendorId, setLineItems]);
+
     // FIX: only count non-system rows so GST/TDS rows don't break allSelected
-    const selectableRows = useMemo(() => rows.filter((r) => !r.isSystemRow), [rows]);
+    const selectableRows = useMemo(() => rows, [rows]);
 
     const allSelected = selectableRows.length > 0 && selectedIds.size === selectableRows.length;
     const someSelected = selectedIds.size > 0 && !allSelected;
@@ -241,7 +293,7 @@ const CodingTab = () => {
         setLineItems(prev =>
             prev.map(item => {
                 const isEditedRow = item.id === id;
-                const isOtherSelectedRow = isBulk && currentSelectedIds.has(item.id) && !item.isSystemRow;
+                const isOtherSelectedRow = isBulk && currentSelectedIds.has(item.id);
 
                 if (!isEditedRow && !isOtherSelectedRow) return item;
 
@@ -406,12 +458,10 @@ const CodingTab = () => {
                                             >
                                                 {/* Checkbox hidden for system rows */}
                                                 <td className="p-2 text-center border-r border-gray-100" style={stickyCheckbox(isSelected ? "#dbeafe" : "#ffffff")}>
-                                                    {!isSystem && (
-                                                        <Checkbox
-                                                            checked={isSelected}
-                                                            onChange={() => toggleSelectRow(row.id)}
-                                                        />
-                                                    )}
+                                                    <Checkbox
+                                                        checked={isSelected}
+                                                        onChange={() => toggleSelectRow(row.id)}
+                                                    />
                                                 </td>
                                                 <td className="p-2 text-center text-[13px] text-gray-500 border-r border-gray-100" style={stickySNo(isSelected ? "#dbeafe" : "#ffffff")}>
                                                     {index + 1}

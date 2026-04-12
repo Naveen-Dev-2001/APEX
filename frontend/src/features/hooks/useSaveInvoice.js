@@ -29,6 +29,11 @@ export const useSaveInvoice = () => {
             unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
             discount: { value: Number(item.discount) || 0, source: "user" },
             tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
+            gl_code: { value: item.glCode || "", source: "user" },
+            lob: { value: item.lob || "", source: "user" },
+            department: { value: item.department || "", source: "user" },
+            customer: { value: item.customer || "", source: "user" },
+            item: { value: item.item || "", source: "user" },
             ...(item.isSystemRow ? { is_system_row: true, row_type: item.type } : {}),
         }));
 

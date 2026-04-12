@@ -17,6 +17,7 @@ import json
 from typing import Dict, Optional, Any
 from app.services.email_service import email_service
 
+
 from app.models.db_models import (
     Invoice, WorkflowStep, WorkflowStepTypeEnum, 
     WorkflowStepStatusEnum, InvoiceStatusEnum, InvoiceStatusHistory,
@@ -1457,7 +1458,7 @@ async def update_invoice(
         items = extracted_data.get("Items", {}).get("value", [])
 
         original_items = deserialize_json_field(invoice.original_items) or items
-        update_data["original_items"] = serialize_json_field(original_items)
+        update_data["original_items"] = original_items # Save as dict, will be serialized later
 
         if new_grouping == "Yes":
             from app.services.line_grouping import aggregate_items
@@ -1466,7 +1467,7 @@ async def update_invoice(
         else:
             extracted_data["Items"]["value"] = original_items
 
-        update_data["extracted_data"] = serialize_json_field(extracted_data)
+        update_data["extracted_data"] = extracted_data # Save as dict, will be serialized later
 
     if "invoice_number" in update_data:
         new_invoice_number = update_data["invoice_number"]
@@ -1602,7 +1603,7 @@ async def update_invoice(
                 if "invoice_number" not in extracted_data["invoice_details"]: extracted_data["invoice_details"]["invoice_number"] = {}
                 extracted_data["invoice_details"]["invoice_number"]["value"] = new_invoice_number
                 
-            update_data["extracted_data"] = serialize_json_field(extracted_data)
+            update_data["extracted_data"] = extracted_data # Keep as dict for now
 
 
     # Merge validation
@@ -1629,10 +1630,103 @@ async def update_invoice(
         if field in update_data:
             setattr(invoice, field, update_data[field])
             
+    if "original_items" in update_data:
+        invoice.original_items = serialize_json_field(update_data["original_items"])
+
     if "extracted_data" in update_data:
-        invoice.extracted_data = serialize_json_field(update_data["extracted_data"])
-        
+        # Use a local variable to ensure we have the dict version for coding sync
+        ext_data_dict = update_data["extracted_data"]
+        if isinstance(ext_data_dict, str):
+            try:
+                ext_data_dict = json.loads(ext_data_dict)
+            except:
+                pass
+        # Persist the extracted_data to the invoice record
+        invoice.extracted_data = serialize_json_field(ext_data_dict)
+
     db.commit()
+
+    # --- Auto-Coding Suggestions on transition to waiting_coding ---
+    # When an invoice is sent to coding, automatically apply AI-based GL suggestions
+    # to any line items that don't already have a GL code.
+    if "status" in update_data and update_data["status"] == InvoiceStatusEnum.WAITING_CODING:
+        try:
+            from app.routes.coding import apply_coding_suggestions_to_invoice
+            # Refresh invoice from DB so it has the latest extracted_data
+            db.refresh(invoice)
+            apply_coding_suggestions_to_invoice(db, invoice)
+            logger.info(f"[AutoCode] Applied coding suggestions to invoice {invoice_id} on waiting_coding transition.")
+        except Exception as e:
+            logger.error(f"[AutoCode] Error applying coding suggestions to invoice {invoice_id}: {e}")
+
+    # --- Coding Synchronization ---
+    # If extracted_data was updated, sync coding fields to the Coding table and History
+    if "extracted_data" in update_data:
+        try:
+            from app.routes.coding import update_coding_history
+            from app.models.coding import LineItemCoding
+            from app.models.db_models import Coding as DBCoding
+            
+            # Use the dict version we prepared or fallback to deserializing
+            ext_data = ext_data_dict if 'ext_data_dict' in locals() else deserialize_json_field(update_data.get("extracted_data"))
+            if not isinstance(ext_data, dict):
+                logger.error(f"extracted_data is not a dict: {type(ext_data)}")
+                return InvoiceResponse(**invoice_to_dict(invoice))
+                
+            items = ext_data.get("Items", {}).get("value", [])
+            
+            if items:
+                coding_line_items = []
+                for idx, item in enumerate(items):
+                    # Skip system rows for history, but keep them in the Coding table if needed
+                    # Actually, update_coding_history handles skipping system rows
+                    
+                    def get_val(item_obj, key, default=""):
+                        val_obj = item_obj.get(key)
+                        if isinstance(val_obj, dict):
+                            return val_obj.get("value", default)
+                        return val_obj if val_obj is not None else default
+
+                    coding_line_items.append(LineItemCoding(
+                        s_no=idx + 1,
+                        description=get_val(item, "description"),
+                        line_type="Expense",
+                        quantity=float(get_val(item, "qty", 1)),
+                        unit_price=float(get_val(item, "unit_price", 0)),
+                        net_amount=float(get_val(item, "amount", 0)),
+                        gl_code=get_val(item, "gl_code", ""),
+                        lob=get_val(item, "lob"),
+                        department=get_val(item, "department"),
+                        customer=get_val(item, "customer"),
+                        item=get_val(item, "item"),
+                        original_index=idx
+                    ))
+                
+                # Update Coding Table
+                line_items_json = json.dumps([item.dict() for item in coding_line_items])
+                existing_coding = db.query(DBCoding).filter(DBCoding.invoice_id == invoice_id).first()
+                
+                if existing_coding:
+                    existing_coding.line_items = line_items_json
+                    existing_coding.updated_at = datetime.utcnow()
+                else:
+                    new_coding = DBCoding(
+                        invoice_id=invoice_id,
+                        line_items=line_items_json,
+                        entity=invoice.entity,
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(new_coding)
+                
+                # Update Coding History (vendor suggestions)
+                update_coding_history(db, invoice.vendor_name, coding_line_items, vendor_id=invoice.vendor_id)
+                
+                db.commit()
+                
+        except Exception as e:
+            logger.error(f"Error synchronizing coding data: {e}")
+            # Don't fail the whole update if coding sync fails
+            pass
 
     # --- Registry Sync ---
     if new_vendor_id != current_vendor_id or new_invoice_number != current_invoice_number:
@@ -1751,7 +1845,7 @@ async def update_invoice(
     return InvoiceResponse(**invoice_to_dict(invoice))
 
 
-@router.delete("/{invoice_id}/")
+@router.delete("/{invoice_id}")
 async def delete_invoice(
     invoice_id: int,
     current_user: UserResponse = Depends(get_current_user),
