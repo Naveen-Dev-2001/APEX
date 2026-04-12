@@ -7,21 +7,21 @@ import { AutoComplete } from "antd";
 import CustomInput from "../../../shared/components/CustomInput";
 import CustomDatePicker from "../../../shared/components/CustomDatePicker";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
+import { masterDataService } from "../../../api/masterdataAPI";
 import InvoiceCalculationModal from "./InvoiceCalculationModal";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
+import loadLineItemTable from "../../../utils/lineItemLogic";
 
 dayjs.extend(customParseFormat);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
-const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, forceDisabled = false }) => {
-    // Local state → instant feedback
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading }) => {
     const [localValue, setLocalValue] = useState(storeValue ?? "");
     const debounceRef = useRef(null);
 
-    // Sync when the store pushes a new value from outside (e.g. vendor sync)
     useEffect(() => {
         setLocalValue(storeValue ?? "");
     }, [storeValue]);
@@ -67,25 +67,38 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
                 return (
                     <CustomInput
                         {...commonProps}
-                        label={null} // label will be handled by the outer wrapper for hover
+                        label={null}
                         onChange={(e) => handleChange(e.target.value)}
                         height="40px"
                     />
                 );
-
-            case "dropdown":
+            case "dropdown": {
+                let options = field.options || [];
+                let loading = false;
+                let onDropdownVisibleChange = undefined;
+                if (field.key === "invoiceCurrency") {
+                    options = currencyOptions;
+                    loading = currencyLoading;
+                    onDropdownVisibleChange = (open) => {
+                        if (open && options.length === 0 && !loading) {
+                            fetchCurrencyOptions();
+                        }
+                    };
+                }
                 return (
                     <CustomDropdown
                         {...commonProps}
                         label={null}
-                        options={field.options || []}
+                        options={options}
+                        loading={loading}
                         style={{ width: "100%", borderRadius: "8px", height: "40px" }}
                         onChange={(val) => handleChange(val)}
                         filterOption={filterVendors}
                         placement="bottomLeft"
+                        onOpenChange={onDropdownVisibleChange}
                     />
                 );
-
+            }
             case "date":
                 return (
                     <CustomDatePicker
@@ -95,7 +108,6 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
                         onChange={(_date, dateString) => handleChange(dateString)}
                     />
                 );
-
             default:
                 return null;
         }
@@ -127,36 +139,61 @@ FieldRenderer.displayName = "FieldRenderer";
 // ─────────────────────────────────────────────────────────────────────────────
 // Line-item cell — isolated so only the changed cell re-renders
 // ─────────────────────────────────────────────────────────────────────────────
-const LineItemCell = memo(({ value, disabled, rowId, colKey, onUpdate, onHover, onLeave }) => {
-    const [local, setLocal] = useState(value ?? "");
-    const debounceRef = useRef(null);
+// ─── FIX 1: LineItemCell — change the useEffect condition ────────────────────
+const LineItemCell = memo(
+    ({ value, disabled, rowId, colKey, onUpdate, onHover, onLeave }) => {
+        const [local, setLocal] = useState(value ?? "");
+        const isEditing = useRef(false);
+        const editTimerRef = useRef(null);
 
-    useEffect(() => { setLocal(value ?? ""); }, [value]);
+        useEffect(() => {
+            if (!isEditing.current) {
+                setLocal(value ?? "");
+            }
+        }, [value]);
 
-    const handleChange = useCallback((e) => {
-        const v = e.target.value;
-        setLocal(v);
-        clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => onUpdate(rowId, colKey, v), 300);
-    }, [rowId, colKey, onUpdate]);
+        const handleChange = useCallback((e) => {
+            const v = e.target.value;
+            isEditing.current = true;
+            setLocal(v);
+            clearTimeout(editTimerRef.current);
+            editTimerRef.current = setTimeout(() => {
+                isEditing.current = false;
+            }, 300);
+            onUpdate(rowId, colKey, v);
+        }, [rowId, colKey, onUpdate]);
 
-    useEffect(() => () => clearTimeout(debounceRef.current), []);
+        const handleBlur = useCallback(() => {
+            isEditing.current = false;
+        }, []);
 
-    return (
-        <div
-            onMouseEnter={() => onHover(rowId, colKey)}
-            onMouseLeave={onLeave}
-            className="w-full h-full min-h-[40px] flex items-center"
-        >
-            <CustomInput
-                value={local}
-                disabled={disabled}
-                onChange={handleChange}
-                className="mb-0 w-full"
-            />
-        </div>
-    );
-});
+        useEffect(() => () => clearTimeout(editTimerRef.current), []);
+
+        return (
+            <div
+                onMouseEnter={() => onHover(rowId, colKey)}
+                onMouseLeave={onLeave}
+                className="w-full h-full min-h-[40px] flex items-center"
+            >
+                <CustomInput
+                    value={local}
+                    disabled={disabled}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className="mb-0 w-full"
+                />
+            </div>
+        );
+    },
+    // ── Custom comparator: only re-render when data props change ──────────────
+    // Ignores onUpdate/onHover/onLeave — if those references change due to
+    // a store-wide re-render, the cell must NOT re-render because of it.
+    (prevProps, nextProps) =>
+        prevProps.value === nextProps.value &&
+        prevProps.disabled === nextProps.disabled &&
+        prevProps.rowId === nextProps.rowId &&
+        prevProps.colKey === nextProps.colKey
+);
 
 LineItemCell.displayName = "LineItemCell";
 
@@ -164,56 +201,137 @@ LineItemCell.displayName = "LineItemCell";
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
+    const [currencyOptions, setCurrencyOptions] = useState([]);
+    const [currencyLoading, setCurrencyLoading] = useState(false);
+    const fetchCurrencyOptions = useCallback(async () => {
+        setCurrencyLoading(true);
+        try {
+            const data = await masterDataService.getCurrencyData();
+            // Expecting data as array of { code, name, ... }
+            const options = (data || []).map(c => ({ label: `${c.symbol ? c.symbol + ' ' : ''}${c.code}`, value: c.code }));
+            setCurrencyOptions(options);
+        } finally {
+            setCurrencyLoading(false);
+        }
+    }, []);
     const {
         quickViewFormData,
         setQuickViewField,
-        quickViewLineItems,
-        updateQuickViewLineItem,
-        deleteQuickViewLineItem,
+        activeInvoiceData,
         selectedVendorId,
-        batchUpdateQuickViewFields,   // new batch action (add to store — see store patch)
         setQuickViewFormData,
         setSelectedVendorId,
         setHighlightedField,
-        addQuickViewLineItem,
         entityMaster,
         isDuplicate,
-        duplicateMessage
+        duplicateMessage,
+        lineItems,
+        setLineItems
     } = useInvoiceStore();
+
+    const VIEW_ONLY_STATUSES = ["WAITING_CODING"];
 
     const { vendorsList } = useVendersListSync();
     const { vendor } = useVendorDetailSync(selectedVendorId);
     const [showCalcModal, setShowCalcModal] = useState(false);
 
-    // Vendor sync — write once via batch to avoid multiple re-renders
+    const prevVendorRef = useRef(null);
+
+
+    // ── Vendor sync ───────────────────────────────────────────────────────────
     useEffect(() => {
         if (!vendor || !selectedVendorId) return;
+        if (vendor.vendor_id !== selectedVendorId) return;
 
         const TERMS = ['NET 7', 'NET 8', 'NET 12', 'NET 15', 'NET 20', 'NET 30', 'NET 45', 'NET 60', 'NET 90'];
 
-        const getDueDate = (invoiceDate, payTerms) => {
-            if (!invoiceDate || !payTerms) return "";
-            const days = parseInt(payTerms.match(/\d+/)?.[0] || 0, 10);
-            return dayjs(invoiceDate).add(days, "day").format("YYYY-MM-DD");
+        const parseDateFlexible = (dateStr) => {
+            if (!dateStr) return null;
+            const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
+            for (const fmt of formats) {
+                const d = dayjs(dateStr, fmt, true);
+                if (d.isValid()) return d;
+            }
+            const d = dayjs(dateStr);
+            return d.isValid() ? d : null;
         };
 
-        // Use functional update on setQuickViewFormData (or batchUpdate if added)
-        setQuickViewFormData((prev) => {
-            const extracted = prev?.paymentTerms;
-            return {
-                ...prev,
-                gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
-                tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
-                tdsRate: vendor?.tds_percentage ?? 0,
-                tdsSection: vendor?.tds_section_code ?? "NA",
-                lineGrouping: vendor?.line_grouping ? "Yes" : "No",
-                paymentTerms: TERMS.includes(extracted) ? extracted : vendor?.pay_terms || "",
-                dueDate: getDueDate(prev?.invoiceDate, vendor?.pay_terms),
-                gst_eligibility: vendor?.gst_eligibility,
-            };
-        });
-    }, [vendor, selectedVendorId, setQuickViewFormData]);
+        const extractDays = (payTerms) => {
+            if (!payTerms) return null;
+            const match = payTerms.match(/\d+/);
+            return match ? parseInt(match[0], 10) : null;
+        };
 
+        const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
+            if (existingDueDate) {
+                const d = parseDateFlexible(existingDueDate);
+                if (d) return d.format("MM-DD-YYYY");
+            }
+            const baseDate = parseDateFlexible(invoiceDate);
+            if (!baseDate) return "";
+            const invoiceDays = extractDays(invoicePayTerms);
+            if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
+            const vendorDays = extractDays(vendorPayTerms);
+            if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
+            return "";
+        };
+
+        const prev = useInvoiceStore.getState().quickViewFormData;
+        const prevVendorId = prevVendorRef.current;
+
+        prevVendorRef.current = vendor?.vendor_id;
+
+        const isVendorChanged = prevVendorId !== null          // not first load
+            && prevVendorId !== vendor?.vendor_id
+
+        const extractedPayTerms = prev?.paymentTerms;
+        const computedDueDate = getDueDate(
+            prev?.dueDate,
+            prev?.invoiceDate,
+            extractedPayTerms,
+            vendor?.pay_terms
+        );
+        const updatedFormData = {
+            ...prev,
+            gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
+            lineGrouping: vendor?.line_grouping ? "Yes" : "No",
+            paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || "",
+            dueDate: computedDueDate,
+            gst_eligibility: vendor?.gst_eligibility,
+            tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
+            tdsRate: vendor?.tds_percentage ?? 0,
+            tdsSection: vendor?.tds_section_code ?? "NA",
+            // map these so addSystemRows can read them:
+            tds_applicability: vendor?.tds_applicability,
+            tds_percentage: vendor?.tds_percentage ?? 0,
+            totalTaxAmount: prev?.totalTaxAmount,
+        };
+
+        // Commit to store
+        setQuickViewFormData(updatedFormData);
+        if (!activeInvoiceData) return;
+        // const prevVendorId = prevVendorRef.current;
+        // const isVendorChanged = prevVendorId !== vendor?.vendor_id;
+        const result = loadLineItemTable({
+            activeInvoiceData,
+            quickViewFormData: updatedFormData,
+            vendor,
+            isVendorChanged
+        });
+
+        if (result) setLineItems(result);
+
+    }, [vendor, selectedVendorId]);
+
+    useEffect(() => {
+        console.log("quickViewFormData00000000000000000000", quickViewFormData);
+
+    }, [quickViewFormData])
+
+
+
+
+    // ── Vendor options ─────────────────────────────────────────────────────────
     const vendorOptions = useMemo(() => {
         if (!vendorsList?.length) return [];
         return vendorsList.map(v => ({
@@ -222,9 +340,44 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         }));
     }, [vendorsList]);
 
-    // Stable commit callback — doesn't change between renders
     const handleCommit = useCallback((key, value) => {
-        setQuickViewField(key, value);
+        if (key === "invoiceDate") {
+            // Get current form data and vendor info
+            const state = useInvoiceStore.getState();
+            const prev = state.quickViewFormData;
+            const vendor = state.vendor || {};
+            // Helper functions (copied from above)
+            const parseDateFlexible = (dateStr) => {
+                if (!dateStr) return null;
+                const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
+                for (const fmt of formats) {
+                    const d = dayjs(dateStr, fmt, true);
+                    if (d.isValid()) return d;
+                }
+                const d = dayjs(dateStr);
+                return d.isValid() ? d : null;
+            };
+            const extractDays = (payTerms) => {
+                if (!payTerms) return null;
+                const match = payTerms.match(/\d+/);
+                return match ? parseInt(match[0], 10) : null;
+            };
+            const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
+                // Always recalculate due date on invoiceDate change
+                const baseDate = parseDateFlexible(invoiceDate);
+                if (!baseDate) return "";
+                const invoiceDays = extractDays(prev?.paymentTerms);
+                if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
+                const vendorDays = extractDays(vendor?.pay_terms);
+                if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
+                return "";
+            };
+            const newDueDate = getDueDate(null, value, prev?.paymentTerms, vendor?.pay_terms);
+            setQuickViewField("invoiceDate", value);
+            setQuickViewField("dueDate", newDueDate);
+        } else {
+            setQuickViewField(key, value);
+        }
     }, [setQuickViewField]);
 
     const filterVendors = useCallback((input, option) =>
@@ -237,69 +390,134 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [setQuickViewField, setSelectedVendorId]);
 
     const handleUpdateLineItem = useCallback((id, key, value) => {
-        updateQuickViewLineItem(id, key, value);
-    }, [updateQuickViewLineItem]);
+        setLineItems(prev =>
+            prev.map(item => {
+                debugger
+                if (item.id !== id) return item;
+
+                // Keep value as-is (string) — don't cast to Number here.
+                // Casting kills partial input like "1." or "" mid-type.
+                let updated = { ...item, [key]: value };
+
+                if (!item.isSystemRow) {
+                    if (key === "netAmount") {
+                        // User manually typed netAmount — mark as overridden,
+                        // do NOT recalculate from qty/unitPrice/discount.
+                        updated.isNetAmountOverridden = true;
+                    } else if (["qty", "unitPrice", "discount"].includes(key)) {
+                        // These fields drive the auto-calculation.
+                        updated.isNetAmountOverridden = false;
+
+                        // Use parseFloat so partial input ("1.", "") doesn't
+                        // corrupt the calculation — it just treats them as 0.
+                        const qty = parseFloat(updated.qty) || 0;
+                        const price = parseFloat(updated.unitPrice) || 0;
+                        const discount = parseFloat(updated.discount) || 0;
+
+                        updated.netAmount = qty * price - discount;
+                    }
+                    // "description" and other string fields: no calculation needed.
+                } else {
+                    // System rows (GST / TDS): keep unitPrice and netAmount in sync.
+                    if (key === "unitPrice" || key === "netAmount") {
+                        const numVal = parseFloat(value) || 0;
+                        updated.unitPrice = numVal;
+                        updated.netAmount = numVal;
+                    }
+                }
+
+                return updated;
+            })
+        );
+    }, [setLineItems]);
 
     const handleDeleteLineItem = useCallback((id) => {
-        deleteQuickViewLineItem(id);
-    }, [deleteQuickViewLineItem]);
+        setLineItems(prev => prev.filter(item => item.id !== id));
+    }, [setLineItems]);
 
     const handleHoverField = useCallback((key) => {
         setHighlightedField(key);
     }, [setHighlightedField]);
 
+    const lineItemsRef = useRef(lineItems);
+    useEffect(() => {
+        lineItemsRef.current = lineItems;
+    }, [lineItems]);
+
+
     const handleHoverLineItem = useCallback((rowId, colKey) => {
-        // Find index of the row by internal ID
-        const index = quickViewLineItems.findIndex(item => item.id === rowId);
+        const index = lineItemsRef.current.findIndex(item => item.id === rowId);
         if (index !== -1) {
             setHighlightedField(`LineItem_${index}_${colKey}`);
         }
-    }, [quickViewLineItems, setHighlightedField]);
+    }, [setHighlightedField]);
 
     const handleLeaveField = useCallback(() => {
         setHighlightedField(null);
     }, [setHighlightedField]);
 
-    // Derived line-item values (memoized so table doesn't recompute on every field change)
-    const { processedItems, gstTaxLabel, gstTaxValue, tdsDeductionValue, totalAmountPayable } = useMemo(() => {
-        const isGstEligible = entityMaster?.gst_applicable === true;
-        const gstTaxLabel = isGstEligible ? "Total GST" : "Total Tax";
-        const gstTaxValue = parseFloat(quickViewFormData?.totalTaxAmount || 0);
-        const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
-        const totalInvoiceAmount = parseFloat(quickViewFormData?.total_invoice_amount || 0);
-        const tdsDeductionValue = -Math.abs(tdsRate * totalInvoiceAmount);
+    const handleAddLineItem = useCallback(() => {
+        const newItem = {
+            id: Date.now(),
+            description: "",
+            qty: 0,
+            unitPrice: 0,
+            discount: 0,
+            netAmount: 0,
+            taxAmt: 0,
 
-        const regularItems = quickViewLineItems.filter(
-            row => row.description !== "Total GST" && row.description !== "Total Tax"
+            lineType: "",
+            glCode: "",
+            lob: "",
+            department: "",
+            customer: "",
+            item: "",
+        };
+
+        setLineItems(prev => {
+            const systemRows = prev.filter(r => r.isSystemRow);
+            const regularRows = prev.filter(r => !r.isSystemRow);
+
+            return [...regularRows, newItem, ...systemRows];
+        });
+    }, [setLineItems]);
+
+    // ── Totals — derived directly from quickViewLineItems (single source of truth) ──
+    //
+    // regularItemsSum: sum of all non-system rows (used for "Total Sum Excl GST" label)
+    // totalAmountPayable: regularItemsSum + GST row + TDS row
+    //
+    // Because quickViewLineItems always reflects exactly what is on screen
+    // (grouping was applied at load time, edits mutate the state directly),
+    // these values are always correct.
+    const { regularItemsSum, totalAmountPayable } = useMemo(() => {
+        const regularItems = lineItems?.filter(row => !row.isSystemRow);
+        const gstRow = lineItems.find(r => r.type === "GST");
+        const tdsRow = lineItems.find(r => r.type === "TDS");
+
+        const regularItemsSum = regularItems.reduce(
+            (sum, row) => sum + (Number(row.netAmount) || 0),
+            0
         );
-        const isLineGrouped = quickViewFormData?.lineGrouping === "Yes";
+        const totalAmountPayable =
+            regularItemsSum + (Number(gstRow?.netAmount) || 0) + (Number(tdsRow?.netAmount) || 0);
 
-        const processedItems = isLineGrouped
-            ? (regularItems.length
-                ? [regularItems.reduce((acc, row) => ({
-                    id: 1,
-                    description: regularItems[0].description,
-                    qty: (acc.qty || 0) + (Number(row.qty) || 0),
-                    unitPrice: (acc.unitPrice || 0) + (Number(row.unitPrice) || 0),
-                    discount: (acc.discount || 0) + (Number(row.discount) || 0),
-                    netAmount: (acc.netAmount || 0) + (Number(row.netAmount) || 0),
-                    taxAmt: (acc.taxAmt || 0) + (Number(row.taxAmt) || 0),
-                }), {})]
-                : [])
-            : regularItems;
+        return { regularItemsSum, totalAmountPayable };
+    }, [lineItems]);
 
-        const totalAmountPayable = processedItems.reduce(
-            (sum, row) => sum + parseFloat(row.netAmount || 0), 0
-        ) + gstTaxValue + tdsDeductionValue;
+    // Label for the GST system row
+    const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
 
-        return { processedItems, gstTaxLabel, gstTaxValue, tdsDeductionValue, totalAmountPayable };
-    }, [quickViewLineItems, quickViewFormData?.total_tax_amount, quickViewFormData?.tdsRate,
-        quickViewFormData?.total_invoice_amount, quickViewFormData?.lineGrouping, entityMaster]);
+    const isViewOnly = VIEW_ONLY_STATUSES
+        .map(s => s.toLowerCase())
+        .includes(activeInvoiceData?.status?.toLowerCase());
 
     return (
         <div className="p-2">
             {QUICK_VIEW_CONFIG
-                .filter(section => (showOnlyHeader ? section.section === "Header" : (isAllFields || !section.showInAllFields)))
+                .filter(section => (showOnlyHeader
+                    ? section.section === "Header"
+                    : (isAllFields || !section.showInAllFields)))
                 .map((section) => {
                     const content = (
                         <>
@@ -314,19 +532,27 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                         })
                                         .map(field => (
                                             <div key={field.key} className="flex flex-col justify-start">
-                                                <FieldRenderer
-                                                    field={field}
-                                                    storeValue={quickViewFormData?.[field.key] ?? ""}
-                                                    onCommit={handleCommit}
-                                                    vendorOptions={vendorOptions}
-                                                    filterVendors={filterVendors}
-                                                    onVendorSelect={handleVendorSelect}
-                                                    onHover={handleHoverField}
-                                                    onLeave={handleLeaveField}
-                                                    isDuplicate={isDuplicate}
-                                                    duplicateMessage={duplicateMessage}
-                                                    forceDisabled={showOnlyHeader}
-                                                />
+                                                {field.key === "exchangeRate" && (quickViewFormData?.invoiceCurrency ?? "USD") === "USD"
+                                                    ? null
+                                                    : (
+                                                        <FieldRenderer
+                                                            field={field}
+                                                            storeValue={quickViewFormData?.[field.key] ?? ""}
+                                                            onCommit={handleCommit}
+                                                            vendorOptions={vendorOptions}
+                                                            filterVendors={filterVendors}
+                                                            onVendorSelect={handleVendorSelect}
+                                                            onHover={handleHoverField}
+                                                            onLeave={handleLeaveField}
+                                                            isDuplicate={isDuplicate}
+                                                            duplicateMessage={duplicateMessage}
+                                                            forceDisabled={showOnlyHeader || isViewOnly}
+                                                            currencyOptions={currencyOptions}
+                                                            fetchCurrencyOptions={fetchCurrencyOptions}
+                                                            currencyLoading={currencyLoading}
+                                                        />
+                                                    )
+                                                }
                                             </div>
                                         ))}
                                 </div>
@@ -348,83 +574,81 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {processedItems.map((row, index) => (
-                                                        <tr key={row.id} className="bg-white shadow-sm">
-                                                            <td className="p-2 text-center w-[60px]">{index + 1}</td>
-                                                            {section.columns.map(col => (
-                                                                <td key={col.key} className="p-2 min-w-[150px]">
-                                                                    <LineItemCell
-                                                                        value={row[col.key]}
-                                                                        disabled={!col.editable}
-                                                                        rowId={row.id}
-                                                                        colKey={col.key}
-                                                                        onUpdate={handleUpdateLineItem}
-                                                                        onHover={handleHoverLineItem}
-                                                                        onLeave={handleLeaveField}
-                                                                    />
-                                                                </td>
-                                                            ))}
-                                                            <td
-                                                                className="p-2 text-red-500 cursor-pointer text-center w-[60px]"
-                                                                onClick={() => handleDeleteLineItem(row.id)}
+                                                    {/* ── Render quickViewLineItems directly — no derived processedItems ── */}
+                                                    {lineItems?.map((row, index) => {
+                                                        const isSystem = !!row.isSystemRow;
+                                                        const rowLabel = row.type === "GST" ? gstTaxLabel : row.description;
+
+                                                        return (
+                                                            <tr
+                                                                key={row.id || index}
+                                                                className={`shadow-sm ${isSystem ? "bg-gray-50" : "bg-white"}`}
                                                             >
-                                                                🗑
-                                                            </td>
-                                                        </tr>
-                                                    ))}
+                                                                <td className="p-2 text-center w-[60px]">{index + 1}</td>
+                                                                {section.columns.map((col, colIndex) => (
+                                                                    <td key={col.key} className="p-2 min-w-[150px]">
+                                                                        {isSystem ? (
+                                                                            // System rows: read-only display
+                                                                            <LineItemCell
+                                                                                value={
+                                                                                    colIndex === 0
+                                                                                        ? rowLabel
+                                                                                        : col.key === "qty"
+                                                                                            ? "1"
+                                                                                            : col.key === "unitPrice"
+                                                                                                ? Number((row.unitPrice || 0).toString().replace(/,/g, ""))
+                                                                                                    .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                                : col.key === "discount"
+                                                                                                    ? "0"
+                                                                                                    : col.key === "netAmount"
+                                                                                                        ? Number((row.netAmount || 0).toString().replace(/,/g, ""))
+                                                                                                            .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                                        : col.key === "taxAmt"
+                                                                                                            ? "0"
+                                                                                                            : ""
+                                                                                }
+                                                                                disabled={isViewOnly}
+                                                                                rowId={row.id ?? index}
+                                                                                colKey={col.key}
+                                                                                onUpdate={handleUpdateLineItem}
+                                                                                onHover={handleHoverLineItem}
+                                                                                onLeave={handleLeaveField}
+                                                                            />
+                                                                        ) : (
+                                                                            // Regular / grouped rows: fully editable
+                                                                            <LineItemCell
+                                                                                value={row[col.key]}
+                                                                                disabled={!col.editable || isViewOnly}
+                                                                                rowId={row.id}
+                                                                                colKey={col.key}
+                                                                                onUpdate={handleUpdateLineItem}
+                                                                                onHover={handleHoverLineItem}
+                                                                                onLeave={handleLeaveField}
 
-                                                    {/* Total GST / Tax row */}
-                                                    <tr className="shadow-sm">
-                                                        <td className="p-2 text-center w-[60px]">{processedItems.length + 1}</td>
-                                                        {section.columns.map((col, colIndex) => (
-                                                            <td key={col.key} className="p-2 min-w-[150px]">
-                                                                <CustomInput
-                                                                    value={
-                                                                        colIndex === 0 ? gstTaxLabel
-                                                                            : col.key === "qty" ? "1"
-                                                                                : col.key === "unitPrice" ? gstTaxValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                                                                    : col.key === "discount" ? "0"
-                                                                                        : col.key === "netAmount" ? gstTaxValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                                                                            : col.key === "taxAmt" ? "0"
-                                                                                                : ""
-                                                                    }
-                                                                    disabled={false}
-                                                                    onChange={() => { }}
-                                                                />
-                                                            </td>
-                                                        ))}
-                                                        <td className="p-2 w-[60px]" />
-                                                    </tr>
-
-                                                    {/* TDS Deduction row */}
-                                                    <tr className="shadow-sm">
-                                                        <td className="p-2 text-center w-[60px]">{processedItems.length + 2}</td>
-                                                        {section.columns.map((col, colIndex) => (
-                                                            <td key={col.key} className="p-2 min-w-[150px]">
-                                                                <CustomInput
-                                                                    value={
-                                                                        colIndex === 0 ? "TDS Deduction"
-                                                                            : col.key === "qty" ? "1"
-                                                                                : col.key === "unitPrice" ? tdsDeductionValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                                                                    : col.key === "discount" ? "0"
-                                                                                        : col.key === "netAmount" ? tdsDeductionValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                                                                            : col.key === "taxAmt" ? "0"
-                                                                                                : ""
-                                                                    }
-                                                                    disabled={false}
-                                                                    onChange={() => { }}
-                                                                />
-                                                            </td>
-                                                        ))}
-                                                        <td className="p-2 w-[60px]" />
-                                                    </tr>
+                                                                            />
+                                                                        )}
+                                                                    </td>
+                                                                ))}
+                                                                <td className="p-2 w-[60px]">
+                                                                    {!isSystem && (
+                                                                        <span
+                                                                            className="text-red-500 cursor-pointer flex justify-center"
+                                                                            onClick={() => handleDeleteLineItem(row.id)}
+                                                                        >
+                                                                            🗑
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
                                     </div>
 
                                     <button
-                                        onClick={addQuickViewLineItem}
+                                        onClick={handleAddLineItem}
                                         className="w-full flex items-center justify-center gap-2 py-2 mt-1 mb-4 border border-dashed border-[#2F5D7C] rounded-md text-[#2F5D7C] hover:bg-[#eaf2f8] transition-colors font-medium text-sm"
                                     >
                                         <span className="text-lg leading-none">+</span>
@@ -437,9 +661,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                 Total Sum of Line Items <span className="text-xs">(Excl GST)</span> :
                                             </span>
                                             <span className="text-sm font-semibold text-gray-800 min-w-[120px] text-right">
-                                                $ {processedItems
-                                                    .reduce((sum, row) => sum + parseFloat(row.netAmount || 0), 0)
-                                                    .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                $ {regularItemsSum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
                                         </div>
                                         <div className="flex justify-end items-center gap-4 pr-2 pb-2">

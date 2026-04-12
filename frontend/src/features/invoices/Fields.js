@@ -10,15 +10,8 @@ export const QUICK_VIEW_CONFIG = [
             { key: "dueDate", label: "Due Date", type: "date", editable: true },
             { key: "paymentTerms", label: "Payment Terms", type: "input", editable: true },
             {
-                key: "invoiceCurrency", label: "Invoice Currency", type: "dropdown", editable: true,
-                options: [
-                    { label: "$ USD", value: "USD" },
-                    { label: "€ EUR", value: "EUR" },
-                    { label: "£ GBP", value: "GBP" },
-                    { label: "₹ INR", value: "INR" },
-                    { label: "C$ CAD", value: "CAD" },
-                    { label: "A$ AUD", value: "AUD" },
-                ]
+                key: "invoiceCurrency", label: "Invoice Currency", type: "dropdown", editable: true
+                // options will be injected dynamically
             },
             {
                 key: "exchangeRate", label: "Exchange Rate", type: "input", editable: true,
@@ -26,9 +19,9 @@ export const QUICK_VIEW_CONFIG = [
             },
             { key: "totalAmount", label: "Total Amount", type: "input", editable: true },
             { key: "totalPayable", label: "Total Payable", type: "input", editable: true },
+            { key: "memo", label: "Memo", type: "input", editable: true, showInAllFields: true },
             // AllFields only ↓
             { key: "amountPaid", label: "Amount Paid", type: "input", editable: true, showInAllFields: true },
-            { key: "memo", label: "Memo", type: "input", editable: true, showInAllFields: true },
             { key: "invoiceType", label: "Invoice Type", type: "input", editable: true, showInAllFields: true },
             { key: "poNumber", label: "PO Number", type: "input", editable: true, showInAllFields: true },
             { key: "paymentMethod", label: "Payment Method", type: "input", editable: true, showInAllFields: true },

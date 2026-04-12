@@ -33,7 +33,6 @@ export const useInvoiceStore = create((set, get) => ({
     fileName: "",
     setFileName: (name) => set({ fileName: name }),
 
-
     isModalOpen: false,
     setIsModalOpen: (open) => set({ isModalOpen: open }),
 
@@ -50,7 +49,6 @@ export const useInvoiceStore = create((set, get) => ({
     //  QUICK VIEW - FORM DATA
     // =============================
     quickViewFormData: {
-        // Header
         vendorId: "",
         vendorName: "",
         invoiceNumber: "",
@@ -69,8 +67,6 @@ export const useInvoiceStore = create((set, get) => ({
         costCenter: "",
         serviceStartDate: "",
         serviceEndDate: "",
-
-        // Vendor Level
         vendorAddress: "",
         vendorCountry: "",
         vendorTaxId: "",
@@ -79,8 +75,6 @@ export const useInvoiceStore = create((set, get) => ({
         vendorBankName: "",
         vendorBankAccount: "",
         vendorContactPerson: "",
-
-        // Buyer
         clientName: "",
         billingAddress: "",
         shippingAddress: "",
@@ -88,27 +82,19 @@ export const useInvoiceStore = create((set, get) => ({
         email: "",
         clientTaxId: "",
         contactPerson: "",
-
-        // Taxes
         totalTaxAmount: "",
         cgst: "",
         sgst: "",
         igst: "",
         withholdingTax: "",
-
-        // Totals
         subtotal: "",
         shippingFees: "",
         surcharges: "",
         totalInvoiceAmount: "",
         amountDue: "",
-
-        // Compliance
         notes: "",
         qrOrIrn: "",
         companyRegistrationNumber: "",
-
-        // Vendor master
         gstEligibility: "",
         tdsApplicability: "",
         tdsRate: "",
@@ -122,151 +108,170 @@ export const useInvoiceStore = create((set, get) => ({
     duplicateMessage: "",
     setDuplicateMessage: (msg) => set({ duplicateMessage: msg }),
 
-    // ── Update single field (used by debounced FieldRenderer) ──────────────
-    setQuickViewField: (key, value) =>
-        set((state) => ({
-            quickViewFormData: {
-                ...state.quickViewFormData,
-                [key]: value,
-            },
-        })),
+    // ─────────────────────────────────────────────────────────────────────────
+    // _syncSystemRows
+    //
+    // Rebuilds the GST and (conditionally) TDS system rows at the END of
+    // the line-items list.
+    //
+    // GUARD: if isModified === true the invoice was already saved with
+    // calculated values, so we preserve whatever is in the system rows
+    // and do NOT recalculate.
+    //
+    // NOTE: This function never touches regular rows or applies line grouping.
+    // Line grouping is handled exclusively in setQuickViewLineItems (load time).
+    // ─────────────────────────────────────────────────────────────────────────
+    _syncSystemRows: (formData, lineItems, isModified = false) => {
+        if (!formData || !lineItems?.length) return lineItems ?? [];
 
-    // ── Update multiple fields in ONE set() call (avoids cascading re-renders) ──
-    batchUpdateQuickViewFields: (updates) =>
-        set((state) => ({
-            quickViewFormData: {
-                ...state.quickViewFormData,
-                ...updates,
-            },
-        })),
+        const regularItems = lineItems.filter(i => !i.isSystemRow);
+        const existingGstRow = lineItems.find(i => i.type === "GST");
+        const existingTdsRow = lineItems.find(i => i.type === "TDS");
 
-    // ── Replace full form or functional update (used by vendor sync) ────────
-    setQuickViewFormData: (dataOrUpdater) =>
-        set((state) => ({
-            quickViewFormData:
-                typeof dataOrUpdater === "function"
-                    ? dataOrUpdater(state.quickViewFormData)
-                    : dataOrUpdater,
-        })),
-
-    // =============================
-    //  QUICK VIEW - LINE ITEMS
-    // =============================
-    quickViewLineItems: [
-        {
-            id: 1,
-            description: "SVC: TOLL FREE USAGE NO RRF",
-            qty: 1,
-            unitPrice: 16,
-            discount: 0,
-            netAmount: 16,
-            taxAmt: 0,
-            isNetAmountOverridden: false,
-        },
-        {
-            id: 2,
-            description: "Additional Local Number",
-            qty: 21,
-            unitPrice: 1.1,
-            discount: 0,
-            netAmount: 23.1,
-            taxAmt: 0,
-            isNetAmountOverridden: false,
-        },
-        {
-            id: 3,
-            description: "Local Number - Included",
-            qty: 233,
-            unitPrice: 0,
-            discount: 0,
-            netAmount: 0,
-            taxAmt: 0,
-            isNetAmountOverridden: false,
-        },
-    ],
-
-    // ── Update table cell + auto-calculation ────────────────────────────────
-    updateQuickViewLineItem: (id, key, value) =>
-        set((state) => ({
-            quickViewLineItems: state.quickViewLineItems.map((item) => {
-                if (item.id !== id) return item;   // ← unchanged items keep same reference
-
-                let updated = { ...item, [key]: value };
-
-                const qty = Number(updated.qty) || 0;
-                const price = Number(updated.unitPrice) || 0;
-                const discount = Number(updated.discount) || 0;
-
-                if (key === "netAmount") {
-                    updated.isNetAmountOverridden = true;
-                }
-                if (["qty", "unitPrice", "discount"].includes(key)) {
-                    updated.isNetAmountOverridden = false;
-                }
-                if (!updated.isNetAmountOverridden) {
-                    updated.netAmount = qty * price - discount;
-                }
-
-                return updated;
-            }),
-        })),
-
-    // ── Delete row ───────────────────────────────────────────────────────────
-    deleteQuickViewLineItem: (id) =>
-        set((state) => ({
-            quickViewLineItems: state.quickViewLineItems.filter(i => i.id !== id),
-        })),
-
-    // ── Add new row (always before Total GST row) ───────────────────────────
-    addQuickViewLineItem: () =>
-        set((state) => {
-            const newItem = {
-                id: Date.now(),
-                description: "",
+        if (isModified) {
+            // Preserve saved system rows exactly as-is
+            const gstRow = existingGstRow ?? {
+                id: "gst-row",
+                type: "GST",
+                description: "Total GST",
                 qty: 1,
                 unitPrice: 0,
                 discount: 0,
                 netAmount: 0,
                 taxAmt: 0,
-                lineType: "Expense",
-                glCode: "",
-                lob: "",
-                department: "",
-                customer: "",
-                item: "",
+                isSystemRow: true,
                 isNetAmountOverridden: false,
             };
-            const regularItems = state.quickViewLineItems.filter(
-                row => row.description !== "Total GST"
-            );
-            const gstRow = state.quickViewLineItems.filter(
-                row => row.description === "Total GST"
-            );
-            return { quickViewLineItems: [...regularItems, newItem, ...gstRow] };
-        }),
+            const systemRows = [gstRow, ...(existingTdsRow ? [existingTdsRow] : [])];
+            return [...regularItems, ...systemRows];
+        }
 
-    setQuickViewLineItems: (items) => set({ quickViewLineItems: items }),
-
-    // =============================
-    // TOTAL CALCULATION
-    // =============================
-    recalculateQuickViewTotals: () => {
-        const { quickViewLineItems } = get();
-        const total = quickViewLineItems.reduce(
-            (sum, item) => sum + (Number(item.netAmount) || 0),
-            0
+        // Recalculate from form fields
+        const gstValue = parseFloat(formData?.totalTaxAmount || 0);
+        const tdsRate = parseFloat(formData?.tdsRate || 0);
+        const totalInvoiceAmount = parseFloat(
+            formData?.totalInvoiceAmount || formData?.total_invoice_amount || 0
         );
-        set((state) => ({
-            quickViewFormData: {
-                ...state.quickViewFormData,
-                totalAmount: total.toFixed(2),
-                totalPayable: total.toFixed(2),
-            },
-        }));
+        const tdsValue = -Math.abs(tdsRate * totalInvoiceAmount);
+        const isTdsApplicable = formData?.tdsApplicability === "Yes";
+
+        const gstRow = {
+            id: "gst-row",
+            type: "GST",
+            description: "Total GST",
+            qty: 1,
+            unitPrice: gstValue,
+            discount: 0,
+            netAmount: gstValue,
+            taxAmt: 0,
+            isSystemRow: true,
+            isNetAmountOverridden: false,
+        };
+
+        const tdsRow = {
+            id: "tds-row",
+            type: "TDS",
+            description: "TDS Deduction",
+            qty: 1,
+            unitPrice: tdsValue,
+            discount: 0,
+            netAmount: tdsValue,
+            taxAmt: 0,
+            isSystemRow: true,
+            isNetAmountOverridden: false,
+        };
+
+        const systemRows = [gstRow, ...(isTdsApplicable ? [tdsRow] : [])];
+        return [...regularItems, ...systemRows];
     },
 
+    originalLineItems: [],
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // _applyLineGrouping
+    //
+    // Merges all regular rows into a single grouped row (first row's
+    // description, summed numeric fields). Only called at initial load
+    // when isModified === false and lineGrouping === "Yes".
+    //
+    // System rows are always passed through untouched.
+    // ─────────────────────────────────────────────────────────────────────────
+    _applyLineGrouping: (items, formData) => {
+        const isLineGrouped = formData?.lineGrouping === "Yes";
+        const isModified = formData?.isModified;
+
+        // DO NOT group if already saved
+        if (!isLineGrouped) return items;
+
+        const regularItems = items.filter(i => !i.isSystemRow);
+        const systemRows = items.filter(i => i.isSystemRow);
+
+        if (regularItems.length === 0) return items;
+
+        const firstRow = regularItems[0];
+
+        const groupedRow = {
+            ...firstRow,
+            id: "grouped-1",
+            description: firstRow.description, //  keep first row desc
+            qty: regularItems.reduce((s, r) => s + (Number(r.qty) || 0), 0),
+            unitPrice: regularItems.reduce((s, r) => s + (Number(r.unitPrice) || 0), 0),
+            discount: regularItems.reduce((s, r) => s + (Number(r.discount) || 0), 0),
+            netAmount: regularItems.reduce((s, r) => s + (Number(r.netAmount) || 0), 0),
+            taxAmt: regularItems.reduce((s, r) => s + (Number(r.taxAmt) || 0), 0),
+            isNetAmountOverridden: false,
+        };
+
+        return [groupedRow, ...systemRows];
+    },
+
+    // ── Update single field ──────────────────────────────────────────────────
+    setQuickViewField: (key, value) =>
+        set((state) => {
+            const updatedFormData = {
+                ...state.quickViewFormData,
+                [key]: value,
+            };
+
+            const triggerKeys = [
+                "totalTaxAmount",
+                "tdsRate",
+                "tdsApplicability",
+                "totalInvoiceAmount",
+                "total_invoice_amount",
+            ];
+
+            return { quickViewFormData: updatedFormData, };
+        }),
+
+
+    // ── Replace full form (used on initial load & vendor sync) ───────────────
+    setQuickViewFormData: (dataOrUpdater) =>
+        set((state) => {
+            const updatedFormData =
+                typeof dataOrUpdater === "function"
+                    ? dataOrUpdater(state.quickViewFormData)
+                    : dataOrUpdater;
+
+            return { quickViewFormData: updatedFormData };
+        }),
+
+
+
+
+
+
+    resetQuickView: () => set({
+        quickViewFormData: {},
+        originalLineItems: [],
+        selectedVendorId: null,
+        activeInvoiceData: null,
+    }),
+
+
+
     // =============================
-    // PDF HIGHLIGHT (FUTURE)
+    // PDF HIGHLIGHT
     // =============================
     highlightedField: null,
     setHighlightedField: (field) => set({ highlightedField: field }),
@@ -276,4 +281,12 @@ export const useInvoiceStore = create((set, get) => ({
 
     entityMaster: {},
     setEntityMaster: (data) => set({ entityMaster: data }),
+
+    lineItems: [],
+    setLineItems: (itemsOrUpdater) =>
+        set((state) => ({
+            lineItems: typeof itemsOrUpdater === "function"
+                ? itemsOrUpdater(state.lineItems)
+                : itemsOrUpdater,
+        })),
 }));

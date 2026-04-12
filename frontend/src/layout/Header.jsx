@@ -21,6 +21,7 @@ import approvalUnselectIcon from '../assets/header-icons/approval-icon-unselect.
 import invoiceSelectIcon from '../assets/header-icons/invoics-icon-select.png';
 import invoiceUnselectIcon from '../assets/header-icons/invoics-icon-unselect.png';
 import useAdminStore from '../store/useAdminStore';
+import { useInvoiceStore } from '../store/invoice.store';
 
 const tabs = [
     { name: 'Dashboard', route: '/dashboard', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
@@ -48,6 +49,7 @@ const iconMap = {
 const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { setInvoiceSection } = useInvoiceStore()
     const { activeTab, setActiveTab } = useUIStore();
     const logout = useAuthStore((state) => state.logout);
     const user = useAuthStore((state) => state.user);
@@ -79,7 +81,7 @@ const Header = () => {
         }
 
         const userRole = user?.role?.toLowerCase() || '';
-        
+
         const filtered = navigation
             .filter(nav => {
                 // Check if role has access
@@ -92,7 +94,7 @@ const Header = () => {
                 selectIcon: iconMap[nav.label]?.select || iconMap.default.select,
                 unselectIcon: iconMap[nav.label]?.unselect || iconMap.default.unselect
             }));
-            
+
         setFilteredTabs(filtered);
     }, [navigation, user]);
 
@@ -111,6 +113,10 @@ const Header = () => {
     };
 
     const handleTabClick = (tab) => {
+        debugger
+        if (tab.name == "Invoices") {
+            setInvoiceSection(1)
+        }
         setActiveTab(tab.name);
         navigate(tab.route);
     };
@@ -121,8 +127,8 @@ const Header = () => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsDropdownOpen(false);
             }
-            if (mobileMenuRef.current && 
-                !mobileMenuRef.current.contains(event.target) && 
+            if (mobileMenuRef.current &&
+                !mobileMenuRef.current.contains(event.target) &&
                 !hamburgerRef.current?.contains(event.target)) {
                 setIsMobileMenuOpen(false);
             }
@@ -201,7 +207,7 @@ const Header = () => {
 
             {/* Mobile Navigation Menu */}
             {isMobileMenuOpen && (
-                <div 
+                <div
                     ref={mobileMenuRef}
                     className="absolute top-[60px] left-0 w-full bg-white border-b border-gray-100 shadow-lg md:hidden z-40 transition-all duration-300 ease-in-out"
                 >
@@ -266,14 +272,14 @@ const Header = () => {
                         <div className="absolute right-0 mt-3 w-[240px] bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
                             {/* Arrow Pointer - Centered with the 34px icon at the right edge */}
                             <div className="absolute -top-[6px] right-2.5 w-3 h-3 bg-white border-l border-t border-gray-100 rotate-45 z-0"></div>
-                            
+
                             <div className="relative z-10 p-4">
                                 {/* Dropdown Header */}
                                 <div className="flex justify-between items-center mb-4">
                                     <span className="text-[11px] font-bold text-[#333] tracking-tighter uppercase opacity-60 truncate mr-2">
                                         {selectedEntityName}
                                     </span>
-                                    <button 
+                                    <button
                                         onClick={handleLogout}
                                         className="text-[13px] text-[#ff5a5f] hover:text-red-600 font-semibold transition-colors shrink-0"
                                     >
@@ -300,7 +306,7 @@ const Header = () => {
                                 <div className="h-[1px] w-full bg-gray-50 mb-4"></div>
 
                                 {/* Change Entity Action */}
-                                <button 
+                                <button
                                     onClick={() => {
                                         navigate('/select-entity');
                                         setIsDropdownOpen(false);
