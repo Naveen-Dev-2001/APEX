@@ -19,9 +19,9 @@ export const QUICK_VIEW_CONFIG = [
             },
             { key: "totalAmount", label: "Total Amount", type: "input", editable: true },
             { key: "totalPayable", label: "Total Payable", type: "input", editable: true },
+            { key: "memo", label: "Memo", type: "input", editable: true, showInAllFields: true },
             // AllFields only ↓
             { key: "amountPaid", label: "Amount Paid", type: "input", editable: true, showInAllFields: true },
-            { key: "memo", label: "Memo", type: "input", editable: true, showInAllFields: true },
             { key: "invoiceType", label: "Invoice Type", type: "input", editable: true, showInAllFields: true },
             { key: "poNumber", label: "PO Number", type: "input", editable: true, showInAllFields: true },
             { key: "paymentMethod", label: "Payment Method", type: "input", editable: true, showInAllFields: true },

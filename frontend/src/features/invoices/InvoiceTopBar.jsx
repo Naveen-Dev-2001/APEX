@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate()
-    const { setInvoiceSection, setInvoiceActiveTab, isDuplicate, viewInvoiceId, resetQuickView } = useInvoiceStore();
+    const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView, setInvoiceActiveTab, activeInvoiceData } = useInvoiceStore();
     const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
 
@@ -25,12 +25,25 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         }
     };
 
+    const handleSendToApproval = async () => {
+        const response = await handleSave()
+        const payload = await saveInvoice(viewInvoiceId, { status: 'waiting_approval' })
+        if (payload.status == "waiting_approval") {
+            toast.success("Invoice sent for approval successfully!")
+            navigate('/invoices')
+        } else {
+            toast.error(payload?.message || "Something went wrong while sending for approval.");
+        }
+    };
+
     const handleSaveInvoice = async () => {
         const response = await handleSave()
         if (response) {
             toast.success("Invoice Saved Successfully!")
         }
     }
+
+    const currentStatus = activeInvoiceData?.status || invoice?.status;
 
     const Back = () => {
         resetQuickView();
@@ -75,16 +88,20 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                         Save
                     </CustomButton>
                 </div>
-                <div className="w-[180px]">
+                <div className="w-[220px]">
 
-                    {/* Send to Coding - Green button */}
+                    {/* Send to Coding / Send to Approval - Green button */}
                     <CustomButton
                         variant="success"
                         className="w-40"
                         disabled={isDuplicate}
-                        onClick={handleSendToCoding}
+                        onClick={currentStatus === 'waiting_coding' ? handleSendToApproval : handleSendToCoding}
                     >
-                        Send to Coding
+                        {currentStatus === 'waiting_coding'
+                            ? "Send to Approval"
+                            : currentStatus === 'processed'
+                                ? "Send to Coding"
+                                : "Send to Coding"}
                     </CustomButton>
                 </div>
             </div>
