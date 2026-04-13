@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Body, UploadFile, File, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import asc, func, Boolean, String, DateTime
+from sqlalchemy.exc import IntegrityError
 import traceback
 import pandas as pd
 import numpy as np
@@ -365,6 +366,9 @@ async def upload_master_file(
                                 raw_val = str(int(raw_val))
                             else:
                                 raw_val = str(raw_val)
+                            
+                            if isinstance(raw_val, str) and raw_val.strip() == "":
+                                raw_val = None
 
                     record[m_col] = raw_val
                 # Also check some variations if needed
@@ -473,34 +477,14 @@ async def get_sheet_data(
             elif isinstance(val, (float)) and np.isnan(val):
                 val = None
 
-            # Map back to pretty names for Vendor and Entity Master
-            if identifier in ["Vendor_Master", "vendor_master", "Entity_Master", "entity_master", "Entity"]:
-                pretty_map = {
-                    "gst_eligibility": "GST / Use Tax Eligibility Configuration",
-                    "tds_applicability": "TDS/Withhold Tax Applicability Configuration",
-                    "tds_percentage": "TDS Percentage",
-                    "tds_section_code": "TDS Section Code and Description",
-                    "workflow_applicable": "Workflow Applicability Configuration",
-                    "line_grouping": "Line Grouping"
-                }
-
-                if column.name in pretty_map:
-                    pretty_val = val
-                    # Match frontend switch logic
-                    if column.name == "gst_eligibility":
-                        pretty_val = "Eligible" if val is True or val == 1 else "Ineligible"
-                    elif column.name in ["tds_applicability", "workflow_applicable", "line_grouping"]:
-                        pretty_val = "Yes" if val is True or val == 1 else "No"
-
-                    row_dict[pretty_map[column.name]] = pretty_val
-                    continue
-
+            # No custom mapping required, matching frontend expectations.
             if identifier in ["TDS_Rates", "tds_rates", "TDS"]:
                 # Keep snake_case keys to match frontend table accessors
                 # (section, nature_of_payment, tds_rate)
                 if column.name in ["section", "nature_of_payment", "tds_rate"]:
                     row_dict[column.name] = val
                     continue
+
 
             row_dict[column.name] = val
         result.append(row_dict)
@@ -559,27 +543,9 @@ def add_row(
     data.pop('created_at', None)
     data.pop('updated_at', None)
 
-    # Reverse mapping for pretty names
-    reverse_map = {}
-    if identifier in ["Vendor_Master", "vendor_master", "Entity_Master", "entity_master", "Entity"]:
-        reverse_map = {
-            "GST / Use Tax Eligibility Configuration": "gst_eligibility",
-            "TDS/Withhold Tax Applicability Configuration": "tds_applicability",
-            "TDS Percentage": "tds_percentage",
-            "TDS Section Code and Description": "tds_section_code",
-            "Workflow Applicability Configuration": "workflow_applicable",
-            "Line Grouping": "line_grouping"
-        }
-    elif identifier in ["TDS_Rates", "tds_rates", "TDS"]:
-        reverse_map = {
-            "Section": "section",
-            "Nature of Payment": "nature_of_payment",
-            "TDS Rate": "tds_rate"
-        }
-
     final_data = {}
     for k, v in data.items():
-        m_col = reverse_map.get(k, k)
+        m_col = k
 
         # Boolean Conversion
         col_info = model.__table__.columns.get(m_col)
@@ -593,14 +559,28 @@ def add_row(
             elif isinstance(v, (int, float)):
                 v = bool(v)
 
+        if v == "":
+            v = None
+
         final_data[m_col] = v
+
 
     repo = TAB_REPO_MAP.get(identifier)
     if not repo:
         raise HTTPException(404, "Table not found")
 
-    new_record = repo.create(db, obj_in=final_data)
-    return {"status": "success", "id": new_record.id}
+    try:
+        new_record = repo.create(db, obj_in=final_data)
+        return {"status": "success", "id": new_record.id}
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if "FOREIGN KEY constraint" in error_msg:
+            raise HTTPException(400, "Validation Error: A provided key (e.g., Entity ID, Vendor ID) does not exist in its parent master list. Please verify your data and try again.")
+        elif "UNIQUE KEY constraint" in error_msg or "Violation of UNIQUE KEY" in error_msg:
+            raise HTTPException(400, "Validation Error: A record with this unique identifier already exists.")
+        else:
+            raise HTTPException(400, f"Database Integrity Error: {error_msg}")
 
 
 @router.patch("/sheet/{identifier}/edit")
@@ -628,30 +608,12 @@ def edit_row(
     if not record:
         raise HTTPException(404, "Record not found")
 
-    # Reverse mapping for pretty names
-    reverse_map = {}
-    if identifier in ["Vendor_Master", "vendor_master", "Entity_Master", "entity_master", "Entity"]:
-        reverse_map = {
-            "GST / Use Tax Eligibility Configuration": "gst_eligibility",
-            "TDS/Withhold Tax Applicability Configuration": "tds_applicability",
-            "TDS Percentage": "tds_percentage",
-            "TDS Section Code and Description": "tds_section_code",
-            "Workflow Applicability Configuration": "workflow_applicable",
-            "Line Grouping": "line_grouping"
-        }
-    elif identifier in ["TDS_Rates", "tds_rates", "TDS"]:
-        reverse_map = {
-            "Section": "section",
-            "Nature of Payment": "nature_of_payment",
-            "TDS Rate": "tds_rate"
-        }
-
     valid_update_data = {}
     for k, v in updated_data.items():
         if k in ['id', 'created_at', 'updated_at']:
             continue
 
-        m_col = reverse_map.get(k, k)
+        m_col = k
         if hasattr(record, m_col):
             # Boolean Conversion
             col_info = repo.model.__table__.columns.get(m_col)
@@ -664,10 +626,25 @@ def edit_row(
                         v = False
                 elif isinstance(v, (int, float)):
                     v = bool(v)
+            
+            if v == "":
+                v = None
+                
             valid_update_data[m_col] = v
 
-    repo.update(db, db_obj=record, obj_in=valid_update_data)
-    return {"status": "updated"}
+
+    try:
+        repo.update(db, db_obj=record, obj_in=valid_update_data)
+        return {"status": "updated"}
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if "FOREIGN KEY constraint" in error_msg:
+            raise HTTPException(400, "Validation Error: A provided key (e.g., Entity ID, Vendor ID) does not exist in its parent master list. Please verify your data and try again.")
+        elif "UNIQUE KEY constraint" in error_msg or "Violation of UNIQUE KEY" in error_msg:
+            raise HTTPException(400, "Validation Error: A record with this unique identifier already exists.")
+        else:
+            raise HTTPException(400, f"Database Integrity Error: {error_msg}")
 
 
 @router.delete("/sheet/{identifier}/delete")
