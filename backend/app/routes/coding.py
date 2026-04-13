@@ -12,7 +12,7 @@ from app.models.db_models import (
     Invoice, Coding as DBCoding, CodingHistory, InvoiceStatusHistory
 )
 from app.repository.repositories import (
-    invoice_repo, coding_repo, coding_history_repo
+    invoice_repo, coding_repo, coding_history_repo, vendor_repo
 )
 from app.database.db_utils import invoice_to_dict
 from app.auth.jwt import get_current_user
@@ -57,9 +57,12 @@ def get_line_items(invoice: Any) -> List[Dict[str, Any]]:
     if invoice.extracted_data:
         try: extracted = json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else invoice.extracted_data
         except: pass
+    
     for key in ["line_items", "items", "LineItems", "lineItems", "item_list", "products", "details"]:
         if isinstance(extracted.get(key), list): return extracted[key]
+    
     if isinstance(extracted.get("Items"), dict): return extracted["Items"].get("value", [])
+    
     return []
 
 def update_coding_history(db: Session, vendor_name: str, line_items: List[LineItemCoding], vendor_id: str = None):
@@ -71,17 +74,6 @@ def update_coding_history(db: Session, vendor_name: str, line_items: List[LineIt
             
             # Skip if gl_code is empty - don't store empty/unfilled coding in history
             if not item.gl_code:
-                continue
-
-            # Skip system-generated lines from polluting history
-            if item.gl_code in ["TDS_PAYABLE", "GST_INPUT", "GST_PAYABLE"]:
-                continue
-            
-            if item.description and (
-                item.description.startswith("TDS Deduction") or 
-                item.description.startswith("Total GST") or
-                item.description.startswith("GST for item")
-            ):
                 continue
 
             norm_desc = normalize_description(item.description)
@@ -128,59 +120,181 @@ def update_coding_history(db: Session, vendor_name: str, line_items: List[LineIt
         logger.error(f"Error updating coding history: {e}")
         db.rollback()
 
-def get_coding_suggestions(db: Session, vendor_name: str, extracted_items: List[Dict[str, Any]], vendor_id: str = None) -> List[LineItemCoding]:
-    vendor_key = normalize_vendor(vendor_name) if vendor_name else None
+def apply_coding_suggestions_to_invoice(db: Session, invoice: Any):
+    """
+    Enriches an invoice's extracted_data with history-based coding suggestions.
+    This is typically called when an invoice moves to 'waiting_coding' status.
+    """
+    vendor_name = get_vendor_name(invoice)
+    items = get_line_items(invoice)
     
+    if not vendor_name or not items:
+        return
+        
+    suggestions = get_coding_suggestions(db, vendor_name, items, vendor_id=invoice.vendor_id)
+    
+    # Update extracted_data
+    try:
+        ext_data = json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else invoice.extracted_data
+        if not isinstance(ext_data, dict):
+            ext_data = {}
+            
+        if "Items" not in ext_data:
+            ext_data["Items"] = {"value": []}
+            
+        orig_items = ext_data["Items"].get("value", [])
+        
+        for idx, suggestion in enumerate(suggestions):
+            if idx < len(orig_items):
+                item = orig_items[idx]
+                # Map LineItemCoding to extracted_data format
+                # We use .get("value") check to avoid overwriting if something was already there, 
+                # but for waiting_coding we usually want the best suggestion.
+                # However, to be safe and "automatically display values", we fill them.
+                
+                if not item.get("gl_code", {}).get("value"):
+                    item["gl_code"] = {"value": suggestion.gl_code}
+                if not item.get("lob", {}).get("value"):
+                    item["lob"] = {"value": suggestion.lob}
+                if not item.get("department", {}).get("value"):
+                    item["department"] = {"value": suggestion.department or ""}
+                if not item.get("customer", {}).get("value"):
+                    item["customer"] = {"value": suggestion.customer or ""}
+                if not item.get("item", {}).get("value"):
+                    item["item"] = {"value": suggestion.item or ""}
+                if not item.get("line_type", {}).get("value"):
+                    item["line_type"] = {"value": suggestion.line_type or "Expense"}
+        
+        from app.database.db_utils import serialize_json_field
+        
+        # 1. Update Coding record (Primary source for "LINE ITEMS CODING" table)
+        line_items_data = [item.dict() if hasattr(item, 'dict') else item for item in suggestions]
+        line_items_json = serialize_json_field(line_items_data)
+        
+        # We need to refresh the check for existing coding record
+        existing_coding = db.query(DBCoding).filter(DBCoding.invoice_id == invoice.id).first()
+        if existing_coding:
+            existing_coding.line_items = line_items_json
+            existing_coding.updated_at = datetime.utcnow()
+        else:
+            new_coding = DBCoding(
+                invoice_id=invoice.id,
+                line_items=line_items_json,
+                entity=invoice.entity,
+                created_at=datetime.utcnow()
+            )
+            db.add(new_coding)
+
+        # 2. Update Invoice extracted_data (Sync for All Fields view and UI fallback)
+        invoice.extracted_data = serialize_json_field(ext_data)
+            
+        db.add(invoice)
+        db.commit()
+        logger.info(f"Automatically applied coding suggestions to invoice {invoice.id}")
+    except Exception as e:
+        logger.error(f"Error applying coding suggestions: {e}")
+        db.rollback()
+
+def get_coding_suggestions(db: Session, vendor_name: str, extracted_items: List[Dict[str, Any]], vendor_id: str = None) -> List[LineItemCoding]:
+
+    vendor_key = normalize_vendor(vendor_name) if vendor_name else None
+
+    # Fetch vendor tax eligibility
+    vendor_gst_eligible = False
+    vendor_tds_eligible = False
+    if vendor_id:
+        try:
+            vendor_list = vendor_repo.get_multi(db, filters={"vendor_id": vendor_id}, limit=1)
+            vendor = vendor_list[0] if vendor_list else None
+            if vendor:
+                vendor_gst_eligible = bool(vendor.gst_eligibility)
+                vendor_tds_eligible = bool(vendor.tds_applicability)
+                logger.info(f"Vendor {vendor_id} tax flags: GST={vendor_gst_eligible}, TDS={vendor_tds_eligible}")
+        except Exception as e:
+            logger.error(f"Error checking vendor tax eligibility: {e}")
+
     history_entries = []
     seen_ids = set()
 
-    # 1. Fetch by Vendor ID (Strong matching)
+    # 1️. Fetch by Vendor ID (Strong match)
     if vendor_id:
         try:
-            id_entries = coding_history_repo.get_multi(db, filters={"vendor_id": vendor_id}, limit=500)
+            id_entries = coding_history_repo.get_multi(
+                db,
+                filters={"vendor_id": vendor_id},
+                limit=500
+            )
             for h in id_entries:
                 history_entries.append(h)
                 seen_ids.add(h.id)
         except Exception as e:
             logger.error(f"Error fetching ID-based history: {e}")
 
-    # 2. Fetch by Vendor Name (Broad matching) - ALWAYS fetch to fill gaps
+    # 2. Fetch by Vendor Name (Broad match)
     if vendor_key:
         try:
             expressions = []
             if vendor_id:
                 expressions = [CodingHistory.vendor_id != vendor_id]
-            
+
             name_entries = coding_history_repo.get_multi(
-                db, 
-                filters={"vendor_key": vendor_key}, 
+                db,
+                filters={"vendor_key": vendor_key},
                 expressions=expressions,
                 limit=500
             )
-            history_entries.extend(name_entries)
+
+            for h in name_entries:
+                if h.id not in seen_ids:
+                    history_entries.append(h)
+
         except Exception as e:
             logger.error(f"Error fetching Name-based history: {e}")
-            
-    # Suggestions logic follows...
-    
+
     suggestions: List[LineItemCoding] = []
+
     for idx, raw in enumerate(extracted_items):
+
+        #  Extract description
         desc = raw.get("description")
-        if isinstance(desc, dict): desc = desc.get("value")
-        if not desc: continue
-        
-        query_embedding = embed_text(normalize_description(desc))
+        if isinstance(desc, dict):
+            desc = desc.get("value")
+
+        if not desc:
+            continue
+
+        normalized_desc = normalize_description(desc)
+
+        #  Flags (IMPORTANT)
+        is_gst_eligible = (
+            raw.get("gst_eligible") or 
+            raw.get("gst") == "eligible" or 
+            "gst" in normalized_desc.lower()
+        )
+        is_tds = (
+            raw.get("is_tds") or 
+            "tds" in normalized_desc.lower()
+        )
+
+        #  Generate embedding
+        query_embedding = embed_text(normalized_desc)
+
         best_match = None
         best_score = 0.0
 
+        # 🔹 Find best similarity match
         try:
             for h in history_entries:
-                if not h.embedding: continue
+                if not h.embedding:
+                    continue
+
                 h_emb = json.loads(h.embedding)
                 score = cosine_similarity(query_embedding, h_emb)
+
                 if score > best_score:
                     best_score = score
                     best_match = h
+
         except Exception as e:
             logger.error(f"Error processing history entries: {e}")
             best_match = None
@@ -202,17 +316,45 @@ def get_coding_suggestions(db: Session, vendor_name: str, extracted_items: List[
             quantity=safe_float(val("quantity")),
             unit_price=safe_float(val("unit_price") or val("price")),
             net_amount=safe_float(val("amount") or val("total")),
-            gl_code=""
+            gl_code="",
+            lob="",
+            department="",
+            customer="",
+            item=""
         )
 
+        #  Match from history (AI match)
         if best_match and best_match.coding_json:
-            coding = json.loads(best_match.coding_json)
-            item.gl_code = coding.get("gl_code", "")
-            item.lob = coding.get("lob", "")
-            item.department = coding.get("department", "")
-            item.customer = coding.get("customer", "")
-            item.item = coding.get("item", "")
+            try:
+                coding = json.loads(best_match.coding_json)
+
+                item.gl_code = coding.get("gl_code", "")
+                item.lob = coding.get("lob", "")
+                item.department = coding.get("department", "")
+                item.customer = coding.get("customer", "")
+                item.item = coding.get("item", "")
+
+            except Exception as e:
+                logger.error(f"Error parsing coding_json: {e}")
+
+        # =========================================================
+        #  BUSINESS RULE OVERRIDES (PRIORITY BASED)
+        # =========================================================
+
+        #  1. TDS → override GL code if vendor is TDS applicable
+        if is_tds and vendor_tds_eligible:
+            item.gl_code = "TDS_INPUT"
+
+        #  2. GST Eligible → override GL code if vendor is GST eligible
+        elif is_gst_eligible and vendor_gst_eligible:
+            item.gl_code = "GST_INPUT"
+
+        #  3. GST Ineligible (Implicit) → Already handled by history block above
+
+        #  If no rule + no match → stays empty (manual input)
+
         suggestions.append(item)
+
     return suggestions
 
 @router.get("/{invoice_id}", response_model=CodingResponse)

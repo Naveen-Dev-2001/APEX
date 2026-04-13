@@ -75,3 +75,10 @@ export const saveInvoice = async (invoice_id, payload) => {
     const res = await API.put(`/invoices/${invoice_id}`, payload)
     return res.data
 }
+
+
+export const fetchCodingSuggestions = async (invoiceId, vendorId = null) => {
+    const params = vendorId ? { vendor_id: vendorId } : {};
+    const res = await API.get(`/coding/${invoiceId}/suggestions`, { params });
+    return res.data;
+};

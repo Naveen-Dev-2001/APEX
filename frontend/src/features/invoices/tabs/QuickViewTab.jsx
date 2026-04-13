@@ -11,6 +11,7 @@ import { masterDataService } from "../../../api/masterdataAPI";
 import InvoiceCalculationModal from "./InvoiceCalculationModal";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
+import loadLineItemTable from "../../../utils/lineItemLogic";
 
 dayjs.extend(customParseFormat);
 
@@ -94,7 +95,7 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
                         onChange={(val) => handleChange(val)}
                         filterOption={filterVendors}
                         placement="bottomLeft"
-                        onDropdownVisibleChange={onDropdownVisibleChange}
+                        onOpenChange={onDropdownVisibleChange}
                     />
                 );
             }
@@ -138,36 +139,61 @@ FieldRenderer.displayName = "FieldRenderer";
 // ─────────────────────────────────────────────────────────────────────────────
 // Line-item cell — isolated so only the changed cell re-renders
 // ─────────────────────────────────────────────────────────────────────────────
-const LineItemCell = memo(({ value, disabled, rowId, colKey, onUpdate, onHover, onLeave }) => {
-    const [local, setLocal] = useState(value ?? "");
-    const debounceRef = useRef(null);
+// ─── FIX 1: LineItemCell — change the useEffect condition ────────────────────
+const LineItemCell = memo(
+    ({ value, disabled, rowId, colKey, onUpdate, onHover, onLeave }) => {
+        const [local, setLocal] = useState(value ?? "");
+        const isEditing = useRef(false);
+        const editTimerRef = useRef(null);
 
-    useEffect(() => { setLocal(value ?? ""); }, [value]);
+        useEffect(() => {
+            if (!isEditing.current) {
+                setLocal(value ?? "");
+            }
+        }, [value]);
 
-    const handleChange = useCallback((e) => {
-        const v = e.target.value;
-        setLocal(v);
-        clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => onUpdate(rowId, colKey, v), 300);
-    }, [rowId, colKey, onUpdate]);
+        const handleChange = useCallback((e) => {
+            const v = e.target.value;
+            isEditing.current = true;
+            setLocal(v);
+            clearTimeout(editTimerRef.current);
+            editTimerRef.current = setTimeout(() => {
+                isEditing.current = false;
+            }, 300);
+            onUpdate(rowId, colKey, v);
+        }, [rowId, colKey, onUpdate]);
 
-    useEffect(() => () => clearTimeout(debounceRef.current), []);
+        const handleBlur = useCallback(() => {
+            isEditing.current = false;
+        }, []);
 
-    return (
-        <div
-            onMouseEnter={() => onHover(rowId, colKey)}
-            onMouseLeave={onLeave}
-            className="w-full h-full min-h-[40px] flex items-center"
-        >
-            <CustomInput
-                value={local}
-                disabled={disabled}
-                onChange={handleChange}
-                className="mb-0 w-full"
-            />
-        </div>
-    );
-});
+        useEffect(() => () => clearTimeout(editTimerRef.current), []);
+
+        return (
+            <div
+                onMouseEnter={() => onHover(rowId, colKey)}
+                onMouseLeave={onLeave}
+                className="w-full h-full min-h-[40px] flex items-center"
+            >
+                <CustomInput
+                    value={local}
+                    disabled={disabled}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className="mb-0 w-full"
+                />
+            </div>
+        );
+    },
+    // ── Custom comparator: only re-render when data props change ──────────────
+    // Ignores onUpdate/onHover/onLeave — if those references change due to
+    // a store-wide re-render, the cell must NOT re-render because of it.
+    (prevProps, nextProps) =>
+        prevProps.value === nextProps.value &&
+        prevProps.disabled === nextProps.disabled &&
+        prevProps.rowId === nextProps.rowId &&
+        prevProps.colKey === nextProps.colKey
+);
 
 LineItemCell.displayName = "LineItemCell";
 
@@ -192,20 +218,15 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         quickViewFormData,
         setQuickViewField,
         activeInvoiceData,
-        quickViewLineItems,
-        originalLineItems,
-        setQuickViewLineItems,
-        updateQuickViewLineItem,
-        deleteQuickViewLineItem,
         selectedVendorId,
         setQuickViewFormData,
         setSelectedVendorId,
         setHighlightedField,
-        addQuickViewLineItem,
         entityMaster,
         isDuplicate,
-        batchUpdateQuickViewFields,
         duplicateMessage,
+        lineItems,
+        setLineItems
     } = useInvoiceStore();
 
     const VIEW_ONLY_STATUSES = ["WAITING_CODING"];
@@ -213,6 +234,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const { vendorsList } = useVendersListSync();
     const { vendor } = useVendorDetailSync(selectedVendorId);
     const [showCalcModal, setShowCalcModal] = useState(false);
+
+    const prevVendorRef = useRef(null);
+
 
     // ── Vendor sync ───────────────────────────────────────────────────────────
     useEffect(() => {
@@ -253,6 +277,13 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         };
 
         const prev = useInvoiceStore.getState().quickViewFormData;
+        const prevVendorId = prevVendorRef.current;
+
+        prevVendorRef.current = vendor?.vendor_id;
+
+        const isVendorChanged = prevVendorId !== null          // not first load
+            && prevVendorId !== vendor?.vendor_id
+
         const extractedPayTerms = prev?.paymentTerms;
         const computedDueDate = getDueDate(
             prev?.dueDate,
@@ -260,62 +291,45 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             extractedPayTerms,
             vendor?.pay_terms
         );
-
-        setQuickViewFormData((p) => ({
-            ...p,
+        const updatedFormData = {
+            ...prev,
             gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
             lineGrouping: vendor?.line_grouping ? "Yes" : "No",
             paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || "",
             dueDate: computedDueDate,
             gst_eligibility: vendor?.gst_eligibility,
-        }));
-
-        batchUpdateQuickViewFields({
             tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
             tdsRate: vendor?.tds_percentage ?? 0,
             tdsSection: vendor?.tds_section_code ?? "NA",
+            // map these so addSystemRows can read them:
+            tds_applicability: vendor?.tds_applicability,
+            tds_percentage: vendor?.tds_percentage ?? 0,
+            totalTaxAmount: prev?.totalTaxAmount,
+        };
+
+        // Commit to store
+        setQuickViewFormData(updatedFormData);
+        if (!activeInvoiceData) return;
+        // const prevVendorId = prevVendorRef.current;
+        // const isVendorChanged = prevVendorId !== vendor?.vendor_id;
+        const result = loadLineItemTable({
+            activeInvoiceData,
+            quickViewFormData: updatedFormData,
+            vendor,
+            isVendorChanged
         });
 
-        setQuickViewFormData((p) => ({
-            ...p,
-            tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
-            tdsRate: vendor?.tds_percentage ?? 0,
-            tdsSection: vendor?.tds_section_code ?? "NA",
-        }));
+        if (result) setLineItems(result);
 
     }, [vendor, selectedVendorId]);
 
     useEffect(() => {
-        const state = useInvoiceStore.getState();
-        const { quickViewFormData: fd, originalLineItems } = state;
+        console.log("quickViewFormData00000000000000000000", quickViewFormData);
 
-        if (!originalLineItems?.length) return;
+    }, [quickViewFormData])
 
-        // Always pass isModified: false here — lineGrouping change is triggered by
-        // vendor sync, which means system rows must recalculate from current form
-        // values (tdsApplicability, tdsRate, totalTaxAmount) regardless of save state.
-        if (fd?.lineGrouping === "Yes") {
-            const grouped = useInvoiceStore.getState()._applyLineGrouping(
-                originalLineItems,
-                fd
-            );
-            useInvoiceStore.setState({
-                quickViewLineItems: useInvoiceStore.getState()._syncSystemRows(
-                    fd,
-                    grouped,
-                    false  // ← recalculate always on vendor change
-                ),
-            });
-        } else {
-            useInvoiceStore.setState({
-                quickViewLineItems: useInvoiceStore.getState()._syncSystemRows(
-                    fd,
-                    originalLineItems,
-                    false  // ← recalculate always on vendor change
-                ),
-            });
-        }
-    }, [quickViewFormData?.lineGrouping]);
+
+
 
     // ── Vendor options ─────────────────────────────────────────────────────────
     const vendorOptions = useMemo(() => {
@@ -376,27 +390,97 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [setQuickViewField, setSelectedVendorId]);
 
     const handleUpdateLineItem = useCallback((id, key, value) => {
-        updateQuickViewLineItem(id, key, value);
-    }, [updateQuickViewLineItem]);
+        setLineItems(prev =>
+            prev.map(item => {
+                debugger
+                if (item.id !== id) return item;
+
+                // Keep value as-is (string) — don't cast to Number here.
+                // Casting kills partial input like "1." or "" mid-type.
+                let updated = { ...item, [key]: value };
+
+                if (!item.isSystemRow) {
+                    if (key === "netAmount") {
+                        // User manually typed netAmount — mark as overridden,
+                        // do NOT recalculate from qty/unitPrice/discount.
+                        updated.isNetAmountOverridden = true;
+                    } else if (["qty", "unitPrice", "discount"].includes(key)) {
+                        // These fields drive the auto-calculation.
+                        updated.isNetAmountOverridden = false;
+
+                        // Use parseFloat so partial input ("1.", "") doesn't
+                        // corrupt the calculation — it just treats them as 0.
+                        const qty = parseFloat(updated.qty) || 0;
+                        const price = parseFloat(updated.unitPrice) || 0;
+                        const discount = parseFloat(updated.discount) || 0;
+
+                        updated.netAmount = qty * price - discount;
+                    }
+                    // "description" and other string fields: no calculation needed.
+                } else {
+                    // System rows (GST / TDS): keep unitPrice and netAmount in sync.
+                    if (key === "unitPrice" || key === "netAmount") {
+                        const numVal = parseFloat(value) || 0;
+                        updated.unitPrice = numVal;
+                        updated.netAmount = numVal;
+                    }
+                }
+
+                return updated;
+            })
+        );
+    }, [setLineItems]);
 
     const handleDeleteLineItem = useCallback((id) => {
-        deleteQuickViewLineItem(id);
-    }, [deleteQuickViewLineItem]);
+        setLineItems(prev => prev.filter(item => item.id !== id));
+    }, [setLineItems]);
 
     const handleHoverField = useCallback((key) => {
         setHighlightedField(key);
     }, [setHighlightedField]);
 
+    const lineItemsRef = useRef(lineItems);
+    useEffect(() => {
+        lineItemsRef.current = lineItems;
+    }, [lineItems]);
+
+
     const handleHoverLineItem = useCallback((rowId, colKey) => {
-        const index = quickViewLineItems.findIndex(item => item.id === rowId);
+        const index = lineItemsRef.current.findIndex(item => item.id === rowId);
         if (index !== -1) {
             setHighlightedField(`LineItem_${index}_${colKey}`);
         }
-    }, [quickViewLineItems, setHighlightedField]);
+    }, [setHighlightedField]);
 
     const handleLeaveField = useCallback(() => {
         setHighlightedField(null);
     }, [setHighlightedField]);
+
+    const handleAddLineItem = useCallback(() => {
+        const newItem = {
+            id: Date.now(),
+            description: "",
+            qty: 0,
+            unitPrice: 0,
+            discount: 0,
+            netAmount: 0,
+            taxAmt: 0,
+
+            lineType: "",
+            glCode: "",
+            lob: "",
+            department: "",
+            customer: "",
+            item: "",
+        };
+
+        setLineItems(prev => {
+            const systemRows = prev.filter(r => r.isSystemRow);
+            const regularRows = prev.filter(r => !r.isSystemRow);
+
+            return [...regularRows, newItem, ...systemRows];
+        });
+    }, [setLineItems]);
 
     // ── Totals — derived directly from quickViewLineItems (single source of truth) ──
     //
@@ -407,9 +491,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     // (grouping was applied at load time, edits mutate the state directly),
     // these values are always correct.
     const { regularItemsSum, totalAmountPayable } = useMemo(() => {
-        const regularItems = quickViewLineItems.filter(row => !row.isSystemRow);
-        const gstRow = quickViewLineItems.find(r => r.type === "GST");
-        const tdsRow = quickViewLineItems.find(r => r.type === "TDS");
+        const regularItems = lineItems?.filter(row => !row.isSystemRow);
+        const gstRow = lineItems.find(r => r.type === "GST");
+        const tdsRow = lineItems.find(r => r.type === "TDS");
 
         const regularItemsSum = regularItems.reduce(
             (sum, row) => sum + (Number(row.netAmount) || 0),
@@ -419,7 +503,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             regularItemsSum + (Number(gstRow?.netAmount) || 0) + (Number(tdsRow?.netAmount) || 0);
 
         return { regularItemsSum, totalAmountPayable };
-    }, [quickViewLineItems]);
+    }, [lineItems]);
 
     // Label for the GST system row
     const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
@@ -491,13 +575,13 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                 </thead>
                                                 <tbody>
                                                     {/* ── Render quickViewLineItems directly — no derived processedItems ── */}
-                                                    {quickViewLineItems.map((row, index) => {
+                                                    {lineItems?.map((row, index) => {
                                                         const isSystem = !!row.isSystemRow;
                                                         const rowLabel = row.type === "GST" ? gstTaxLabel : row.description;
 
                                                         return (
                                                             <tr
-                                                                key={row.id}
+                                                                key={row.id || index}
                                                                 className={`shadow-sm ${isSystem ? "bg-gray-50" : "bg-white"}`}
                                                             >
                                                                 <td className="p-2 text-center w-[60px]">{index + 1}</td>
@@ -524,7 +608,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                                                             : ""
                                                                                 }
                                                                                 disabled={isViewOnly}
-                                                                                rowId={row.id}
+                                                                                rowId={row.id ?? index}
                                                                                 colKey={col.key}
                                                                                 onUpdate={handleUpdateLineItem}
                                                                                 onHover={handleHoverLineItem}
@@ -564,7 +648,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                     </div>
 
                                     <button
-                                        onClick={addQuickViewLineItem}
+                                        onClick={handleAddLineItem}
                                         className="w-full flex items-center justify-center gap-2 py-2 mt-1 mb-4 border border-dashed border-[#2F5D7C] rounded-md text-[#2F5D7C] hover:bg-[#eaf2f8] transition-colors font-medium text-sm"
                                     >
                                         <span className="text-lg leading-none">+</span>

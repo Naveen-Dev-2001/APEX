@@ -6,10 +6,10 @@ import { useCallback } from "react";
 export const useSaveInvoice = () => {
     const {
         quickViewFormData,
-        quickViewLineItems,
         activeInvoiceData,
         setActiveInvoiceData,
         viewInvoiceId,
+        lineItems
     } = useInvoiceStore();
 
     const buildPayload = useCallback(() => {
@@ -17,7 +17,7 @@ export const useSaveInvoice = () => {
         const f = quickViewFormData;
 
         // ── Save exactly what is on screen ────────────────────────────────────
-        const lineItemsToSave = useInvoiceStore.getState().getLineItemsForSave();
+        const lineItemsToSave = lineItems;
         const originalLineItems = useInvoiceStore.getState().originalLineItems;
 
         // ── Map to the server Items shape ─────────────────────────────────────
@@ -29,6 +29,11 @@ export const useSaveInvoice = () => {
             unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
             discount: { value: Number(item.discount) || 0, source: "user" },
             tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
+            gl_code: { value: item.glCode || "", source: "user" },
+            lob: { value: item.lob || "", source: "user" },
+            department: { value: item.department || "", source: "user" },
+            customer: { value: item.customer || "", source: "user" },
+            item: { value: item.item || "", source: "user" },
             ...(item.isSystemRow ? { is_system_row: true, row_type: item.type } : {}),
         }));
 
@@ -64,6 +69,7 @@ export const useSaveInvoice = () => {
 
             // Mark as saved so the next load skips recalculation and grouping
             isModified: true,
+            lineItemsSnapshot: lineItems,
 
             vendor_info: {
                 ...activeInvoiceData.extracted_data?.vendor_info,
@@ -151,7 +157,7 @@ export const useSaveInvoice = () => {
         };
 
         return payload;
-    }, [quickViewFormData, quickViewLineItems, activeInvoiceData]);
+    }, [quickViewFormData, lineItems, activeInvoiceData]);
 
     const handleSave = useCallback(async () => {
         debugger
