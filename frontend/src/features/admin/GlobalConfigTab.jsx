@@ -15,8 +15,10 @@ const GlobalConfigTab = () => {
     });
 
     useEffect(() => {
-        fetchSettings();
-    }, [fetchSettings]);
+        if (!statuses.length && !roles.length && !navigation.length) {
+            fetchSettings();
+        }
+    }, [fetchSettings, statuses.length, roles.length, navigation.length]);
 
     const toggleModal = (type, value = true) => {
         setModals(prev => ({ ...prev, [type]: value }));

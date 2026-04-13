@@ -68,8 +68,10 @@ const Header = () => {
 
     // Fetch settings on mount to ensure we have navigation
     useEffect(() => {
-        fetchSettings();
-    }, [fetchSettings]);
+        if (!navigation || navigation.length === 0) {
+            fetchSettings();
+        }
+    }, [fetchSettings, navigation]);
 
     // Filter navigation based on user role
     useEffect(() => {

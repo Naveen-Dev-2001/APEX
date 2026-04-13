@@ -2,9 +2,13 @@ import { create } from 'zustand';
 import { adminService } from '../features/admin/adminService';
 import toast from '../utils/toast';
 
+const SETTINGS_TTL_MS = 5 * 60 * 1000;
+let settingsRequestPromise = null;
+
 const useAdminStore = create((set, get) => ({
     users: [],
     roles: [],
+    statuses: [],
     navigation: [],
     loading: false,
     error: null,
@@ -16,6 +20,7 @@ const useAdminStore = create((set, get) => ({
     sortDirection: 'asc',
     isUpdating: false,
     delegations: [],
+    settingsLoadedAt: 0,
 
     setSearchQuery: (query) => set({ searchQuery: query }),
     setCurrentPage: (page) => set({ currentPage: page }),
@@ -30,20 +35,45 @@ const useAdminStore = create((set, get) => ({
         }
     },
 
-    fetchSettings: async () => {
-        set({ loading: true });
-        try {
-            const data = await adminService.getSettings();
-            set({ 
-                roles: data.roles || [], 
-                statuses: data.statuses || [],
-                navigation: data.navigation || [],
-                loading: false
-            });
-        } catch (error) {
-            console.error("Failed to fetch settings", error);
-            set({ loading: false });
+    fetchSettings: async ({ force = false } = {}) => {
+        const { roles, statuses, navigation, settingsLoadedAt } = get();
+        const hasSettings = roles.length > 0 || statuses.length > 0 || navigation.length > 0;
+        const isFresh = Date.now() - settingsLoadedAt < SETTINGS_TTL_MS;
+
+        if (!force && hasSettings && isFresh) {
+            return { roles, statuses, navigation };
         }
+
+        if (settingsRequestPromise) {
+            return settingsRequestPromise;
+        }
+
+        set({ loading: true });
+
+        settingsRequestPromise = (async () => {
+            try {
+                const data = await adminService.getSettings();
+                const nextSettings = {
+                    roles: data.roles || [],
+                    statuses: data.statuses || [],
+                    navigation: data.navigation || []
+                };
+                set({
+                    ...nextSettings,
+                    settingsLoadedAt: Date.now(),
+                    loading: false
+                });
+                return nextSettings;
+            } catch (error) {
+                console.error("Failed to fetch settings", error);
+                set({ loading: false });
+                throw error;
+            } finally {
+                settingsRequestPromise = null;
+            }
+        })();
+
+        return settingsRequestPromise;
     },
 
     updateSettings: async (newSettings) => {
@@ -53,7 +83,8 @@ const useAdminStore = create((set, get) => ({
             set({ 
                 roles: newSettings.roles, 
                 statuses: newSettings.statuses,
-                navigation: newSettings.navigation 
+                navigation: newSettings.navigation,
+                settingsLoadedAt: Date.now()
             });
             toast.success('Settings saved successfully');
             return true;

@@ -15,8 +15,13 @@ const UserManagementTab = ({ onEdit }) => {
 
     useEffect(() => {
         fetchUsers();
-        fetchSettings();
-    }, [fetchUsers, fetchSettings, currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection]);
+    }, [fetchUsers, currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection]);
+
+    useEffect(() => {
+        if (!roles.length) {
+            fetchSettings();
+        }
+    }, [fetchSettings, roles.length]);
 
     const safeUsers = users || [];
 

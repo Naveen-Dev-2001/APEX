@@ -61,14 +61,14 @@ const AccessControl = ({ roles, navigation, onAdd, onEdit, loading = false }) =>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden text-left">
             <div className="px-6 py-4 flex justify-between items-center border-b border-gray-100">
                 <h3 className="text-[15px] font-medium text-[#444444]">Navigation & Access Control</h3>
-                <button 
+                <button
                     onClick={onAdd}
                     className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-1.5 rounded-[4px] flex items-center gap-1.5 text-xs font-semibold transition-colors"
                 >
                     <img src={addIcon} alt="Add" className="w-[14px]" /> Add
                 </button>
             </div>
-            
+
             <div className="overflow-x-auto w-full">
                 <table className="w-full text-left">
                     <thead className="bg-[#106fa4] text-white text-[13px] font-medium">
@@ -100,14 +100,14 @@ const AccessControl = ({ roles, navigation, onAdd, onEdit, loading = false }) =>
                                 </td>
                                 <td className="px-6 py-4 align-top">
                                     <div className="flex items-center justify-center gap-4">
-                                        <button 
+                                        <button
                                             onClick={() => onEdit(role)}
                                             className="text-gray-500 hover:text-gray-700 transition-colors p-1"
                                             title="Edit access"
                                         >
                                             <Pencil size={18} />
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => handleRemove(role)}
                                             disabled={isUpdating || role === 'admin'}
                                             className={`transition-colors p-1 ${role === 'admin' ? 'text-gray-300 cursor-not-allowed' : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
