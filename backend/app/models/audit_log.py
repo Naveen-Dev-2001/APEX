@@ -15,6 +15,10 @@ class AuditAction(str, Enum):
     REWORKED = "Reworked"
     RECALLED = "Recalled"
     COMMENT_ADDED = "Comment Added"
+    SAGE_POSTED = "Sage Posted"
+    SAGE_POST_FAILED = "Sage Post Failed"
+    SAGE_REPOSTED = "Sage Reposted"
+    SAGE_REPOST_FAILED = "Sage Repost Failed"
 
 class AuditLogCreate(BaseModel):
     invoice_id: str

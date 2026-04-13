@@ -15,24 +15,25 @@ import { message } from "antd";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
+
 const Invoice = () => {
-    const { 
-        invoiceSection, skip, limit, view, setView, setInvoiceSection, 
-        setIsModalOpen, isModalOpen, setFileName, setViewInvoiceId, 
-        viewInvoiceId, quickViewFormData, setQuickViewFormData, 
-        selectedVendorId, setSelectedVendorId, setQuickViewLineItems, 
+    const {
+        invoiceSection, skip, limit, view, setView, setInvoiceSection,
+        setIsModalOpen, isModalOpen, setFileName, setViewInvoiceId,
+        viewInvoiceId, quickViewFormData, setQuickViewFormData,
+        selectedVendorId, setSelectedVendorId, setQuickViewLineItems,
         setEntityMaster, setActiveInvoiceData,
         searchQuery, setSearchQuery, sortColumn, sortDirection, setSort, setSkip, setLimit
     } = useInvoiceStore();
-    
+
     const [localSearch, setLocalSearch] = useState(searchQuery);
 
-    const { invoices, total, isLoading, refetch } = useInvoiceData({ 
-        skip, 
-        limit, 
-        search: searchQuery, 
-        sort_by: sortColumn, 
-        sort_dir: sortDirection 
+    const { invoices, total, isLoading, refetch } = useInvoiceData({
+        skip,
+        limit,
+        search: searchQuery,
+        sort_by: sortColumn,
+        sort_dir: sortDirection
     });
 
     // Debounce search
@@ -42,45 +43,54 @@ const Invoice = () => {
         }, 500);
         return () => clearTimeout(timer);
     }, [localSearch, setSearchQuery]);
+
     const [messageApi, contextHolder] = message.useMessage();
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const { isLoadingVendorDetail, vendor } = useVendorDetailSync(selectedVendorId);
 
-    console.log('vendor', vendor);
-    console.log('quickViewFormData', vendor, quickViewFormData);
-
     useEffect(() => {
         fetchEntityMaster().then((res) => {
             const data = res.data || [];
-            // selected_entity now holds entity_id (FK value), so compare against entity_id
             const selectedEntityId = sessionStorage.getItem('selected_entity');
             const selectedEntity = data.filter((item) => item.entity_id === selectedEntityId);
             setEntityMaster(selectedEntity?.[0] || {});
         }).catch((err) => {
             console.error("Failed to fetch entity master", err);
-        })
-    }, [])
+        });
+    }, []);
+
+    useEffect(() => {
+        if (invoiceSection === 1) {
+            refetch();
+        }
+    }, [invoiceSection]);
 
     const removeCurrencyFormat = (value) => {
         if (!value) return 0;
         return Number(value.toString().replace(/[^0-9.]/g, ""));
     };
 
-
     const handleView = useCallback((data) => {
-        console.log('handleView', data);
-
         const id = Number(data.id);
         if (!id) return;
+
+        // ── isModified guard ─────────────────────────────────────────────────
+        // If the invoice was previously saved, extracted_data.isModified === true.
+        // We pass this flag through to setQuickViewFormData and setQuickViewLineItems
+        // so that _syncSystemRows skips recalculation and preserves the saved values.
+        const isModified = !!data?.extracted_data?.isModified;
 
         setFileName(data.original_filename ?? "");
         setActiveInvoiceData(data);
 
         setQuickViewFormData({
+            // ── isModified flag — read by the store's _syncSystemRows guard ──
+            isModified,
+
             // Header
-            vendorId: data.vendor_id ?? "",
-            vendorName: data.vendor_name ?? "",
+            vendorId: data.extracted_data.vendor_info.vendor_id.value ?? "",
+            vendorName: data.extracted_data.vendor_info.name.value ?? "",
             invoiceNumber: data.invoice_number ?? "",
             invoiceDate: data.extracted_data?.invoice_details?.invoice_date?.value ?? "",
             dueDate: data.extracted_data?.invoice_details?.due_date?.value ?? "",
@@ -139,32 +149,66 @@ const Invoice = () => {
             qrOrIrn: data.extracted_data?.additional_info?.qr_code_irn?.value ?? "",
             companyRegistrationNumber: data.extracted_data?.additional_info?.company_registration_number?.value ?? "",
 
-            // Vendor master (empty → will be filled later)
+            // Vendor master — will be filled by vendor sync in QuickViewTab.
+            // tdsApplicability / tdsRate are needed for TDS row visibility,
+            // so we also read them from saved amounts if present (isModified path).
             gstEligibility: "",
-            tdsApplicability: "",
-            tdsRate: "",
-            tdsSection: "",
+            tdsApplicability: data.extracted_data?.amounts?.tds_applicability?.value ?? "",
+            tdsRate: data.extracted_data?.amounts?.tds_rate?.value ?? "",
+            tdsSection: data.extracted_data?.amounts?.tds_section?.value ?? "",
             lineGrouping: "",
         });
 
+        // ── Line items ───────────────────────────────────────────────────────
         const items = data?.extracted_data?.Items?.value || [];
         const mappedItems = items.map((item, index) => {
-            const netAmount = item.amount?.value || 0;
+            const desc = item.description?.value || "";
+            const netAmount = Number(item.amount?.value) || 0;
+            const qty = Number(item.qty?.value) || 1;
+            const unitPrice = Number(item.unit_price?.value) || 0;
+            const discount = Number(item.discount?.value) || 0;
+            const taxAmt = Number(item.tax_amount?.value) || 0;
+
+            const isGst = desc === "Total GST" || desc === "Total Tax";
+            const isTds = desc === "TDS Deduction";
+
             return {
-                id: index + 1,
-                description: item.description?.value || "",
-                qty: 1,
-                unitPrice: netAmount,
-                discount: 0,
-                netAmount: netAmount,
-                taxAmt: 0,
+                id: isGst ? "gst-row" : isTds ? "tds-row" : index + 1,
+                type: isGst ? "GST" : isTds ? "TDS" : undefined,
+                description: desc,
+                qty,
+                unitPrice: isGst || isTds ? netAmount : unitPrice,
+                discount,
+                netAmount,
+                taxAmt,
+                isSystemRow: isGst || isTds,
+                isNetAmountOverridden: false,
             };
         });
 
-        setQuickViewLineItems(mappedItems);
-        setViewInvoiceId(id);
+        // ── Original items (pre-grouping source of truth) ──────────────────────
+        // OriginalItems is saved separately by useSaveInvoice — always holds the
+        // raw ungrouped rows without system rows.
+        // Falls back to regular rows from Items for invoices saved before this feature.
+        const originalItems = data?.extracted_data?.OriginalItems?.value || [];
+        const mappedOriginalItems = originalItems.length
+            ? originalItems.map((item, index) => ({
+                id: index + 1,
+                description: item.description?.value || "",
+                qty: Number(item.qty?.value) || 1,
+                unitPrice: Number(item.unit_price?.value) || 0,
+                discount: Number(item.discount?.value) || 0,
+                netAmount: Number(item.amount?.value) || 0,
+                taxAmt: Number(item.tax_amount?.value) || 0,
+                isNetAmountOverridden: false,
+            }))
+            : mappedItems.filter(i => !i.isSystemRow); // fallback for legacy saved invoices
 
-        // Mark that this vendor fetch was intentionally triggered
+        // mappedItems drives the visible table (may be grouped),
+        // mappedOriginalItems is the restore source for lineGrouping toggles.
+        setQuickViewLineItems(mappedItems, isModified);
+        useInvoiceStore.setState({ originalLineItems: mappedOriginalItems });
+        setViewInvoiceId(id);
         setSelectedVendorId(data.vendor_id);
         setInvoiceSection(2);
     }, [setQuickViewFormData, setViewInvoiceId, setSelectedVendorId, setQuickViewLineItems]);
@@ -172,8 +216,6 @@ const Invoice = () => {
     const handleDelete = useCallback((data) => {
         deleteInvoice(data.id).then(() => {
             messageApi.success("Invoice deleted successfully");
-            console.log("Delete", data);
-
             refetch();
         }).catch(() => {
             messageApi.error("Failed to delete invoice");
@@ -184,12 +226,12 @@ const Invoice = () => {
         () => view === "condensed"
             ? getCondensedColumns(handleView, handleDelete)
             : getFullColumns(handleView, handleDelete),
-        [view]   // ← recompute only when view changes 
+        [view]
     );
 
     const handleCreateInvoice = () => {
-        setIsModalOpen(true)
-    }
+        setIsModalOpen(true);
+    };
 
     const handleUpload = async (files) => {
         if (!files || files.length === 0) {
@@ -213,24 +255,14 @@ const Invoice = () => {
             const progressUrl = `${API.defaults.baseURL}/invoices/upload-progress/${taskId}`;
             eventSource = new EventSource(progressUrl);
 
-            // Track completed files count to compute true cumulative progress
             let completedFiles = 0;
 
             eventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.progress !== undefined) {
-                        if (data.progress >= 100) {
-                            // One more file fully processed
-                            completedFiles += 1;
-                        }
-
-                        // Cumulative: how far through ALL files are we?
-                        // e.g. 3 files, file 2 at 50% → (1 + 0.5) / 3 = 50% of processing
-                        const processingRatio =
-                            (completedFiles + data.progress / 100) / totalFiles;
-
-                        // Map server processing phase to 50%–99% range
+                        if (data.progress >= 100) completedFiles += 1;
+                        const processingRatio = (completedFiles + data.progress / 100) / totalFiles;
                         const mapped = 50 + Math.round(processingRatio * 49);
                         setUploadProgress(Math.min(mapped, 99));
                     }
@@ -245,10 +277,7 @@ const Invoice = () => {
 
             const response = await uploadInvoices(formData, taskId, (progressEvent) => {
                 if (progressEvent.total) {
-                    // Network upload phase: 0% → 50%
-                    const percent = Math.round(
-                        (progressEvent.loaded / progressEvent.total) * 50
-                    );
+                    const percent = Math.round((progressEvent.loaded / progressEvent.total) * 50);
                     setUploadProgress(percent);
                 }
             });
@@ -261,7 +290,6 @@ const Invoice = () => {
             );
 
             await refetch();
-
             await new Promise((res) => setTimeout(res, 700));
 
             if (files.length === 1 && response?.data?.invoices?.length > 0) {
@@ -285,12 +313,13 @@ const Invoice = () => {
     return (
         <>
             {contextHolder}
-            {
-                invoiceSection === 1 && (<>
+            {invoiceSection === 1 && (
+                <>
                     <div className="p-4 bg-[#F7F7F7]">
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-3xl font-bold custom-font-jura">
-                                Invoices <span className="text-base font-normal  px-2 py-1 rounded-3xl shadow-sm bg-[#E0E0E0] inline-block">
+                                Invoices{" "}
+                                <span className="text-base font-normal px-2 py-1 rounded-3xl shadow-sm bg-[#E0E0E0] inline-block">
                                     {total || 0}
                                 </span>
                             </span>
@@ -315,13 +344,11 @@ const Invoice = () => {
                                         onChange={(val) => setView(val)}
                                     />
                                 </div>
-
                                 <div className="w-[200px]">
                                     <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
                                         Create Invoice
                                     </CustomButton>
                                 </div>
-
                             </div>
                         </div>
                     </div>
@@ -338,7 +365,6 @@ const Invoice = () => {
                                 tableSearch={false}
                                 defaultPageSize={10}
                                 shouldUseFlex={false}
-                                // Server-side props
                                 totalItems={total}
                                 currentPage={(skip / limit) + 1}
                                 itemsPerPage={limit}
@@ -351,32 +377,24 @@ const Invoice = () => {
                             />
                         )}
                     </div>
-                </>)
-            }
-            {
-                (invoiceSection === 1 || isModalOpen) && (<>
-                    <AddInvoiceModal
-                        open={isModalOpen}
-                        onCancel={() => {
-                            setIsModalOpen(false)
-                            setInvoiceSection(1);
-                        }}
-                        onUpload={handleUpload}
-                        uploadProgress={uploadProgress}
-                        confirmLoading={uploadLoading}
-                    />
-                </>)
+                </>
+            )}
 
-            }
-            {
-                invoiceSection === 2 && (<>
+            {(invoiceSection === 1 || isModalOpen) && (
+                <AddInvoiceModal
+                    open={isModalOpen}
+                    onCancel={() => {
+                        setIsModalOpen(false);
+                        setInvoiceSection(1);
+                    }}
+                    onUpload={handleUpload}
+                    uploadProgress={uploadProgress}
+                    confirmLoading={uploadLoading}
+                />
+            )}
 
-                    <ViewInvoicePage />
-
-                </>)
-            }
+            {invoiceSection === 2 && <ViewInvoicePage />}
         </>
-
     );
 };
 

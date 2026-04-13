@@ -13,11 +13,57 @@ export const useSaveInvoice = () => {
     } = useInvoiceStore();
 
     const buildPayload = useCallback(() => {
+        debugger
         const f = quickViewFormData;
 
-        // Reverse-map flat quickViewFormData → extracted_data shape
+        // ── Save exactly what is on screen ────────────────────────────────────
+        const lineItemsToSave = useInvoiceStore.getState().getLineItemsForSave();
+        const originalLineItems = useInvoiceStore.getState().originalLineItems;
+
+        // ── Map to the server Items shape ─────────────────────────────────────
+        const mappedItems = lineItemsToSave.map((item, index) => ({
+            item_number: { value: index + 1, source: "system" },
+            description: { value: item.description ?? "", source: "user" },
+            amount: { value: Number(item.netAmount) || 0, source: "user" },
+            qty: { value: Number(item.qty) || 1, source: "user" },
+            unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
+            discount: { value: Number(item.discount) || 0, source: "user" },
+            tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
+            ...(item.isSystemRow ? { is_system_row: true, row_type: item.type } : {}),
+        }));
+
+        // ── Map originalLineItems → OriginalItems server shape ────────────────
+        // Always excludes system rows — they are derived, never part of the original.
+        // Falls back to regular rows from mappedItems if originalLineItems is empty.
+        const sourceOriginals = originalLineItems?.length
+            ? originalLineItems
+            : lineItemsToSave.filter(i => !i.isSystemRow);
+
+        const mappedOriginalItems = sourceOriginals.map((item, index) => ({
+            item_number: { value: index + 1, source: "system" },
+            description: { value: item.description ?? "", source: "user" },
+            amount: { value: Number(item.netAmount) || 0, source: "user" },
+            qty: { value: Number(item.qty) || 1, source: "user" },
+            unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
+            discount: { value: Number(item.discount) || 0, source: "user" },
+            tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
+        }));
+
+        // ── Derived TDS deduction amount ──────────────────────────────────────
+        const tdsRate = parseFloat(f.tdsRate || 0);
+        const totalInvoiceAmount = parseFloat(f.totalInvoiceAmount || f.total_invoice_amount || 0);
+        const tdsDeductionValue = -Math.abs(tdsRate * totalInvoiceAmount);
+
+        // ── Reverse-map flat quickViewFormData → extracted_data shape ─────────
         const updatedExtractedData = {
             ...activeInvoiceData.extracted_data,
+
+            OriginalItems: {
+                value: mappedOriginalItems,
+            },
+
+            // Mark as saved so the next load skips recalculation and grouping
+            isModified: true,
 
             vendor_info: {
                 ...activeInvoiceData.extracted_data?.vendor_info,
@@ -29,6 +75,8 @@ export const useSaveInvoice = () => {
                 bank_name: { value: f.vendorBankName },
                 bank_account_number: { value: f.vendorBankAccount },
                 contact_person: { value: f.vendorContactPerson },
+                vendor_id: { value: f.vendorId },
+                name: { value: f.vendorName },
             },
 
             client_info: {
@@ -73,6 +121,10 @@ export const useSaveInvoice = () => {
                 SGST: { value: f.sgst },
                 IGST: { value: f.igst },
                 withholding_tax: { value: f.withholdingTax },
+                tds_applicability: { value: f.tdsApplicability },
+                tds_rate: { value: f.tdsRate },
+                tds_section: { value: f.tdsSection },
+                tds_deduction: { value: tdsDeductionValue },
             },
 
             additional_info: {
@@ -82,29 +134,13 @@ export const useSaveInvoice = () => {
                 company_registration_number: { value: f.companyRegistrationNumber },
             },
 
-            // Reverse-map quickViewLineItems → Items shape
+            // Exactly what is on screen — regular rows + system rows
             Items: {
                 ...activeInvoiceData.extracted_data?.Items,
-                value: quickViewLineItems
-                    .filter(row =>
-                        row.description !== "Total GST" &&
-                        row.description !== "Total Tax" &&
-                        row.description !== "TDS Deduction"
-                    )
-                    .map((item, index) => ({
-                        item_number: { value: index + 1, source: "system" },
-                        description: { value: item.description, source: "user" },
-                        amount: { value: Number(item.netAmount) || 0, source: "user" },
-                        // Add qty/unitPrice/discount as extra fields if your backend accepts them
-                        qty: { value: Number(item.qty) || 1, source: "user" },
-                        unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
-                        discount: { value: Number(item.discount) || 0, source: "user" },
-                        tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
-                    })),
+                value: mappedItems,
             },
         };
 
-        // Final payload — mirrors the shape of your original document JSON
         const payload = {
             ...activeInvoiceData,
             vendor_id: f.vendorId,
@@ -124,22 +160,17 @@ export const useSaveInvoice = () => {
         // Optimistically update the store so UI stays in sync
         setActiveInvoiceData(payload);
 
-        // TODO: swap with your real API call, e.g.:
-        // await updateInvoice(activeInvoiceData.id, payload);
-        console.log("Save payload →", payload);
         const object = {
-            extracted_data: { ...payload.extracted_data, isModified: true, },
+            extracted_data: payload.extracted_data,   // already has isModified: true
             exchange_rate: null,
             vender_id: payload.vendor_id,
-        }
-        const response = await saveInvoice(viewInvoiceId, object)
-        console.log("response", response);
+        };
 
+        const response = await saveInvoice(viewInvoiceId, object);
+        console.log("Save response →", response);
 
-        return response; // return in case caller (Send to Coding) needs it
-    }, [buildPayload, setActiveInvoiceData]);
-
+        return response;
+    }, [buildPayload, setActiveInvoiceData, viewInvoiceId]);
 
     return { handleSave, buildPayload };
-
 };
