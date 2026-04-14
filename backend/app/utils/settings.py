@@ -10,8 +10,8 @@ DEFAULT_SETTINGS = {
     "navigation": [
         {"label": "Dashboard", "path": "/dashboard", "roles": ["admin", "coder", "approver"]},
         {"label": "Invoices", "path": "/invoices", "roles": ["coder", "admin"]},
-        {"label": "Coding", "path": "/coding", "roles": ["coder", "admin"]},
-        {"label": "Approvals", "path": "/approvals", "roles": ["approver", "admin"]},
+        {"label": "Coding", "path": "/coding", "roles": ["coder"]},
+        {"label": "Approvals", "path": "/approvals", "roles": ["approver"]},
         {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
         {"label": "Settings", "path": "/settings", "roles": ["admin"]},
         {"label": "Admin", "path": "/admin", "roles": ["admin"]}
