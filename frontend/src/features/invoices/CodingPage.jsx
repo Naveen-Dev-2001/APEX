@@ -4,6 +4,7 @@ import { EyeOutlined } from '@ant-design/icons';
 import ReusableDataTable from '../../shared/components/ReusableDataTable';
 import { getInvoices } from '../../api/invoiceApi';
 import toast from '../../utils/toast';
+import ExportButton from '../../shared/components/ExportButton';
 
 const CodingPage = () => {
     const navigate = useNavigate();
@@ -147,6 +148,13 @@ const CodingPage = () => {
                 tableHeader={true}
                 rowHeight={52}
                 shouldUseFlex={true}
+                renderHeaderActions={() => (
+                    <ExportButton 
+                        data={invoices} 
+                        columns={columnDefs} 
+                        fileName="CodingQueue.xlsx" 
+                    />
+                )}
             />
         </div>
     );

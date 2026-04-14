@@ -13,6 +13,7 @@ import DepartmentMasterModal from './DepartmentMasterModal';
 import CustomerMasterModal from './CustomerMasterModal';
 import ItemMasterModal from './ItemMasterModal';
 import CurrencyMasterModal from './CurrencyMasterModal';
+import ExchangeRateMasterModal from './ExchangeRateMasterModal';
 
 const MasterDataPage = () => {
     const {
@@ -31,6 +32,7 @@ const MasterDataPage = () => {
         fetchCustomerMasterData, customerLoading, customerError, uploadCustomerMaster,
         fetchItemMasterData, itemLoading, itemError, uploadItemMaster,
         fetchCurrencyData, currencyLoading, currencyError,
+        fetchExchangeRateData, exchangeRateLoading, exchangeRateError,
         clearMasterData,
         addEntityRow, updateEntityRow, deleteEntityRow,
         addVendorRow, updateVendorRow, deleteVendorRow,
@@ -41,6 +43,7 @@ const MasterDataPage = () => {
         addCustomerRow, updateCustomerRow, deleteCustomerRow,
         addItemRow, updateItemRow, deleteItemRow,
         addCurrencyRow, updateCurrencyRow, deleteCurrencyRow,
+        addExchangeRateRow, updateExchangeRateRow, deleteExchangeRateRow,
         syncingData, syncMasterData,
     } = useMasterDataStore();
     const { showConfirm } = useToastStore();
@@ -59,6 +62,7 @@ const MasterDataPage = () => {
     const isCustomerTab = activeTab === 'Customer Master';
     const isItemTab = activeTab === 'Item Master';
     const isCurrencyTab = activeTab === 'Currency';
+    const isExchangeRateTab = activeTab === 'Exchange Rate Master';
 
     // Fetch data on mount, tab change, or pagination/search change
     useEffect(() => {
@@ -160,6 +164,14 @@ const MasterDataPage = () => {
                     await addCurrencyRow(formData);
                     toast.success('Currency added successfully');
                 }
+            } else if (isExchangeRateTab) {
+                if (modalState.mode === 'edit') {
+                    await updateExchangeRateRow(formData, modalState.rowIndex);
+                    toast.success('Exchange Rate updated successfully');
+                } else {
+                    await addExchangeRateRow(formData);
+                    toast.success('Exchange Rate added successfully');
+                }
             }
             closeModal();
         } catch (err) {
@@ -206,6 +218,8 @@ const MasterDataPage = () => {
                         await deleteItemRow(indexToDelete);
                     } else if (isCurrencyTab) {
                         await deleteCurrencyRow(row.id);
+                    } else if (isExchangeRateTab) {
+                        await deleteExchangeRateRow(indexToDelete);
                     }
                     toast.dismiss(loadingToast);
                     toast.success(`${activeTab} deleted successfully`);
@@ -256,14 +270,14 @@ const MasterDataPage = () => {
                     return (
                         <div className="flex items-center gap-4">
                             <button
-                                onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && openEdit(row, index)}
+                                onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && openEdit(row, index)}
                                 className="text-gray-500 hover:text-gray-700 transition-colors p-1"
                                 title="Edit"
                             >
                                 <Pencil size={18} />
                             </button>
                             <button
-                                onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) && handleDelete(row, index)}
+                                onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && handleDelete(row, index)}
                                 disabled={isDeleteDisabled}
                                 className={`transition-colors p-1 ${isDeleteDisabled
                                     ? 'text-gray-300 cursor-not-allowed'
@@ -542,7 +556,7 @@ const MasterDataPage = () => {
                     </>
                 )}
                 <button
-                    onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab) ? openAdd : undefined}
+                    onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) ? openAdd : undefined}
                     className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
                 >
                     <Plus size={16} />
@@ -552,7 +566,7 @@ const MasterDataPage = () => {
 
             {/* Table Area */}
             <div className="flex-1 relative">
-                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) || (currencyError && isCurrencyTab) ? (
+                {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) || (currencyError && isCurrencyTab) || (exchangeRateError && isExchangeRateTab) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -573,6 +587,7 @@ const MasterDataPage = () => {
                                     else if (isCustomerTab) fetchCustomerMasterData();
                                     else if (isItemTab) fetchItemMasterData();
                                     else if (isCurrencyTab) fetchCurrencyData();
+                                    else if (isExchangeRateTab) fetchExchangeRateData();
                                 }}
                                 className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-all"
                             >
@@ -588,7 +603,7 @@ const MasterDataPage = () => {
                             <DataTable
                                 columns={columns}
                                 data={filteredData} // Now already paginated by backend
-                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : currencyLoading}
+                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : isCurrencyTab ? currencyLoading : exchangeRateLoading}
                                 skeletonRows={itemsPerPage}
                                 totalItems={masters[activeTab]?.total || 0}
                                 currentPage={currentPage}
@@ -682,6 +697,15 @@ const MasterDataPage = () => {
             {/* Currency Master Modal */}
             {modalState.open && isCurrencyTab && (
                 <CurrencyMasterModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSave={handleSave}
+                />
+            )}
+            {/* Exchange Rate Master Modal */}
+            {modalState.open && isExchangeRateTab && (
+                <ExchangeRateMasterModal
                     mode={modalState.mode}
                     rowData={modalState.rowData}
                     onClose={closeModal}
