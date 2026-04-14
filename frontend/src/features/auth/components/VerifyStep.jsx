@@ -3,7 +3,7 @@ import CustomInput from '../../../shared/components/CustomInput';
 import CustomButton from '../../../shared/components/CustomButton';
 import API from '../../services/api';
 
-const VerifyStep = ({ email, otp, setOtp, onNext, onBack }) => {
+const VerifyStep = ({ email, otp, setOtp, onNext, onBack, purpose = 'registration' }) => {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -21,7 +21,7 @@ const VerifyStep = ({ email, otp, setOtp, onNext, onBack }) => {
         
         try {
             setLoading(true);
-            await API.post('/auth/verify-otp', { email, otp_code: otp, purpose: 'registration' });
+            await API.post('/auth/verify-otp', { email, otp_code: otp, purpose });
             onNext();
         } catch (err) {
             setError(err.message || "Failed to verify OTP");

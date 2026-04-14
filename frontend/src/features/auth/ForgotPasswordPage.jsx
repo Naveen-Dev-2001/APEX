@@ -4,25 +4,22 @@ import AuthLayout from '../../layout/AuthLayout';
 import Stepper from '../../shared/components/Stepper';
 import EmailStep from './components/EmailStep';
 import VerifyStep from './components/VerifyStep';
-import DetailsStep from './components/DetailsStep';
-import API from '../services/api';
+import NewPasswordStep from './components/NewPasswordStep';
+import toast from '../../utils/toast';
 
 const STEPS = [
     { number: 1, label: 'Email' },
     { number: 2, label: 'Verify' },
-    { number: 3, label: 'Details' }
+    { number: 3, label: 'Reset' }
 ];
 
-const RegisterPage = () => {
+const ForgotPasswordPage = () => {
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(1);
 
     // Form State
     const [email, setEmail] = useState('');
     const [otp, setOtp] = useState('');
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
 
     const handleNextStep = useCallback(() => {
         setCurrentStep(prev => prev + 1);
@@ -34,27 +31,12 @@ const RegisterPage = () => {
     }, []);
 
     const handleFinalSubmit = async () => {
-        try {
-            // Replace with real registration endpoint
-            const payload = {
-                email,
-                username,
-                password
-            };
-            console.log("Submitting:", payload);
-
-            // Real API call
-            await API.post('/auth/register', payload);
-
-            navigate('/login');
-        } catch (error) {
-            throw new Error(error.response?.data?.message || "Registration failed");
-        }
+        toast.success("Password reset successfully!");
+        navigate('/login');
     };
 
     return (
-        <AuthLayout title="Create Account">
-
+        <AuthLayout title="Reset Password">
             <Stepper steps={STEPS} currentStep={currentStep} />
 
             <div className="mt-8 transition-all duration-300">
@@ -63,7 +45,7 @@ const RegisterPage = () => {
                         email={email}
                         setEmail={setEmail}
                         onNext={handleNextStep}
-                        purpose="registration"
+                        purpose="forgot_password"
                     />
                 )}
 
@@ -74,18 +56,13 @@ const RegisterPage = () => {
                         setOtp={setOtp}
                         onNext={handleNextStep}
                         onBack={handleBackToEmail}
-                        purpose="registration"
+                        purpose="forgot_password"
                     />
                 )}
 
                 {currentStep === 3 && (
-                    <DetailsStep
-                        username={username}
-                        setUsername={setUsername}
-                        password={password}
-                        setPassword={setPassword}
-                        confirmPassword={confirmPassword}
-                        setConfirmPassword={setConfirmPassword}
+                    <NewPasswordStep
+                        email={email}
                         onSubmit={handleFinalSubmit}
                     />
                 )}
@@ -94,4 +71,4 @@ const RegisterPage = () => {
     );
 };
 
-export default RegisterPage;
+export default ForgotPasswordPage;

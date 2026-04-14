@@ -17,6 +17,8 @@ import Invoice from './features/invoices/Invoice';
 import CodingPage from './features/invoices/CodingPage';
 import ApprovalsPage from './features/invoices/ApprovalsPage';
 
+import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
+
 function App() {
 
   return (
@@ -36,9 +38,9 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/test-date-picker" element={<TestDatePicker />} />
-            {/* <Route path="/signup" element={<SignupForm />} />
+            {/* <Route path="/signup" element={<SignupForm />} /> */}
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
+            {/* <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
           </Route>
 
           {/* Protected Routes */}
