@@ -62,14 +62,18 @@ const formatWorkflowData = (workflowData) => {
 };
 
 const WorkflowTab = () => {
-
-    const { viewInvoiceId } = useInvoiceStore();
+    const { viewInvoiceId, activeInvoiceData } = useInvoiceStore();
+    const isArchived = activeInvoiceData?.is_archived;
 
     const {
-        workflowData,
+        workflowData: fetchedWorkflowData,
         isLoadingWorkflowData,
         isWorkflowDataError
-    } = useWorkflowDataSync(viewInvoiceId);
+    } = useWorkflowDataSync(!isArchived ? viewInvoiceId : null);
+
+    const workflowData = isArchived 
+        ? { steps: activeInvoiceData.workflow_steps || [] } 
+        : fetchedWorkflowData;
 
     if (isLoadingWorkflowData) {
         return <div className="p-6 text-gray-400">Loading...</div>;

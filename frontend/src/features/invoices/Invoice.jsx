@@ -17,6 +17,7 @@ import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
 import ExportButton from "../../shared/components/ExportButton";
 import { useAuthStore } from "../../store/authStore";
+import ArchivedInvoicesTab, { ARCHIVE_COLUMNS } from "./ArchivedInvoicesTab";
 
 const Invoice = () => {
     const {
@@ -29,6 +30,8 @@ const Invoice = () => {
     } = useInvoiceStore();
 
     const [localSearch, setLocalSearch] = useState(searchQuery);
+    const [pageTab, setPageTab] = useState("invoices"); // "invoices" | "archive"
+    const [archivedRecords, setArchivedRecords] = useState([]);
     
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
@@ -320,28 +323,80 @@ const Invoice = () => {
             {contextHolder}
             {invoiceSection === 1 && (
                 <>
-                    <div className="p-4 bg-[#F7F7F7]">
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="text-3xl font-bold custom-font-jura">
-                                Invoices{" "}
-                                <span className="text-base font-normal px-2 py-1 rounded-3xl shadow-sm bg-[#E0E0E0] inline-block">
-                                    {total || 0}
-                                </span>
-                            </span>
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "16px 16px",
+                            background: "#F7F7F7",
+                            borderBottom: "1px solid #E5E7EB",
+                            flexWrap: "wrap",
+                            gap: "12px"
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                border: "1px solid #D9D9D9",
+                                borderRadius: "4px",
+                                overflow: "hidden",
+                                background: "#FFFFFF",
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+                            }}
+                        >
+                            {[
+                                { key: "invoices", label: "Invoices" },
+                                { key: "archive",  label: "Archive" },
+                            ].map(({ key, label }, index, arr) => {
+                                const isActive = pageTab === key;
+                                return (
+                                    <button
+                                        key={key}
+                                        onClick={() => setPageTab(key)}
+                                        style={{
+                                            padding: "8px 24px",
+                                            fontSize: 13,
+                                            fontWeight: 500,
+                                            color: isActive ? "#003A8C" : "#595959",
+                                            background: isActive ? "#BAE7FF" : "#FFFFFF",
+                                            border: "none",
+                                            borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none",
+                                            cursor: "pointer",
+                                            transition: "all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1)",
+                                            outline: "none",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            minWidth: "120px",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!isActive) e.currentTarget.style.background = "#FAFAFA";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!isActive) e.currentTarget.style.background = "#FFFFFF";
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
 
-                            <div className="flex items-center gap-3">
-                                <div className="w-[300px]">
-                                    <CustomInput
-                                        placeholder="Search invoices..."
-                                        value={localSearch}
-                                        onChange={(e) => setLocalSearch(e.target.value)}
-                                        icon={<SearchOutlined />}
-                                        rightIcon={localSearch && <CloseCircleOutlined />}
-                                        onRightIconClick={() => setLocalSearch("")}
-                                        className="mb-0"
-                                    />
-                                </div>
-                                <div className="w-[250px]">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <div style={{ width: 280 }}>
+                                <CustomInput
+                                    placeholder={pageTab === 'archive' ? "Search archive..." : "Search invoices..."}
+                                    value={localSearch}
+                                    onChange={(e) => setLocalSearch(e.target.value)}
+                                    icon={<SearchOutlined />}
+                                    rightIcon={localSearch && <CloseCircleOutlined />}
+                                    onRightIconClick={() => setLocalSearch("")}
+                                    className="mb-0"
+                                />
+                            </div>
+                            {pageTab === 'invoices' && (
+                                <div style={{ width: 200 }}>
                                     <Dropdown
                                         options={VIEW_OPTIONS}
                                         placeholder="Select View"
@@ -349,62 +404,77 @@ const Invoice = () => {
                                         onChange={(val) => setView(val)}
                                     />
                                 </div>
-                                <div className="w-[150px]">
-                                    <ExportButton 
-                                        data={invoices} 
-                                        columns={columnDefs} 
-                                        fileName="Invoices.xlsx" 
-                                    />
-                                </div>
-                                {userRole === 'scanner' && (
-                                    <div className="w-[200px]">
-                                        <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
-                                            Create Invoice
-                                        </CustomButton>
-                                    </div>
-                                )}
+                            )}
+                            <div style={{ minWidth: 120 }}>
+                                <ExportButton 
+                                    data={pageTab === 'archive' ? archivedRecords : invoices} 
+                                    columns={pageTab === 'archive' ? ARCHIVE_COLUMNS : columnDefs} 
+                                    fileName={pageTab === 'archive' ? "Archived_Invoices.xlsx" : "Invoices.xlsx"} 
+                                />
                             </div>
+                            {userRole === 'scanner' && pageTab === 'invoices' && (
+                                <div style={{ minWidth: 160 }}>
+                                    <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
+                                        Create Invoice
+                                    </CustomButton>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto w-full">
-                        {isLoading ? (
-                            <Skeleton height={400} borderRadius={16} />
-                        ) : (
-                            <ReusableDataTable
-                                columnDefs={columnDefs}
-                                data={invoices ?? []}
-                                searchText={searchQuery}
-                                tableHeader={false}
-                                tableSearch={false}
-                                defaultPageSize={10}
-                                shouldUseFlex={false}
-                                totalItems={total}
-                                currentPage={(skip / limit) + 1}
-                                itemsPerPage={limit}
-                                onPageChange={(page) => setSkip((page - 1) * limit)}
-                                onItemsPerPageChange={(newLimit) => {
-                                    setLimit(newLimit);
-                                    setSkip(0);
-                                }}
-                                onSortChange={(col, dir) => setSort(col, dir)}
-                            />
-                        )}
-                    </div>
-                </>
-            )}
+                    {/* ── Invoices Tab ── */}
+                    {pageTab === "invoices" && (
+                        <>
+                            <div className="overflow-x-auto w-full">
+                                {isLoading ? (
+                                    <Skeleton height={400} borderRadius={16} />
+                                ) : (
+                                    <ReusableDataTable
+                                        columnDefs={columnDefs}
+                                        data={invoices ?? []}
+                                        searchText={searchQuery}
+                                        tableHeader={false}
+                                        tableSearch={false}
+                                        defaultPageSize={10}
+                                        shouldUseFlex={false}
+                                        totalItems={total}
+                                        currentPage={(skip / limit) + 1}
+                                        itemsPerPage={limit}
+                                        onPageChange={(page) => setSkip((page - 1) * limit)}
+                                        onItemsPerPageChange={(newLimit) => {
+                                            setLimit(newLimit);
+                                            setSkip(0);
+                                        }}
+                                        onSortChange={(col, dir) => setSort(col, dir)}
+                                    />
+                                )}
+                            </div>
+                        </>
+                    )}
 
-            {(invoiceSection === 1 || isModalOpen) && (
-                <AddInvoiceModal
-                    open={isModalOpen}
-                    onCancel={() => {
-                        setIsModalOpen(false);
-                        setInvoiceSection(1);
-                    }}
-                    onUpload={handleUpload}
-                    uploadProgress={uploadProgress}
-                    confirmLoading={uploadLoading}
-                />
+                    {/* ── Archive Tab ── */}
+                    {pageTab === "archive" && (
+                        <ArchivedInvoicesTab 
+                            onView={handleView} 
+                            onDataChange={setArchivedRecords}
+                            externalSearch={searchQuery}
+                        />
+                    )}
+
+                    {/* ── Upload Modal (only in invoices tab) ── */}
+                    {(invoiceSection === 1 || isModalOpen) && pageTab === "invoices" && (
+                        <AddInvoiceModal
+                            open={isModalOpen}
+                            onCancel={() => {
+                                setIsModalOpen(false);
+                                setInvoiceSection(1);
+                            }}
+                            onUpload={handleUpload}
+                            uploadProgress={uploadProgress}
+                            confirmLoading={uploadLoading}
+                        />
+                    )}
+                </>
             )}
 
             {invoiceSection === 2 && <ViewInvoicePage />}
@@ -413,3 +483,4 @@ const Invoice = () => {
 };
 
 export default Invoice;
+

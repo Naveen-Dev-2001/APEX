@@ -186,6 +186,7 @@ const CodingTab = () => {
     const userRole = user?.role?.toLowerCase();
 
     const isViewOnly = (() => {
+        if (activeInvoiceData?.is_archived) return true;
         const status = activeInvoiceData?.status?.toLowerCase();
         if (!status) return false;
         

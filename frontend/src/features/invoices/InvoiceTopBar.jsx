@@ -70,7 +70,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
             {/* Right — actions */}
             <div className="flex items-center gap-3">
-                {((userRole === 'scanner' && currentStatus !== 'waiting_coding') || (userRole === 'coder' && currentStatus === 'waiting_coding')) && (
+                {!activeInvoiceData?.is_archived && ((userRole === 'scanner' && currentStatus !== 'waiting_coding') || (userRole === 'coder' && currentStatus === 'waiting_coding')) && (
                     <>
                         <div className="w-[100px]">
 

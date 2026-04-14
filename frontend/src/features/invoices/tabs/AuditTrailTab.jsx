@@ -151,8 +151,18 @@ AuditItem.displayName = "AuditItem";
 // ─────────────────────────────────────────────────────────────────────────────
 const AuditTrailTab = () => {
     // Precise state-selector for better performance
-    const viewInvoiceId = useInvoiceStore(state => state.viewInvoiceId);
-    const { getAuditData, isAuditLoading, isAuditError } = getAuditflowSync(viewInvoiceId);
+    const { viewInvoiceId, activeInvoiceData } = useInvoiceStore();
+    const isArchived = activeInvoiceData?.is_archived;
+
+    const { 
+        getAuditData: fetchedAuditData, 
+        isAuditLoading, 
+        isAuditError 
+    } = getAuditflowSync(!isArchived ? viewInvoiceId : null);
+
+    const getAuditData = isArchived 
+        ? activeInvoiceData.audit_logs || [] 
+        : fetchedAuditData;
 
     const content = useMemo(() => {
         if (isAuditLoading) {

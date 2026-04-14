@@ -82,3 +82,18 @@ export const fetchCodingSuggestions = async (invoiceId, vendorId = null) => {
     const res = await API.get(`/coding/${invoiceId}/suggestions`, { params });
     return res.data;
 };
+
+export const fetchDeletedInvoices = (params = {}) =>
+    API.get(`/invoices/deleted`, {
+        params: {
+            skip: params.skip || 0,
+            limit: params.limit || 50,
+            entity: params.entity || undefined,
+            vendor_id: params.vendor_id || undefined,
+            invoice_number: params.invoice_number || undefined,
+        }
+    }).then(res => res.data);
+
+export const fetchDeletedInvoiceById = (archiveId) =>
+    API.get(`/invoices/deleted/${archiveId}`).then(res => res.data);
+
