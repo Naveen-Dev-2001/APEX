@@ -73,7 +73,9 @@ const Header = () => {
     const getTargetRole = () => {
         const current = activeRole.toLowerCase().trim();
         if (current === 'admin') return 'approver';
-        return allRoles.find(r => r.toLowerCase().trim() !== current) || 'approver';
+        if (current === 'approver') return 'admin';
+        // For any other role, find a different role from allRoles or default to 'admin'
+        return allRoles.find(r => r.toLowerCase().trim() !== current) || 'admin';
     };
     const targetRole = getTargetRole();
 
@@ -270,6 +272,18 @@ const Header = () => {
 
             {/* Right side controls */}
             <div className="flex items-center space-x-5">
+                {/* Entity Badge */}
+                <div className="hidden md:flex items-center space-x-2 bg-[#f0f8ff] border border-[#a2d5f2] rounded-full px-4 py-1.5">
+                    <svg className="w-4.5 h-4.5 text-[#1e9bd8] shrink-0" style={{width:'18px',height:'18px'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="text-[13px] font-semibold text-black uppercase tracking-wide leading-none">Entity:</span>
+                    <span className="text-[13px] font-medium text-[#1e9bd8] max-w-[160px] truncate leading-none capitalize">{selectedEntityName}</span>
+                </div>
+
+                {/* Divider */}
+                <div className="hidden md:block h-6 w-px bg-gray-200"></div>
+
                 {/* Search / Help Button */}
                 {/* <button className="flex items-center space-x-2 px-4 py-[6px] border border-[#a2d5f2] rounded-full text-sm text-gray-600 hover:bg-[#f0f8ff] transition-colors focus:outline-none">
                     <svg className="w-4 h-4 text-[#1e9bd8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,7 +313,7 @@ const Header = () => {
                     </div>
 
                     {isDropdownOpen && (
-                        <div className="absolute right-0 mt-3 w-[240px] bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                        <div className="absolute right-0 mt-3 w-[280px] bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
                             {/* Arrow Pointer - Centered with the 34px icon at the right edge */}
                             <div className="absolute -top-[6px] right-2.5 w-3 h-3 bg-white border-l border-t border-gray-100 rotate-45 z-0"></div>
 
@@ -383,7 +397,7 @@ const Header = () => {
                             onClick={() => setShowChangeRoleModal(false)}
                         >
                             <div
-                                className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+                                className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {/* Modal Header */}
