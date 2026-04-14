@@ -44,6 +44,10 @@ const useMasterDataStore = create((set, get) => ({
     // Loading / error state for Currency
     currencyLoading: false,
     currencyError: null,
+
+    // Loading / error state for Exchange Rate Master
+    exchangeRateLoading: false,
+    exchangeRateError: null,
     // Master data for all tabs
     syncingData: false,
     masters: {
@@ -140,7 +144,18 @@ const useMasterDataStore = create((set, get) => ({
             columns: [
                 { header: 'Currency Code', accessor: 'code', sortable: true },
                 { header: 'Currency Name', accessor: 'name', sortable: true },
-                { header: 'Symbol', accessor: 'symbol', sortable: true },
+                { header: 'Actions', accessor: 'actions', sortable: false },
+            ],
+            data: [],
+        },
+        'Exchange Rate Master': {
+            columns: [
+                { header: 'Base Currency', accessor: 'base_currency', sortable: true },
+                { header: 'Target Currency', accessor: 'target_currency', sortable: true },
+                { header: 'Exchange Rate', accessor: 'exchange_rate', sortable: true },
+                { header: 'Effective Date', accessor: 'effective_date', sortable: true },
+                { header: 'Rate Type', accessor: 'rate_type', sortable: true },
+                { header: 'Rate Key', accessor: 'rate_key', sortable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
             data: [],
@@ -173,7 +188,8 @@ const useMasterDataStore = create((set, get) => ({
             'Department Master': 'departmentLoading',
             'Customer Master': 'customerLoading',
             'Item Master': 'itemLoading',
-            'Currency': 'currencyLoading'
+            'Currency': 'currencyLoading',
+            'Exchange Rate Master': 'exchangeRateLoading'
         };
         const errorKeyMap = {
             'Entity Master': 'entityError',
@@ -184,7 +200,8 @@ const useMasterDataStore = create((set, get) => ({
             'Department Master': 'departmentError',
             'Customer Master': 'customerError',
             'Item Master': 'itemError',
-            'Currency': 'currencyError'
+            'Currency': 'currencyError',
+            'Exchange Rate Master': 'exchangeRateError'
         };
         const fetcherMap = {
             'Entity Master': masterDataService.getEntityMasterData,
@@ -195,7 +212,8 @@ const useMasterDataStore = create((set, get) => ({
             'Department Master': masterDataService.getDepartmentMasterData,
             'Customer Master': masterDataService.getCustomerMasterData,
             'Item Master': masterDataService.getItemMasterData,
-            'Currency': masterDataService.getCurrencyData
+            'Currency': masterDataService.getCurrencyData,
+            'Exchange Rate Master': masterDataService.getExchangeRateData
         };
 
         const loadingKey = loadingKeyMap[tabName];
@@ -245,6 +263,7 @@ const useMasterDataStore = create((set, get) => ({
     fetchCustomerMasterData: async () => get().fetchMasterData('Customer Master'),
     fetchItemMasterData: async () => get().fetchMasterData('Item Master'),
     fetchCurrencyData: async () => get().fetchMasterData('Currency'),
+    fetchExchangeRateData: async () => get().fetchMasterData('Exchange Rate Master'),
 
     uploadEntityMaster: async (file) => {
         set({ entityLoading: true, entityError: null });
@@ -334,25 +353,6 @@ const useMasterDataStore = create((set, get) => ({
         }
     },
 
-    fetchCurrencyData: async () => {
-        set({ currencyLoading: true, currencyError: null });
-        try {
-            const rows = await masterDataService.getCurrencyData();
-            set((state) => ({
-                currencyLoading: false,
-                masters: {
-                    ...state.masters,
-                    'Currency': {
-                        ...state.masters['Currency'],
-                        data: rows.map(r => ({ ...r, id: r.id })), // backend returns id
-                    },
-                },
-            }));
-        } catch (err) {
-            console.error('[Currency] fetch failed', err);
-            set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
-        }
-    },
 
     syncMasterData: async (tabName) => {
         set({ syncingData: true });
@@ -368,6 +368,7 @@ const useMasterDataStore = create((set, get) => ({
             else if (tabName === 'Customer Master') await get().fetchCustomerMasterData();
             else if (tabName === 'Item Master') await get().fetchItemMasterData();
             else if (tabName === 'Currency') await get().fetchCurrencyData();
+            else if (tabName === 'Exchange Rate Master') await get().fetchExchangeRateData();
         } finally {
             set({ syncingData: false });
         }
@@ -801,6 +802,61 @@ const useMasterDataStore = create((set, get) => ({
             await get().fetchItemMasterData();
         } catch (err) {
             set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    // ─── Exchange Rate Master: Add ───────────────────────────────────────────────────
+    addExchangeRateRow: async (formData) => {
+        set({ exchangeRateLoading: true, exchangeRateError: null });
+        try {
+            const payload = {
+                rate_key: formData.rate_key,
+                rate_type: formData.rate_type,
+                base_currency: formData.base_currency,
+                target_currency: formData.target_currency,
+                exchange_rate: parseFloat(formData.exchange_rate),
+                effective_date: formData.effective_date,
+                status: formData.status || 'active',
+            };
+            await masterDataService.addExchangeRateRow(payload);
+            await get().fetchExchangeRateData();
+        } catch (err) {
+            set({ exchangeRateLoading: false, exchangeRateError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    // ─── Exchange Rate Master: Edit ──────────────────────────────────────────────────
+    updateExchangeRateRow: async (formData, rowIndex) => {
+        set({ exchangeRateLoading: true, exchangeRateError: null });
+        try {
+            const payload = {
+                id: formData.id,
+                rate_key: formData.rate_key,
+                rate_type: formData.rate_type,
+                base_currency: formData.base_currency,
+                target_currency: formData.target_currency,
+                exchange_rate: parseFloat(formData.exchange_rate),
+                effective_date: formData.effective_date,
+                status: formData.status || 'active',
+            };
+            await masterDataService.editExchangeRateRow(rowIndex, payload);
+            await get().fetchExchangeRateData();
+        } catch (err) {
+            set({ exchangeRateLoading: false, exchangeRateError: err?.response?.data?.detail || err.message });
+            throw err;
+        }
+    },
+
+    // ─── Exchange Rate Master: Delete ────────────────────────────────────────────────
+    deleteExchangeRateRow: async (rowIndex) => {
+        set({ exchangeRateLoading: true, exchangeRateError: null });
+        try {
+            await masterDataService.deleteExchangeRateRow(rowIndex);
+            await get().fetchExchangeRateData();
+        } catch (err) {
+            set({ exchangeRateLoading: false, exchangeRateError: err?.response?.data?.detail || err.message });
             throw err;
         }
     },

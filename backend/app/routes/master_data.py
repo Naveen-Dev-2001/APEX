@@ -15,11 +15,13 @@ import logging
 from app.database.database import get_db
 from app.models.db_models import (
     EntityMaster, VendorMaster, TdsRate, GLMaster,
-    LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster
+    LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster,
+    Currency
 )
 from app.repository.repositories import (
     entity_master_repo, vendor_master_repo, tds_rate_repo, gl_master_repo, lob_master_repo, department_master_repo, 
-    customer_master_repo, item_master_repo, exchange_rate_master_repo
+    customer_master_repo, item_master_repo, exchange_rate_master_repo,
+    currency_repo
 )
 from app.auth.jwt import get_current_user
 from app.models.user import UserResponse
@@ -53,8 +55,8 @@ TAB_MODEL_MAP = {
     "master_data_Item": ItemMaster,
     "Exchange_Rate": ExchangeRateMaster,
     "master_data_Exchange_Rate": ExchangeRateMaster,
-    "Currency": ExchangeRateMaster,
-    "master_data_Currency": ExchangeRateMaster
+    "Currency": Currency,
+    "master_data_Currency": Currency
 }
 
 # Search fields for each model
@@ -84,7 +86,7 @@ TAB_REPO_MAP = {
     "Item": item_master_repo,
     "TDS": tds_rate_repo,
     "Exchange_Rate": exchange_rate_master_repo,
-    "Currency": exchange_rate_master_repo
+    "Currency": currency_repo
 }
 
 

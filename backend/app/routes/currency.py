@@ -39,10 +39,15 @@ async def create_currency(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can add currencies")
         
+    # Check if currency code already exists
+    existing = currency_repo.get_multi(db, filters={"code": currency.code.upper()})
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Currency code {currency.code.upper()} already exists")
+        
     new_currency_data = {
         "name": currency.name,
         "symbol": currency.symbol,
-        "code": currency.code
+        "code": currency.code.upper()
     }
     new_currency = currency_repo.create(db, obj_in=new_currency_data)
     
@@ -55,17 +60,17 @@ async def update_currency(
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user)
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can update currencies")
-        
-    db_currency = currency_repo.get(db, currency_id)
-    if not db_currency:
-        raise HTTPException(status_code=404, detail="Currency not found")
-        
     update_data = {}
     if currency.name is not None: update_data["name"] = currency.name
     if currency.symbol is not None: update_data["symbol"] = currency.symbol
-    if currency.code is not None: update_data["code"] = currency.code
+    if currency.code is not None: 
+        new_code = currency.code.upper()
+        # Check if the new code is already used by another record
+        if new_code != db_currency.code:
+            existing = currency_repo.get_multi(db, filters={"code": new_code})
+            if existing:
+                raise HTTPException(status_code=400, detail=f"Currency code {new_code} already exists")
+        update_data["code"] = new_code
     update_data["updated_at"] = datetime.utcnow()
     
     db_currency = currency_repo.update(db, db_obj=db_currency, obj_in=update_data)

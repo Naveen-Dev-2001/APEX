@@ -9,6 +9,7 @@ const DEPARTMENT_IDENTIFIER = 'Department';
 const CUSTOMER_IDENTIFIER = 'Customer';
 const ITEM_IDENTIFIER = 'Item';
 const CURRENCY_IDENTIFIER = 'Currency';
+const EXCHANGE_RATE_IDENTIFIER = 'Exchange_Rate';
 
 export const masterDataService = {
     /** Generic Paginated Fetch for any Master Data tab */
@@ -70,6 +71,11 @@ export const masterDataService = {
         return this.getMasterData(VENDOR_IDENTIFIER, params);
     },
 
+    /** Fetch all exchange rate master rows from DB */
+    async getExchangeRateData(params = {}) {
+        return this.getMasterData(EXCHANGE_RATE_IDENTIFIER, params);
+    },
+
     /** Upload a vendor master file */
     async uploadVendorMaster(file) {
         const formData = new FormData();
@@ -99,6 +105,29 @@ export const masterDataService = {
     /** Delete a vendor row */
     async deleteVendorRow(rowIndex) {
         const res = await API.delete(`/master/sheet/${VENDOR_IDENTIFIER}/delete`, {
+            params: { row_index: rowIndex },
+        });
+        return res.data;
+    },
+
+    /** Add a new exchange rate row */
+    async addExchangeRateRow(newRow) {
+        const res = await API.post(`/master/sheet/${EXCHANGE_RATE_IDENTIFIER}/add`, { new_row: newRow });
+        return res.data;
+    },
+
+    /** Edit an existing exchange rate row */
+    async editExchangeRateRow(rowIndex, updatedRow) {
+        const res = await API.patch(`/master/sheet/${EXCHANGE_RATE_IDENTIFIER}/edit`, {
+            row_index: rowIndex,
+            updated_row: updatedRow,
+        });
+        return res.data;
+    },
+
+    /** Delete an exchange rate row */
+    async deleteExchangeRateRow(rowIndex) {
+        const res = await API.delete(`/master/sheet/${EXCHANGE_RATE_IDENTIFIER}/delete`, {
             params: { row_index: rowIndex },
         });
         return res.data;
@@ -346,40 +375,41 @@ export const masterDataService = {
 
     /** Delete all data for a specific tab */
     async deleteTabData(tabName) {
-        const identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER 
-                        : tabName === 'Vendor Master' ? VENDOR_IDENTIFIER 
-                        : tabName === 'TDS Rates' ? TDS_IDENTIFIER 
-                        : tabName === 'GL Master' ? GL_IDENTIFIER 
-                        : tabName === 'LOB Master' ? LOB_IDENTIFIER 
-                        : tabName === 'Department Master' ? DEPARTMENT_IDENTIFIER 
-                        : tabName === 'Customer Master' ? CUSTOMER_IDENTIFIER 
-                        : tabName === 'Item Master' ? ITEM_IDENTIFIER : tabName;
+        const identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER
+            : tabName === 'Vendor Master' ? VENDOR_IDENTIFIER
+                : tabName === 'TDS Rates' ? TDS_IDENTIFIER
+                    : tabName === 'GL Master' ? GL_IDENTIFIER
+                        : tabName === 'LOB Master' ? LOB_IDENTIFIER
+                            : tabName === 'Department Master' ? DEPARTMENT_IDENTIFIER
+                                : tabName === 'Customer Master' ? CUSTOMER_IDENTIFIER
+                                    : tabName === 'Item Master' ? ITEM_IDENTIFIER
+                                        : tabName === 'Exchange Rate Master' ? EXCHANGE_RATE_IDENTIFIER : tabName;
         const res = await API.delete(`/master/files/${identifier}`);
         return res.data;
     },
 
     /** Sync data for a specific tab */
     async syncTabData(tabName) {
-        let identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER 
-                        : tabName === 'Vendor Master' ? VENDOR_IDENTIFIER 
-                        : tabName === 'TDS Rates' ? TDS_IDENTIFIER 
-                        : tabName === 'GL Master' ? GL_IDENTIFIER 
-                        : tabName === 'LOB Master' ? LOB_IDENTIFIER 
-                        : tabName === 'Department Master' ? DEPARTMENT_IDENTIFIER 
-                        : tabName === 'Customer Master' ? CUSTOMER_IDENTIFIER 
-                        : tabName === 'Item Master' ? ITEM_IDENTIFIER 
-                        : tabName === 'Currency' ? CURRENCY_IDENTIFIER : tabName;
+        let identifier = tabName === 'Entity Master' ? ENTITY_IDENTIFIER
+            : tabName === 'Vendor Master' ? VENDOR_IDENTIFIER
+                : tabName === 'TDS Rates' ? TDS_IDENTIFIER
+                    : tabName === 'GL Master' ? GL_IDENTIFIER
+                        : tabName === 'LOB Master' ? LOB_IDENTIFIER
+                            : tabName === 'Department Master' ? DEPARTMENT_IDENTIFIER
+                                : tabName === 'Customer Master' ? CUSTOMER_IDENTIFIER
+                                    : tabName === 'Item Master' ? ITEM_IDENTIFIER
+                                        : tabName === 'Exchange Rate Master' ? EXCHANGE_RATE_IDENTIFIER
+                                            : tabName === 'Currency' ? CURRENCY_IDENTIFIER : tabName;
         // Fix for sync identifiers if needed, based on backend config
-        if (tabName === 'Currency') identifier = 'Exchange_Rate';
         const res = await API.post(`/master/sync/${identifier}`);
         return res.data;
     },
 
     // ─── Currency ──────────────────────────────────────────────────────────
     /** Fetch all currencies from DB */
-    async getCurrencyData() {
-        const res = await API.get(`/currency/`);
-        return res.data;
+    /** Fetch all currency codes from DB with pagination */
+    async getCurrencyData(params = {}) {
+        return this.getMasterData(CURRENCY_IDENTIFIER, params);
     },
 
     /** Add a new currency row */
