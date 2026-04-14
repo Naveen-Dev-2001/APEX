@@ -31,8 +31,6 @@ const SelectEntityPage = () => {
     };
   });
 
-
-
   useEffect(() => {
     if (entityData.length === 0) {
       fetchEntityMasterData();
@@ -41,7 +39,14 @@ const SelectEntityPage = () => {
 
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
+
+  // Parse user roles
+  const userRoles = user?.role ? user.role.split(',') : [];
+  const hasMultipleRoles = userRoles.length > 1;
+  const [activeRole, setActiveRole] = useState(userRoles[0] || 'approver');
+  const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false);
 
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
@@ -53,6 +58,16 @@ const SelectEntityPage = () => {
   const handleSelectEntity = (entity) => {
     setSelectedEntity(entity.displayName);
     setIsSelectOpen(false);
+    
+    // Store active role
+    sessionStorage.setItem('active_role', activeRole);
+    
+    // Update user in store with ACTIVE role for this session
+    // This ensures UI components see the correct role
+    if (user) {
+        setAuth(sessionStorage.getItem('access_token'), { ...user, role: activeRole });
+    }
+
     // Store the entity_id as the FK value sent in X-Entity header to the backend
     setEntity(entity.entityId || entity.name);
     sessionStorage.setItem('selected_entity', entity.entityId || entity.name); // entity_id for DB FK
@@ -131,7 +146,49 @@ const SelectEntityPage = () => {
           <h2 className="text-[24px] mb-2 text-gray-800 font-medium">Select Entity</h2>
           <p className="text-[14px] text-gray-500 mb-6">Choose which entity you want to work with.</p>
 
+          {hasMultipleRoles && (
+            <div className="relative w-full text-left mt-6">
+              <label className="text-[12px] text-gray-500 mb-1 block font-medium">Login As</label>
+              <button
+                type="button"
+                className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#f8f9fa] border border-gray-200 hover:bg-gray-50 active:bg-gray-100 text-gray-700 font-medium transition-all focus:outline-none"
+                onClick={() => setIsRoleSelectOpen(!isRoleSelectOpen)}
+              >
+                <span className="capitalize">{activeRole}</span>
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${isRoleSelectOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isRoleSelectOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-[60] max-h-60 overflow-y-auto">
+                  <ul className="py-1">
+                    {userRoles.map((role) => (
+                      <li key={role}>
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors capitalize"
+                          onClick={() => {
+                            setActiveRole(role);
+                            setIsRoleSelectOpen(false);
+                          }}
+                        >
+                          {role}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="relative w-full text-left mt-6">
+            <label className="text-[12px] text-gray-500 mb-1 block font-medium">Select Entity</label>
             <button
               type="button"
               className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#1e9bd8] hover:opacity-85 active:opacity-75 text-white font-medium transition-all focus:outline-none"

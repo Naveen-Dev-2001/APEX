@@ -9,9 +9,9 @@ import toast from '../../utils/toast';
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
     const [editingUser, setEditingUser] = useState(null);
-    const [editForm, setEditForm] = useState({ role: '', status: '', department: '' });
+    const [editForm, setEditForm] = useState({ role: [], status: '', department: '' });
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'approver', department: '' });
+    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: ['approver'], department: '' });
 
     const {
         searchQuery, setSearchQuery, setCurrentPage,
@@ -30,12 +30,14 @@ const AdminPage = () => {
             return;
         }
         setEditingUser(user);
-        setEditForm({ role: user.role, status: user.status, department: user.department || '' });
+        const userRoles = user.role ? user.role.split(',') : [];
+        setEditForm({ role: userRoles, status: user.status, department: user.department || '' });
     };
 
     const handleSaveEdit = async () => {
         if (!editingUser) return;
-        const success = await updateUserRole(editingUser.id, editForm.role, editForm.status, editForm.department);
+        const roleString = Array.isArray(editForm.role) ? editForm.role.join(',') : editForm.role;
+        const success = await updateUserRole(editingUser.id, roleString, editForm.status, editForm.department);
         if (success) {
             setEditingUser(null);
         } else {
@@ -44,10 +46,14 @@ const AdminPage = () => {
     };
 
     const handleAddUser = async () => {
-        const success = await addUser(addForm);
+        const payload = {
+            ...addForm,
+            role: Array.isArray(addForm.role) ? addForm.role.join(',') : addForm.role
+        };
+        const success = await addUser(payload);
         if (success) {
             setIsAddModalOpen(false);
-            setAddForm({ username: '', email: '', password: '', role: 'approver', department: '' });
+            setAddForm({ username: '', email: '', password: '', role: ['approver'], department: '' });
         } else {
             toast.error('Failed to create user. Please try again.');
         }
@@ -72,6 +78,7 @@ const AdminPage = () => {
                             <div className="p-6 space-y-5">
                                 <Dropdown
                                     label="Role"
+                                    mode="multiple"
                                     value={editForm.role}
                                     options={roleOptions}
                                     onChange={(val) => setEditForm({ ...editForm, role: val })}
@@ -82,7 +89,7 @@ const AdminPage = () => {
                                     options={statusOptions}
                                     onChange={(val) => setEditForm({ ...editForm, status: val })}
                                 />
-                                {editForm.role === 'approver' && (
+                                {editForm.role?.includes('approver') && (
                                     <Dropdown
                                         label="Department"
                                         value={editForm.department || ''}
@@ -156,11 +163,12 @@ const AdminPage = () => {
                                 </div>
                                 <Dropdown
                                     label="Initial Role"
+                                    mode="multiple"
                                     value={addForm.role}
                                     options={roleOptions}
                                     onChange={(val) => setAddForm({ ...addForm, role: val })}
                                 />
-                                {addForm.role === 'approver' && (
+                                {addForm.role?.includes('approver') && (
                                     <Dropdown
                                         label="Department"
                                         value={addForm.department || ''}

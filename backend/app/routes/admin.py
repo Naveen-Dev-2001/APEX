@@ -50,6 +50,14 @@ async def create_new_user(
     if existing_username_list:
         raise HTTPException(status_code=400, detail="Username already taken")
 
+    # Validate role(s)
+    settings_data = get_app_settings(db)
+    allowed_roles = settings_data.get("roles", [])
+    roles_to_validate = [r.strip() for r in user_data.role.split(',')]
+    for r in roles_to_validate:
+        if r not in allowed_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid role: {r}")
+
     from app.auth.jwt import get_password_hash
     hashed_password = get_password_hash("Apex2026")
 
@@ -107,12 +115,14 @@ async def update_user_role(
     allowed_roles = settings.get("roles", [])
     allowed_statuses = settings.get("statuses", [])
 
-    # Validate role
-    if update_data.role not in allowed_roles:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid role: {update_data.role}"
-        )
+    # Validate role(s)
+    roles_to_validate = [r.strip() for r in update_data.role.split(',')]
+    for r in roles_to_validate:
+        if r not in allowed_roles:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid role: {r}"
+            )
 
     # Validate status
     if update_data.status not in allowed_statuses:
