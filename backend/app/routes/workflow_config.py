@@ -179,7 +179,7 @@ async def get_workflow_vendors(
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user)
 ):
-    vendors = vendor_repo.get_multi(db, limit=10000)
+    vendors = vendor_repo.get_multi(db,limit=2000000)
     workflow_vendors = []
     
     for v in vendors:
@@ -189,7 +189,7 @@ async def get_workflow_vendors(
         if is_val is None or is_val is True or is_val == 1 or str(is_val).strip().lower() in ["yes", "true"]:
             vendor_name = v.vendor_name
             vendor_id = v.vendor_id
-            
+        
             if vendor_name:
                 label = f"{vendor_id} - {vendor_name}" if vendor_id else str(vendor_name)
                 unique_val = f"{vendor_id}|{vendor_name}" if vendor_id else str(vendor_name)
