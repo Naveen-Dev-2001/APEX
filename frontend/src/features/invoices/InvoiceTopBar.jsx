@@ -6,9 +6,12 @@ import { useSaveInvoice } from "../hooks/useSaveInvoice";
 import toast from "../../utils/toast";
 import { saveInvoice } from "../../api/invoiceApi";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../store/authStore";
 
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate()
+    const user = useAuthStore((state) => state.user);
+    const userRole = user?.role?.toLowerCase();
     const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView, setInvoiceActiveTab, activeInvoiceData } = useInvoiceStore();
     const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
@@ -67,43 +70,47 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
             {/* Right — actions */}
             <div className="flex items-center gap-3">
-                <div className="w-[100px]">
+                {userRole === 'scanner' && (
+                    <>
+                        <div className="w-[100px]">
 
-                    <CustomButton
-                        variant="outline"
-                        className="w-32"
-                        onClick={() => {/* handle discard */ }}
-                    >
-                        Discard
-                    </CustomButton>
-                </div>
-                <div className="w-[100px]">
+                            <CustomButton
+                                variant="outline"
+                                className="w-32"
+                                onClick={() => {/* handle discard */ }}
+                            >
+                                Discard
+                            </CustomButton>
+                        </div>
+                        <div className="w-[100px]">
 
-                    {/* Save - Primary button */}
-                    <CustomButton
-                        variant="primary"
-                        className="w-24"
-                        onClick={handleSaveInvoice}
-                    >
-                        Save
-                    </CustomButton>
-                </div>
-                <div className="w-[220px]">
+                            {/* Save - Primary button */}
+                            <CustomButton
+                                variant="primary"
+                                className="w-24"
+                                onClick={handleSaveInvoice}
+                            >
+                                Save
+                            </CustomButton>
+                        </div>
+                        <div className="w-[220px]">
 
-                    {/* Send to Coding / Send to Approval - Green button */}
-                    <CustomButton
-                        variant="success"
-                        className="w-40"
-                        disabled={isDuplicate}
-                        onClick={currentStatus === 'waiting_coding' ? handleSendToApproval : handleSendToCoding}
-                    >
-                        {currentStatus === 'waiting_coding'
-                            ? "Send to Approval"
-                            : currentStatus === 'processed'
-                                ? "Send to Coding"
-                                : "Send to Coding"}
-                    </CustomButton>
-                </div>
+                            {/* Send to Coding / Send to Approval - Green button */}
+                            <CustomButton
+                                variant="success"
+                                className="w-40"
+                                disabled={isDuplicate}
+                                onClick={currentStatus === 'waiting_coding' ? handleSendToApproval : handleSendToCoding}
+                            >
+                                {currentStatus === 'waiting_coding'
+                                    ? "Send to Approval"
+                                    : currentStatus === 'processed'
+                                        ? "Send to Coding"
+                                        : "Send to Coding"}
+                            </CustomButton>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

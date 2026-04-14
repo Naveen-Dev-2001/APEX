@@ -81,12 +81,20 @@ const Header = () => {
         }
 
         const userRole = user?.role?.toLowerCase() || '';
+        const userDept = user?.department?.toLowerCase() || '';
 
         const filtered = navigation
             .filter(nav => {
                 // Check if role has access
                 const roles = nav.roles || [];
-                return roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === userRole);
+                const roleAccess = roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === userRole);
+                
+                // Specific block: non-finance approvers cannot see dashboard
+                if (nav.label === 'Dashboard' && userRole === 'approver' && userDept === 'non-finance') {
+                    return false;
+                }
+                
+                return roleAccess;
             })
             .map(nav => ({
                 name: nav.label,

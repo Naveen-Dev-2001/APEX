@@ -26,6 +26,12 @@ const ProtectedRoute = () => {
     // Skip protection for main entry points or if navigation hasn't loaded yet
     if (navigation.length > 0 && currentPath !== '/select-entity') {
         const userRole = user?.role?.toLowerCase() || '';
+        const userDept = user?.department?.toLowerCase() || '';
+
+        // Specific block: non-finance approvers cannot see dashboard
+        if (currentPath === '/dashboard' && userRole === 'approver' && userDept === 'non-finance') {
+            return <Navigate to="/invoices" replace />;
+        }
         
         // Find if this path requires specific roles
         const navItem = navigation.find(nav => 
@@ -39,9 +45,11 @@ const ProtectedRoute = () => {
             );
             
             if (!hasAccess) {
-                // If user doesn't have access, redirect to dashboard or first available tab
-                // But avoid infinite redirect if dashboard itself is blocked (unlikely)
+                // If user doesn't have access, redirect to appropriate default route
                 if (currentPath !== '/dashboard') {
+                    if (userRole === 'approver' && userDept === 'non-finance') {
+                        return <Navigate to="/invoices" replace />;
+                    }
                     return <Navigate to="/dashboard" replace />;
                 }
             }

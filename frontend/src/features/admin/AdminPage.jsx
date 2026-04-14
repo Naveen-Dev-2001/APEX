@@ -9,9 +9,9 @@ import toast from '../../utils/toast';
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
     const [editingUser, setEditingUser] = useState(null);
-    const [editForm, setEditForm] = useState({ role: '', status: '' });
+    const [editForm, setEditForm] = useState({ role: '', status: '', department: '' });
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'approver' });
+    const [addForm, setAddForm] = useState({ username: '', email: '', password: '', role: 'approver', department: '' });
 
     const {
         searchQuery, setSearchQuery, setCurrentPage,
@@ -30,12 +30,12 @@ const AdminPage = () => {
             return;
         }
         setEditingUser(user);
-        setEditForm({ role: user.role, status: user.status });
+        setEditForm({ role: user.role, status: user.status, department: user.department || '' });
     };
 
     const handleSaveEdit = async () => {
         if (!editingUser) return;
-        const success = await updateUserRole(editingUser.id, editForm.role, editForm.status);
+        const success = await updateUserRole(editingUser.id, editForm.role, editForm.status, editForm.department);
         if (success) {
             setEditingUser(null);
         } else {
@@ -47,7 +47,7 @@ const AdminPage = () => {
         const success = await addUser(addForm);
         if (success) {
             setIsAddModalOpen(false);
-            setAddForm({ username: '', email: '', password: '', role: 'approver' });
+            setAddForm({ username: '', email: '', password: '', role: 'approver', department: '' });
         } else {
             toast.error('Failed to create user. Please try again.');
         }
@@ -82,6 +82,18 @@ const AdminPage = () => {
                                     options={statusOptions}
                                     onChange={(val) => setEditForm({ ...editForm, status: val })}
                                 />
+                                {editForm.role === 'approver' && (
+                                    <Dropdown
+                                        label="Department"
+                                        value={editForm.department || ''}
+                                        options={[
+                                            { label: 'Finance Team', value: 'finance' },
+                                            { label: 'Non-Finance Team', value: 'non-finance' }
+                                        ]}
+                                        placeholder="Select Department"
+                                        onChange={(val) => setEditForm({ ...editForm, department: val })}
+                                    />
+                                )}
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
                                 <button
@@ -148,6 +160,18 @@ const AdminPage = () => {
                                     options={roleOptions}
                                     onChange={(val) => setAddForm({ ...addForm, role: val })}
                                 />
+                                {addForm.role === 'approver' && (
+                                    <Dropdown
+                                        label="Department"
+                                        value={addForm.department || ''}
+                                        options={[
+                                            { label: 'Finance Team', value: 'finance' },
+                                            { label: 'Non-Finance Team', value: 'non-finance' }
+                                        ]}
+                                        placeholder="Select Department"
+                                        onChange={(val) => setAddForm({ ...addForm, department: val })}
+                                    />
+                                )}
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
                                 <button

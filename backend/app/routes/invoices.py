@@ -567,6 +567,27 @@ async def get_invoices(
     if not show_all:
         filters["uploaded_by"] = current_user.username
 
+    expressions = []
+    
+    # Extra role filtering for non-finance approvers
+    user_dept = getattr(current_user, "department", "finance") or "finance"
+    if current_user.role.lower() == "approver" and user_dept.lower() == "non-finance":
+        from app.models.delegation import Delegation
+        curr_time = datetime.utcnow()
+        active_delegations = db.query(Delegation.delegator_email).filter(
+            Delegation.substitute_email.ilike(current_user.email),
+            Delegation.entity == entity,
+            Delegation.start_date <= curr_time,
+            Delegation.end_date >= curr_time
+        ).all()
+        target_emails = [current_user.email.lower()] + [d[0].lower() for d in active_delegations]
+        
+        expressions.append(
+            Invoice.assigned_approvers_list.any(
+                InvoiceAssignedApprover.approver_email.in_(target_emails)
+            )
+        )
+
     search_fields = ["invoice_number", "vendor_name", "vendor_id", "status", "filename"]
     
     paginated_res = invoice_repo.get_paginated(
@@ -577,7 +598,8 @@ async def get_invoices(
         search=search,
         search_fields=search_fields,
         order_by=sort_by,
-        descending=(sort_dir.lower() == 'desc')
+        descending=(sort_dir.lower() == 'desc'),
+        expressions=expressions
     )
     
     # Convert models to dicts

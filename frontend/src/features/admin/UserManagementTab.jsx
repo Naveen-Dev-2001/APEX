@@ -28,6 +28,7 @@ const UserManagementTab = ({ onEdit }) => {
             case 'admin': return 'border-[#4ade80] text-[#4ade80] bg-[#4ade80]/5';
             case 'coder': return 'border-[#2dd4bf] text-[#2dd4bf] bg-[#2dd4bf]/5';
             case 'approver': return 'border-[#c084fc] text-[#c084fc] bg-[#c084fc]/5';
+            case 'scanner': return 'border-[#60a5fa] text-[#60a5fa] bg-[#60a5fa]/5';
             default: return 'border-gray-300 text-gray-500 bg-gray-50';
         }
     };
@@ -55,6 +56,15 @@ const UserManagementTab = ({ onEdit }) => {
                     {role}
                 </span>
             )
+        },
+        {
+            header: 'Department',
+            accessor: 'department',
+            sortable: true,
+            onClick: () => setSort('department'),
+            render: (dept) => dept ? (
+                <span className="text-[12px] text-gray-600 capitalize">{dept.replace('-', ' ')}</span>
+            ) : <span className="text-gray-400">-</span>
         },
         {
             header: 'Status',
