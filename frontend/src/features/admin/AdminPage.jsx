@@ -25,6 +25,28 @@ const AdminPage = () => {
 
     const tabs = ['User Management', 'Global Config', 'Delegations'];
 
+    const handleRoleLogic = (newSelectedRoles, previousRoles) => {
+        const multiRoles = ['admin', 'approver'];
+        
+        // If a role was removed, just return the new list
+        if (newSelectedRoles.length < previousRoles.length) {
+            return newSelectedRoles;
+        }
+
+        // Find the newly added role
+        const addedRole = newSelectedRoles.find(r => !previousRoles.includes(r));
+        if (!addedRole) return newSelectedRoles;
+
+        // Logic check
+        if (multiRoles.includes(addedRole)) {
+            // If added role is admin or approver, keep only multiRoles
+            return newSelectedRoles.filter(r => multiRoles.includes(r));
+        } else {
+            // If added role is any other, it becomes single-select
+            return [addedRole];
+        }
+    };
+
     const handleEditClick = (user) => {
         if (user.email?.toLowerCase() === 'admin@example.com') {
             return;
@@ -81,7 +103,7 @@ const AdminPage = () => {
                                     mode="multiple"
                                     value={editForm.role}
                                     options={roleOptions}
-                                    onChange={(val) => setEditForm({ ...editForm, role: val })}
+                                    onChange={(val) => setEditForm({ ...editForm, role: handleRoleLogic(val, editForm.role || []) })}
                                 />
                                 <Dropdown
                                     label="Status"
@@ -166,7 +188,7 @@ const AdminPage = () => {
                                     mode="multiple"
                                     value={addForm.role}
                                     options={roleOptions}
-                                    onChange={(val) => setAddForm({ ...addForm, role: val })}
+                                    onChange={(val) => setAddForm({ ...addForm, role: handleRoleLogic(val, addForm.role || []) })}
                                 />
                                 {addForm.role?.includes('approver') && (
                                     <Dropdown
