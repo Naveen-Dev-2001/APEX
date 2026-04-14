@@ -1,6 +1,7 @@
 import { Collapse } from "antd";
 import { QUICK_VIEW_CONFIG } from "../Fields";
 import { useInvoiceStore } from "../../../store/invoice.store";
+import { useAuthStore } from "../../../store/authStore";
 import { useVendersListSync, useVendorDetailSync } from "../../hooks/useInvoiceDetailSync";
 import { useCallback, useEffect, useMemo, useState, useRef, memo } from "react";
 import { AutoComplete } from "antd";
@@ -229,7 +230,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         setLineItems
     } = useInvoiceStore();
 
-    const VIEW_ONLY_STATUSES = ["WAITING_CODING"];
+
 
     const { vendorsList } = useVendersListSync();
     const { vendor } = useVendorDetailSync(selectedVendorId);
@@ -508,9 +509,22 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     // Label for the GST system row
     const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
 
-    const isViewOnly = VIEW_ONLY_STATUSES
-        .map(s => s.toLowerCase())
-        .includes(activeInvoiceData?.status?.toLowerCase());
+    const user = useAuthStore((state) => state.user);
+    const userRole = user?.role?.toLowerCase();
+
+    const isViewOnly = (() => {
+        const status = activeInvoiceData?.status?.toLowerCase();
+        if (!status) return false;
+        
+        if (userRole === 'coder') {
+            if (status === 'processed') return true;
+            if (status === 'waiting_coding') return false;
+            return false;
+        }
+
+        const VIEW_ONLY_STATUSES = ["waiting_coding"];
+        return VIEW_ONLY_STATUSES.includes(status);
+    })();
 
     return (
         <div className="p-2">
