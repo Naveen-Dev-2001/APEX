@@ -16,6 +16,7 @@ import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
 import ExportButton from "../../shared/components/ExportButton";
+import { useAuthStore } from "../../store/authStore";
 
 const Invoice = () => {
     const {
@@ -28,6 +29,9 @@ const Invoice = () => {
     } = useInvoiceStore();
 
     const [localSearch, setLocalSearch] = useState(searchQuery);
+    
+    const user = useAuthStore((state) => state.user);
+    const userRole = user?.role?.toLowerCase();
 
     const { invoices, total, isLoading, refetch } = useInvoiceData({
         skip,
@@ -352,11 +356,13 @@ const Invoice = () => {
                                         fileName="Invoices.xlsx" 
                                     />
                                 </div>
-                                <div className="w-[200px]">
-                                    <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
-                                        Create Invoice
-                                    </CustomButton>
-                                </div>
+                                {userRole === 'scanner' && (
+                                    <div className="w-[200px]">
+                                        <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
+                                            Create Invoice
+                                        </CustomButton>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

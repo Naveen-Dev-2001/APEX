@@ -7,8 +7,8 @@ export const adminService = {
     return response.data;
   },
 
-  async updateUserRole(userId, role, status) {
-    const response = await API.put(`/users/${userId}/role`, { role, status });
+  async updateUserRole(userId, role, status, department) {
+    const response = await API.put(`/users/${userId}/role`, { role, status, department });
     return response.data;
   },
 

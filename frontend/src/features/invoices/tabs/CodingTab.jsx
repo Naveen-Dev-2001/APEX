@@ -7,6 +7,7 @@ import {
     CaretUpOutlined
 } from "@ant-design/icons";
 import { useInvoiceStore } from "../../../store/invoice.store";
+import { useAuthStore } from "../../../store/authStore";
 import QuickViewTab from "./QuickViewTab";
 import CustomInput from "../../../shared/components/CustomInput";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
@@ -29,7 +30,7 @@ const LINE_TYPE_OPTIONS = [
 // EditableCell — local state with debounced propagation.
 // Only syncs from outside when user is NOT actively typing.
 // ─────────────────────────────────────────────────────────────────────────────
-const EditableCell = memo(({ value, onChange, placeholder, type = "text" }) => {
+const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabled = false }) => {
     const [local, setLocal] = useState(value ?? "");
     const debounceRef = useRef(null);
     const isEditingRef = useRef(false);
@@ -61,6 +62,7 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text" }) => {
             className="mb-0 w-full"
             height="32px"
             type={type}
+            disabled={disabled}
         />
     );
 },
@@ -71,13 +73,14 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text" }) => {
         prev.onChange === next.onChange
 );
 
-const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption }) => (
+const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, disabled = false }) => (
     <div style={{ width: "100%" }}>
         <CustomDropdown
             value={value}
             onChange={onChange}
             options={options}
             loading={isLoading}
+            disabled={disabled}
             className="mb-0"
             showSearch
             filterOption={filterOption}
@@ -100,7 +103,7 @@ DropdownCell.displayName = "DropdownCell";
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom Checkbox — polished UI with checkmark + indeterminate state
 // ─────────────────────────────────────────────────────────────────────────────
-const Checkbox = memo(({ checked, indeterminate, onChange, title }) => {
+const Checkbox = memo(({ checked, indeterminate, onChange, title, disabled = false }) => {
     const ref = useRef(null);
 
     useEffect(() => {
@@ -119,6 +122,7 @@ const Checkbox = memo(({ checked, indeterminate, onChange, title }) => {
                 checked={checked}
                 onChange={onChange}
                 className="sr-only"
+                disabled={disabled}
             />
             <span
                 style={{
@@ -132,6 +136,8 @@ const Checkbox = memo(({ checked, indeterminate, onChange, title }) => {
                     background: checked || indeterminate ? "#2F5D7C" : "#ffffff",
                     transition: "border-color 0.15s ease, background 0.15s ease",
                     flexShrink: 0,
+                    opacity: disabled ? 0.5 : 1,
+                    cursor: disabled ? 'not-allowed' : 'pointer'
                 }}
             >
                 {indeterminate && !checked ? (
@@ -173,8 +179,25 @@ const applyCalculation = (item, key, value) => {
 };
 
 const CodingTab = () => {
-    const { lineItems, setLineItems, viewInvoiceId, selectedVendorId } = useInvoiceStore();
+    const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData } = useInvoiceStore();
     const rows = lineItems;
+
+    const user = useAuthStore((state) => state.user);
+    const userRole = user?.role?.toLowerCase();
+
+    const isViewOnly = (() => {
+        const status = activeInvoiceData?.status?.toLowerCase();
+        if (!status) return false;
+        
+        if (userRole === 'coder') {
+            if (status === 'processed') return true;
+            if (status === 'waiting_coding') return false;
+            return false;
+        }
+
+        const VIEW_ONLY_STATUSES = ["waiting_coding"];
+        return VIEW_ONLY_STATUSES.includes(status);
+    })();
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);
@@ -429,6 +452,7 @@ const CodingTab = () => {
                                                 indeterminate={someSelected}
                                                 onChange={toggleSelectAll}
                                                 title="Select all"
+                                                disabled={isViewOnly}
                                             />
                                         </th>
                                         <th className="p-2 text-center text-[12px] font-medium border-r border-[#ffffff1a]" style={stickySNo("#2F5D7C")}>S.No</th>
@@ -461,6 +485,7 @@ const CodingTab = () => {
                                                     <Checkbox
                                                         checked={isSelected}
                                                         onChange={() => toggleSelectRow(row.id)}
+                                                        disabled={isViewOnly}
                                                     />
                                                 </td>
                                                 <td className="p-2 text-center text-[13px] text-gray-500 border-r border-gray-100" style={stickySNo(isSelected ? "#dbeafe" : "#ffffff")}>
@@ -469,36 +494,37 @@ const CodingTab = () => {
 
                                                 {/* All cells below are IDENTICAL to original — no isSystem branching */}
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <EditableCell value={row.description} onChange={(v) => handleUpdate(row.id, "description", v)} placeholder="Description" />
+                                                    <EditableCell disabled={isViewOnly} value={row.description} onChange={(v) => handleUpdate(row.id, "description", v)} placeholder="Description" />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell value={row.lineType} onChange={(v) => handleUpdate(row.id, "lineType", v)} options={LINE_TYPE_OPTIONS} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.lineType} onChange={(v) => handleUpdate(row.id, "lineType", v)} options={LINE_TYPE_OPTIONS} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <EditableCell value={row.qty} onChange={(v) => handleUpdate(row.id, "qty", v)} type="number" />
+                                                    <EditableCell disabled={isViewOnly} value={row.qty} onChange={(v) => handleUpdate(row.id, "qty", v)} type="number" />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <EditableCell value={row.unitPrice} onChange={(v) => handleUpdate(row.id, "unitPrice", v)} type="number" />
+                                                    <EditableCell disabled={isViewOnly} value={row.unitPrice} onChange={(v) => handleUpdate(row.id, "unitPrice", v)} type="number" />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <EditableCell value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="number" />
+                                                    <EditableCell disabled={isViewOnly} value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="number" />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell value={row.glCode} onChange={(v) => handleUpdate(row.id, "glCode", v)} options={glOptions} isLoading={glLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.glCode} onChange={(v) => handleUpdate(row.id, "glCode", v)} options={glOptions} isLoading={glLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell value={row.lob} onChange={(v) => handleUpdate(row.id, "lob", v)} options={lobOptions} isLoading={lobLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.lob} onChange={(v) => handleUpdate(row.id, "lob", v)} options={lobOptions} isLoading={lobLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell value={row.department} onChange={(v) => handleUpdate(row.id, "department", v)} options={deptOptions} isLoading={deptLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.department} onChange={(v) => handleUpdate(row.id, "department", v)} options={deptOptions} isLoading={deptLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell value={row.customer} onChange={(v) => handleUpdate(row.id, "customer", v)} options={customerOptions} isLoading={customerLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.customer} onChange={(v) => handleUpdate(row.id, "customer", v)} options={customerOptions} isLoading={customerLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell value={row.item} onChange={(v) => handleUpdate(row.id, "item", v)} options={itemOptions} isLoading={itemLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.item} onChange={(v) => handleUpdate(row.id, "item", v)} options={itemOptions} isLoading={itemLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>
+                                                    {!isViewOnly && (
                                                     <button
                                                         onClick={() => handleDelete(row.id)}
                                                         className="text-gray-400 hover:text-red-500 transition-colors"
@@ -519,6 +545,7 @@ const CodingTab = () => {
                                                     >
                                                         <DeleteOutlined style={{ fontSize: 12, color: "inherit" }} />
                                                     </button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -532,6 +559,7 @@ const CodingTab = () => {
                             className="flex-shrink-0 border-t border-gray-100 bg-white px-3 py-2"
                             style={{ position: "sticky", left: 0 }}
                         >
+                            {!isViewOnly && (
                             <button
                                 onClick={handleAdd}
                                 className="flex items-center gap-1.5 text-[12px] font-medium text-[#2F5D7C] transition-all"
@@ -549,6 +577,7 @@ const CodingTab = () => {
                                 <PlusOutlined style={{ fontSize: 11 }} />
                                 Add Line
                             </button>
+                            )}
                         </div>
                     </div>
                 )}

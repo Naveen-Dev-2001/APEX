@@ -53,9 +53,24 @@ def create_database_if_not_exists():
 
 
 def create_tables():
-    """Create all database tables"""
+    """Create all database tables and schema migrations"""
     print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
+    
+    # Run manual migrations if required
+    try:
+        with engine.connect() as conn:
+            # Check if department column exists
+            result = conn.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'department'"
+            ))
+            if result.scalar() == 0:
+                conn.execute(text("ALTER TABLE users ADD department NVARCHAR(100) NULL"))
+                conn.execute(text("COMMIT"))
+                print("✓ Added department column to users table")
+    except Exception as e:
+        print(f"Migration error (might be expected if table newly created): {e}")
+
     print("✓ All tables created successfully")
 
 
@@ -105,11 +120,11 @@ def create_default_currencies(db):
 def create_default_settings(db):
     """Create default global settings if not exists"""
     default_settings = {
-        "roles": ["admin", "coder", "approver"],
+        "roles": ["admin", "coder", "approver", "scanner"],
         "statuses": ["active", "pending", "rejected"],
         "navigation": [
             {"label": "Dashboard", "path": "/dashboard", "roles": ["all"]},
-            {"label": "Invoices", "path": "/invoices", "roles": ["coder", "admin"]},
+            {"label": "Invoices", "path": "/invoices", "roles": ["coder", "admin", "approver", "scanner"]},
             {"label": "Coding", "path": "/coding", "roles": ["coder", "admin"]},
             {"label": "Approvals", "path": "/approvals", "roles": ["approver", "admin"]},
             {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},

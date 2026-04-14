@@ -5,13 +5,13 @@ from app.repository.repositories import global_setting_repo
 import json
 
 DEFAULT_SETTINGS = {
-    "roles": ["admin", "coder", "approver"],
+    "roles": ["admin", "coder", "approver", "scanner"],
     "statuses": ["active", "pending", "rejected"],
     "navigation": [
-        {"label": "Dashboard", "path": "/dashboard", "roles": ["admin", "coder", "approver"]},
-        {"label": "Invoices", "path": "/invoices", "roles": ["coder", "admin"]},
-        {"label": "Coding", "path": "/coding", "roles": ["coder"]},
-        {"label": "Approvals", "path": "/approvals", "roles": ["approver"]},
+        {"label": "Dashboard", "path": "/dashboard", "roles": ["admin", "coder", "approver", "scanner"]},
+        {"label": "Invoices", "path": "/invoices", "roles": ["coder", "admin", "approver", "scanner"]},
+        {"label": "Coding", "path": "/coding", "roles": ["coder", "admin"]},
+        {"label": "Approvals", "path": "/approvals", "roles": ["approver", "admin"]},
         {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
         {"label": "Settings", "path": "/settings", "roles": ["admin"]},
         {"label": "Admin", "path": "/admin", "roles": ["admin"]}
@@ -62,6 +62,11 @@ def get_app_settings(db: Session = None):
         # Update other keys (roles, statuses, etc.)
         other_settings = {k: v for k, v in settings_data.items() if k != "navigation"}
         merged_settings.update(other_settings)
+        
+        # Ensure necessary default roles exist
+        if "roles" in merged_settings and isinstance(merged_settings["roles"], list):
+            if "scanner" not in merged_settings["roles"]:
+                merged_settings["roles"].append("scanner")
         
         return merged_settings
     finally:

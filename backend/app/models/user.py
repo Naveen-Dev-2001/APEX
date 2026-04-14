@@ -8,6 +8,7 @@ class User(BaseModel):
     password: str
     role: str = "user"  # admin, coder, approver, user
     status: str = "pending"  # pending, active, rejected
+    department: Optional[str] = None
     created_at: Optional[datetime] = None
 
 class UserInDB(User):
@@ -21,6 +22,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: str
     status: str 
+    department: Optional[str] = None
     isCreatedByUser: bool = True
     createdby: str = "self"
     ispasswordchange: bool = True

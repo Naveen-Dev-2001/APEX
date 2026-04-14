@@ -57,6 +57,7 @@ class User(Base):
     password = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="coder")  # admin, coder, approver
     status = Column(String(50), nullable=False, default="pending")  # pending, active, rejected
+    department = Column(String(100), nullable=True)  # finance, non-finance
     isCreatedByUser = Column(Boolean, nullable=False, default=True)
     createdby = Column(String(100), nullable=False, default="self")
     ispasswordchange = Column(Boolean, nullable=False, default=True)
