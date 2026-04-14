@@ -15,6 +15,7 @@ import { message } from "antd";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
+import ExportButton from "../../shared/components/ExportButton";
 
 const Invoice = () => {
     const {
@@ -342,6 +343,13 @@ const Invoice = () => {
                                         placeholder="Select View"
                                         value={view}
                                         onChange={(val) => setView(val)}
+                                    />
+                                </div>
+                                <div className="w-[150px]">
+                                    <ExportButton 
+                                        data={invoices} 
+                                        columns={columnDefs} 
+                                        fileName="Invoices.xlsx" 
                                     />
                                 </div>
                                 <div className="w-[200px]">

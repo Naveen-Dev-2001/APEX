@@ -9,6 +9,7 @@ import { getDelegations } from '../../api/delegationApi';
 import { getApprovers } from '../../api/workflowConfigApi';
 import { useAuthStore } from '../../store/authStore';
 import toast from '../../utils/toast';
+import ExportButton from '../../shared/components/ExportButton';
 
 const { confirm } = Modal;
 
@@ -257,9 +258,16 @@ const ApprovalsPage = () => {
 
     return (
         <div className="p-6 bg-[#f8fafc] min-h-screen pt-[10px]">
-            {/* <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">Approvals</h1>
-            </div> */}
+            <div className="flex items-center justify-between mb-4">
+                <h1 className="text-3xl font-bold custom-font-jura">Approvals</h1>
+                <div className="w-[150px]">
+                    <ExportButton 
+                        data={invoices} 
+                        columns={columnDefs} 
+                        fileName="Approvals.xlsx" 
+                    />
+                </div>
+            </div>
             <div className="bg-white rounded-xl shadow-sm p-2">
                 <Tabs
                     defaultActiveKey="1"

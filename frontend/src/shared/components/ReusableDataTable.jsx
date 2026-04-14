@@ -35,6 +35,7 @@ export default function ReusableDataTable({
     onPageChange = null,
     onItemsPerPageChange = null,
     onSortChange = null,
+    renderHeaderActions = null,
 }) {
     const gridRef = useRef(null);
     const [gridApi, setGridApi] = useState(null);
@@ -139,6 +140,12 @@ export default function ReusableDataTable({
                             >
                                 Create New User
                             </CustomButton>
+                        </div>
+                    )}
+
+                    {renderHeaderActions && (
+                        <div className="flex items-center gap-3">
+                            {renderHeaderActions()}
                         </div>
                     )}
                 </div>
