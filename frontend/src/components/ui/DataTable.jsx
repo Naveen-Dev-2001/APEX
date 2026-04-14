@@ -69,12 +69,13 @@ const DataTable = ({
                             {columns.map((col, idx) => {
                                 const isSortedColumn = sortColumn === col.accessor;
                                 const isLastColumn = idx === columns.length - 1;
+                                const isSticky = isLastColumn && col.accessor === 'actions';
                                 return (
                                     <th 
                                         key={idx} 
                                         className={`px-5 py-3 font-medium whitespace-nowrap border-b border-gray-200 
                                             ${col.sortable ? 'cursor-pointer select-none hover:bg-[#1a669a]' : ''}
-                                            ${isLastColumn ? 'sticky right-0 bg-[#1D71AB] z-30 shadow-[-12px_1px_12px_-8px_rgba(0,0,0,0.3)]' : ''}`}
+                                            ${isSticky ? 'sticky right-0 bg-[#1D71AB] z-30 shadow-[-12px_1px_12px_-8px_rgba(0,0,0,0.3)]' : ''}`}
                                         onClick={() => col.sortable && col.onClick ? col.onClick() : null}
                                     >
                                         <div className="flex items-center gap-2">
@@ -96,11 +97,12 @@ const DataTable = ({
                             <tr key={rowIdx} className="hover:bg-gray-50 transition-colors group">
                                 {columns.map((col, colIdx) => {
                                     const isLastColumn = colIdx === columns.length - 1;
+                                    const isSticky = isLastColumn && col.accessor === 'actions';
                                     return (
                                         <td 
                                             key={colIdx} 
                                             className={`px-5 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
-                                                ${isLastColumn ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}`}
+                                                ${isSticky ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}`}
                                         >
                                             {col.render ? col.render(row[col.accessor], row) : row[col.accessor] || '-'}
                                         </td>

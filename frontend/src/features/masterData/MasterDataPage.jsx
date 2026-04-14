@@ -15,7 +15,13 @@ import ItemMasterModal from './ItemMasterModal';
 import CurrencyMasterModal from './CurrencyMasterModal';
 import ExchangeRateMasterModal from './ExchangeRateMasterModal';
 
+import { useAuthStore } from '../../store/authStore';
+
 const MasterDataPage = () => {
+    const user = useAuthStore((state) => state.user);
+    const userRole = user?.role?.toLowerCase() || '';
+    const isReadOnly = userRole === 'scanner' || userRole === 'coder';
+
     const {
         activeTab, setActiveTab,
         searchQuery, setSearchQuery,
@@ -232,7 +238,9 @@ const MasterDataPage = () => {
     };
 
     // Prepare columns for DataTable
-    const columns = (currentMaster?.columns || []).map((col) => {
+    const columns = (currentMaster?.columns || [])
+        .filter(col => !(isReadOnly && col.accessor === 'actions'))
+        .map((col) => {
         if (col.accessor === 'gst_applicable') {
             return {
                 ...col,
@@ -266,6 +274,8 @@ const MasterDataPage = () => {
                     let deleteTooltip = "Delete";
                     if (isTopLevelEntity) deleteTooltip = "Top Level Entity cannot be deleted";
                     else if (hasInvoices) deleteTooltip = "Cannot delete: Invoice created under this entity";
+
+                    if (isReadOnly) return null;
 
                     return (
                         <div className="flex items-center gap-4">
@@ -526,7 +536,7 @@ const MasterDataPage = () => {
                 </div>
 
                 {/* Actions */}
-                {!isCurrencyTab && (
+                {!isCurrencyTab && !isReadOnly && (
                     <>
                         <button
                             onClick={handleClearTab}
@@ -555,13 +565,15 @@ const MasterDataPage = () => {
                         </button>
                     </>
                 )}
-                <button
-                    onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) ? openAdd : undefined}
-                    className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
-                >
-                    <Plus size={16} />
-                    <span>{isCurrencyTab ? 'Add Currency' : 'Add New'}</span>
-                </button>
+                {!isReadOnly && (
+                    <button
+                        onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) ? openAdd : undefined}
+                        className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
+                    >
+                        <Plus size={16} />
+                        <span>{isCurrencyTab ? 'Add Currency' : 'Add New'}</span>
+                    </button>
+                )}
             </div>
 
             {/* Table Area */}

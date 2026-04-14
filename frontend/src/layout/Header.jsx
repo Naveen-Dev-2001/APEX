@@ -89,6 +89,11 @@ const Header = () => {
                 const roles = nav.roles || [];
                 const roleAccess = roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === userRole);
                 
+                // Show Master Data for scanner and coder as well
+                if (nav.label === 'Master Data' && (userRole === 'scanner' || userRole === 'coder')) {
+                    return true;
+                }
+
                 // Specific block: non-finance approvers cannot see dashboard
                 if (nav.label === 'Dashboard' && userRole === 'approver' && userDept === 'non-finance') {
                     return false;
