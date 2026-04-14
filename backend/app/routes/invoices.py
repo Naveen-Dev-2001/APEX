@@ -18,11 +18,14 @@ from typing import Dict, Optional, Any
 from app.services.email_service import email_service
 
 
+
 from app.models.db_models import (
     Invoice, WorkflowStep, WorkflowStepTypeEnum, 
     WorkflowStepStatusEnum, InvoiceStatusEnum, InvoiceStatusHistory,
-    VendorMetadata, RawExtractionData, User, EntityMaster
+    VendorMetadata, RawExtractionData, User, EntityMaster,
+    DeletedInvoice
 )
+
 from app.repository.repositories import (
     invoice_repo, workflow_step_repo, invoice_status_history_repo,
     user_repo, entity_repo, vendor_metadata_repo, raw_extraction_repo
@@ -642,7 +645,16 @@ async def get_invoice_pdf(
 ):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        # Check archive if not found in active invoices
+        archived = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
+        if not archived:
+             # Also try searching by archive ID if passed directly
+             archived = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
+        
+        if archived:
+            invoice = archived
+        else:
+            raise HTTPException(status_code=404, detail="Invoice not found")
 
     file_path = invoice.file_path
     
@@ -1867,24 +1879,311 @@ async def update_invoice(
     return InvoiceResponse(**invoice_to_dict(invoice))
 
 
+# @router.delete("/{invoice_id}")
+# async def delete_invoice(
+#     invoice_id: int,
+#     current_user: UserResponse = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+#     if not invoice:
+#         raise HTTPException(status_code=404, detail="Invoice not found")
+
+#     # Remove from registry
+#     from app.utils.invoice_registry import remove_from_registry
+#     remove_from_registry(db, invoice_id)
+
+#     db.delete(invoice)
+#     db.commit()
+
+#     return {"message": "Invoice deleted successfully"}
+
+# @router.get("/debug/last-approved")
+# async def debug_last_approved(db: Session = Depends(get_db)):
+#     from app.models.db_models import Invoice
+#     invs = db.query(Invoice).filter(Invoice.status == InvoiceStatusEnum.APPROVED).order_by(Invoice.id.desc()).limit(10).all()
+#     return [{"id": i.id, "number": i.invoice_number, "status": i.status, "approvals": len(i.approved_by_list or []), "required": i.required_approvers} for i in invs]
+
+# @router.get("/{invoice_id}/generate-pdf-debug")
+# async def generate_pdf_debug(invoice_id: int, db: Session = Depends(get_db)):
+#     from app.services.pdf_service import generate_approval_pdf
+#     try:
+#         path = generate_approval_pdf(db, invoice_id)
+#         return {"status": "success", "path": path}
+#     except Exception as e:
+#         import traceback
+#         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+# @router.get("/debug/log")
+# async def debug_log(lines: int = 100):
+#     try:
+#         with open("application_error.log", "r") as f:
+#             content = f.readlines()
+#             return {"log": content[-lines:]}
+#     except Exception as e:
+#         return {"error": str(e)}
+
+
+
+
 @router.delete("/{invoice_id}")
 async def delete_invoice(
     invoice_id: int,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """
+    Soft-delete an invoice: snapshot the invoice and all its related child rows
+    into the `deleted_invoices` table, then remove from `invoices` (cascade).
+    This preserves full history and allows re-upload of the same invoice
+    without triggering a duplicate warning.
+    """
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Remove from registry
-    from app.utils.invoice_registry import remove_from_registry
-    remove_from_registry(db, invoice_id)
+    try:
+        # ------------------------------------------------------------------
+        # 1. Snapshot child-table rows as JSON
+        # ------------------------------------------------------------------
+        def _row_to_dict(row):
+            """Serialize a SQLAlchemy row to a plain dict (primitive values only)."""
+            result = {}
+            for col in row.__table__.columns:
+                val = getattr(row, col.name)
+                if isinstance(val, datetime):
+                    val = val.isoformat()
+                elif hasattr(val, 'value'):   # Enum
+                    val = val.value
+                result[col.name] = val
+            return result
 
-    db.delete(invoice)
-    db.commit()
+        status_history_snapshot = json.dumps(
+            [_row_to_dict(h) for h in (invoice.status_history or [])]
+        )
+        workflow_steps_snapshot = json.dumps(
+            [_row_to_dict(s) for s in (invoice.workflow_steps or [])]
+        )
+        approved_by_snapshot = json.dumps(
+            [_row_to_dict(a) for a in (invoice.approved_by_list or [])]
+        )
+        assigned_approvers_snapshot = json.dumps(
+            [_row_to_dict(a) for a in (invoice.assigned_approvers_list or [])]
+        )
+        coding_snapshot = json.dumps(
+            _row_to_dict(invoice.coding) if invoice.coding else None
+        )
+        audit_logs_snapshot = json.dumps(
+            [_row_to_dict(al) for al in (invoice.audit_logs or [])]
+        )
 
-    return {"message": "Invoice deleted successfully"}
+        # ------------------------------------------------------------------
+        # 2. Build and insert the DeletedInvoice archive row
+        # ------------------------------------------------------------------
+        deleted_record = DeletedInvoice(
+            original_invoice_id=invoice.id,
+            filename=invoice.filename,
+            original_filename=invoice.original_filename,
+            file_path=invoice.file_path,
+            uploaded_by=invoice.uploaded_by,
+            uploaded_by_id=invoice.uploaded_by_id,
+            status=invoice.status.value if hasattr(invoice.status, 'value') else invoice.status,
+            entity=invoice.entity,
+            vendor_id=invoice.vendor_id,
+            vendor_name=invoice.vendor_name,
+            invoice_number=invoice.invoice_number,
+            azure_vendor_name=invoice.azure_vendor_name,
+            azure_vendor_address=invoice.azure_vendor_address,
+            line_grouping=invoice.line_grouping,
+            exchange_rate=invoice.exchange_rate,
+            sage_bill_number=invoice.sage_bill_number,
+            extracted_data=invoice.extracted_data,
+            vendor_details=invoice.vendor_details,
+            processing_steps=invoice.processing_steps,
+            validation_results=invoice.validation_results,
+            duplicate_info=invoice.duplicate_info,
+            original_items=invoice.original_items,
+            approver_breakdown=invoice.approver_breakdown,
+            gl_summary=invoice.gl_summary,
+            confidence_score=invoice.confidence_score,
+            uploaded_at=invoice.uploaded_at,
+            processed_at=invoice.processed_at,
+            required_approvers=invoice.required_approvers,
+            current_approver_level=invoice.current_approver_level,
+            # Child-table snapshots
+            status_history_json=status_history_snapshot,
+            workflow_steps_json=workflow_steps_snapshot,
+            approved_by_json=approved_by_snapshot,
+            assigned_approvers_json=assigned_approvers_snapshot,
+            coding_json=coding_snapshot,
+            audit_logs_json=audit_logs_snapshot,
+            # Deletion metadata
+            deleted_at=datetime.utcnow(),
+            deleted_by=current_user.username,
+        )
+        db.add(deleted_record)
+        db.flush()  # Write archive row before deleting the source
+
+        # ------------------------------------------------------------------
+        # 3. Remove from invoice_registry (so re-upload isn't flagged as duplicate)
+        # ------------------------------------------------------------------
+        from app.utils.invoice_registry import remove_from_registry
+        remove_from_registry(db, invoice_id)
+
+        # ------------------------------------------------------------------
+        # 4. Delete from invoices table (cascade removes all child rows)
+        # ------------------------------------------------------------------
+        db.delete(invoice)
+        db.commit()
+
+        logger.info(
+            f"[DeleteInvoice] Invoice {invoice_id} soft-deleted by {current_user.username}. "
+            f"Archived as deleted_invoice id={deleted_record.id}."
+        )
+        return {"message": "Invoice deleted and archived successfully"}
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[DeleteInvoice] Failed to soft-delete invoice {invoice_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to delete invoice: {str(e)}")
+
+
+@router.get("/deleted", summary="List deleted (archived) invoices")
+async def list_deleted_invoices(
+    entity: Optional[str] = Query(None, description="Filter by entity"),
+    vendor_id: Optional[str] = Query(None, description="Filter by vendor ID"),
+    invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Return a paginated list of soft-deleted (archived) invoices.
+    Accessible by all authenticated users.
+    """
+    # [Requirement Update] Deleted invoices can be viewed by all roles.
+    # if current_user.role != "admin":
+    #     raise HTTPException(status_code=403, detail="Only admins can view deleted invoices")
+
+    query = db.query(DeletedInvoice)
+    if entity:
+        query = query.filter(DeletedInvoice.entity == entity)
+    if vendor_id:
+        query = query.filter(DeletedInvoice.vendor_id == vendor_id)
+    if invoice_number:
+        query = query.filter(DeletedInvoice.invoice_number == invoice_number)
+
+    total = query.count()
+    records = query.order_by(DeletedInvoice.deleted_at.desc()).offset(skip).limit(limit).all()
+
+    def _serialize(r: DeletedInvoice):
+        return {
+            "id": r.id,
+            "original_invoice_id": r.original_invoice_id,
+            "filename": r.original_filename or r.filename,
+            "vendor_id": r.vendor_id,
+            "vendor_name": r.vendor_name,
+            "invoice_number": r.invoice_number,
+            "entity": r.entity,
+            "status": r.status,
+            "uploaded_by": r.uploaded_by,
+            "uploaded_at": r.uploaded_at.isoformat() if r.uploaded_at else None,
+            "deleted_by": r.deleted_by,
+            "deleted_at": r.deleted_at.isoformat() if r.deleted_at else None,
+            "sage_bill_number": r.sage_bill_number,
+        }
+
+    return {
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "data": [_serialize(r) for r in records]
+    }
+
+@router.get("/deleted/{archive_id}", summary="Get deleted invoice details")
+async def get_deleted_invoice(
+    archive_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Return full snapshot details of a deleted invoice.
+    """
+    record = db.query(DeletedInvoice).filter(DeletedInvoice.id == archive_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Archived invoice not found")
+
+    # Helper to deserialize the snapshots
+    def _safe_json(s):
+        if not s: return None
+        try: return json.loads(s)
+        except: return s
+
+    # Reconstruct a dictionary similar to invoice_to_dict but from snapshots
+    extracted_data = _safe_json(record.extracted_data) or {}
+    coding_snapshot = _safe_json(record.coding_json) or []
+    
+    # Ensure the frontend's loadLineItemTable sees this as a saved record with a snapshot
+    if coding_snapshot:
+        extracted_data["isModified"] = True
+        extracted_data["lineItemsSnapshot"] = coding_snapshot
+
+    res = {
+        "id": record.id,
+        "original_invoice_id": record.original_invoice_id,
+        "filename": record.filename,
+        "original_filename": record.original_filename,
+        "file_path": record.file_path,
+        "uploaded_by": record.uploaded_by,
+        "status": record.status,
+        "entity": record.entity,
+        "vendor_id": record.vendor_id,
+        "vendor_name": record.vendor_name,
+        "invoice_number": record.invoice_number,
+        "azure_vendor_name": record.azure_vendor_name,
+        "azure_vendor_address": record.azure_vendor_address,
+        "line_grouping": record.line_grouping,
+        "exchange_rate": float(record.exchange_rate) if record.exchange_rate else None,
+        "sage_bill_number": record.sage_bill_number,
+        "extracted_data": extracted_data,
+        "vendor_details": _safe_json(record.vendor_details),
+        "processing_steps": _safe_json(record.processing_steps),
+        "validation_results": _safe_json(record.validation_results),
+        "duplicate_info": _safe_json(record.duplicate_info),
+        "original_items": _safe_json(record.original_items),
+        "approver_breakdown": _safe_json(record.approver_breakdown),
+        "gl_summary": _safe_json(record.gl_summary),
+        "confidence_score": record.confidence_score,
+        "uploaded_at": record.uploaded_at.isoformat() if record.uploaded_at else None,
+        "processed_at": record.processed_at.isoformat() if record.processed_at else None,
+        "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
+        "deleted_by": record.deleted_by,
+        # Snapshots
+        "status_history": _safe_json(record.status_history_json),
+        "workflow_steps": _safe_json(record.workflow_steps_json),
+        "coding": coding_snapshot,
+        "audit_logs": _safe_json(record.audit_logs_json),
+        "is_archived": True
+    }
+
+    # Normalize approved_by
+    approved_by_snap = _safe_json(record.approved_by_json) or []
+    res["approved_by"] = [a.get("approver_email") for a in approved_by_snap if a.get("approver_email")]
+
+    # Normalize assigned_approvers
+    assigned_snap = _safe_json(record.assigned_approvers_json) or []
+    if assigned_snap:
+        grouped = {}
+        for a in sorted(assigned_snap, key=lambda x: x.get("sequence_order", 0)):
+            seq = a.get("sequence_order", 0)
+            if seq not in grouped: grouped[seq] = []
+            grouped[seq].append(a.get("approver_email"))
+        res["assigned_approvers"] = [grouped[seq] for seq in sorted(grouped.keys())]
+    else:
+        res["assigned_approvers"] = []
+
+    return res
 
 @router.get("/debug/last-approved")
 async def debug_last_approved(db: Session = Depends(get_db)):
@@ -1910,6 +2209,14 @@ async def debug_log(lines: int = 100):
             return {"log": content[-lines:]}
     except Exception as e:
         return {"error": str(e)}
+
+
+
+
+
+
+
+
 
 
 

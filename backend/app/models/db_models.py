@@ -57,7 +57,7 @@ class User(Base):
     password = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="coder")  # admin, coder, approver
     status = Column(String(50), nullable=False, default="pending")  # pending, active, rejected
-    department = Column(String(100), nullable=True)  # finance, non-finance
+    department = Column(String(100), nullable=False, default="non-finance")  # finance, non-finance
     isCreatedByUser = Column(Boolean, nullable=False, default=True)
     createdby = Column(String(100), nullable=False, default="self")
     ispasswordchange = Column(Boolean, nullable=False, default=True)
@@ -673,3 +673,87 @@ class RawExtractionData(Base):
 
     # Relationships
     invoice = relationship("Invoice", backref=backref("raw_data_record", uselist=False, cascade="all, delete-orphan"))
+
+
+
+
+# ==================== DELETED INVOICES (SOFT-DELETE ARCHIVE) ====================
+
+class DeletedInvoice(Base):
+    """
+    Archive table for soft-deleted invoices.
+    When an invoice is deleted, all its data and related child-table rows
+    are snapshotted here as JSON before being removed from the invoices table.
+    This preserves full history and allows the same invoice to be re-uploaded
+    without triggering a duplicate warning.
+    """
+    __tablename__ = "deleted_invoices"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # ---- Original invoice identity ----
+    original_invoice_id = Column(Integer, nullable=False, index=True)
+    filename = Column(String(500), nullable=True)
+    original_filename = Column(String(500), nullable=True)
+    file_path = Column(String(1000), nullable=True)
+    uploaded_by = Column(String(100), nullable=True)
+    uploaded_by_id = Column(Integer, nullable=True)
+
+    # ---- Status & workflow ----
+    status = Column(String(100), nullable=True)
+    entity = Column(String(100), nullable=True)
+
+    # ---- Vendor information ----
+    vendor_id = Column(String(100), nullable=True, index=True)
+    vendor_name = Column(String(500), nullable=True, index=True)
+    invoice_number = Column(String(200), nullable=True, index=True)
+    azure_vendor_name = Column(String(500), nullable=True)
+    azure_vendor_address = Column(String(500), nullable=True)
+    line_grouping = Column(String(10), nullable=True)
+
+    # ---- Financial ----
+    exchange_rate = Column(DECIMAL(18, 6), nullable=True)
+    sage_bill_number = Column(String(200), nullable=True)
+
+    # ---- JSON fields (copied from Invoice) ----
+    extracted_data = Column(Text, nullable=True)
+    vendor_details = Column(Text, nullable=True)
+    processing_steps = Column(Text, nullable=True)
+    validation_results = Column(Text, nullable=True)
+    duplicate_info = Column(Text, nullable=True)
+    original_items = Column(Text, nullable=True)
+    approver_breakdown = Column(Text, nullable=True)
+    gl_summary = Column(Text, nullable=True)
+
+    # ---- Metadata ----
+    confidence_score = Column(String(50), nullable=True)
+    uploaded_at = Column(DateTime, nullable=True)
+    processed_at = Column(DateTime, nullable=True)
+    required_approvers = Column(Integer, nullable=True)
+    current_approver_level = Column(Integer, nullable=True)
+
+    # ---- Child-table snapshots (JSON) ----
+    status_history_json = Column(Text, nullable=True)      # Snapshot of invoice_status_history
+    workflow_steps_json = Column(Text, nullable=True)       # Snapshot of workflow_steps
+    approved_by_json = Column(Text, nullable=True)          # Snapshot of invoice_approved_by
+    assigned_approvers_json = Column(Text, nullable=True)   # Snapshot of invoice_assigned_approvers
+    coding_json = Column(Text, nullable=True)               # Snapshot of coding table row
+    audit_logs_json = Column(Text, nullable=True)           # Snapshot of audit_logs
+
+    # ---- Deletion metadata ----
+    deleted_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    deleted_by = Column(String(100), nullable=False)
+
+    __table_args__ = (
+        Index('ix_deleted_invoices_vendor_number', 'vendor_id', 'invoice_number'),
+        Index('ix_deleted_invoices_entity', 'entity'),
+    )
+
+
+
+
+
+
+
+
+

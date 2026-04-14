@@ -76,6 +76,7 @@ async def register(user: UserPydantic, db: Session = Depends(get_db)):
         "password": hashed_password,
         "status": "pending",
         "role": "coder",
+        "department": "non-finance",
         "isCreatedByUser": True,
         "createdby": "self",
         "ispasswordchange": True,
