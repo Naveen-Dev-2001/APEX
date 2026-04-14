@@ -44,10 +44,6 @@ async def create_new_user(
     if existing_email_list:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    existing_username_list = user_repo.get_multi(db, filters={"username": user_data.username}, limit=1)
-    if existing_username_list:
-        raise HTTPException(status_code=400, detail="Username already taken")
-
     from app.auth.jwt import get_password_hash
     hashed_password = get_password_hash("Apex2026")
 

@@ -66,13 +66,6 @@ async def register(user: UserPydantic, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    existing_username = user_repo.get_multi(db, filters={"username": user.username}, limit=1)
-    if existing_username:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken"
-        )
-    
     # Hash password
     hashed_password = get_password_hash(user.password)
     

@@ -3,7 +3,7 @@ import CustomInput from '../../../shared/components/CustomInput';
 import CustomButton from '../../../shared/components/CustomButton';
 import API from '../../services/api';
 
-const EmailStep = ({ email, setEmail, onNext }) => {
+const EmailStep = ({ email, setEmail, onNext, purpose = 'registration' }) => {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -21,7 +21,7 @@ const EmailStep = ({ email, setEmail, onNext }) => {
         
         try {
             setLoading(true);
-            await API.post('/auth/send-otp', { email, purpose: 'registration' });
+            await API.post('/auth/send-otp', { email, purpose });
             onNext();
         } catch (err) {
             setError(err.response?.data?.detail || err.response?.data?.message || err.message || "Failed to send OTP");
