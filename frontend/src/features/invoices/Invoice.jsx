@@ -79,7 +79,7 @@ const Invoice = () => {
     // Reset pagination when search or filters change
     useEffect(() => {
         setSkip(0);
-    }, [searchQuery, columnFilters, setSkip]);
+    }, [searchQuery, columnFilters, sortColumn, sortDirection, setSkip]);
 
     // Debounce search
     useEffect(() => {
@@ -506,6 +506,7 @@ const Invoice = () => {
                                 }}
                                 sortColumn={sortColumn}
                                 sortDirection={sortDirection}
+                                onSort={setSort}
                                 stickyHeader
                                 maxHeight="calc(100vh - 220px)"
                                 enableColumnFilters

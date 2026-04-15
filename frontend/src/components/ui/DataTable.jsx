@@ -373,6 +373,7 @@ const DataTable = ({
   enableColumnFilters = false,
   columnFilters: externalColumnFilters,
   onColumnFiltersChange: onExternalColumnFiltersChange,
+  onSort,
 }) => {
     // ── Filter state ──────────────────────────────────────────────────────────
     // columnFilters: { [accessor]: Set<string> }
@@ -566,7 +567,16 @@ const DataTable = ({
                                         className={`px-4 py-3 font-medium whitespace-nowrap
                                             ${col.sortable ? 'cursor-pointer select-none hover:bg-[#1a669a]' : ''}
                                             ${isSticky ? 'sticky right-0 bg-[#1D71AB] z-30 shadow-[-12px_1px_12px_-8px_rgba(0,0,0,0.3)]' : ''}`}
-                                        onClick={() => col.sortable && col.onClick ? col.onClick() : null}
+                                        onClick={() => {
+                                            if (col.sortable) {
+                                                if (onSort) {
+                                                    const newDirection = (sortColumn === col.accessor && sortDirection === 'asc') ? 'desc' : 'asc';
+                                                    onSort(col.accessor, newDirection);
+                                                } else if (col.onClick) {
+                                                    col.onClick();
+                                                }
+                                            }
+                                        }}
                                     >
                                         <div className="flex items-center justify-between w-full gap-1.5">
                                             {/* Column label */}
