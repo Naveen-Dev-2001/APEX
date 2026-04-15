@@ -120,6 +120,8 @@ class Invoice(Base):
 
     # Financial data
     exchange_rate = Column(DECIMAL(18, 6), nullable=True)
+    total_amount = Column(DECIMAL(18, 2), nullable=True, index=True)
+    amount_due = Column(DECIMAL(18, 2), nullable=True, index=True)
 
     # JSON fields (stored as NVARCHAR(MAX))
     extracted_data = Column(Text, nullable=True)  # JSON

@@ -44,6 +44,19 @@ import traceback
 from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
 
+def remove_currency_format(value):
+    if not value or value == "" or value == "N/A":
+        return None
+    try:
+        # Remove commas and $ symbols
+        clean_val = str(value).replace(',', '').replace('$', '').strip()
+        if not clean_val:
+            return None
+        return float(clean_val)
+    except (ValueError, TypeError):
+        return None
+
+
 router = APIRouter()
 invoice_processor = InvoiceProcessor()
 
@@ -404,6 +417,14 @@ async def upload_invoices(
                     original_items = deserialize_json_field(new_invoice.original_items) or items
                     extracted_data["Items"]["value"] = original_items
                     new_invoice.extracted_data = serialize_json_field(extracted_data)
+            
+            # Populate numeric columns for filtering/sorting
+            amounts = extracted_data.get("amounts", {})
+            total_val = amounts.get("total_invoice_amount", {}).get("value")
+            due_val = amounts.get("amount_due", {}).get("value")
+            
+            new_invoice.total_amount = remove_currency_format(total_val)
+            new_invoice.amount_due = remove_currency_format(due_val)
 
             task_db.commit()
 

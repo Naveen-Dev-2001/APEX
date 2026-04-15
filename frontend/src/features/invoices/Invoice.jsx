@@ -42,6 +42,8 @@ const Invoice = () => {
         invoice_number: "invoice_number",
         uploaded_by: "uploaded_by",
         status: "status",
+        total_amount: "total_amount",
+        amount_due: "amount_due",
     };
 
     const backendFilters = useMemo(() => {
