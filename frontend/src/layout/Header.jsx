@@ -69,9 +69,12 @@ const Header = () => {
     const allRoles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
     const getTargetRole = () => {
         const current = (activeRole || '').toLowerCase().trim();
-        if (current === 'admin') return 'approver';
-        if (current === 'approver') return 'admin';
-        // For other roles (like scanner), switch to anything else available or default to first role
+        // If we have admin/approver combo, prioritize switching between them
+        if (allRoles.includes('admin') && allRoles.includes('approver')) {
+            if (current === 'admin') return 'approver';
+            if (current === 'approver') return 'admin';
+        }
+        // General logic for other combinations: find the first available role that is not the current one
         return allRoles.find(r => r.toLowerCase().trim() !== current) || allRoles[0] || 'admin';
     };
     const targetRole = getTargetRole();
@@ -80,6 +83,8 @@ const Header = () => {
         setActiveRole(targetRole);
         setShowChangeRoleModal(false);
         setIsDropdownOpen(false);
+        // Always navigate to dashboard to ensure the user lands on a valid page for the new role
+        navigate('/dashboard');
     };
 
     const { navigation, fetchSettings } = useAdminStore();
@@ -366,8 +371,8 @@ const Header = () => {
                                     </span>
                                 </button>
                                
-                                {/* Change Role Action (only if user has both admin and approver roles) */}
-                                {Array.isArray(allRoles) && allRoles.length >= 2 && allRoles.includes('admin') && allRoles.includes('approver') && (
+                                {/* Change Role Action (only if user has multiple roles) */}
+                                {Array.isArray(allRoles) && allRoles.length >= 2 && (
                                     <button
                                         onClick={() => {
                                             setShowChangeRoleModal(true);
