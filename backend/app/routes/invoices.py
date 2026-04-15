@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, BackgroundTasks
 import logging
 from fastapi.responses import FileResponse
 from typing import List
@@ -22,7 +22,7 @@ from app.services.email_service import email_service
 from app.models.db_models import (
     Invoice, WorkflowStep, WorkflowStepTypeEnum, 
     WorkflowStepStatusEnum, InvoiceStatusEnum, InvoiceStatusHistory,
-    VendorMetadata, RawExtractionData, User, EntityMaster,
+    VendorMetadata, RawExtractionData, User, EntityMaster, InvoiceAssignedApprover,
     DeletedInvoice
 )
 
@@ -43,6 +43,34 @@ import asyncio
 import traceback
 from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
+
+def _flatten_emails(items):
+    """Refined helper to extract a flat list of emails from strings or JSON-encoded lists."""
+    if not items:
+        return []
+    res = []
+    if isinstance(items, str):
+        items = [items]
+    
+    for item in items:
+        if not item:
+            continue
+        if isinstance(item, list):
+            res.extend(_flatten_emails(item))
+        elif isinstance(item, str):
+            item = item.strip()
+            if item.startswith("[") and item.endswith("]"):
+                try:
+                    parsed = json.loads(item)
+                    if isinstance(parsed, list):
+                        res.extend(_flatten_emails(parsed))
+                    else:
+                        res.append(item.lower())
+                except:
+                    res.append(item.lower())
+            else:
+                res.append(item.lower())
+    return list(set(res)) # deduplicate and return
 
 router = APIRouter()
 invoice_processor = InvoiceProcessor()
@@ -900,7 +928,10 @@ async def update_invoice_status(
 
         if assigned_approvers:
             if not is_authorized:
+                 # Fetch the specific group assigned to the current stage
+                 expected_emails = assigned_approvers[current_level - 1] if 0 <= current_level - 1 < len(assigned_approvers) else []
                  expected_flat = _flatten_emails(expected_emails)
+                 
                  detail_msg = f"Only {', '.join(expected_flat)} (or their active substitute) can take action at this level."
                  if is_parallel:
                      all_flat = _flatten_emails(assigned_approvers)
@@ -1450,6 +1481,7 @@ async def download_approval_report(
 async def update_invoice(
     invoice_id: int,
     invoice_update: InvoiceUpdate,
+    background_tasks: BackgroundTasks,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1682,85 +1714,93 @@ async def update_invoice(
 
     # --- Auto-Coding Suggestions on transition to waiting_coding ---
     # When an invoice is sent to coding, automatically apply AI-based GL suggestions
-    # to any line items that don't already have a GL code.
+    # in the background to provide an immediate response.
     if "status" in update_data and update_data["status"] == InvoiceStatusEnum.WAITING_CODING:
-        try:
-            from app.routes.coding import apply_coding_suggestions_to_invoice
-            # Refresh invoice from DB so it has the latest extracted_data
-            db.refresh(invoice)
-            apply_coding_suggestions_to_invoice(db, invoice)
-            logger.info(f"[AutoCode] Applied coding suggestions to invoice {invoice_id} on waiting_coding transition.")
-        except Exception as e:
-            logger.error(f"[AutoCode] Error applying coding suggestions to invoice {invoice_id}: {e}")
+        def run_auto_coding(inv_id):
+            bg_db = SessionLocal()
+            try:
+                from app.routes.coding import apply_coding_suggestions_to_invoice
+                inv = bg_db.query(Invoice).filter(Invoice.id == inv_id).first()
+                if inv:
+                    apply_coding_suggestions_to_invoice(bg_db, inv)
+                    logger.info(f"[AutoCode] Background: Applied suggestions to invoice {inv_id}")
+            except Exception as e:
+                logger.error(f"[AutoCode] Background Error for invoice {inv_id}: {e}")
+            finally:
+                bg_db.close()
+        
+        background_tasks.add_task(run_auto_coding, invoice_id)
 
     # --- Coding Synchronization ---
-    # If extracted_data was updated, sync coding fields to the Coding table and History
+    # If extracted_data was updated, sync coding fields in the background
     if "extracted_data" in update_data:
-        try:
-            from app.routes.coding import update_coding_history
-            from app.models.coding import LineItemCoding
-            from app.models.db_models import Coding as DBCoding
-            
-            # Use the dict version we prepared or fallback to deserializing
-            ext_data = ext_data_dict if 'ext_data_dict' in locals() else deserialize_json_field(update_data.get("extracted_data"))
-            if not isinstance(ext_data, dict):
-                logger.error(f"extracted_data is not a dict: {type(ext_data)}")
-                return InvoiceResponse(**invoice_to_dict(invoice))
+        # Prepare the data needed for the background task to avoid closure issues
+        def run_coding_sync(inv_id, data_dict, v_name, v_id):
+            bg_db = SessionLocal()
+            try:
+                from app.routes.coding import update_coding_history
+                from app.models.coding import LineItemCoding
+                from app.models.db_models import Coding as DBCoding
                 
-            items = ext_data.get("Items", {}).get("value", [])
-            
-            if items:
-                coding_line_items = []
-                for idx, item in enumerate(items):
-                    # Skip system rows for history, but keep them in the Coding table if needed
-                    # Actually, update_coding_history handles skipping system rows
-                    
-                    def get_val(item_obj, key, default=""):
-                        val_obj = item_obj.get(key)
-                        if isinstance(val_obj, dict):
-                            return val_obj.get("value", default)
-                        return val_obj if val_obj is not None else default
+                inv = bg_db.query(Invoice).filter(Invoice.id == inv_id).first()
+                if not inv: 
+                    return
+                
+                items = data_dict.get("Items", {}).get("value", [])
+                if items:
+                    coding_line_items = []
+                    for idx, item in enumerate(items):
+                        def get_val(item_obj, key, default=""):
+                            val_obj = item_obj.get(key)
+                            if isinstance(val_obj, dict):
+                                return val_obj.get("value", default)
+                            return val_obj if val_obj is not None else default
 
-                    coding_line_items.append(LineItemCoding(
-                        s_no=idx + 1,
-                        description=get_val(item, "description"),
-                        line_type="Expense",
-                        quantity=float(get_val(item, "qty", 1)),
-                        unit_price=float(get_val(item, "unit_price", 0)),
-                        net_amount=float(get_val(item, "amount", 0)),
-                        gl_code=get_val(item, "gl_code", ""),
-                        lob=get_val(item, "lob"),
-                        department=get_val(item, "department"),
-                        customer=get_val(item, "customer"),
-                        item=get_val(item, "item"),
-                        original_index=idx
-                    ))
-                
-                # Update Coding Table
-                line_items_json = json.dumps([item.dict() for item in coding_line_items])
-                existing_coding = db.query(DBCoding).filter(DBCoding.invoice_id == invoice_id).first()
-                
-                if existing_coding:
-                    existing_coding.line_items = line_items_json
-                    existing_coding.updated_at = datetime.utcnow()
-                else:
-                    new_coding = DBCoding(
-                        invoice_id=invoice_id,
-                        line_items=line_items_json,
-                        entity=invoice.entity,
-                        created_at=datetime.utcnow()
-                    )
-                    db.add(new_coding)
-                
-                # Update Coding History (vendor suggestions)
-                update_coding_history(db, invoice.vendor_name, coding_line_items, vendor_id=invoice.vendor_id)
-                
-                db.commit()
-                
-        except Exception as e:
-            logger.error(f"Error synchronizing coding data: {e}")
-            # Don't fail the whole update if coding sync fails
-            pass
+                        coding_line_items.append(LineItemCoding(
+                            s_no=idx + 1,
+                            description=get_val(item, "description"),
+                            line_type="Expense",
+                            quantity=float(get_val(item, "qty", 1)),
+                            unit_price=float(get_val(item, "unit_price", 0)),
+                            net_amount=float(get_val(item, "amount", 0)),
+                            gl_code=get_val(item, "gl_code", ""),
+                            lob=get_val(item, "lob"),
+                            department=get_val(item, "department"),
+                            customer=get_val(item, "customer"),
+                            item=get_val(item, "item"),
+                            original_index=idx
+                        ))
+                    
+                    line_items_json = json.dumps([item.dict() for item in coding_line_items])
+                    existing_coding = bg_db.query(DBCoding).filter(DBCoding.invoice_id == inv_id).first()
+                    
+                    if existing_coding:
+                        existing_coding.line_items = line_items_json
+                        existing_coding.updated_at = datetime.utcnow()
+                    else:
+                        new_coding = DBCoding(
+                            invoice_id=inv_id,
+                            line_items=line_items_json,
+                            entity=inv.entity,
+                            created_at=datetime.utcnow()
+                        )
+                        bg_db.add(new_coding)
+                    
+                    update_coding_history(bg_db, v_name, coding_line_items, vendor_id=v_id)
+                    bg_db.commit()
+                    logger.info(f"[CodingSync] Background: Synced coding for invoice {inv_id}")
+            except Exception as e:
+                logger.error(f"[CodingSync] Background Error for invoice {inv_id}: {e}")
+            finally:
+                bg_db.close()
+
+        background_tasks.add_task(
+            run_coding_sync, 
+            invoice_id, 
+            ext_data_dict if 'ext_data_dict' in locals() else deserialize_json_field(update_data.get("extracted_data")),
+            invoice.vendor_name, 
+            invoice.vendor_id
+        )
 
     # --- Registry Sync ---
     if new_vendor_id != current_vendor_id or new_invoice_number != current_invoice_number:
