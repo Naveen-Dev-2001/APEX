@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Trash2, Upload, Plus, Pencil, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import useMasterDataStore from '../../store/masterData.store';
 import useToastStore from '../../store/useToastStore';
 import toast from '../../utils/toast';
-import DataTable from '../../components/ui/DataTable';
+import ReusableDataTable from '../../shared/components/ReusableDataTable';
 import EntityMasterModal from './EntityMasterModal';
 import VendorMasterModal from './VendorMasterModal';
 import TDSRatesModal from './TDSRatesModal';
@@ -56,9 +56,9 @@ const MasterDataPage = () => {
 
     const [modalState, setModalState] = useState({ open: false, mode: 'add', rowData: null, rowIndex: null });
 
-    const filteredData = getFilteredData();
+    const filteredData = useMemo(() => getFilteredData(), [getFilteredData, masters, activeTab]);
     const currentMaster = masters[activeTab];
-    const tabs = Object.keys(masters);
+    const tabs = useMemo(() => Object.keys(masters), [masters]);
     const isEntityTab = activeTab === 'Entity Master';
     const isVendorTab = activeTab === 'Vendor Master';
     const isTDSTab = activeTab === 'TDS Rates';
@@ -237,75 +237,139 @@ const MasterDataPage = () => {
         });
     };
 
-    // Prepare columns for DataTable
-    const columns = (currentMaster?.columns || [])
-        .filter(col => !(isReadOnly && col.accessor === 'actions'))
-        .map((col) => {
-        if (col.accessor === 'gst_applicable') {
-            return {
-                ...col,
-                render: (val) => (
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
-                        ${val ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500'}`}>
-                        {val ? 'Yes' : 'No'}
-                    </span>
-                )
-            };
-        }
-        if (col.accessor === 'require_department' || col.accessor === 'require_location') {
-            return {
-                ...col,
-                render: (val) => (
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
-                        ${val ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500'}`}>
-                        {val ? 'Yes' : 'No'}
-                    </span>
-                )
-            };
-        }
-        if (col.accessor === 'actions') {
-            return {
-                ...col,
-                render: (_, row, index) => {
-                    const isTopLevelEntity = isEntityTab && (row.entity_name === 'Top Level' || row.entity_name === 'Default Entity');
-                    const hasInvoices = isEntityTab && row.invoice_count > 0;
-                    const isDeleteDisabled = isTopLevelEntity;
+    // Prepare column definitions for Ag-Grid (ReusableDataTable)
+    const columnDefs = useMemo(() => {
+        return (currentMaster?.columns || [])
+            .filter(col => !(isReadOnly && col.accessor === 'actions'))
+            .map((col) => {
+                const { header, accessor } = col;
+                let flex = 1;
+                let minWidth = 100;
 
-                    let deleteTooltip = "Delete";
-                    if (isTopLevelEntity) deleteTooltip = "Top Level Entity cannot be deleted";
-                    else if (hasInvoices) deleteTooltip = "Cannot delete: Invoice created under this entity";
+                if (accessor.includes('name') || accessor === 'title' || accessor === 'nature_of_payment') {
+                    flex = 3;
+                    minWidth = 200;
+                } else if (accessor.includes('address') || accessor === 'registered_address') {
+                    flex = 4;
+                    minWidth = 250;
+                } else if (accessor === 'primary_email_address') {
+                    flex = 2;
+                    minWidth = 180;
+                } else if (accessor === 'city' || accessor === 'state_or_territory' || accessor === 'country') {
+                    flex = 1.2;
+                    minWidth = 120;
+                }
 
-                    if (isReadOnly) return null;
+                const baseDef = {
+                    headerName: header,
+                    field: accessor,
+                    colId: accessor, // Explicitly map to accessor for accurate backend sorting
+                    sortable: col.sortable,
+                    flex: flex,
+                    minWidth: minWidth,
+                    wrapText: true,
+                    autoHeight: true,
+                    comparator: () => 0, // Disable internal local sorting; use server-side only
+                    cellStyle: {
+                        display: 'flex',
+                        alignItems: 'center',
+                        whiteSpace: 'normal',
+                        padding: '10px 0',
+                        lineHeight: '1.5',
+                    }
+                };
 
-                    return (
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && openEdit(row, index)}
-                                className="text-gray-500 hover:text-gray-700 transition-colors p-1"
-                                title="Edit"
-                            >
-                                <Pencil size={18} />
-                            </button>
-                            <button
-                                onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && handleDelete(row, index)}
-                                disabled={isDeleteDisabled}
-                                className={`transition-colors p-1 ${isDeleteDisabled
-                                    ? 'text-gray-300 cursor-not-allowed'
-                                    : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
-                                title={deleteTooltip}
-                            >
-                                <Trash2 size={18} />
-                            </button>
-                        </div>
-                    );
-                },
-            };
-        }
-        return {
-            ...col,
-            onClick: col.sortable ? () => setSort(col.accessor) : undefined
-        };
-    });
+                if (col.accessor === 'gst_applicable') {
+                    return {
+                        ...baseDef,
+                        cellRenderer: (params) => {
+                            const val = params.value;
+                            return (
+                                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
+                                ${val ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500'}`}>
+                                    {val ? 'Yes' : 'No'}
+                                </span>
+                            );
+                        }
+                    };
+                }
+
+                if (col.accessor === 'require_department' || col.accessor === 'require_location') {
+                    return {
+                        ...baseDef,
+                        cellRenderer: (params) => {
+                            const val = params.value;
+                            return (
+                                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
+                                ${val ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500'}`}>
+                                    {val ? 'Yes' : 'No'}
+                                </span>
+                            );
+                        }
+                    };
+                }
+
+                if (col.accessor === 'actions') {
+                    return {
+                        headerName: 'Actions',
+                        field: 'actions',
+                        pinned: 'right',
+                        lockPinned: true,
+                        sortable: false,
+                        filter: false,
+                        minWidth: 100,
+                        maxWidth: 100,
+                        cellStyle: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                        },
+                        cellRenderer: (params) => {
+                            const row = params.data;
+                            const indexInAgGrid = params.node.rowIndex;
+
+                            // Note: Current page and items per page are needed if handleDelete/openEdit rely on absolute index
+                            // but they seem to use row.id or realIndex internally.
+
+                            const isTopLevelEntity = isEntityTab && (row.entity_name === 'Top Level' || row.entity_name === 'Default Entity');
+                            const hasInvoices = isEntityTab && row.invoice_count > 0;
+                            const isDeleteDisabled = isTopLevelEntity;
+
+                            let deleteTooltip = "Delete";
+                            if (isTopLevelEntity) deleteTooltip = "Top Level Entity cannot be deleted";
+                            else if (hasInvoices) deleteTooltip = "Cannot delete: Invoice created under this entity";
+
+                            if (isReadOnly) return null;
+
+                            return (
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && openEdit(row, indexInAgGrid)}
+                                        className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                                        title="Edit"
+                                    >
+                                        <Pencil size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && handleDelete(row, indexInAgGrid)}
+                                        disabled={isDeleteDisabled}
+                                        className={`transition-colors p-1 ${isDeleteDisabled
+                                            ? 'text-gray-300 cursor-not-allowed'
+                                            : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
+                                        title={deleteTooltip}
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            );
+                        },
+                    };
+                }
+
+                return baseDef;
+            });
+    }, [currentMaster, isReadOnly]);
 
     // Vendor Upload View Component
     const VendorUploadView = () => {
@@ -556,8 +620,8 @@ const MasterDataPage = () => {
                             onClick={handleSync}
                             disabled={syncingData}
                             className={`flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium border rounded-[4px] transition-all whitespace-nowrap
-                                ${syncingData 
-                                    ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50' 
+                                ${syncingData
+                                    ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50'
                                     : 'text-gray-700 border-[#24A1DD] hover:bg-[#F0F9FF]'}`}
                         >
                             <RefreshCw size={15} className={`${syncingData ? 'text-gray-400 animate-spin' : 'text-[#24A1DD]'}`} />
@@ -612,21 +676,45 @@ const MasterDataPage = () => {
                         {false ? (
                             <VendorUploadView />
                         ) : (
-                            <DataTable
-                                columns={columns}
-                                data={filteredData} // Now already paginated by backend
-                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : isCurrencyTab ? currencyLoading : exchangeRateLoading}
-                                skeletonRows={itemsPerPage}
-                                totalItems={masters[activeTab]?.total || 0}
-                                currentPage={currentPage}
-                                itemsPerPage={itemsPerPage}
-                                onPageChange={setCurrentPage}
-                                onItemsPerPageChange={setItemsPerPage}
-                                sortColumn={sortColumn}
-                                sortDirection={sortDirection}
-                                maxHeight="calc(100vh - 280px)"
-                                stickyHeader={true}
-                            />
+                            <div
+                                className="master-data-table-wrapper"
+                                style={{ '--forced-table-height': `${((filteredData?.length || 0) * 48) + 48}px` }}
+                            >
+                                <style>
+                                    {`
+                                        .master-data-table-wrapper .ag-theme-alpine {
+                                            height: var(--forced-table-height) !important;
+                                        }
+                                    `}
+                                </style>
+                                <ReusableDataTable
+                                    columnDefs={columnDefs}
+                                    data={filteredData || []}
+                                    loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : isCurrencyTab ? currencyLoading : exchangeRateLoading}
+                                    totalItems={masters[activeTab]?.total || 0}
+                                    currentPage={currentPage}
+                                    itemsPerPage={itemsPerPage}
+                                    onPageChange={setCurrentPage}
+                                    onItemsPerPageChange={setItemsPerPage}
+                                    onSortChange={(colId, sortDir) => {
+                                        setSort(colId, sortDir);
+                                        setCurrentPage(1); // Reset to page 1 on sort change
+                                    }}
+                                    onGridReady={(params) => {
+                                        // Handle "cancel sorting" (non-shared fix)
+                                        params.api.addEventListener('sortChanged', () => {
+                                            const activeSort = params.api.getColumnState().find(c => c.sort != null);
+                                            if (!activeSort) {
+                                                setSort(null, null);
+                                                setCurrentPage(1);
+                                            }
+                                        });
+                                    }}
+                                    tableHeader={false}
+                                    tableSearch={false}
+                                    rowHeight={48}
+                                />
+                            </div>
                         )}
                     </>
                 )}

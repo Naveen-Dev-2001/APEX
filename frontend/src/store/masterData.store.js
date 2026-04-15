@@ -167,17 +167,27 @@ const useMasterDataStore = create((set, get) => ({
     setSearchQuery: (query) => set({ searchQuery: query, currentPage: 1 }),
     setCurrentPage: (page) => set({ currentPage: page }),
     setItemsPerPage: (items) => set({ itemsPerPage: items, currentPage: 1 }),
-    setSort: (column) => {
+    setSort: (column, direction = null) => {
         const { sortColumn, sortDirection } = get();
-        if (sortColumn === column) {
+        if (column === null) {
+            // Explicitly clear sort
+            set({ sortColumn: '', sortDirection: 'asc' });
+        } else if (direction) {
+            // Use the explicit direction provided by the caller (e.g., from Ag-Grid)
+            set({ sortColumn: column, sortDirection: direction });
+        } else if (sortColumn === column) {
+            // Standard toggle logic
             set({ sortDirection: sortDirection === 'asc' ? 'desc' : 'asc' });
         } else {
+            // Reset to asc for a new column
             set({ sortColumn: column, sortDirection: 'asc' });
         }
     },
 
     // ─── Unified Fetcher: Handles all tabs with server-side pagination ──────
+    lastFetchId: 0,
     fetchMasterData: async (tabName) => {
+        const fetchId = ++get().lastFetchId;
         const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection } = get();
         const loadingKeyMap = {
             'Entity Master': 'entityLoading',
@@ -236,6 +246,8 @@ const useMasterDataStore = create((set, get) => ({
             const rows = response.data || [];
             const total = response.total || 0;
 
+            if (fetchId !== get().lastFetchId) return; // Ignore stale fetches
+
             set((state) => ({
                 [loadingKey]: false,
                 masters: {
@@ -248,6 +260,7 @@ const useMasterDataStore = create((set, get) => ({
                 },
             }));
         } catch (err) {
+            if (fetchId !== get().lastFetchId) return;
             console.error(`[${tabName}] fetch failed`, err);
             set({ [loadingKey]: false, [errorKey]: err?.response?.data?.detail || err.message });
         }
