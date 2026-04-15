@@ -32,7 +32,7 @@ const Invoice = () => {
     const [columnFilters, setColumnFilters] = useState({});
     const [pageTab, setPageTab] = useState("invoices"); // "invoices" | "archive"
     const [archivedRecords, setArchivedRecords] = useState([]);
-    
+
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
 
@@ -254,7 +254,7 @@ const Invoice = () => {
             messageApi.error("Failed to delete invoice");
         });
     }, []);
-    
+
     const handleResetAll = useCallback(() => {
         setSearchQuery("");
         setLocalSearch("");
@@ -389,7 +389,7 @@ const Invoice = () => {
                         >
                             {[
                                 { key: "invoices", label: "Invoices" },
-                                { key: "archive",  label: "Archive" },
+                                { key: "archive", label: "Archive" },
                             ].map(({ key, label }, index, arr) => {
                                 const isActive = pageTab === key;
                                 return (
@@ -448,13 +448,13 @@ const Invoice = () => {
                                 </div>
                             )}
                             <div style={{ minWidth: 120 }}>
-                                <ExportButton 
-                                    data={pageTab === 'archive' ? archivedRecords : invoices} 
-                                    columns={pageTab === 'archive' ? ARCHIVE_COLUMNS : columnDefs} 
-                                    fileName={pageTab === 'archive' ? "Archived_Invoices.xlsx" : "Invoices.xlsx"} 
+                                <ExportButton
+                                    data={pageTab === 'archive' ? archivedRecords : invoices}
+                                    columns={pageTab === 'archive' ? ARCHIVE_COLUMNS : columnDefs}
+                                    fileName={pageTab === 'archive' ? "Archived_Invoices.xlsx" : "Invoices.xlsx"}
                                 />
                             </div>
-                            {isFilterApplied && pageTab === 'invoices' && (
+                            {/* {isFilterApplied && pageTab === 'invoices' && (
                                 <div style={{ minWidth: 100 }}>
                                     <CustomButton 
                                         variant="outline" 
@@ -464,7 +464,7 @@ const Invoice = () => {
                                         Reset All
                                     </CustomButton>
                                 </div>
-                            )}
+                            )} */}
                             {userRole === 'scanner' && pageTab === 'invoices' && (
                                 <div style={{ minWidth: 160 }}>
                                     <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
@@ -505,8 +505,8 @@ const Invoice = () => {
 
                     {/* ── Archive Tab ── */}
                     {pageTab === "archive" && (
-                        <ArchivedInvoicesTab 
-                            onView={handleView} 
+                        <ArchivedInvoicesTab
+                            onView={handleView}
                             onDataChange={setArchivedRecords}
                             externalSearch={searchQuery}
                         />
@@ -534,4 +534,4 @@ const Invoice = () => {
 };
 
 export default Invoice;
-
+
