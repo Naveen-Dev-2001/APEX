@@ -29,6 +29,7 @@ const Invoice = () => {
     } = useInvoiceStore();
 
     const [localSearch, setLocalSearch] = useState(searchQuery);
+    const [columnFilters, setColumnFilters] = useState({});
     const [pageTab, setPageTab] = useState("invoices"); // "invoices" | "archive"
     const [archivedRecords, setArchivedRecords] = useState([]);
     
@@ -228,6 +229,16 @@ const Invoice = () => {
             messageApi.error("Failed to delete invoice");
         });
     }, []);
+    
+    const handleResetAll = useCallback(() => {
+        setSearchQuery("");
+        setLocalSearch("");
+        setColumnFilters({});
+        setSkip(0);
+    }, [setSearchQuery, setSkip]);
+
+    const hasColumnFilters = Object.values(columnFilters).some(s => s && s.size > 0);
+    const isFilterApplied = (searchQuery && searchQuery.trim().length > 0) || hasColumnFilters;
 
     const columnDefs = useMemo(
         () => view === "condensed"
@@ -411,6 +422,17 @@ const Invoice = () => {
                                     fileName={pageTab === 'archive' ? "Archived_Invoices.xlsx" : "Invoices.xlsx"} 
                                 />
                             </div>
+                            {isFilterApplied && pageTab === 'invoices' && (
+                                <div style={{ minWidth: 100 }}>
+                                    <CustomButton 
+                                        variant="outline" 
+                                        onClick={handleResetAll}
+                                        style={{ height: '36px', fontSize: '12px' }}
+                                    >
+                                        Reset All
+                                    </CustomButton>
+                                </div>
+                            )}
                             {userRole === 'scanner' && pageTab === 'invoices' && (
                                 <div style={{ minWidth: 160 }}>
                                     <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
@@ -443,6 +465,8 @@ const Invoice = () => {
                                 stickyHeader
                                 maxHeight="calc(100vh - 220px)"
                                 enableColumnFilters
+                                columnFilters={columnFilters}
+                                onColumnFiltersChange={setColumnFilters}
                             />
                         </div>
                     )}

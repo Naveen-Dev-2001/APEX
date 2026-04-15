@@ -225,10 +225,26 @@ const DataTable = ({
   maxHeight,
   stickyHeader = false,
   enableColumnFilters = false,
+  columnFilters: externalColumnFilters,
+  onColumnFiltersChange: onExternalColumnFiltersChange,
 }) => {
     // ── Filter state ──────────────────────────────────────────────────────────
     // columnFilters: { [accessor]: Set<string> }
-    const [columnFilters, setColumnFilters] = useState({});
+    const [internalColumnFilters, setInternalColumnFilters] = useState({});
+    
+    const columnFilters = externalColumnFilters !== undefined ? externalColumnFilters : internalColumnFilters;
+
+    const setColumnFilters = useCallback((update) => {
+        if (onExternalColumnFiltersChange) {
+            if (typeof update === 'function') {
+                onExternalColumnFiltersChange(prev => update(prev || {}));
+            } else {
+                onExternalColumnFiltersChange(update);
+            }
+        } else {
+            setInternalColumnFilters(update);
+        }
+    }, [onExternalColumnFiltersChange]);
     // Which column's popover is open + where to render it
     const [openFilter, setOpenFilter] = useState(null); // { accessor, anchorPos }
 
@@ -255,18 +271,34 @@ const DataTable = ({
     }, []);
 
     // ── Client-side filtering ─────────────────────────────────────────────────
-    const filteredData = useMemo(() => {
-        if (!enableColumnFilters || !hasActiveFilters) return data;
+    // Helper to filter data by a specific subset of filters
+    const getFilteredDataCommon = useCallback((filters) => {
+        if (!enableColumnFilters) return data;
+        const activeAccessors = Object.keys(filters).filter(acc => filters[acc]?.size > 0);
+        if (activeAccessors.length === 0) return data;
+
         return data.filter(row =>
             columns.every(col => {
                 if (!col.filterable) return true;
-                const selected = columnFilters[col.accessor];
+                const selected = filters[col.accessor];
                 if (!selected || selected.size === 0) return true;
                 const val = getColFilterValue(col, row);
                 return selected.has(val);
             })
         );
-    }, [data, columnFilters, columns, enableColumnFilters, hasActiveFilters]);
+    }, [data, columns, enableColumnFilters]);
+
+    // Main filtered data for the table body
+    const filteredData = useMemo(() => {
+        return getFilteredDataCommon(columnFilters);
+    }, [getFilteredDataCommon, columnFilters]);
+
+    // Data for a specific column's filter popover (all filters EXCEPT its own)
+    const getDataForFilterPopover = useCallback((colAccessor) => {
+        const otherFilters = { ...columnFilters };
+        delete otherFilters[colAccessor];
+        return getFilteredDataCommon(otherFilters);
+    }, [getFilteredDataCommon, columnFilters]);
 
     if (loading) {
         return <TableSkeleton rowCount={skeletonRows} columnCount={columns.length} />;
@@ -468,7 +500,7 @@ const DataTable = ({
         {openFilter && (
             <FilterPopover
                 col={openFilter.col}
-                data={data}
+                data={getDataForFilterPopover(openFilter.accessor)}
                 activeFilters={columnFilters[openFilter.accessor]}
                 anchorPos={openFilter.anchorPos}
                 onApply={(selected) => applyFilter(openFilter.accessor, selected)}
