@@ -360,8 +360,20 @@ const DataTable = ({
     // Which column's popover is open + where to render it
     const [openFilter, setOpenFilter] = useState(null); // { accessor, anchorPos }
 
-    const hasActiveFilters = Object.values(columnFilters).some(s => s && s.size > 0);
-    const isColFiltered = (accessor) => (columnFilters[accessor]?.size ?? 0) > 0;
+    const hasActiveFilters = Object.values(columnFilters).some(val => {
+        if (!val) return false;
+        if (val instanceof Set) return val.size > 0;
+        if (typeof val === 'object' && val.op) return val.val !== "" && val.val !== undefined;
+        return false;
+    });
+
+    const isColFiltered = (accessor) => {
+        const val = columnFilters[accessor];
+        if (!val) return false;
+        if (val instanceof Set) return val.size > 0;
+        if (typeof val === 'object' && val.op) return val.val !== "" && val.val !== undefined;
+        return false;
+    };
 
     const handleFunnelClick = useCallback((e, col) => {
         e.stopPropagation();
@@ -388,16 +400,33 @@ const DataTable = ({
         // If server side filtering is enabled, we assume 'data' is already filtered
         if (enableColumnFilters) return data;
         
-        const activeAccessors = Object.keys(filters).filter(acc => filters[acc]?.size > 0);
-        if (activeAccessors.length === 0) return data;
-
         return data.filter(row =>
             columns.every(col => {
                 if (!col.filterable) return true;
                 const selected = filters[col.accessor];
-                if (!selected || selected.size === 0) return true;
-                const val = getColFilterValue(col, row);
-                return selected.has(val);
+                if (!selected) return true;
+                
+                if (selected instanceof Set) {
+                    if (selected.size === 0) return true;
+                    const val = getColFilterValue(col, row);
+                    return selected.has(val);
+                } else if (typeof selected === 'object' && selected.op) {
+                    if (selected.val === "" || selected.val === undefined) return true;
+                    const rowVal = parseFloat(getColFilterValue(col, row));
+                    const filterVal = parseFloat(selected.val);
+                    if (isNaN(rowVal) || isNaN(filterVal)) return false;
+                    
+                    switch (selected.op) {
+                        case '=': return rowVal === filterVal;
+                        case '>': return rowVal > filterVal;
+                        case '<': return rowVal < filterVal;
+                        case '>=': return rowVal >= filterVal;
+                        case '<=': return rowVal <= filterVal;
+                        case '!=': return rowVal !== filterVal;
+                        default: return true;
+                    }
+                }
+                return true;
             })
         );
     }, [data, columns, enableColumnFilters]);
