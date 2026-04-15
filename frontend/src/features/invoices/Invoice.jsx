@@ -18,6 +18,7 @@ import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
 import ExportButton from "../../shared/components/ExportButton";
 import { useAuthStore } from "../../store/authStore";
 import ArchivedInvoicesTab, { ARCHIVE_COLUMNS } from "./ArchivedInvoicesTab";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const Invoice = () => {
     const {
@@ -32,6 +33,9 @@ const Invoice = () => {
     const [localSearch, setLocalSearch] = useState(searchQuery);
     const [pageTab, setPageTab] = useState("invoices"); // "invoices" | "archive"
     const [archivedRecords, setArchivedRecords] = useState([]);
+    
+    const location = useLocation();
+    const navigate = useNavigate();
     
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
@@ -73,6 +77,7 @@ const Invoice = () => {
             refetch();
         }
     }, [invoiceSection]);
+
 
     const removeCurrencyFormat = (value) => {
         if (!value) return 0;
@@ -220,6 +225,14 @@ const Invoice = () => {
         setSelectedVendorId(data.vendor_id);
         setInvoiceSection(2);
     }, [setQuickViewFormData, setViewInvoiceId, setSelectedVendorId]);
+
+    useEffect(() => {
+        if (location.state?.viewInvoice && handleView) {
+            handleView(location.state.viewInvoice);
+            // Clear state so it doesn't reopen on refresh
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.state?.viewInvoice, handleView, navigate, location.pathname]);
 
     const handleDelete = useCallback((data) => {
         deleteInvoice(data.id).then(() => {

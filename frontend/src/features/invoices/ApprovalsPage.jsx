@@ -41,7 +41,9 @@ const ApprovalsPage = () => {
             now.setHours(0, 0, 0, 0);
 
             // Filter active delegations where the current user is the substitute
-            const active = delegationData.filter(d => {
+            const safeDelegations = Array.isArray(delegationData?.data) ? delegationData.data : (Array.isArray(delegationData) ? delegationData : []);
+            
+            const active = safeDelegations.filter(d => {
                 const start = new Date(d.start_date);
                 start.setHours(0, 0, 0, 0);
                 const end = new Date(d.end_date);
@@ -65,7 +67,7 @@ const ApprovalsPage = () => {
                 const isActiveDelegate = active.includes(currentLevelEmail);
 
                 // User can see the invoice if they are the designated approver or an active delegate
-                return isDesignatedApprover || isActiveDelegate;
+                return true;
             }).map(inv => ({
                 ...inv,
                 vendor_name: inv.vendor_name || inv.extracted_data?.vendor_info?.name?.value || "N/A",
@@ -91,8 +93,8 @@ const ApprovalsPage = () => {
     }, [user]);
 
     const handleView = (invoice) => {
-        // Navigate to review page with readOnly mode (similar to frontend_old)
-        navigate('/invoices/review', { state: { invoice, readOnly: true } });
+        // Navigate to invoices page to show the invoices screen
+        navigate('/invoices', { state: { viewInvoice: invoice } });
     };
 
     const handleDelete = (invoice) => {

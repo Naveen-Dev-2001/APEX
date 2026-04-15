@@ -37,7 +37,7 @@ const CodingPage = () => {
     }, []);
 
     const handleView = (invoice) => {
-        navigate('/coding/review', { state: { invoice } });
+        navigate('/invoices', { state: { viewInvoice: invoice } });
     };
 
     const columnDefs = useMemo(() => [
