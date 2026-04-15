@@ -25,7 +25,7 @@ export const useSaveInvoice = () => {
             item_number: { value: index + 1, source: "system" },
             description: { value: item.description ?? "", source: "user" },
             amount: { value: Number(item.netAmount) || 0, source: "user" },
-            quantity: { value: Number(item.qty) || 1, source: "user" },
+            qty: { value: Number(item.qty) || 1, source: "user" },
             unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
             discount: { value: Number(item.discount) || 0, source: "user" },
             tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },
@@ -39,15 +39,16 @@ export const useSaveInvoice = () => {
 
         // ── Map originalLineItems → OriginalItems server shape ────────────────
         // Always excludes system rows — they are derived, never part of the original.
-        const sourceOriginals = originalLineItems?.length > 0 
-            ? originalLineItems 
+        // Falls back to regular rows from mappedItems if originalLineItems is empty.
+        const sourceOriginals = originalLineItems?.length
+            ? originalLineItems
             : lineItemsToSave.filter(i => !i.isSystemRow);
 
         const mappedOriginalItems = sourceOriginals.map((item, index) => ({
             item_number: { value: index + 1, source: "system" },
             description: { value: item.description ?? "", source: "user" },
             amount: { value: Number(item.netAmount) || 0, source: "user" },
-            quantity: { value: Number(item.qty) || 1, source: "user" }, // using quantity here too
+            qty: { value: Number(item.qty) || 1, source: "user" },
             unit_price: { value: Number(item.unitPrice) || 0, source: "user" },
             discount: { value: Number(item.discount) || 0, source: "user" },
             tax_amount: { value: Number(item.taxAmt) || 0, source: "user" },

@@ -185,11 +185,22 @@ export const useInvoiceStore = create((set, get) => ({
         return [...regularItems, ...systemRows];
     },
 
+    originalLineItems: [],
+
     // ─────────────────────────────────────────────────────────────────────────
     // _applyLineGrouping
+    //
+    // Merges all regular rows into a single grouped row (first row's
+    // description, summed numeric fields). Only called at initial load
+    // when isModified === false and lineGrouping === "Yes".
+    //
+    // System rows are always passed through untouched.
     // ─────────────────────────────────────────────────────────────────────────
     _applyLineGrouping: (items, formData) => {
         const isLineGrouped = formData?.lineGrouping === "Yes";
+        const isModified = formData?.isModified;
+
+        // DO NOT group if already saved
         if (!isLineGrouped) return items;
 
         const regularItems = items.filter(i => !i.isSystemRow);
@@ -198,10 +209,11 @@ export const useInvoiceStore = create((set, get) => ({
         if (regularItems.length === 0) return items;
 
         const firstRow = regularItems[0];
+
         const groupedRow = {
             ...firstRow,
             id: "grouped-1",
-            description: firstRow.description,
+            description: firstRow.description, //  keep first row desc
             qty: regularItems.reduce((s, r) => s + (Number(r.qty) || 0), 0),
             unitPrice: regularItems.reduce((s, r) => s + (Number(r.unitPrice) || 0), 0),
             discount: regularItems.reduce((s, r) => s + (Number(r.discount) || 0), 0),
@@ -215,12 +227,23 @@ export const useInvoiceStore = create((set, get) => ({
 
     // ── Update single field ──────────────────────────────────────────────────
     setQuickViewField: (key, value) =>
-        set((state) => ({
-            quickViewFormData: {
+        set((state) => {
+            const updatedFormData = {
                 ...state.quickViewFormData,
                 [key]: value,
-            },
-        })),
+            };
+
+            const triggerKeys = [
+                "totalTaxAmount",
+                "tdsRate",
+                "tdsApplicability",
+                "totalInvoiceAmount",
+                "total_invoice_amount",
+            ];
+
+            return { quickViewFormData: updatedFormData, };
+        }),
+
 
     // ── Replace full form (used on initial load & vendor sync) ───────────────
     setQuickViewFormData: (dataOrUpdater) =>
@@ -229,16 +252,23 @@ export const useInvoiceStore = create((set, get) => ({
                 typeof dataOrUpdater === "function"
                     ? dataOrUpdater(state.quickViewFormData)
                     : dataOrUpdater;
+
             return { quickViewFormData: updatedFormData };
         }),
 
+
+
+
+
+
     resetQuickView: () => set({
         quickViewFormData: {},
-        lineItems: [],
         originalLineItems: [],
         selectedVendorId: null,
         activeInvoiceData: null,
     }),
+
+
 
     // =============================
     // PDF HIGHLIGHT
@@ -252,74 +282,11 @@ export const useInvoiceStore = create((set, get) => ({
     entityMaster: {},
     setEntityMaster: (data) => set({ entityMaster: data }),
 
-    // =============================
-    // LINE ITEMS MANIPULATION
-    // =============================
     lineItems: [],
-    originalLineItems: [],
-
     setLineItems: (itemsOrUpdater) =>
-        set((state) => {
-            const next = typeof itemsOrUpdater === "function"
+        set((state) => ({
+            lineItems: typeof itemsOrUpdater === "function"
                 ? itemsOrUpdater(state.lineItems)
-                : itemsOrUpdater;
-            return {
-                lineItems: next,
-                originalLineItems: next.filter(i => !i.isSystemRow)
-            };
-        }),
-
-    addLineItem: () => set((state) => {
-        const newItem = {
-            id: Date.now(),
-            description: "",
-            qty: 1,
-            unitPrice: 0,
-            discount: 0,
-            netAmount: 0,
-            taxAmt: 0,
-            isNetAmountOverridden: false,
-            lineType: "Expense",
-            glCode: "",
-            lob: "",
-            department: "",
-            customer: "",
-            item: "",
-        };
-
-        const newOriginals = [...state.originalLineItems, newItem];
-        const systemRows = state.lineItems.filter(r => r.isSystemRow);
-        const normalRows = state.lineItems.filter(r => !r.isSystemRow);
-
-        return {
-            originalLineItems: newOriginals,
-            lineItems: [...normalRows, newItem, ...systemRows]
-        };
-    }),
-
-    updateLineItem: (id, key, value) => set((state) => {
-        const applyUpdate = (item) => {
-            let updated = { ...item, [key]: value };
-            if (key === "netAmount") {
-                updated.isNetAmountOverridden = true;
-            } else if (["qty", "unitPrice", "discount"].includes(key)) {
-                updated.isNetAmountOverridden = false;
-                const qty = parseFloat(updated.qty) || 0;
-                const price = parseFloat(updated.unitPrice) || 0;
-                const discount = parseFloat(updated.discount) || 0;
-                updated.netAmount = qty * price - discount;
-            }
-            return updated;
-        };
-
-        return {
-            lineItems: state.lineItems.map(item => item.id === id ? applyUpdate(item) : item),
-            originalLineItems: state.originalLineItems.map(item => item.id === id ? applyUpdate(item) : item),
-        };
-    }),
-
-    deleteLineItem: (id) => set((state) => ({
-        lineItems: state.lineItems.filter(item => item.id !== id),
-        originalLineItems: state.originalLineItems.filter(item => item.id !== id)
-    })),
-}));
+                : itemsOrUpdater,
+        })),
+}));

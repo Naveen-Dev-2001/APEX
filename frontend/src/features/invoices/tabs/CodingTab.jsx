@@ -179,7 +179,7 @@ const applyCalculation = (item, key, value) => {
 };
 
 const CodingTab = () => {
-    const { lineItems, setLineItems, addLineItem, updateLineItem, deleteLineItem, viewInvoiceId, selectedVendorId, activeInvoiceData } = useInvoiceStore();
+    const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData } = useInvoiceStore();
     const rows = lineItems;
 
     const user = useAuthStore((state) => state.user);
@@ -252,7 +252,7 @@ const CodingTab = () => {
         };
 
         applySuggestions();
-    }, [viewInvoiceId, selectedVendorId]);
+    }, [viewInvoiceId, selectedVendorId, setLineItems]);
 
     // FIX: only count non-system rows so GST/TDS rows don't break allSelected
     const selectableRows = useMemo(() => rows, [rows]);
@@ -309,31 +309,52 @@ const CodingTab = () => {
         selectedIdsRef.current = selectedIds;
     }, [selectedIds]);
 
-    // ── handleUpdate — refactored to use store action ─────────────────────────
+    // ── handleUpdate — original logic, zero changes ───────────────────────────
     const handleUpdate = useCallback((id, key, value) => {
         const currentSelectedIds = selectedIdsRef.current;
         const isBulk = currentSelectedIds.has(id) && currentSelectedIds.size > 1;
 
-        if (isBulk) {
-            // Bulk update not fully mapped to a single store action yet, 
-            // but we can loop over selected IDs and call updateLineItem
-            currentSelectedIds.forEach((selectedId) => {
-                updateLineItem(selectedId, key, value);
-            });
-        } else {
-            updateLineItem(id, key, value);
-        }
-    }, [updateLineItem]);
+        setLineItems(prev =>
+            prev.map(item => {
+                const isEditedRow = item.id === id;
+                const isOtherSelectedRow = isBulk && currentSelectedIds.has(item.id);
 
-    // ── handleDelete — refactored to use store action ─────────────────────────
+                if (!isEditedRow && !isOtherSelectedRow) return item;
+
+                return applyCalculation(item, key, value);
+            })
+        );
+    }, [setLineItems]);
+
+    // ── handleDelete — original logic, zero changes ───────────────────────────
     const handleDelete = useCallback((id) => {
-        deleteLineItem(id);
-    }, [deleteLineItem]);
+        setLineItems(prev => prev.filter(item => item.id !== id));
+    }, [setLineItems]);
 
-    // ── handleAdd — refactored to use store action ──────────────────────────────
+    // ── handleAdd — original logic, zero changes ──────────────────────────────
     const handleAdd = useCallback(() => {
-        addLineItem();
-    }, [addLineItem]);
+        const newItem = {
+            id: Date.now(),
+            description: "",
+            qty: 0,
+            unitPrice: 0,
+            discount: 0,
+            netAmount: 0,
+            taxAmt: 0,
+            isNetAmountOverridden: false,
+            lineType: "",
+            glCode: "",
+            lob: "",
+            department: "",
+            customer: "",
+            item: "",
+        };
+        setLineItems(prev => {
+            const systemRows = prev.filter(r => r.isSystemRow);
+            const normalRows = prev.filter(r => !r.isSystemRow);
+            return [...normalRows, newItem, ...systemRows];
+        });
+    }, [setLineItems]);
 
     const filterOption = useCallback((input, option) =>
         (option?.label ?? "").toLowerCase().includes(input.toLowerCase()), []);

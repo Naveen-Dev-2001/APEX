@@ -1,53 +1,23 @@
 import { useInvoiceStore } from "../../../store/invoice.store";
 
 const InvoiceCalculationModal = ({ open, onClose }) => {
-    const { quickViewFormData, lineItems } = useInvoiceStore();
+    const { quickViewFormData } = useInvoiceStore();
 
     if (!open) return null;
 
-    // 1. Line Items Subtotal (Sum of non-system rows)
-    const lineItemsSum = lineItems
-        ?.filter(row => !row.isSystemRow)
-        ?.reduce((sum, row) => sum + (parseFloat(row.netAmount) || 0), 0) || 0;
-
-    // 2. Total Tax (from form field)
-    const totalTax = parseFloat(quickViewFormData?.totalTaxAmount || 0);
-
-    // 3. Extracted Subtotal (if different) - usually same as lineItemsSum unless specifically overridden
-    const extractedSubtotal = parseFloat(quickViewFormData?.subtotal || lineItemsSum);
-
-    // 4. Amount Paid
+    const lineItemsSubtotal = parseFloat(quickViewFormData?.total_invoice_amount || 0);
+    const totalTax = parseFloat(quickViewFormData?.total_tax_amount || 0);
+    const extractedSubtotal = lineItemsSubtotal;
     const amountPaid = parseFloat(quickViewFormData?.amountPaid || 0);
-
-    // 5. Shipping & Fees
-    const shipping = parseFloat(quickViewFormData?.shippingFees || 0);
-
-    // 6. Surcharges
-    const surcharges = parseFloat(quickViewFormData?.surcharges || 0);
-
-    // 7. TDS Info
+    const shipping = 0;
+    const surcharges = 0;
     const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
-    const isTdsApplicable = quickViewFormData?.tdsApplicability === "Yes";
-    
-    // Find TDS row for actual deduction amount if present, else calculate
-    const tdsRow = lineItems?.find(r => r.type === "TDS");
-    const tdsDeduction = tdsRow 
-        ? parseFloat(tdsRow.netAmount) 
-        : (isTdsApplicable ? -Math.abs((tdsRate / 100) * lineItemsSum) : 0);
+    const tdsDeduction = -Math.abs((tdsRate / 100) * lineItemsSubtotal);
 
-    // 8. Base Invoice Total (Line Items + Tax + Shipping + Surcharges)
-    const baseTotal = lineItemsSum + totalTax + shipping + surcharges;
-
-    // 9. Total Amount Payable
+    const baseTotal = lineItemsSubtotal + totalTax;
     const totalPayable = baseTotal + tdsDeduction;
 
-    const extractionValue = parseFloat(
-        quickViewFormData?.totalInvoiceAmount || 
-        quickViewFormData?.total_invoice_amount || 
-        quickViewFormData?.totalAmount || 
-        quickViewFormData?.totalPayable || 
-        0
-    );
+    const extractionValue = parseFloat(quickViewFormData?.totalPayable || 0);
     const hasMismatch = Math.abs(extractionValue - totalPayable) > 0.01;
 
     const fmt = (val) =>
@@ -57,7 +27,7 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
         });
 
     const rows = [
-        ["Line Items (Subtotal)", `$ ${fmt(lineItemsSum)}`],
+        ["Line Items (Subtotal)", `$ ${fmt(lineItemsSubtotal)}`],
         ["Total Tax (GST/VAT)", `$ ${fmt(totalTax)}`],
         ["Extracted Subtotal (if different)", `$ ${fmt(extractedSubtotal)}`],
         ["Amount Paid", `$ ${fmt(amountPaid)}`],
@@ -147,10 +117,10 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                             Heuristic Calculations:
                         </div>
                         <div className="text-[12px] space-y-1">
-                            <div>1. Line Items + Tax : $ {fmt(baseTotal)}</div>
-                            <div>2. Subtotal + Tax: $ {fmt(extractedSubtotal + totalTax)}</div>
+                            <div>1. Line Items + Tax: $ {fmt(baseTotal)}</div>
+                            <div>2. Subtotal + Tax: $ {fmt(baseTotal)}</div>
                             <div>
-                                3. Total Reconciliation: $ {fmt(lineItemsSum + totalTax + shipping + surcharges - amountPaid)}
+                                3. Total Reconciliation: $ {fmt(baseTotal)}
                                 <div className="text-[11px] text-gray-400">
                                     (Line Items + Tax + Shipping + Surcharges - Amount Paid)
                                 </div>
@@ -193,6 +163,5 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
         </div>
     );
 };
-
 
 export default InvoiceCalculationModal;
