@@ -22,7 +22,7 @@ from app.services.email_service import email_service
 from app.models.db_models import (
     Invoice, WorkflowStep, WorkflowStepTypeEnum, 
     WorkflowStepStatusEnum, InvoiceStatusEnum, InvoiceStatusHistory,
-    VendorMetadata, RawExtractionData, User, EntityMaster,
+    VendorMetadata, RawExtractionData, User, EntityMaster, InvoiceAssignedApprover,
     DeletedInvoice
 )
 
@@ -43,6 +43,34 @@ import asyncio
 import traceback
 from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
+
+def _flatten_emails(items):
+    """Refined helper to extract a flat list of emails from strings or JSON-encoded lists."""
+    if not items:
+        return []
+    res = []
+    if isinstance(items, str):
+        items = [items]
+    
+    for item in items:
+        if not item:
+            continue
+        if isinstance(item, list):
+            res.extend(_flatten_emails(item))
+        elif isinstance(item, str):
+            item = item.strip()
+            if item.startswith("[") and item.endswith("]"):
+                try:
+                    parsed = json.loads(item)
+                    if isinstance(parsed, list):
+                        res.extend(_flatten_emails(parsed))
+                    else:
+                        res.append(item.lower())
+                except:
+                    res.append(item.lower())
+            else:
+                res.append(item.lower())
+    return list(set(res)) # deduplicate and return
 
 router = APIRouter()
 invoice_processor = InvoiceProcessor()
@@ -900,7 +928,10 @@ async def update_invoice_status(
 
         if assigned_approvers:
             if not is_authorized:
+                 # Fetch the specific group assigned to the current stage
+                 expected_emails = assigned_approvers[current_level - 1] if 0 <= current_level - 1 < len(assigned_approvers) else []
                  expected_flat = _flatten_emails(expected_emails)
+                 
                  detail_msg = f"Only {', '.join(expected_flat)} (or their active substitute) can take action at this level."
                  if is_parallel:
                      all_flat = _flatten_emails(assigned_approvers)
