@@ -12,6 +12,11 @@ export const adminService = {
     return response.data;
   },
 
+  async addUser(userData) {
+    const response = await API.post('/users/', userData);
+    return response.data;
+  },
+
   async getSettings() {
     const response = await API.get('/settings/');
     return response.data;

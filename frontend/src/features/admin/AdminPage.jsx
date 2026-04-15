@@ -4,6 +4,8 @@ import useAdminStore from '../../store/useAdminStore';
 import Dropdown from '../../components/ui/Dropdown';
 import GlobalConfigTab from './GlobalConfigTab';
 import DelegationsTab from './DelegationsTab';
+import AddUserModal from './modals/AddUserModal';
+import CustomButton from '../../shared/components/CustomButton';
 import toast from '../../utils/toast';
 
 const AdminPage = () => {
@@ -43,11 +45,10 @@ const AdminPage = () => {
         }
     };
 
-    const handleAddUser = async () => {
-        const success = await addUser(addForm);
+    const handleAddUser = async (userData) => {
+        const success = await addUser(userData);
         if (success) {
             setIsAddModalOpen(false);
-            setAddForm({ username: '', email: '', password: '', role: 'approver', department: '' });
         } else {
             toast.error('Failed to create user. Please try again.');
         }
@@ -115,83 +116,14 @@ const AdminPage = () => {
                     </div>
                 )}
 
-                {/* Add Modal */}
-                {isAddModalOpen && (
-                    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[3000] p-4">
-                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-visible animate-scaleIn">
-                            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                                <h3 className="text-lg font-semibold text-gray-800">Add New User</h3>
-                                <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-                            </div>
-                            <div className="p-6 space-y-4">
-                                <div className="space-y-1">
-                                    <label className="text-[13px] font-medium text-gray-700">Username</label>
-                                    <input
-                                        type="text"
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
-                                        value={addForm.username}
-                                        onChange={(e) => setAddForm({ ...addForm, username: e.target.value })}
-                                        placeholder="Enter username"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[13px] font-medium text-gray-700">Email Address</label>
-                                    <input
-                                        type="email"
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
-                                        value={addForm.email}
-                                        onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                                        placeholder="user@example.com"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[13px] font-medium text-gray-700">Password</label>
-                                    <input
-                                        type="password"
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none"
-                                        value={addForm.password}
-                                        onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                                        placeholder="••••••••"
-                                    />
-                                </div>
-                                <Dropdown
-                                    label="Initial Role"
-                                    value={addForm.role}
-                                    options={roleOptions}
-                                    onChange={(val) => setAddForm({ ...addForm, role: val })}
-                                />
-                                {addForm.role === 'approver' && (
-                                    <Dropdown
-                                        label="Department"
-                                        value={addForm.department || ''}
-                                        options={[
-                                            { label: 'Finance Team', value: 'finance' },
-                                            { label: 'Non-Finance Team', value: 'non-finance' }
-                                        ]}
-                                        placeholder="Select Department"
-                                        onChange={(val) => setAddForm({ ...addForm, department: val })}
-                                    />
-                                )}
-                            </div>
-                            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
-                                <button
-                                    onClick={() => setIsAddModalOpen(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleAddUser}
-                                    disabled={isUpdating}
-                                    className={`px-5 py-2 text-sm font-medium bg-[#24a0ed] text-white hover:bg-[#1c8ad1] rounded shadow-sm transition-colors flex items-center gap-2 ${isUpdating ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                >
-                                    {isUpdating && <div className="loading-spinner"></div>}
-                                    {isUpdating ? 'Creating...' : 'Create User'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Add User Modal Component */}
+                <AddUserModal 
+                    isOpen={isAddModalOpen}
+                    onClose={() => setIsAddModalOpen(false)}
+                    onAdd={handleAddUser}
+                    roles={roles}
+                    isUpdating={isUpdating}
+                />
 
                 {/* Tabs & Top Actions */}
                 <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-5 gap-4">
@@ -234,12 +166,25 @@ const AdminPage = () => {
 
                             {/* Action Buttons */}
                             <div className="flex items-center gap-2 w-full sm:w-auto">
+                                {/* Add User Button */}
+                                {activeTab === 'User Management' && (
+                                    <CustomButton
+                                        onClick={() => setIsAddModalOpen(true)}
+                                        className="!h-[34px] !w-auto !px-4 !rounded-[4px] !text-[13px] font-medium"
+                                    >
+                                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        </svg>
+                                        Add User
+                                    </CustomButton>
+                                )}
+
                                 {/* Refresh Button */}
                                 <button
-                                    onClick={() => { 
+                                    onClick={() => {
                                         if (activeTab === 'User Management') {
-                                            fetchUsers(); 
-                                            fetchSettings(); 
+                                            fetchUsers();
+                                            fetchSettings();
                                         } else if (activeTab === 'Delegations') {
                                             fetchDelegations();
                                         }

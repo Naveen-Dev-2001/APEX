@@ -11,6 +11,7 @@ import AdminPage from './features/admin/AdminPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
+import ChangePasswordFirstTimePage from './features/auth/ChangePasswordFirstTimePage';
 
 import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
@@ -47,6 +48,7 @@ function App() {
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/select-entity" element={<SelectEntityPage />} />
+            <Route path="/change-password-first-time" element={<ChangePasswordFirstTimePage />} />
             {/* <Route path="/sso" element={<SSO />} /> */}
 
             <Route >
