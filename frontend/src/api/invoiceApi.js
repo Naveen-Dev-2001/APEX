@@ -13,9 +13,12 @@ export const getInvoices = (params = {}) =>
         }
     }).then(res => res.data);
 
-export const getInvoiceFilterOptions = (column) =>
+export const getInvoiceFilterOptions = (column, filters = {}) =>
     API.get(`/invoices/filter-options`, {
-        params: { column }
+        params: { 
+            column,
+            filters: Object.keys(filters).length > 0 ? JSON.stringify(filters) : undefined
+        }
     }).then(res => res.data);
 
 export const uploadInvoices = (formData, taskId, onUploadProgress) => {

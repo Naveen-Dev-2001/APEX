@@ -286,10 +286,16 @@ const Invoice = () => {
             ...col,
             onGetOptions: col.filterable ? async (accessor) => {
                 const dbField = accessorToDbField[accessor] || accessor;
-                return await getInvoiceFilterOptions(dbField);
+                
+                // For hierarchical filtering: 
+                // Exclude the current column's filter so the user can still see other options in that column
+                const otherFilters = { ...backendFilters };
+                delete otherFilters[dbField];
+                
+                return await getInvoiceFilterOptions(dbField, otherFilters);
             } : undefined
         }));
-    }, [view, handleView, handleDelete, accessorToDbField]);
+    }, [view, handleView, handleDelete, backendFilters, accessorToDbField]);
 
     const handleCreateInvoice = () => {
         setIsModalOpen(true);

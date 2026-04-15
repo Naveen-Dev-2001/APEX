@@ -675,23 +675,32 @@ async def get_invoices(
 @router.get("/filter-options")
 async def get_invoice_filter_options(
     column: str,
+    filters: Optional[str] = Query(None),
     entity: str = Depends(get_current_entity),
     db: Session = Depends(get_db)
 ):
     """
     Returns all unique values for a specific column in the invoices table, 
-    filtered by the active entity.
+    filtered by the active entity and optionally by other active filters.
     """
     if not hasattr(Invoice, column):
         raise HTTPException(status_code=400, detail=f"Column '{column}' does not exist on Invoice model")
 
     col_attr = getattr(Invoice, column)
     
-    # Query unique non-null values for the column
-    results = db.query(col_attr).filter(
-        Invoice.entity == entity,
-        col_attr != None
-    ).distinct().all()
+    repo_filters = {"entity": entity}
+    if filters:
+        try:
+            extra_filters = json.loads(filters)
+            if isinstance(extra_filters, dict):
+                repo_filters.update(extra_filters)
+        except Exception as e:
+            print(f"Error parsing filters in filter-options: {e}")
+
+    # Query unique non-null values for the column with applied filters
+    query = db.query(col_attr)
+    query = invoice_repo._apply_filters(query, repo_filters)
+    results = query.filter(col_attr != None).distinct().all()
     
     # Flatten result list (SQLAlchemy returns tuples)
     options = [r[0] for r in results if r[0] is not None and str(r[0]).strip() != ""]
