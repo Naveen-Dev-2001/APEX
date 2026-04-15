@@ -324,14 +324,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
 
     }, [vendor, selectedVendorId]);
 
-    useEffect(() => {
-        console.log("quickViewFormData00000000000000000000", quickViewFormData);
-
-    }, [quickViewFormData])
-
-
-
-
     // ── Vendor options ─────────────────────────────────────────────────────────
     const vendorOptions = useMemo(() => {
         if (!vendorsList?.length) return [];
@@ -515,7 +507,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const isViewOnly = (() => {
         const status = activeInvoiceData?.status?.toLowerCase();
         if (!status) return false;
-        
+
         if (userRole === 'coder') {
             if (status === 'processed') return true;
             if (status === 'waiting_coding') return false;

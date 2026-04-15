@@ -7,10 +7,12 @@ import json
 
 from app.database.database import get_db
 from app.models.db_models import (
-    VendorWorkflow as DBVendorWorkflow, 
+    VendorWorkflow as DBVendorWorkflow,
     CodificationWorkflow as DBCodificationWorkflow,
     VendorMaster, LOBMaster, DepartmentMaster, User as DBUser
 )
+import json
+from fastapi.responses import JSONResponse
 from app.repository.repositories import (
     vendor_workflow_repo, codification_workflow_repo,
     vendor_repo, lob_repo, dept_repo, user_repo
@@ -23,21 +25,86 @@ from app.dependencies import get_current_entity
 
 router = APIRouter(tags=["Workflow Configuration"])
 
+
 def serialize_approver(val):
     if isinstance(val, list):
         return json.dumps(val)
     return str(val) if val else None
 
+
 def deserialize_approver(val):
-    if not val: return []
+    if not val:
+        return []
     if isinstance(val, str) and val.startswith("["):
-        try: return json.loads(val)
-        except: return [val]
+        try:
+            return json.loads(val)
+        except:
+            return [val]
     return [val] if val else []
+
 
 def retrieve_single_approver(val):
     lst = deserialize_approver(val)
     return lst[0] if lst else None
+
+
+def serialize_approver_(val):
+    """Serialize ApproverSchema | dict | list | None → JSON string | None"""
+    if val is None:
+        return None  # store actual NULL, not "[]"
+
+    # Pydantic ApproverSchema object
+    if hasattr(val, "is_finance_team"):
+        return json.dumps({
+            "is_finance_team": val.is_finance_team,
+            # preserve is_finance_team
+            "users": [str(u) for u in (val.users or [])]
+        })
+
+    # Already a dict (e.g. from a PUT request passing raw dict)
+    if isinstance(val, dict):
+        return json.dumps({
+            "is_finance_team": val.get("is_finance_team", False),
+            "users": val.get("users", [])
+        })
+
+    # Legacy plain list
+    if isinstance(val, list):
+        return json.dumps({"is_finance_team": False, "users": val})
+
+    return None
+
+
+def deserialize_users(val):
+    if not val:
+        return []
+    try:
+        return json.loads(val)
+    except:
+        return []
+
+
+def deserialize_approver_schema(val):
+    """Returns a dict like {is_finance_team: bool, users: []} or None"""
+    if not val:
+        return None
+    if isinstance(val, dict):
+        return val
+    if isinstance(val, str):
+        try:
+            parsed = json.loads(val)
+            if isinstance(parsed, dict):
+                return parsed
+            # legacy list format
+            return {"is_finance_team": False, "users": parsed}
+        except:
+            return {"is_finance_team": False, "users": [val]}
+    if isinstance(val, list):
+        return {"is_finance_team": False, "users": val}
+    return None
+
+
+# In workflow_config.py
 
 def transform_workflow_response(w):
     return {
@@ -46,22 +113,26 @@ def transform_workflow_response(w):
         "vendor_name": getattr(w, 'vendor_name', None),
         "lob": getattr(w, 'lob', None),
         "department_id": getattr(w, 'department_id', None),
-        "mandatory_approver_1": deserialize_approver(w.mandatory_approver_1),
-        "mandatory_approver_2": deserialize_approver(w.mandatory_approver_2),
-        "mandatory_approver_3": deserialize_approver(w.mandatory_approver_3),
-        "mandatory_approver_4": deserialize_approver(w.mandatory_approver_4),
-        "mandatory_approver_5": deserialize_approver(w.mandatory_approver_5),
+        #  Use deserialize_approver_schema (returns dict | None) instead of
+        #    deserialize_users (returns list) to match Optional[dict] response model
+        "mandatory_approver_1": deserialize_approver_schema(w.mandatory_approver_1),
+        "mandatory_approver_2": deserialize_approver_schema(w.mandatory_approver_2),
+        "mandatory_approver_3": deserialize_approver_schema(w.mandatory_approver_3),
+        "mandatory_approver_4": deserialize_approver_schema(w.mandatory_approver_4),
+        "mandatory_approver_5": deserialize_approver_schema(w.mandatory_approver_5),
         "is_threshold_enabled": getattr(w, 'is_threshold_enabled', False),
         "amount_threshold": w.amount_threshold,
-        "threshold_approver": deserialize_approver(w.threshold_approver),
+        #  Same fix here
+        "threshold_approver": deserialize_approver_schema(w.threshold_approver),
         "approver_count": w.approver_count or 1,
-        "is_parallel": getattr(w, 'is_parallel', False),
-        "entity": getattr(w, 'entity', 'Consolidated Analytics Inc'),
+        "posting_approver": getattr(w, 'posting_approver', None),
+        "entity": getattr(w, 'entity', None),
         "created_at": getattr(w, 'created_at', datetime.utcnow()),
         "updated_at": getattr(w, 'updated_at', None)
     }
 
 # ==================== VENDOR WORKFLOW ====================
+
 
 @router.get("/vendor", response_model=List[VendorWorkflowResponse])
 async def get_vendor_workflows(
@@ -70,12 +141,13 @@ async def get_vendor_workflows(
     entity: str = Depends(get_current_entity)
 ):
     workflows = vendor_workflow_repo.get_multi(
-        db, 
+        db,
         filters={"entity": entity},
-        limit=1000 # Assume reasonable number of workflows
+        limit=1000  # Assume reasonable number of workflows
     )
-    
+
     return [transform_workflow_response(w) for w in workflows]
+
 
 @router.post("/vendor", response_model=VendorWorkflowResponse)
 async def create_vendor_workflow(
@@ -85,34 +157,39 @@ async def create_vendor_workflow(
     entity: str = Depends(get_current_entity)
 ):
     existing_list = vendor_workflow_repo.get_multi(
-        db, 
+        db,
         filters={"vendor_id": workflow.vendor_id, "entity": entity},
         limit=1
     )
     existing = existing_list[0] if existing_list else None
-    
+
     if existing:
-        raise HTTPException(400, f"Workflow already exists for vendor '{workflow.vendor_id}'")
-    
+        raise HTTPException(
+            400, f"Workflow already exists for vendor '{workflow.vendor_id}'")
+
     try:
         new_wf_data = {
             "entity": entity,
-            "vendor_id": workflow.vendor_id,
-            "vendor_name": workflow.vendor_name,
+            "lob": workflow.lob,
+            "department_id": workflow.department_id,
             "approver_count": workflow.approver_count,
-            "mandatory_approver_1": serialize_approver(workflow.mandatory_approver_1),
-            "mandatory_approver_2": serialize_approver(workflow.mandatory_approver_2),
-            "mandatory_approver_3": serialize_approver(workflow.mandatory_approver_3),
-            "mandatory_approver_4": serialize_approver(workflow.mandatory_approver_4),
-            "mandatory_approver_5": serialize_approver(workflow.mandatory_approver_5),
-            "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
-            "amount_threshold": workflow.amount_threshold,
-            "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "is_parallel": workflow.is_parallel,
-            "created_at": datetime.utcnow()
+
+            "mandatory_approver_1": json.dumps(workflow.mandatory_approver_1 or []),
+            "mandatory_approver_2": json.dumps(workflow.mandatory_approver_2 or []),
+            "mandatory_approver_3": json.dumps(workflow.mandatory_approver_3 or []),
+            "mandatory_approver_4": json.dumps(workflow.mandatory_approver_4 or []),
+            "mandatory_approver_5": json.dumps(workflow.mandatory_approver_5 or []),
+
+            "is_threshold_enabled": workflow.is_threshold_enabled,
+            "amount_threshold": workflow.amount_threshold if workflow.is_threshold_enabled else None,
+
+            "threshold_approver": json.dumps(workflow.threshold_approver or []),
+
+            "created_at": datetime.utcnow(),
+            "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None
         }
         new_workflow = vendor_workflow_repo.create(db, obj_in=new_wf_data)
-        
+
         return transform_workflow_response(new_workflow)
     except Exception as e:
         db.rollback()
@@ -120,6 +197,7 @@ async def create_vendor_workflow(
         error_trace = traceback.format_exc()
         print(error_trace)
         raise HTTPException(400, detail=f"Save Error: {str(e)}")
+
 
 @router.put("/vendor/{workflow_id}", response_model=VendorWorkflowResponse)
 async def update_vendor_workflow(
@@ -132,10 +210,10 @@ async def update_vendor_workflow(
     existing = vendor_workflow_repo.get(db, workflow_id)
     if not existing or existing.entity != entity:
         raise HTTPException(404, "Workflow not found")
-    
+
     if not existing:
         raise HTTPException(404, "Workflow not found")
-    
+
     try:
         update_data = {
             "vendor_id": workflow.vendor_id,
@@ -153,12 +231,14 @@ async def update_vendor_workflow(
             "entity": entity,
             "updated_at": datetime.utcnow()
         }
-        
-        updated_wf = vendor_workflow_repo.update(db, db_obj=existing, obj_in=update_data)
+
+        updated_wf = vendor_workflow_repo.update(
+            db, db_obj=existing, obj_in=update_data)
         return transform_workflow_response(updated_wf)
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Update Error: {str(e)}")
+
 
 @router.delete("/vendor/{workflow_id}")
 async def delete_vendor_workflow(
@@ -170,9 +250,10 @@ async def delete_vendor_workflow(
     existing = vendor_workflow_repo.get(db, workflow_id)
     if not existing or existing.entity != entity:
         raise HTTPException(404, "Workflow not found")
-    
+
     vendor_workflow_repo.remove(db, id=workflow_id)
     return {"message": "Workflow deleted successfully"}
+
 
 @router.get("/vendor/vendors")
 async def get_workflow_vendors(
@@ -181,7 +262,7 @@ async def get_workflow_vendors(
 ):
     vendors = vendor_repo.get_multi(db, limit=10000)
     workflow_vendors = []
-    
+
     for v in vendors:
         # Robust check for both boolean (new) and legacy string "Yes"
         is_val = v.workflow_applicable
@@ -189,10 +270,12 @@ async def get_workflow_vendors(
         if is_val is None or is_val is True or is_val == 1 or str(is_val).strip().lower() in ["yes", "true"]:
             vendor_name = v.vendor_name
             vendor_id = v.vendor_id
-            
+
             if vendor_name:
-                label = f"{vendor_id} - {vendor_name}" if vendor_id else str(vendor_name)
-                unique_val = f"{vendor_id}|{vendor_name}" if vendor_id else str(vendor_name)
+                label = f"{vendor_id} - {vendor_name}" if vendor_id else str(
+                    vendor_name)
+                unique_val = f"{vendor_id}|{vendor_name}" if vendor_id else str(
+                    vendor_name)
                 workflow_vendors.append({
                     "id": str(vendor_id) if vendor_id else "",
                     "value": unique_val,
@@ -203,6 +286,7 @@ async def get_workflow_vendors(
 
 # ==================== CODIFICATION WORKFLOW ====================
 
+
 @router.get("/codification", response_model=List[CodificationWorkflowResponse])
 async def get_codification_workflows(
     db: Session = Depends(get_db),
@@ -210,12 +294,13 @@ async def get_codification_workflows(
     entity: str = Depends(get_current_entity)
 ):
     workflows = codification_workflow_repo.get_multi(
-        db, 
+        db,
         filters={"entity": entity},
         limit=1000
     )
-    
+
     return [transform_workflow_response(w) for w in workflows]
+
 
 @router.post("/codification", response_model=CodificationWorkflowResponse)
 async def create_codification_workflow(
@@ -224,43 +309,62 @@ async def create_codification_workflow(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
+    # Check for duplicate lob + department_id under same entity
     existing_list = codification_workflow_repo.get_multi(
         db,
-        filters={
-            "lob": workflow.lob,
-            "department_id": workflow.department_id,
-            "entity": entity
-        },
+        filters={"lob": workflow.lob,
+                 "department_id": workflow.department_id, "entity": entity},
         limit=1
     )
     existing = existing_list[0] if existing_list else None
-    
+
     if existing:
-        raise HTTPException(400, f"Workflow already exists for LOB '{workflow.lob}' and Department '{workflow.department_id}'")
-        
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "DUPLICATE_WORKFLOW",
+                "message": f"Workflow already exists for LOB '{workflow.lob}' and Department '{workflow.department_id}'",
+                "field": "lob_department",
+                "lob": workflow.lob,
+                "department_id": workflow.department_id
+            }
+        )
+
     try:
         new_wf_data = {
             "entity": entity,
             "lob": workflow.lob,
             "department_id": workflow.department_id,
             "approver_count": workflow.approver_count,
-            "mandatory_approver_1": serialize_approver(workflow.mandatory_approver_1),
-            "mandatory_approver_2": serialize_approver(workflow.mandatory_approver_2),
-            "mandatory_approver_3": serialize_approver(workflow.mandatory_approver_3),
-            "mandatory_approver_4": serialize_approver(workflow.mandatory_approver_4),
-            "mandatory_approver_5": serialize_approver(workflow.mandatory_approver_5),
-            "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
-            "amount_threshold": workflow.amount_threshold,
-            "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "is_parallel": workflow.is_parallel,
-            "created_at": datetime.utcnow()
+
+            # Serialize lists → JSON strings for SQL Server Text columns
+            "mandatory_approver_1": json.dumps(workflow.mandatory_approver_1) if workflow.mandatory_approver_1 else None,
+            "mandatory_approver_2": json.dumps(workflow.mandatory_approver_2) if workflow.mandatory_approver_2 else None,
+            "mandatory_approver_3": json.dumps(workflow.mandatory_approver_3) if workflow.mandatory_approver_3 else None,
+            "mandatory_approver_4": json.dumps(workflow.mandatory_approver_4) if workflow.mandatory_approver_4 else None,
+            "mandatory_approver_5": json.dumps(workflow.mandatory_approver_5) if workflow.mandatory_approver_5 else None,
+
+            "is_threshold_enabled": workflow.is_threshold_enabled,
+            "amount_threshold": workflow.amount_threshold if workflow.is_threshold_enabled else None,
+
+            "threshold_approver": json.dumps(workflow.threshold_approver) if workflow.threshold_approver else None,
+
+            "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None,
+            "created_at": datetime.utcnow(),
+            "updated_at": None,
         }
-        new_workflow = codification_workflow_repo.create(db, obj_in=new_wf_data)
-        
-        return transform_workflow_response(new_workflow)
+
+        new_workflow = codification_workflow_repo.create(
+            db, obj_in=new_wf_data)
+        return CodificationWorkflowResponse.model_validate(new_workflow)
+
     except Exception as e:
         db.rollback()
+        import traceback
+        error_trace = traceback.format_exc()
+        print(error_trace)
         raise HTTPException(400, detail=f"Save Error: {str(e)}")
+
 
 @router.put("/codification/{workflow_id}", response_model=CodificationWorkflowResponse)
 async def update_codification_workflow(
@@ -273,10 +377,10 @@ async def update_codification_workflow(
     existing = codification_workflow_repo.get(db, workflow_id)
     if not existing or existing.entity != entity:
         raise HTTPException(404, "Workflow not found")
-    
+
     if not existing:
         raise HTTPException(404, "Workflow not found")
-        
+
     try:
         update_data = {
             "lob": workflow.lob,
@@ -294,12 +398,14 @@ async def update_codification_workflow(
             "entity": entity,
             "updated_at": datetime.utcnow()
         }
-        
-        updated_wf = codification_workflow_repo.update(db, db_obj=existing, obj_in=update_data)
+
+        updated_wf = codification_workflow_repo.update(
+            db, db_obj=existing, obj_in=update_data)
         return transform_workflow_response(updated_wf)
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Update Error: {str(e)}")
+
 
 @router.delete("/codification/{workflow_id}")
 async def delete_codification_workflow(
@@ -311,9 +417,10 @@ async def delete_codification_workflow(
     existing = codification_workflow_repo.get(db, workflow_id)
     if not existing or existing.entity != entity:
         raise HTTPException(404, "Workflow not found")
-        
+
     codification_workflow_repo.remove(db, id=workflow_id)
     return {"message": "Workflow deleted successfully"}
+
 
 @router.get("/codification/lobs")
 async def get_lobs(db: Session = Depends(get_db)):
@@ -327,6 +434,7 @@ async def get_lobs(db: Session = Depends(get_db)):
             "label": f"{val} - {w.name}" if getattr(w, 'name', None) else val
         })
     return result
+
 
 @router.get("/codification/departments")
 async def get_departments(db: Session = Depends(get_db)):
@@ -342,13 +450,15 @@ async def get_departments(db: Session = Depends(get_db)):
         })
     return result
 
+
 @router.get("/approvers")
 async def get_approvers(db: Session = Depends(get_db)):
     # Query all users with role 'approver' regardless of status for debugging/robustness
     # or at least include 'pending' if 'active' is too restrictive
-    approvers = user_repo.get_multi(db, filters={"role": "approver"}, limit=1000)
+    approvers = user_repo.get_multi(
+        db, filters={"role": "approver"}, limit=1000)
     return [{
         "value": a.email,
-        "label": f"{a.username or a.email.split('@')[0]} ({a.email})"
+        "label": f"{a.username or a.email.split('@')[0]} ({a.email})",
+        "department": a.department
     } for a in approvers if a.email]
-

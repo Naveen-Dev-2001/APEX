@@ -1,60 +1,92 @@
-from typing import Optional, List, Union
+import json
+from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, field_validator
 
 
 class CodificationWorkflow(BaseModel):
-    lob: str  # Line of Business
+    lob: str
     department_id: str
-    mandatory_approver_1: Optional[Union[EmailStr, List[EmailStr]]] = None
-    mandatory_approver_2: Optional[Union[EmailStr, List[EmailStr]]] = None
-    mandatory_approver_3: Optional[Union[EmailStr, List[EmailStr]]] = None
-    mandatory_approver_4: Optional[Union[EmailStr, List[EmailStr]]] = None
-    mandatory_approver_5: Optional[Union[EmailStr, List[EmailStr]]] = None
-    threshold_approver: Optional[Union[EmailStr, List[EmailStr]]] = None
-    optional_approver: Optional[Union[EmailStr, List[EmailStr]]] = None
-    amount_threshold: Optional[float] = None
     approver_count: int = 1
-    is_parallel: bool = False
 
+    mandatory_approver_1: Optional[List[EmailStr]] = None
+    mandatory_approver_2: Optional[List[EmailStr]] = None
+    mandatory_approver_3: Optional[List[EmailStr]] = None
+    mandatory_approver_4: Optional[List[EmailStr]] = None
+    mandatory_approver_5: Optional[List[EmailStr]] = None
+
+    is_threshold_enabled: bool = False
+    amount_threshold: Optional[float] = None
+    threshold_approver: Optional[List[EmailStr]] = None
+
+    posting_approver: Optional[EmailStr] = None
+
+    @field_validator(
+        'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3',
+        'mandatory_approver_4', 'mandatory_approver_5', 'threshold_approver',
+        mode='before'
+    )
+    @classmethod
+    def parse_list_field(cls, v):
+        """Accept list or JSON string; normalize to list or None."""
+        if isinstance(v, str):
+            try:
+                v = json.loads(v)
+            except json.JSONDecodeError:
+                v = [x.strip() for x in v.split(',') if x.strip()]
+        if isinstance(v, list):
+            v = [x for x in v if x and str(x).strip()]
+            return v if v else None
+        return v
+
+
+class CodificationWorkflowInDB(CodificationWorkflow):
+    id: int
+
+
+# ── Response model ──
+class CodificationWorkflowResponse(BaseModel):
+    id: int
+    lob: Optional[str] = None
+    department_id: Optional[str] = None
+    approver_count: int
+
+    mandatory_approver_1: Optional[List[str]] = None
+    mandatory_approver_2: Optional[List[str]] = None
+    mandatory_approver_3: Optional[List[str]] = None
+    mandatory_approver_4: Optional[List[str]] = None
+    mandatory_approver_5: Optional[List[str]] = None
+
+    is_threshold_enabled: bool
+    amount_threshold: Optional[float] = None
+    threshold_approver: Optional[List[str]] = None
+
+    posting_approver: Optional[str] = None
     entity: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     @field_validator(
-        'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3', 
-        'mandatory_approver_4', 'mandatory_approver_5',
-        'threshold_approver', 
+        'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3',
+        'mandatory_approver_4', 'mandatory_approver_5', 'threshold_approver',
         mode='before'
     )
     @classmethod
-    def empty_to_none(cls, v):
-        if v == "":
-            return None
+    def parse_json_string(cls, v):
+        """Parse JSON string back to list when reading from DB."""
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [x for x in parsed if x and str(x).strip()] or None
+                return None
+            except json.JSONDecodeError:
+                result = [x.strip() for x in v.split(',') if x.strip()]
+                return result if result else None
+        if isinstance(v, list):
+            cleaned = [x for x in v if x and str(x).strip()]
+            return cleaned if cleaned else None
         return v
-
-
-class CodificationWorkflowInDB(CodificationWorkflow):
-    id: str
-
-class CodificationWorkflowResponse(BaseModel):
-    id: int
-    lob: str
-    department_id: str
-    mandatory_approver_1: Optional[Union[str, List[str]]] = None
-    mandatory_approver_2: Optional[Union[str, List[str]]] = None
-    mandatory_approver_3: Optional[Union[str, List[str]]] = None
-    mandatory_approver_4: Optional[Union[str, List[str]]] = None
-    mandatory_approver_5: Optional[Union[str, List[str]]] = None
-    threshold_approver: Optional[Union[str, List[str]]] = None
-    optional_approver: Optional[Union[str, List[str]]] = None
-    amount_threshold: Optional[float] = None
-    approver_count: int
-    is_parallel: bool = False
-
-    entity: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
