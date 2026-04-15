@@ -227,7 +227,10 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         isDuplicate,
         duplicateMessage,
         lineItems,
-        setLineItems
+        setLineItems,
+        addLineItem,
+        updateLineItem,
+        deleteLineItem
     } = useInvoiceStore();
 
 
@@ -391,50 +394,12 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [setQuickViewField, setSelectedVendorId]);
 
     const handleUpdateLineItem = useCallback((id, key, value) => {
-        setLineItems(prev =>
-            prev.map(item => {
-                debugger
-                if (item.id !== id) return item;
-
-                // Keep value as-is (string) — don't cast to Number here.
-                // Casting kills partial input like "1." or "" mid-type.
-                let updated = { ...item, [key]: value };
-
-                if (!item.isSystemRow) {
-                    if (key === "netAmount") {
-                        // User manually typed netAmount — mark as overridden,
-                        // do NOT recalculate from qty/unitPrice/discount.
-                        updated.isNetAmountOverridden = true;
-                    } else if (["qty", "unitPrice", "discount"].includes(key)) {
-                        // These fields drive the auto-calculation.
-                        updated.isNetAmountOverridden = false;
-
-                        // Use parseFloat so partial input ("1.", "") doesn't
-                        // corrupt the calculation — it just treats them as 0.
-                        const qty = parseFloat(updated.qty) || 0;
-                        const price = parseFloat(updated.unitPrice) || 0;
-                        const discount = parseFloat(updated.discount) || 0;
-
-                        updated.netAmount = qty * price - discount;
-                    }
-                    // "description" and other string fields: no calculation needed.
-                } else {
-                    // System rows (GST / TDS): keep unitPrice and netAmount in sync.
-                    if (key === "unitPrice" || key === "netAmount") {
-                        const numVal = parseFloat(value) || 0;
-                        updated.unitPrice = numVal;
-                        updated.netAmount = numVal;
-                    }
-                }
-
-                return updated;
-            })
-        );
-    }, [setLineItems]);
+        updateLineItem(id, key, value);
+    }, [updateLineItem]);
 
     const handleDeleteLineItem = useCallback((id) => {
-        setLineItems(prev => prev.filter(item => item.id !== id));
-    }, [setLineItems]);
+        deleteLineItem(id);
+    }, [deleteLineItem]);
 
     const handleHoverField = useCallback((key) => {
         setHighlightedField(key);
@@ -458,30 +423,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [setHighlightedField]);
 
     const handleAddLineItem = useCallback(() => {
-        const newItem = {
-            id: Date.now(),
-            description: "",
-            qty: 0,
-            unitPrice: 0,
-            discount: 0,
-            netAmount: 0,
-            taxAmt: 0,
-
-            lineType: "",
-            glCode: "",
-            lob: "",
-            department: "",
-            customer: "",
-            item: "",
-        };
-
-        setLineItems(prev => {
-            const systemRows = prev.filter(r => r.isSystemRow);
-            const regularRows = prev.filter(r => !r.isSystemRow);
-
-            return [...regularRows, newItem, ...systemRows];
-        });
-    }, [setLineItems]);
+        addLineItem();
+    }, [addLineItem]);
 
     // ── Totals — derived directly from quickViewLineItems (single source of truth) ──
     //

@@ -172,7 +172,7 @@ const Invoice = () => {
         const mappedItems = items.map((item, index) => {
             const desc = item.description?.value || "";
             const netAmount = Number(item.amount?.value) || 0;
-            const qty = Number(item.qty?.value) || 1;
+            const qty = Number(item.qty?.value || item.quantity?.value) || 1;
             const unitPrice = Number(item.unit_price?.value) || 0;
             const discount = Number(item.discount?.value) || 0;
             const taxAmt = Number(item.tax_amount?.value) || 0;

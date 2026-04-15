@@ -2,12 +2,12 @@
 const normalizeItems = (items) => {
     return items.map((item, index) => ({
         id: `${index}`,
-        qty: Number(item.quantity?.value || 0),
+        qty: Number(item.qty?.value || item.quantity?.value || 0),
         unitPrice: Number(item.unit_price?.value || 0),
-        discount: Number(0),
+        discount: Number(item.discount?.value || 0),
         netAmount: Number(item.amount?.value || 0),
         description: item.description?.value || "",
-        taxAmt: 0,
+        taxAmt: Number(item.tax_amount?.value || 0),
 
         lineType: "",
         glCode: "",
