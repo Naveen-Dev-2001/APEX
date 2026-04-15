@@ -3,11 +3,10 @@ import CustomInput from "../../shared/components/CustomInput";
 import { SearchOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
-import ReusableDataTable from "../../shared/components/ReusableDataTable";
+import DataTable from "../../components/ui/DataTable";
 import { useInvoiceData } from "../hooks/useInvoiceData";
 import { getCondensedColumns, getFullColumns, VIEW_OPTIONS } from "./invoiceColumns";
 import { useInvoiceStore } from "../../store/invoice.store";
-import { Skeleton } from "antd";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
 import { deleteInvoice, uploadInvoices, fetchEntityMaster } from "../../api/invoiceApi";
@@ -424,32 +423,27 @@ const Invoice = () => {
 
                     {/* ── Invoices Tab ── */}
                     {pageTab === "invoices" && (
-                        <>
-                            <div className="overflow-x-auto w-full">
-                                {isLoading ? (
-                                    <Skeleton height={400} borderRadius={16} />
-                                ) : (
-                                    <ReusableDataTable
-                                        columnDefs={columnDefs}
-                                        data={invoices ?? []}
-                                        searchText={searchQuery}
-                                        tableHeader={false}
-                                        tableSearch={false}
-                                        defaultPageSize={10}
-                                        shouldUseFlex={false}
-                                        totalItems={total}
-                                        currentPage={(skip / limit) + 1}
-                                        itemsPerPage={limit}
-                                        onPageChange={(page) => setSkip((page - 1) * limit)}
-                                        onItemsPerPageChange={(newLimit) => {
-                                            setLimit(newLimit);
-                                            setSkip(0);
-                                        }}
-                                        onSortChange={(col, dir) => setSort(col, dir)}
-                                    />
-                                )}
-                            </div>
-                        </>
+                        <div className="px-4 py-4">
+                            <DataTable
+                                columns={columnDefs}
+                                data={invoices ?? []}
+                                loading={isLoading}
+                                skeletonRows={10}
+                                totalItems={total ?? 0}
+                                currentPage={(skip / limit) + 1}
+                                itemsPerPage={limit}
+                                itemsPerPageOptions={[15, 30, 50]}
+                                onPageChange={(page) => setSkip((page - 1) * limit)}
+                                onItemsPerPageChange={(newLimit) => {
+                                    setLimit(newLimit);
+                                    setSkip(0);
+                                }}
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                stickyHeader
+                                maxHeight="calc(100vh - 220px)"
+                            />
+                        </div>
                     )}
 
                     {/* ── Archive Tab ── */}
