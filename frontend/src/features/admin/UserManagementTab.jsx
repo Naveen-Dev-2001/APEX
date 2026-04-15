@@ -51,11 +51,18 @@ const UserManagementTab = ({ onEdit }) => {
             accessor: 'role',
             sortable: true,
             onClick: () => setSort('role'),
-            render: (role) => (
-                <span className={`px-3 py-0.5 rounded-full border text-[11px] font-medium capitalize ${getRoleStyles(role)}`}>
-                    {role}
-                </span>
-            )
+            render: (role) => {
+                const roles = role ? role.split(',') : [];
+                return (
+                    <div className="flex flex-wrap gap-1">
+                        {roles.map((r, idx) => (
+                            <span key={idx} className={`px-3 py-0.5 rounded-full border text-[11px] font-medium capitalize ${getRoleStyles(r.trim())}`}>
+                                {r.trim()}
+                            </span>
+                        ))}
+                    </div>
+                );
+            }
         },
         {
             header: 'Department',

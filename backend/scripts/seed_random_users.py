@@ -13,7 +13,7 @@ from app.auth.jwt import get_password_hash
 def seed_users():
     db = SessionLocal()
     try:
-        roles = ["admin", "coder", "approver"]
+        roles = ["admin", "coder", "approver", "scanner"]
         count_per_role = 5
         common_password_hash = get_password_hash("Lokesh@2001")
 

@@ -59,14 +59,39 @@ const Header = () => {
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [showChangeRoleModal, setShowChangeRoleModal] = useState(false);
     const dropdownRef = useRef(null);
     const mobileMenuRef = useRef(null);
     const hamburgerRef = useRef(null);
 
     const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
+    // Resolve current active role and compute target for role-switch
+    const setAuth = useAuthStore((state) => state.setAuth);
+    const activeRole = sessionStorage.getItem('active_role') || user?.role || '';
+    const allRoles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
+    const getTargetRole = () => {
+        const current = activeRole.toLowerCase().trim();
+        if (current === 'admin') return 'approver';
+        if (current === 'approver') return 'admin';
+        // For any other role, find a different role from allRoles or default to 'admin'
+        return allRoles.find(r => r.toLowerCase().trim() !== current) || 'admin';
+    };
+    const targetRole = getTargetRole();
+
+    const handleConfirmRoleChange = () => {
+        const newRole = targetRole;
+        sessionStorage.setItem('active_role', newRole);
+        if (user) {
+            setAuth(sessionStorage.getItem('access_token'), { ...user, role: newRole });
+        }
+        setShowChangeRoleModal(false);
+        setIsDropdownOpen(false);
+    };
+
     const { navigation, fetchSettings } = useAdminStore();
     const [filteredTabs, setFilteredTabs] = useState([]);
+    debugger
 
     // Fetch settings on mount to ensure we have navigation
     useEffect(() => {
@@ -253,6 +278,18 @@ const Header = () => {
 
             {/* Right side controls */}
             <div className="flex items-center space-x-5">
+                {/* Entity Badge */}
+                <div className="hidden md:flex items-center space-x-2 bg-[#f0f8ff] border border-[#a2d5f2] rounded-full px-4 py-1.5">
+                    <svg className="w-4.5 h-4.5 text-[#1e9bd8] shrink-0" style={{width:'18px',height:'18px'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="text-[13px] font-semibold text-black uppercase tracking-wide leading-none">Entity:</span>
+                    <span className="text-[13px] font-medium text-[#1e9bd8] max-w-[160px] truncate leading-none capitalize">{selectedEntityName}</span>
+                </div>
+
+                {/* Divider */}
+                <div className="hidden md:block h-6 w-px bg-gray-200"></div>
+
                 {/* Search / Help Button */}
                 {/* <button className="flex items-center space-x-2 px-4 py-[6px] border border-[#a2d5f2] rounded-full text-sm text-gray-600 hover:bg-[#f0f8ff] transition-colors focus:outline-none">
                     <svg className="w-4 h-4 text-[#1e9bd8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,7 +319,7 @@ const Header = () => {
                     </div>
 
                     {isDropdownOpen && (
-                        <div className="absolute right-0 mt-3 w-[240px] bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                        <div className="absolute right-0 mt-3 w-[280px] bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
                             {/* Arrow Pointer - Centered with the 34px icon at the right edge */}
                             <div className="absolute -top-[6px] right-2.5 w-3 h-3 bg-white border-l border-t border-gray-100 rotate-45 z-0"></div>
 
@@ -336,6 +373,79 @@ const Header = () => {
                                         Change Entity
                                     </span>
                                 </button>
+                               
+                                {/* Change Role Action (only if user has both admin and approver roles) */}
+                                {Array.isArray(allRoles) && allRoles.length >= 2 && allRoles.includes('admin') && allRoles.includes('approver') && (
+                                    <button
+                                        onClick={() => {
+                                            setShowChangeRoleModal(true);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5 mt-2"
+                                    >
+                                        <div className="p-1 rounded-lg text-[#3ba5d8] group-hover:bg-blue-50">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                                            Change Role
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Change Role Confirmation Modal */}
+                    {showChangeRoleModal && (
+                        <div
+                            className="fixed inset-0 z-[9999] flex items-center justify-center"
+                            style={{ backgroundColor: 'rgba(0,0,0,0.40)' }}
+                            onClick={() => setShowChangeRoleModal(false)}
+                        >
+                            <div
+                                className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Modal Header */}
+                                <div className="bg-[#1e9bd8] px-6 py-4 flex items-center gap-3">
+                                    <div className="bg-white/20 rounded-full p-2">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-white font-semibold text-[16px] tracking-wide">Change Role</h3>
+                                </div>
+
+                                {/* Modal Body */}
+                                <div className="px-6 py-5">
+                                    <p className="text-gray-600 text-[14px] leading-relaxed">
+                                        Do you want to change your role from{' '}
+                                        <span className="font-semibold text-gray-900 capitalize">{activeRole}</span>
+                                        {' '}to{' '}
+                                        <span className="font-semibold text-[#1e9bd8] capitalize">{targetRole}</span>?
+                                    </p>
+                                    <p className="text-gray-400 text-[12px] mt-2">
+                                        Your current entity selection will be preserved.
+                                    </p>
+                                </div>
+
+                                {/* Modal Footer */}
+                                <div className="px-6 pb-5 flex justify-end gap-3">
+                                    <button
+                                        onClick={() => setShowChangeRoleModal(false)}
+                                        className="px-5 py-2 text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        onClick={handleConfirmRoleChange}
+                                        className="px-5 py-2 text-[13px] font-medium text-white bg-[#1e9bd8] hover:bg-[#1580b5] active:bg-[#116a96] rounded-xl transition-colors shadow-sm"
+                                    >
+                                        OK
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}

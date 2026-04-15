@@ -24,6 +24,12 @@ API.interceptors.request.use(
             config.headers['X-Entity'] = entity;
         }
 
+        // Add Active Role header
+        const activeRole = sessionStorage.getItem('active_role');
+        if (activeRole) {
+            config.headers['X-Active-Role'] = activeRole;
+        }
+
         return config;
     },
     (error) => {

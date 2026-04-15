@@ -103,12 +103,14 @@ async def update_user_role(
     allowed_roles = settings.get("roles", [])
     allowed_statuses = settings.get("statuses", [])
 
-    # Validate role
-    if update_data.role not in allowed_roles:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid role: {update_data.role}"
-        )
+    # Validate role(s)
+    roles_to_validate = [r.strip() for r in update_data.role.split(',')]
+    for r in roles_to_validate:
+        if r not in allowed_roles:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid role: {r}"
+            )
 
     # Validate status
     if update_data.status not in allowed_statuses:

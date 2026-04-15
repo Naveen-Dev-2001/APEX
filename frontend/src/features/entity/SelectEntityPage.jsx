@@ -17,6 +17,9 @@ const SelectEntityPage = () => {
   const [selectedEntity, setSelectedEntity] = useState('Choose Entity');
   const [isSelectOpen, setIsSelectOpen] = useState(false);
 
+  // Change Role modal state
+  const [showChangeRoleModal, setShowChangeRoleModal] = useState(false);
+
   const { masters, fetchEntityMasterData, entityLoading } = useMasterDataStore();
   
   // Get entities from store and format them
@@ -31,8 +34,6 @@ const SelectEntityPage = () => {
     };
   });
 
-
-
   useEffect(() => {
     if (entityData.length === 0) {
       fetchEntityMasterData();
@@ -41,7 +42,36 @@ const SelectEntityPage = () => {
 
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
+
+  // Parse user roles
+  const userRoles = user?.role ? user.role.split(',') : [];
+  const hasMultipleRoles = userRoles.length > 1;
+  const [activeRole, setActiveRole] = useState(
+    sessionStorage.getItem('active_role') || userRoles[0] || 'approver'
+  );
+  const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false);
+
+  // Derive the target role for the Change Role modal
+  // If current is admin, switch to approver; otherwise swap to admin if available
+  const getTargetRole = () => {
+    const current = activeRole.toLowerCase().trim();
+    if (current === 'admin') return 'approver';
+    return userRoles.find(r => r.toLowerCase().trim() !== current) || 'approver';
+  };
+  const targetRole = getTargetRole();
+
+  const handleConfirmRoleChange = () => {
+    const newRole = targetRole;
+    setActiveRole(newRole);
+    sessionStorage.setItem('active_role', newRole);
+    if (user) {
+      setAuth(sessionStorage.getItem('access_token'), { ...user, role: newRole });
+    }
+    setShowChangeRoleModal(false);
+    setIsDropdownOpen(false);
+  };
 
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
@@ -53,6 +83,16 @@ const SelectEntityPage = () => {
   const handleSelectEntity = (entity) => {
     setSelectedEntity(entity.displayName);
     setIsSelectOpen(false);
+    
+    // Store active role
+    sessionStorage.setItem('active_role', activeRole);
+    
+    // Update user in store with ACTIVE role for this session
+    // This ensures UI components see the correct role
+    if (user) {
+        setAuth(sessionStorage.getItem('access_token'), { ...user, role: activeRole });
+    }
+
     // Store the entity_id as the FK value sent in X-Entity header to the backend
     setEntity(entity.entityId || entity.name);
     sessionStorage.setItem('selected_entity', entity.entityId || entity.name); // entity_id for DB FK
@@ -110,7 +150,23 @@ const SelectEntityPage = () => {
           </div>
 
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-100 rounded-md shadow-lg py-1 z-50">
+            <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-100 rounded-md shadow-lg py-1 z-50">
+              {/* Change Role button */}
+              <button
+                onClick={() => {
+                  setShowChangeRoleModal(true);
+                  setIsDropdownOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-[#1e9bd8] hover:bg-blue-50 hover:text-[#1580b5] flex items-center transition-colors"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Change Role
+              </button>
+
+              <div className="border-t border-gray-100 my-0.5" />
+
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center transition-colors"
@@ -122,6 +178,59 @@ const SelectEntityPage = () => {
               </button>
             </div>
           )}
+
+          {/* Change Role Confirmation Modal */}
+          {showChangeRoleModal && (
+            <div
+              className="fixed inset-0 z-[9999] flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(0,0,0,0.35)' }}
+              onClick={() => setShowChangeRoleModal(false)}
+            >
+              <div
+                className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="bg-[#1e9bd8] px-6 py-4 flex items-center gap-3">
+                  <div className="bg-white/20 rounded-full p-2">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-white font-semibold text-[16px]">Change Role</h3>
+                </div>
+
+                {/* Modal Body */}
+                <div className="px-6 py-5">
+                  <p className="text-gray-600 text-[14px] leading-relaxed">
+                    Do you want to change your role from{' '}
+                    <span className="font-semibold text-gray-800 capitalize">{activeRole}</span>
+                    {' '}to{' '}
+                    <span className="font-semibold text-[#1e9bd8] capitalize">{targetRole}</span>?
+                  </p>
+                  <p className="text-gray-400 text-[12px] mt-2">
+                    Your current entity selection will be preserved.
+                  </p>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="px-6 pb-5 flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowChangeRoleModal(false)}
+                    className="px-5 py-2 text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={handleConfirmRoleChange}
+                    className="px-5 py-2 text-[13px] font-medium text-white bg-[#1e9bd8] hover:bg-[#1580b5] active:bg-[#116a96] rounded-lg transition-colors shadow-sm"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -131,7 +240,49 @@ const SelectEntityPage = () => {
           <h2 className="text-[24px] mb-2 text-gray-800 font-medium">Select Entity</h2>
           <p className="text-[14px] text-gray-500 mb-6">Choose which entity you want to work with.</p>
 
+          {hasMultipleRoles && (
+            <div className="relative w-full text-left mt-6">
+              <label className="text-[12px] text-gray-500 mb-1 block font-medium">Login As</label>
+              <button
+                type="button"
+                className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#f8f9fa] border border-gray-200 hover:bg-gray-50 active:bg-gray-100 text-gray-700 font-medium transition-all focus:outline-none"
+                onClick={() => setIsRoleSelectOpen(!isRoleSelectOpen)}
+              >
+                <span className="capitalize">{activeRole}</span>
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${isRoleSelectOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isRoleSelectOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-[60] max-h-60 overflow-y-auto">
+                  <ul className="py-1">
+                    {userRoles.map((role) => (
+                      <li key={role}>
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors capitalize"
+                          onClick={() => {
+                            setActiveRole(role);
+                            setIsRoleSelectOpen(false);
+                          }}
+                        >
+                          {role}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="relative w-full text-left mt-6">
+            <label className="text-[12px] text-gray-500 mb-1 block font-medium">Select Entity</label>
             <button
               type="button"
               className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#1e9bd8] hover:opacity-85 active:opacity-75 text-white font-medium transition-all focus:outline-none"
