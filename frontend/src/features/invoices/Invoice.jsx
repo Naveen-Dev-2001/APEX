@@ -48,10 +48,20 @@ const Invoice = () => {
 
     const backendFilters = useMemo(() => {
         const filters = {};
-        Object.entries(columnFilters).forEach(([accessor, selectedSet]) => {
-            if (selectedSet && selectedSet.size > 0) {
-                const dbField = accessorToDbField[accessor] || accessor;
-                filters[dbField] = Array.from(selectedSet);
+        Object.entries(columnFilters).forEach(([accessor, value]) => {
+            if (!value) return;
+            const dbField = accessorToDbField[accessor] || accessor;
+
+            if (value instanceof Set) {
+                if (value.size > 0) {
+                    filters[dbField] = Array.from(value);
+                }
+            } else if (typeof value === 'object' && value.op && value.val !== "" && value.val !== undefined) {
+                // Numeric condition filter
+                filters[dbField] = { 
+                    op: value.op, 
+                    val: parseFloat(value.val) 
+                };
             }
         });
         return filters;

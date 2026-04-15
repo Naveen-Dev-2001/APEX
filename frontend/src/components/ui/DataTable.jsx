@@ -26,8 +26,18 @@ const getColFilterValue = (col, row) => {
 
 // ─── Column Filter Popover ────────────────────────────────────────────────────
 const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }) => {
+    const isNumber = col.filterType === 'number';
+    const [filterMode, setFilterMode] = useState(() => {
+        if (isNumber && activeFilters && !(activeFilters instanceof Set)) return 'condition';
+        return 'list';
+    });
+
     const [search, setSearch] = useState('');
-    const [pending, setPending] = useState(() => new Set(activeFilters ?? []));
+    const [pendingSet, setPendingSet] = useState(() => (activeFilters instanceof Set ? new Set(activeFilters) : new Set()));
+    const [pendingCond, setPendingCond] = useState(() => {
+        if (activeFilters && !(activeFilters instanceof Set)) return activeFilters;
+        return { op: '>', val: '' };
+    });
     const popRef = useRef(null);
     const searchRef = useRef(null);
 
@@ -88,7 +98,7 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
     }, []);
 
     const toggle = (val) => {
-        setPending(prev => {
+        setPendingSet(prev => {
             const next = new Set(prev);
             next.has(val) ? next.delete(val) : next.add(val);
             return next;
@@ -119,93 +129,160 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
 
     return (
         <div ref={popRef} style={style}>
-            {/* Search box */}
-            <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: '#f7f8fa', border: '1px solid #e5e7eb',
-                    borderRadius: 6, padding: '5px 10px',
-                }}>
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="6.5" cy="6.5" r="5" stroke="#9ca3af" strokeWidth="1.5" />
-                        <path d="M10.5 10.5L14 14" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                    <input
-                        ref={searchRef}
-                        type="text"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Search in filters"
+            {isNumber && (
+                <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
+                    <button
+                        onClick={() => setFilterMode('list')}
                         style={{
-                            border: 'none', outline: 'none', background: 'transparent',
-                            fontSize: 12, color: '#374151', width: '100%',
+                            flex: 1, padding: '10px', fontSize: 12, fontWeight: 500,
+                            background: filterMode === 'list' ? '#fff' : '#f9fafb',
+                            border: 'none', borderBottom: filterMode === 'list' ? '2px solid #1677ff' : '2px solid transparent',
+                            color: filterMode === 'list' ? '#1677ff' : '#6b7280',
+                            cursor: 'pointer'
                         }}
-                    />
-                    {search && (
-                        <button
-                            onClick={() => setSearch('')}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, fontSize: 12 }}
-                        >✕</button>
-                    )}
+                    >
+                        List
+                    </button>
+                    <button
+                        onClick={() => setFilterMode('condition')}
+                        style={{
+                            flex: 1, padding: '10px', fontSize: 12, fontWeight: 500,
+                            background: filterMode === 'condition' ? '#fff' : '#f9fafb',
+                            border: 'none', borderBottom: filterMode === 'condition' ? '2px solid #1677ff' : '2px solid transparent',
+                            color: filterMode === 'condition' ? '#1677ff' : '#6b7280',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Condition
+                    </button>
                 </div>
-            </div>
+            )}
 
-            <div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 0' }}>
-                {loading ? (
-                    <div style={{ padding: '20px', textAlign: 'center' }}>
-                        <div className="inline-block w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                ) : visibleValues.length === 0 ? (
-                    <div style={{ padding: '12px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>
-                        No matching values
-                    </div>
-                ) : visibleValues.map(val => {
-                    const checked = pending.has(val);
-                    const label = String(val);
-                    return (
-                        <label
-                            key={val}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: 10,
-                                padding: '7px 14px', cursor: 'pointer',
-                                background: checked ? '#e6f4ff' : 'transparent',
-                                transition: 'background 0.15s',
-                            }}
-                            onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f5f5f5'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = checked ? '#e6f4ff' : 'transparent'; }}
-                        >
+            {filterMode === 'list' ? (
+                <>
+                    {/* Search box */}
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            background: '#f7f8fa', border: '1px solid #e5e7eb',
+                            borderRadius: 6, padding: '5px 10px',
+                        }}>
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="6.5" cy="6.5" r="5" stroke="#9ca3af" strokeWidth="1.5" />
+                                <path d="M10.5 10.5L14 14" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
                             <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggle(val)}
-                                style={{ display: 'none' }}
+                                ref={searchRef}
+                                type="text"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Search in filters"
+                                style={{
+                                    border: 'none', outline: 'none', background: 'transparent',
+                                    fontSize: 12, color: '#374151', width: '100%',
+                                }}
                             />
-                            {/* Custom checkbox */}
-                            <span style={{
-                                width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                                border: checked ? '2px solid #1677ff' : '2px solid #d1d5db',
-                                background: checked ? '#1677ff' : '#fff',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                transition: 'all 0.15s',
-                            }}>
-                                {checked && (
-                                    <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                                        <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                )}
-                            </span>
-                            <span style={{
-                                fontSize: 13, color: checked ? '#1677ff' : '#374151',
-                                fontWeight: checked ? 500 : 400,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                maxWidth: 190,
-                            }}>
-                                {label}
-                            </span>
-                        </label>
-                    );
-                })}
-            </div>
+                            {search && (
+                                <button
+                                    onClick={() => setSearch('')}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, fontSize: 12 }}
+                                >✕</button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 0' }}>
+                        {loading ? (
+                            <div style={{ padding: '20px', textAlign: 'center' }}>
+                                <div className="inline-block w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                        ) : visibleValues.length === 0 ? (
+                            <div style={{ padding: '12px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>
+                                No matching values
+                            </div>
+                        ) : visibleValues.map(val => {
+                            const checked = pendingSet.has(val);
+                            const label = String(val);
+                            return (
+                                <label
+                                    key={val}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 10,
+                                        padding: '7px 14px', cursor: 'pointer',
+                                        background: checked ? '#e6f4ff' : 'transparent',
+                                        transition: 'background 0.15s',
+                                    }}
+                                    onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f5f5f5'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = checked ? '#e6f4ff' : 'transparent'; }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggle(val)}
+                                        style={{ display: 'none' }}
+                                    />
+                                    {/* Custom checkbox */}
+                                    <span style={{
+                                        width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                                        border: checked ? '2px solid #1677ff' : '2px solid #d1d5db',
+                                        background: checked ? '#1677ff' : '#fff',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        transition: 'all 0.15s',
+                                    }}>
+                                        {checked && (
+                                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                                <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        )}
+                                    </span>
+                                    <span style={{
+                                        fontSize: 13, color: checked ? '#1677ff' : '#374151',
+                                        fontWeight: checked ? 500 : 400,
+                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                        maxWidth: 190,
+                                    }}>
+                                        {label}
+                                    </span>
+                                </label>
+                            );
+                        })}
+                    </div>
+                </>
+            ) : (
+                <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Operator</span>
+                        <select
+                            value={pendingCond.op}
+                            onChange={e => setPendingCond(prev => ({ ...prev, op: e.target.value }))}
+                            style={{
+                                width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db',
+                                fontSize: 13, color: '#374151', outline: 'none'
+                            }}
+                        >
+                            <option value="=">=</option>
+                            <option value=">">&gt;</option>
+                            <option value="<">&lt;</option>
+                            <option value=">=">&gt;=</option>
+                            <option value="<=">&lt;=</option>
+                            <option value="!=">!=</option>
+                        </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Value</span>
+                        <input
+                            type="number"
+                            value={pendingCond.val}
+                            onChange={e => setPendingCond(prev => ({ ...prev, val: e.target.value }))}
+                            placeholder="Enter value"
+                            style={{
+                                width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
+                                fontSize: 13, color: '#374151', outline: 'none'
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Footer */}
             <div style={{
@@ -214,7 +291,10 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                 background: '#fafafa',
             }}>
                 <button
-                    onClick={() => setPending(new Set())}
+                    onClick={() => {
+                        if (filterMode === 'list') setPendingSet(new Set());
+                        else setPendingCond({ op: '>', val: '' });
+                    }}
                     style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         color: '#1677ff', fontSize: 13, fontWeight: 500, padding: 0,
@@ -223,7 +303,10 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                     Reset
                 </button>
                 <button
-                    onClick={() => onApply(pending)}
+                    onClick={() => {
+                        if (filterMode === 'list') onApply(pendingSet);
+                        else onApply(pendingCond);
+                    }}
                     style={{
                         background: '#1677ff', border: 'none', cursor: 'pointer',
                         color: '#fff', fontSize: 13, fontWeight: 500,

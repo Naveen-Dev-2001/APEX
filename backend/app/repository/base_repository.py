@@ -39,15 +39,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         order_by: str = None,
         descending: bool = False
     ) -> List[ModelType]:
-        query = db.query(self.model)
-        if filters:
-            for field, value in filters.items():
-                if hasattr(self.model, field):
-                    column_attr = getattr(self.model, field)
-                    if isinstance(value, (list, tuple, set)):
-                        query = query.filter(column_attr.in_(value))
-                    else:
-                        query = query.filter(column_attr == value)
+        query = self._apply_filters(db.query(self.model), filters)
         
         if expressions:
             for expr in expressions:
@@ -82,17 +74,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Generic paginated query with search and filtering.
         """
 
-        query = db.query(self.model)
-
-        # Filters (exact match or list inclusion)
-        if filters:
-            for field, value in filters.items():
-                if hasattr(self.model, field):
-                    column_attr = getattr(self.model, field)
-                    if isinstance(value, (list, tuple, set)):
-                        query = query.filter(column_attr.in_(value))
-                    else:
-                        query = query.filter(column_attr == value)
+        query = self._apply_filters(db.query(self.model), filters)
 
         # Complex expressions
         if expressions:
@@ -201,11 +183,29 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         from sqlalchemy import func
         query = db.query(func.count(self.model.id))
-        if filters:
-            for field, value in filters.items():
-                if hasattr(self.model, field):
-                    query = query.filter(getattr(self.model, field) == value)
+        query = self._apply_filters(query, filters)
         if expressions:
             for expr in expressions:
                 query = query.filter(expr)
         return query.scalar()
+
+    def _apply_filters(self, query, filters: Dict[str, Any]):
+        if not filters:
+            return query
+        for field, value in filters.items():
+            if hasattr(self.model, field):
+                column_attr = getattr(self.model, field)
+                if isinstance(value, (list, tuple, set)):
+                    query = query.filter(column_attr.in_(value))
+                elif isinstance(value, dict) and "op" in value and "val" in value:
+                    op = value["op"]
+                    val = value["val"]
+                    if op == "=": query = query.filter(column_attr == val)
+                    elif op == ">": query = query.filter(column_attr > val)
+                    elif op == "<": query = query.filter(column_attr < val)
+                    elif op == ">=": query = query.filter(column_attr >= val)
+                    elif op == "<=": query = query.filter(column_attr <= val)
+                    elif op == "!=": query = query.filter(column_attr != val)
+                else:
+                    query = query.filter(column_attr == value)
+        return query
