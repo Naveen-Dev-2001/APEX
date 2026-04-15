@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc
 import json
+import concurrent.futures
 
 from app.models.coding import CodingCreate, CodingResponse, LineItemCoding
 from app.models.workflow import WorkflowStepType, WorkflowStepStatus
@@ -252,6 +253,8 @@ def get_coding_suggestions(db: Session, vendor_name: str, extracted_items: List[
             logger.error(f"Error fetching Name-based history: {e}")
 
     suggestions: List[LineItemCoding] = []
+    item_metadata = []
+    descriptions = []
 
     for idx, raw in enumerate(extracted_items):
 
@@ -276,8 +279,29 @@ def get_coding_suggestions(db: Session, vendor_name: str, extracted_items: List[
             "tds" in normalized_desc.lower()
         )
 
-        #  Generate embedding
-        query_embedding = embed_text(normalized_desc)
+        # COLLECT DATA FOR PARALLEL PROCESSING
+        item_metadata.append({
+            "idx": idx,
+            "raw": raw,
+            "desc": desc,
+            "normalized_desc": normalized_desc,
+            "is_gst_eligible": is_gst_eligible,
+            "is_tds": is_tds
+        })
+        descriptions.append(normalized_desc)
+    
+    # Process embeddings in parallel to overcome sequential network latency
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(descriptions), 10)) as executor:
+        embeddings = list(executor.map(embed_text, descriptions))
+
+    for i, meta in enumerate(item_metadata):
+        idx = meta["idx"]
+        raw = meta["raw"]
+        desc = meta["desc"]
+        normalized_desc = meta["normalized_desc"]
+        is_gst_eligible = meta["is_gst_eligible"]
+        is_tds = meta["is_tds"]
+        query_embedding = embeddings[i]
 
         best_match = None
         best_score = 0.0
