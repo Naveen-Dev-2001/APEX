@@ -561,14 +561,29 @@ async def get_invoices(
     skip: int = 0,
     limit: int = 10,
     search: str = None,
+    filters: Optional[str] = Query(None),
     sort_by: str = "uploaded_at",
     sort_dir: str = "desc",
     show_all: bool = True,
     db: Session = Depends(get_db)
 ):
-    filters = {"entity": entity}
+    repo_filters = {"entity": entity}
     if not show_all:
-        filters["uploaded_by"] = current_user.username
+        repo_filters["uploaded_by"] = current_user.username
+
+    # Parse JSON filters if provided
+    if filters:
+        try:
+            extra_filters = json.loads(filters)
+            if isinstance(extra_filters, dict):
+                # Convert list of values to list if they're not already
+                for k, v in extra_filters.items():
+                    if isinstance(v, list):
+                        repo_filters[k] = v
+                    else:
+                        repo_filters[k] = v
+        except Exception as e:
+            print(f"Error parsing filters: {e}")
 
     expressions = []
     
@@ -597,7 +612,7 @@ async def get_invoices(
         db,
         skip=skip,
         limit=limit,
-        filters=filters,
+        filters=repo_filters,
         search=search,
         search_fields=search_fields,
         order_by=sort_by,
@@ -614,6 +629,33 @@ async def get_invoices(
         "page": paginated_res["page"],
         "page_size": paginated_res["page_size"]
     }
+
+
+@router.get("/filter-options")
+async def get_invoice_filter_options(
+    column: str,
+    entity: str = Depends(get_current_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns all unique values for a specific column in the invoices table, 
+    filtered by the active entity.
+    """
+    if not hasattr(Invoice, column):
+        raise HTTPException(status_code=400, detail=f"Column '{column}' does not exist on Invoice model")
+
+    col_attr = getattr(Invoice, column)
+    
+    # Query unique non-null values for the column
+    results = db.query(col_attr).filter(
+        Invoice.entity == entity,
+        col_attr != None
+    ).distinct().all()
+    
+    # Flatten result list (SQLAlchemy returns tuples)
+    options = [r[0] for r in results if r[0] is not None and str(r[0]).strip() != ""]
+    
+    return sorted(list(set(options)), key=lambda x: str(x))
 
 
 @router.get("/{invoice_id}/", response_model=InvoiceResponse)

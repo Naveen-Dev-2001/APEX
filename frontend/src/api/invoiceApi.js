@@ -6,10 +6,16 @@ export const getInvoices = (params = {}) =>
             skip: params.skip || 0,
             limit: params.limit || 10,
             search: params.search || undefined,
+            filters: params.filters ? JSON.stringify(params.filters) : undefined,
             sort_by: params.sort_by || "uploaded_at",
             sort_dir: params.sort_dir || "desc",
             show_all: params.show_all ?? true
         }
+    }).then(res => res.data);
+
+export const getInvoiceFilterOptions = (column) =>
+    API.get(`/invoices/filter-options`, {
+        params: { column }
     }).then(res => res.data);
 
 export const uploadInvoices = (formData, taskId, onUploadProgress) => {

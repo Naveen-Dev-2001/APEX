@@ -31,19 +31,44 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
     const popRef = useRef(null);
     const searchRef = useRef(null);
 
-    // All unique values for this column derived from full data
-    const allValues = useMemo(() => {
-        const vals = [...new Set(data.map(row => getColFilterValue(col, row)))]
-            .filter(v => v && v !== '-')
-            .sort((a, b) => a.localeCompare(b));
-        return vals;
-    }, [data, col]);
+    // All unique values for this column
+    const [allValues, setAllValues] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchOptions = async () => {
+            if (!col.onGetOptions) {
+                // Fallback to deriving from local data
+                const vals = [...new Set(data.map(row => getColFilterValue(col, row)))]
+                    .filter(v => v && v !== '-')
+                    .sort((a, b) => String(a).localeCompare(String(b)));
+                setAllValues(vals);
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const options = await col.onGetOptions(col.accessor);
+                if (isMounted) {
+                    setAllValues(options);
+                }
+            } catch (err) {
+                console.error('Error fetching filter options:', err);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        fetchOptions();
+        return () => { isMounted = false; };
+    }, [col, data]);
 
     // Values visible after searching
     const visibleValues = useMemo(() => {
         if (!search.trim()) return allValues;
         const q = search.toLowerCase();
-        return allValues.filter(v => v.toLowerCase().includes(q));
+        return allValues.filter(v => String(v).toLowerCase().includes(q));
     }, [allValues, search]);
 
     // Close on outside click
@@ -125,14 +150,18 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                 </div>
             </div>
 
-            {/* Checkbox list */}
             <div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 0' }}>
-                {visibleValues.length === 0 ? (
+                {loading ? (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                        <div className="inline-block w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                ) : visibleValues.length === 0 ? (
                     <div style={{ padding: '12px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>
                         No matching values
                     </div>
                 ) : visibleValues.map(val => {
                     const checked = pending.has(val);
+                    const label = String(val);
                     return (
                         <label
                             key={val}
@@ -171,7 +200,7 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                 maxWidth: 190,
                             }}>
-                                {val}
+                                {label}
                             </span>
                         </label>
                     );
@@ -273,7 +302,9 @@ const DataTable = ({
     // ── Client-side filtering ─────────────────────────────────────────────────
     // Helper to filter data by a specific subset of filters
     const getFilteredDataCommon = useCallback((filters) => {
-        if (!enableColumnFilters) return data;
+        // If server side filtering is enabled, we assume 'data' is already filtered
+        if (enableColumnFilters) return data;
+        
         const activeAccessors = Object.keys(filters).filter(acc => filters[acc]?.size > 0);
         if (activeAccessors.length === 0) return data;
 

@@ -9,7 +9,7 @@ import { getCondensedColumns, getFullColumns, VIEW_OPTIONS } from "./invoiceColu
 import { useInvoiceStore } from "../../store/invoice.store";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
-import { deleteInvoice, uploadInvoices, fetchEntityMaster } from "../../api/invoiceApi";
+import { deleteInvoice, uploadInvoices, fetchEntityMaster, getInvoiceFilterOptions } from "../../api/invoiceApi";
 import { message } from "antd";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
@@ -36,13 +36,38 @@ const Invoice = () => {
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
 
+    const accessorToDbField = {
+        vendor_name: "vendor_name",
+        vendor_id: "vendor_id",
+        invoice_number: "invoice_number",
+        uploaded_by: "uploaded_by",
+        status: "status",
+    };
+
+    const backendFilters = useMemo(() => {
+        const filters = {};
+        Object.entries(columnFilters).forEach(([accessor, selectedSet]) => {
+            if (selectedSet && selectedSet.size > 0) {
+                const dbField = accessorToDbField[accessor] || accessor;
+                filters[dbField] = Array.from(selectedSet);
+            }
+        });
+        return filters;
+    }, [columnFilters]);
+
     const { invoices, total, isLoading, refetch } = useInvoiceData({
         skip,
         limit,
         search: searchQuery,
+        filters: backendFilters,
         sort_by: sortColumn,
         sort_dir: sortDirection
     });
+
+    // Reset pagination when search or filters change
+    useEffect(() => {
+        setSkip(0);
+    }, [searchQuery, columnFilters, setSkip]);
 
     // Debounce search
     useEffect(() => {
@@ -240,12 +265,19 @@ const Invoice = () => {
     const hasColumnFilters = Object.values(columnFilters).some(s => s && s.size > 0);
     const isFilterApplied = (searchQuery && searchQuery.trim().length > 0) || hasColumnFilters;
 
-    const columnDefs = useMemo(
-        () => view === "condensed"
+    const columnDefs = useMemo(() => {
+        const cols = view === "condensed"
             ? getCondensedColumns(handleView, handleDelete)
-            : getFullColumns(handleView, handleDelete),
-        [view]
-    );
+            : getFullColumns(handleView, handleDelete);
+
+        return cols.map(col => ({
+            ...col,
+            onGetOptions: col.filterable ? async (accessor) => {
+                const dbField = accessorToDbField[accessor] || accessor;
+                return await getInvoiceFilterOptions(dbField);
+            } : undefined
+        }));
+    }, [view, handleView, handleDelete, accessorToDbField]);
 
     const handleCreateInvoice = () => {
         setIsModalOpen(true);

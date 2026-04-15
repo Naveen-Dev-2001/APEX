@@ -43,7 +43,11 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if filters:
             for field, value in filters.items():
                 if hasattr(self.model, field):
-                    query = query.filter(getattr(self.model, field) == value)
+                    column_attr = getattr(self.model, field)
+                    if isinstance(value, (list, tuple, set)):
+                        query = query.filter(column_attr.in_(value))
+                    else:
+                        query = query.filter(column_attr == value)
         
         if expressions:
             for expr in expressions:
@@ -80,11 +84,15 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         query = db.query(self.model)
 
-        # Filters (exact match)
+        # Filters (exact match or list inclusion)
         if filters:
             for field, value in filters.items():
                 if hasattr(self.model, field):
-                    query = query.filter(getattr(self.model, field) == value)
+                    column_attr = getattr(self.model, field)
+                    if isinstance(value, (list, tuple, set)):
+                        query = query.filter(column_attr.in_(value))
+                    else:
+                        query = query.filter(column_attr == value)
 
         # Complex expressions
         if expressions:
