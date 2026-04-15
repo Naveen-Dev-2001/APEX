@@ -39,7 +39,8 @@ const RegisterPage = () => {
             const payload = {
                 email,
                 username,
-                password
+                password,
+                department: "non-finance team"
             };
             console.log("Submitting:", payload);
 
