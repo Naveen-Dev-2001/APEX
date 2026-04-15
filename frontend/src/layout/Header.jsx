@@ -91,6 +91,7 @@ const Header = () => {
 
     const { navigation, fetchSettings } = useAdminStore();
     const [filteredTabs, setFilteredTabs] = useState([]);
+    debugger
 
     // Fetch settings on mount to ensure we have navigation
     useEffect(() => {
@@ -367,24 +368,26 @@ const Header = () => {
                                         Change Entity
                                     </span>
                                 </button>
-
-                                {/* Change Role Action */}
-                                <button
-                                    onClick={() => {
-                                        setShowChangeRoleModal(true);
-                                        setIsDropdownOpen(false);
-                                    }}
-                                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5 mt-2"
-                                >
-                                    <div className="p-1 rounded-lg text-[#3ba5d8] group-hover:bg-blue-50">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                    </div>
-                                    <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
-                                        Change Role
-                                    </span>
-                                </button>
+                               
+                                {/* Change Role Action (only if user has both admin and approver roles) */}
+                                {Array.isArray(allRoles) && allRoles.length >= 2 && allRoles.includes('admin') && allRoles.includes('approver') && (
+                                    <button
+                                        onClick={() => {
+                                            setShowChangeRoleModal(true);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5 mt-2"
+                                    >
+                                        <div className="p-1 rounded-lg text-[#3ba5d8] group-hover:bg-blue-50">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                                            Change Role
+                                        </span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
