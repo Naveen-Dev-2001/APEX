@@ -36,7 +36,7 @@ const LoginPage = () => {
                     email: response.data.email || null,
                     role: response.data.role || null
                 };
-                setAuth(response.data.access_token, userObj);
+                setAuth(response.data.access_token, userObj, response.data.refresh_token);
 
                 // Navigate to dashboard upon successful login
                 navigate('/select-entity');

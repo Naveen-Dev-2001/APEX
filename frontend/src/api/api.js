@@ -37,4 +37,37 @@ API.interceptors.request.use(
     }
 );
 
-export default API;
+API.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true;
+
+            try {
+                const refreshToken = sessionStorage.getItem('refresh_token');
+                if (!refreshToken) throw new Error("No refresh token");
+
+                const res = await axios.post(`${baseURL}/auth/refresh?refresh_token=${refreshToken}`);
+                
+                if (res.data?.access_token) {
+                    const { access_token, refresh_token } = res.data;
+                    sessionStorage.setItem('access_token', access_token);
+                    if (refresh_token) sessionStorage.setItem('refresh_token', refresh_token);
+                    
+                    originalRequest.headers.Authorization = `Bearer ${access_token}`;
+                    return API(originalRequest);
+                }
+            } catch (refreshError) {
+                console.error("Token refresh failed:", refreshError);
+                sessionStorage.clear();
+                window.location.href = '/login';
+                return Promise.reject(refreshError);
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
+export default API;
