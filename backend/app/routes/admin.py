@@ -1,3 +1,4 @@
+from pydantic import EmailStr
 from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from datetime import datetime
 from typing import List, Dict, Any, Optional 
@@ -30,6 +31,7 @@ def get_current_admin(current_user: UserResponse = Depends(get_current_user)):
 class UserCreate(BaseModel):
     username: str
     email: str
+    password: Optional[str] = None
     role: str
     status: str
     department: Optional[str] = None
@@ -47,7 +49,8 @@ async def create_new_user(
         raise HTTPException(status_code=400, detail="Email already registered")
     
     from app.auth.jwt import get_password_hash
-    hashed_password = get_password_hash("Apex2026")
+    password_to_hash = user_data.password if user_data.password else "Apex2026"
+    hashed_password = get_password_hash(password_to_hash)
 
     new_user_data = {
         "username": user_data.username,

@@ -37,9 +37,15 @@ const LoginPage = () => {
                     role: response.data.role || null
                 };
                 setAuth(response.data.access_token, userObj);
-
-                // Navigate to dashboard upon successful login
-                navigate('/select-entity');
+                
+                // Check if user must change password on first login
+                if (response.data.ispasswordchange === false) {
+                    toast.info('Please change your password to continue');
+                    navigate('/change-password-first-time', { state: { email: response.data.email || email } });
+                } else {
+                    // Navigate to dashboard upon successful login
+                    navigate('/select-entity');
+                }
             } else {
                 setError("Invalid response from server");
             }

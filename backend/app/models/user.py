@@ -19,7 +19,7 @@ class UserResponse(BaseModel):
     
     id: Union[str, int]
     username: str
-    email: EmailStr
+    email: str
     role: str
     status: str 
     department: Optional[str] = None
@@ -32,4 +32,4 @@ class UserPaginatedResponse(BaseModel):
     data: List[UserResponse]
     total: int
     page: int
-    page_size: int
+    page_size: int

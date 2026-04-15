@@ -43,12 +43,13 @@ const SelectEntityPage = () => {
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const setAuth = useAuthStore((state) => state.setAuth);
+  const setActiveRole = useAuthStore((state) => state.setActiveRole);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
 
   // Parse user roles
   const userRoles = user?.role ? user.role.split(',') : [];
   const hasMultipleRoles = userRoles.length > 1;
-  const [activeRole, setActiveRole] = useState(
+  const [activeRole, setLocalActiveRole] = useState(
     sessionStorage.getItem('active_role') || userRoles[0] || 'approver'
   );
   const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false);
@@ -64,11 +65,8 @@ const SelectEntityPage = () => {
 
   const handleConfirmRoleChange = () => {
     const newRole = targetRole;
+    setLocalActiveRole(newRole);
     setActiveRole(newRole);
-    sessionStorage.setItem('active_role', newRole);
-    if (user) {
-      setAuth(sessionStorage.getItem('access_token'), { ...user, role: newRole });
-    }
     setShowChangeRoleModal(false);
     setIsDropdownOpen(false);
   };
@@ -84,14 +82,8 @@ const SelectEntityPage = () => {
     setSelectedEntity(entity.displayName);
     setIsSelectOpen(false);
     
-    // Store active role
-    sessionStorage.setItem('active_role', activeRole);
-    
-    // Update user in store with ACTIVE role for this session
-    // This ensures UI components see the correct role
-    if (user) {
-        setAuth(sessionStorage.getItem('access_token'), { ...user, role: activeRole });
-    }
+    // Store active role context without mutating the primary user object
+    setActiveRole(activeRole);
 
     // Store the entity_id as the FK value sent in X-Entity header to the backend
     setEntity(entity.entityId || entity.name);
@@ -267,7 +259,7 @@ const SelectEntityPage = () => {
                         <button
                           className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors capitalize"
                           onClick={() => {
-                            setActiveRole(role);
+                            setLocalActiveRole(role);
                             setIsRoleSelectOpen(false);
                           }}
                         >

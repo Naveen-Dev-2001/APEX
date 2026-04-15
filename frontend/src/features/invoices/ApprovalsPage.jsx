@@ -15,7 +15,7 @@ const { confirm } = Modal;
 
 const ApprovalsPage = () => {
     const navigate = useNavigate();
-    const user = useAuthStore((state) => state.user);
+    const { user, activeRole } = useAuthStore();
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(false);
     const [activeDelegations, setActiveDelegations] = useState([]);
@@ -246,7 +246,7 @@ const ApprovalsPage = () => {
             children: (
                 <div className="pt-4">
                     <DelegationManager
-                        isAdmin={user?.role === 'admin'}
+                        isAdmin={activeRole?.toLowerCase() === 'admin'}
                         onUpdate={fetchData}
                         approvers={approvers}
                         loading={loading}

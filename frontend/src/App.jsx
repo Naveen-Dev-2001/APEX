@@ -11,6 +11,7 @@ import AdminPage from './features/admin/AdminPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
+import ChangePasswordFirstTimePage from './features/auth/ChangePasswordFirstTimePage';
 
 import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
@@ -34,32 +35,26 @@ function App() {
       <Router>
         <ToastProvider />
         <Routes>
-          <Route >
-            <Route path="/" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/test-date-picker" element={<TestDatePicker />} />
-            {/* <Route path="/signup" element={<SignupForm />} /> */}
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            {/* <Route path="/update-password" element={<UpdatePasswordPage />} /> */}
-          </Route>
+          {/* Public Routes */}
+          <Route path="/" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/test-date-picker" element={<TestDatePicker />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/select-entity" element={<SelectEntityPage />} />
-            {/* <Route path="/sso" element={<SSO />} /> */}
+            <Route path="/change-password-first-time" element={<ChangePasswordFirstTimePage />} />
 
-            <Route >
-              <Route element={<AppLayout />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/invoices" element={<Invoice />} />
-                <Route path="/coding" element={<CodingPage />} />
-                <Route path="/approvals" element={<ApprovalsPage />} />
-                <Route path="/master-data" element={<MasterDataPage />} />
-                {/* <Route path="/settings" element={<SettingsPage />} /> */}
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/admin" element={<AdminPage />} />
-              </Route>
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/invoices" element={<Invoice />} />
+              <Route path="/coding" element={<CodingPage />} />
+              <Route path="/approvals" element={<ApprovalsPage />} />
+              <Route path="/master-data" element={<MasterDataPage />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/admin" element={<AdminPage />} />
             </Route>
           </Route>
         </Routes>

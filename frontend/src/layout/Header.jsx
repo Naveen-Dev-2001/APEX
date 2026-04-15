@@ -51,8 +51,7 @@ const Header = () => {
     const location = useLocation();
     const { setInvoiceSection } = useInvoiceStore()
     const { activeTab, setActiveTab } = useUIStore();
-    const logout = useAuthStore((state) => state.logout);
-    const user = useAuthStore((state) => state.user);
+    const { logout, user, activeRole, setActiveRole } = useAuthStore();
     const entity = useCommonStore((state) => state.entity);
     // Use the display name for UI; fall back to entity_id or a default
     const selectedEntityName = sessionStorage.getItem('selected_entity_name') || entity || sessionStorage.getItem('selected_entity') || 'consolidated analytics';
@@ -66,32 +65,25 @@ const Header = () => {
 
     const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
-    // Resolve current active role and compute target for role-switch
-    const setAuth = useAuthStore((state) => state.setAuth);
-    const activeRole = sessionStorage.getItem('active_role') || user?.role || '';
+    // Resolve target role for the Change Role feature
     const allRoles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
     const getTargetRole = () => {
-        const current = activeRole.toLowerCase().trim();
+        const current = (activeRole || '').toLowerCase().trim();
         if (current === 'admin') return 'approver';
         if (current === 'approver') return 'admin';
-        // For any other role, find a different role from allRoles or default to 'admin'
-        return allRoles.find(r => r.toLowerCase().trim() !== current) || 'admin';
+        // For other roles (like scanner), switch to anything else available or default to first role
+        return allRoles.find(r => r.toLowerCase().trim() !== current) || allRoles[0] || 'admin';
     };
     const targetRole = getTargetRole();
-
+    
     const handleConfirmRoleChange = () => {
-        const newRole = targetRole;
-        sessionStorage.setItem('active_role', newRole);
-        if (user) {
-            setAuth(sessionStorage.getItem('access_token'), { ...user, role: newRole });
-        }
+        setActiveRole(targetRole);
         setShowChangeRoleModal(false);
         setIsDropdownOpen(false);
     };
 
     const { navigation, fetchSettings } = useAdminStore();
     const [filteredTabs, setFilteredTabs] = useState([]);
-    debugger
 
     // Fetch settings on mount to ensure we have navigation
     useEffect(() => {
@@ -106,21 +98,22 @@ const Header = () => {
         }
 
         const userRole = user?.role?.toLowerCase() || '';
+        const currentRole = (activeRole || '').toLowerCase();
         const userDept = user?.department?.toLowerCase() || '';
 
         const filtered = navigation
             .filter(nav => {
                 // Check if role has access
                 const roles = nav.roles || [];
-                const roleAccess = roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === userRole);
+                const roleAccess = roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === currentRole);
                 
                 // Show Master Data for scanner and coder as well
-                if (nav.label === 'Master Data' && (userRole === 'scanner' || userRole === 'coder')) {
+                if (nav.label === 'Master Data' && (currentRole === 'scanner' || currentRole === 'coder')) {
                     return true;
                 }
 
                 // Specific block: non-finance approvers cannot see dashboard
-                if (nav.label === 'Dashboard' && userRole === 'approver' && userDept === 'non-finance') {
+                if (nav.label === 'Dashboard' && currentRole === 'approver' && userDept === 'non-finance') {
                     return false;
                 }
                 
@@ -134,7 +127,7 @@ const Header = () => {
             }));
 
         setFilteredTabs(filtered);
-    }, [navigation, user]);
+    }, [navigation, user, activeRole]);
 
     // Sync active tab with route on path change or refresh
     useEffect(() => {
@@ -151,7 +144,6 @@ const Header = () => {
     };
 
     const handleTabClick = (tab) => {
-        debugger
         if (tab.name == "Invoices") {
             setInvoiceSection(1)
         }
@@ -346,8 +338,8 @@ const Header = () => {
                                         <span className="text-[16px] font-bold text-gray-900 truncate leading-none mb-1">
                                             {user?.username || 'admin'}
                                         </span>
-                                        <span className="text-[13px] text-gray-400 font-medium truncate">
-                                            {user?.role || 'Admin'}
+                                        <span className="text-[13px] text-gray-400 font-medium truncate capitalize">
+                                            {activeRole || 'User'}
                                         </span>
                                     </div>
                                 </div>

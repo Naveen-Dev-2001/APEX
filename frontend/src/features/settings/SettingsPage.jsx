@@ -20,8 +20,8 @@ const SettingsPage = () => {
         getFilteredData, approversList
     } = useWorkflowStore();
 
-    const { user } = useAuthStore();
-    const isCoder = user?.role === 'coder';
+    const { user, activeRole } = useAuthStore();
+    const isCoder = activeRole?.toLowerCase() === 'coder';
 
     const { showConfirm } = useToastStore();
     const [modalState, setModalState] = useState({ open: false, mode: 'add', rowData: null });

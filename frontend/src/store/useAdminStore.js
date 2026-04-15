@@ -173,11 +173,14 @@ const useAdminStore = create((set, get) => ({
     addUser: async (userData) => {
         set({ isUpdating: true });
         try {
-            await API.post('/auth/register', userData);
+            await adminService.addUser(userData);
             await get().fetchUsers();
+            toast.success('User created successfully');
             return true;
         } catch (error) {
             console.error("Failed to add user", error);
+            const errMsg = error.response?.data?.detail || 'Failed to create user';
+            toast.error(errMsg);
             return false;
         } finally {
             set({ isUpdating: false });
