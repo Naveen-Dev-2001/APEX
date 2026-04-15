@@ -93,6 +93,7 @@ export const getCondensedColumns = (onView, onDelete) => [
         accessor:   "processed_at",
         sortable:   true,
         filterable: true,
+        filterType: 'date',
         render:     (val) => val ? new Date(val).toLocaleDateString() : "-",
     },
     {
@@ -204,15 +205,15 @@ export const getFullColumns = (onView, onDelete) => [
         header:         "Invoice Date",
         accessor:       "invoice_date",
         filterable:     true,
-        getFilterValue: (row) => row?.extracted_data?.invoice_details?.invoice_date?.value ?? "",
-        render:         (_, row) => row?.extracted_data?.invoice_details?.invoice_date?.value ?? "-",
+        filterType:     'date',
+        render:         (val) => val ? new Date(val).toLocaleDateString() : "-",
     },
     {
         header:         "Due Date",
         accessor:       "due_date",
         filterable:     true,
-        getFilterValue: (row) => row?.extracted_data?.invoice_details?.due_date?.value ?? "",
-        render:         (_, row) => row?.extracted_data?.invoice_details?.due_date?.value ?? "-",
+        filterType:     'date',
+        render:         (val) => val ? new Date(val).toLocaleDateString() : "-",
     },
     {
         header:         "Currency",

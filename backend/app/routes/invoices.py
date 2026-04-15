@@ -43,6 +43,7 @@ import asyncio
 import traceback
 from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
+from dateutil import parser
 
 def remove_currency_format(value):
     if not value or value == "" or value == "N/A":
@@ -54,6 +55,18 @@ def remove_currency_format(value):
             return None
         return float(clean_val)
     except (ValueError, TypeError):
+        return None
+
+def parse_date_safely(value):
+    if not value or value == "" or value == "N/A":
+        return None
+    try:
+        if isinstance(value, datetime):
+            return value.date()
+        # Parse common date formats
+        dt = parser.parse(str(value))
+        return dt.date()
+    except (ValueError, TypeError, parser.ParserError):
         return None
 
 
@@ -425,6 +438,13 @@ async def upload_invoices(
             
             new_invoice.total_amount = remove_currency_format(total_val)
             new_invoice.amount_due = remove_currency_format(due_val)
+
+            # Populate date columns for filtering/sorting
+            invoice_dt_val = invoice_details.get("invoice_date", {}).get("value")
+            due_dt_val = invoice_details.get("due_date", {}).get("value")
+            
+            new_invoice.invoice_date = parse_date_safely(invoice_dt_val)
+            new_invoice.due_date = parse_date_safely(due_dt_val)
 
             task_db.commit()
 
@@ -1695,12 +1715,19 @@ async def update_invoice(
             if new_vendor_name: 
                 extracted_data["vendor_info"]["name"] = {"value": new_vendor_name}
                 
-            if "invoice_details" not in extracted_data: extracted_data["invoice_details"] = {}
-            if new_invoice_number:
-                if "invoice_number" not in extracted_data["invoice_details"]: extracted_data["invoice_details"]["invoice_number"] = {}
-                extracted_data["invoice_details"]["invoice_number"]["value"] = new_invoice_number
-                
-            update_data["extracted_data"] = extracted_data # Keep as dict for now
+            if "invoice_number" not in extracted_data["invoice_details"]: extracted_data["invoice_details"]["invoice_number"] = {}
+            extracted_data["invoice_details"]["invoice_number"]["value"] = new_invoice_number
+
+        # --- Date Columns Sync ---
+        inv_dt = extracted_data.get("invoice_details", {}).get("invoice_date", {}).get("value")
+        due_dt = extracted_data.get("invoice_details", {}).get("due_date", {}).get("value")
+        
+        if inv_dt is not None:
+            update_data["invoice_date"] = parse_date_safely(inv_dt)
+        if due_dt is not None:
+            update_data["due_date"] = parse_date_safely(due_dt)
+            
+        update_data["extracted_data"] = extracted_data # Keep as dict for now
 
 
     # Merge validation

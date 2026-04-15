@@ -122,6 +122,8 @@ class Invoice(Base):
     exchange_rate = Column(DECIMAL(18, 6), nullable=True)
     total_amount = Column(DECIMAL(18, 2), nullable=True, index=True)
     amount_due = Column(DECIMAL(18, 2), nullable=True, index=True)
+    invoice_date = Column(Date, nullable=True, index=True)
+    due_date = Column(Date, nullable=True, index=True)
 
     # JSON fields (stored as NVARCHAR(MAX))
     extracted_data = Column(Text, nullable=True)  # JSON
@@ -166,6 +168,8 @@ class Invoice(Base):
         Index('ix_invoice_vendor_number', 'vendor_id', 'invoice_number'),
         Index('ix_invoice_entity_status', 'entity', 'status'),
         Index('ix_invoice_uploaded_at_desc', uploaded_at.desc()),
+        Index('ix_invoice_date', 'invoice_date'),
+        Index('ix_invoice_due_date', 'due_date'),
     )
 
 

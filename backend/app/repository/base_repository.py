@@ -206,6 +206,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     elif op == ">=": query = query.filter(column_attr >= val)
                     elif op == "<=": query = query.filter(column_attr <= val)
                     elif op == "!=": query = query.filter(column_attr != val)
+                    elif op == "between":
+                        if isinstance(val, (list, tuple)) and len(val) == 2:
+                            if val[0]: query = query.filter(column_attr >= val[0])
+                            if val[1]: query = query.filter(column_attr <= val[1])
                 else:
                     query = query.filter(column_attr == value)
         return query

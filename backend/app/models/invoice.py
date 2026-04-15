@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, Dict, Any, List, Union
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 
 class InvoiceStatus(str, Enum):
@@ -38,6 +38,8 @@ class InvoiceBase(BaseModel):
     vendor_id: Optional[str] = None
     vendor_name: Optional[str] = None
     invoice_number: Optional[str] = None
+    invoice_date: Optional[date] = None
+    due_date: Optional[date] = None
 
 class InvoiceCreate(InvoiceBase):
     pass
@@ -48,6 +50,8 @@ class InvoiceUpdate(BaseModel):
     status_history: Optional[List[Dict[str, Any]]] = None
     validation_results: Optional[Dict[str, Any]] = None
     exchange_rate: Optional[float] = None
+    invoice_date: Optional[date] = None
+    due_date: Optional[date] = None
 
 class Invoice(InvoiceBase):
     model_config = ConfigDict(from_attributes=True)

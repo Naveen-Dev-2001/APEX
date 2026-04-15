@@ -27,8 +27,9 @@ const getColFilterValue = (col, row) => {
 // ─── Column Filter Popover ────────────────────────────────────────────────────
 const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }) => {
     const isNumber = col.filterType === 'number';
+    const isDate = col.filterType === 'date';
     const [filterMode, setFilterMode] = useState(() => {
-        if (isNumber && activeFilters && !(activeFilters instanceof Set)) return 'condition';
+        if ((isNumber || isDate) && activeFilters && !(activeFilters instanceof Set)) return 'condition';
         return 'list';
     });
 
@@ -36,6 +37,7 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
     const [pendingSet, setPendingSet] = useState(() => (activeFilters instanceof Set ? new Set(activeFilters) : new Set()));
     const [pendingCond, setPendingCond] = useState(() => {
         if (activeFilters && !(activeFilters instanceof Set)) return activeFilters;
+        if (isDate) return { op: 'between', val: ['', ''] };
         return { op: '>', val: '' };
     });
     const popRef = useRef(null);
@@ -118,8 +120,8 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
             width: W,
             background: '#fff',
             border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            borderRadius: 12,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
             zIndex: 9999,
             overflow: 'hidden',
             display: 'flex',
@@ -129,7 +131,7 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
 
     return (
         <div ref={popRef} style={style}>
-            {isNumber && (
+            {(isNumber || isDate) && (
                 <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
                     <button
                         onClick={() => setFilterMode('list')}
@@ -249,38 +251,69 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                     </div>
                 </>
             ) : (
-                <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Operator</span>
-                        <select
-                            value={pendingCond.op}
-                            onChange={e => setPendingCond(prev => ({ ...prev, op: e.target.value }))}
-                            style={{
-                                width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db',
-                                fontSize: 13, color: '#374151', outline: 'none'
-                            }}
-                        >
-                            <option value="=">=</option>
-                            <option value=">">&gt;</option>
-                            <option value="<">&lt;</option>
-                            <option value=">=">&gt;=</option>
-                            <option value="<=">&lt;=</option>
-                            <option value="!=">!=</option>
-                        </select>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Value</span>
-                        <input
-                            type="number"
-                            value={pendingCond.val}
-                            onChange={e => setPendingCond(prev => ({ ...prev, val: e.target.value }))}
-                            placeholder="Enter value"
-                            style={{
-                                width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
-                                fontSize: 13, color: '#374151', outline: 'none'
-                            }}
-                        />
-                    </div>
+                <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {isDate ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>From</span>
+                                <input
+                                    type="date"
+                                    value={pendingCond.val[0] || ''}
+                                    onChange={e => setPendingCond(prev => ({ ...prev, op: 'between', val: [e.target.value, prev.val[1] || ''] }))}
+                                    style={{
+                                        width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
+                                        fontSize: 13, color: '#374151', outline: 'none'
+                                    }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>To</span>
+                                <input
+                                    type="date"
+                                    value={pendingCond.val[1] || ''}
+                                    onChange={e => setPendingCond(prev => ({ ...prev, op: 'between', val: [prev.val[0] || '', e.target.value] }))}
+                                    style={{
+                                        width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
+                                        fontSize: 13, color: '#374151', outline: 'none'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Operator</span>
+                                <select
+                                    value={pendingCond.op}
+                                    onChange={e => setPendingCond(prev => ({ ...prev, op: e.target.value }))}
+                                    style={{
+                                        width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db',
+                                        fontSize: 13, color: '#374151', outline: 'none'
+                                    }}
+                                >
+                                    <option value="=">=</option>
+                                    <option value=">">&gt;</option>
+                                    <option value="<">&lt;</option>
+                                    <option value=">=">&gt;=</option>
+                                    <option value="<=">&lt;=</option>
+                                    <option value="!=">!=</option>
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Value</span>
+                                <input
+                                    type="number"
+                                    value={pendingCond.val}
+                                    onChange={e => setPendingCond(prev => ({ ...prev, val: e.target.value }))}
+                                    placeholder="Enter value"
+                                    style={{
+                                        width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
+                                        fontSize: 13, color: '#374151', outline: 'none'
+                                    }}
+                                />
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
@@ -293,6 +326,7 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                 <button
                     onClick={() => {
                         if (filterMode === 'list') setPendingSet(new Set());
+                        else if (isDate) setPendingCond({ op: 'between', val: ['', ''] });
                         else setPendingCond({ op: '>', val: '' });
                     }}
                     style={{
@@ -363,7 +397,12 @@ const DataTable = ({
     const hasActiveFilters = Object.values(columnFilters).some(val => {
         if (!val) return false;
         if (val instanceof Set) return val.size > 0;
-        if (typeof val === 'object' && val.op) return val.val !== "" && val.val !== undefined;
+        if (typeof val === 'object' && val.op) {
+            if (val.op === 'between') {
+                return (val.val[0] !== "" && val.val[0] !== undefined) || (val.val[1] !== "" && val.val[1] !== undefined);
+            }
+            return val.val !== "" && val.val !== undefined;
+        }
         return false;
     });
 
@@ -371,7 +410,12 @@ const DataTable = ({
         const val = columnFilters[accessor];
         if (!val) return false;
         if (val instanceof Set) return val.size > 0;
-        if (typeof val === 'object' && val.op) return val.val !== "" && val.val !== undefined;
+        if (typeof val === 'object' && val.op) {
+            if (val.op === 'between') {
+                return (val.val[0] !== "" && val.val[0] !== undefined) || (val.val[1] !== "" && val.val[1] !== undefined);
+            }
+            return val.val !== "" && val.val !== undefined;
+        }
         return false;
     };
 
@@ -410,7 +454,25 @@ const DataTable = ({
                     if (selected.size === 0) return true;
                     const val = getColFilterValue(col, row);
                     return selected.has(val);
-                } else if (typeof selected === 'object' && selected.op) {
+                    } else if (typeof selected === 'object' && selected.op) {
+                    if (selected.op === 'between') {
+                        const rowVal = getColFilterValue(col, row);
+                        if (!rowVal) return false;
+                        const rowDate = new Date(rowVal);
+                        if (isNaN(rowDate.getTime())) return false;
+                        
+                        const [from, to] = selected.val;
+                        if (from) {
+                            const fromDate = new Date(from);
+                            if (rowDate < fromDate) return false;
+                        }
+                        if (to) {
+                            const toDate = new Date(to);
+                            if (rowDate > toDate) return false;
+                        }
+                        return true;
+                    }
+                    
                     if (selected.val === "" || selected.val === undefined) return true;
                     const rowVal = parseFloat(getColFilterValue(col, row));
                     const filterVal = parseFloat(selected.val);
