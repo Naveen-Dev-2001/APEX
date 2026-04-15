@@ -626,6 +626,7 @@ const MasterDataPage = () => {
                                 sortDirection={sortDirection}
                                 maxHeight="calc(100vh - 280px)"
                                 stickyHeader={true}
+                                enableColumnFilters={true}
                             />
                         )}
                     </>

@@ -135,18 +135,21 @@ const ApprovalsPage = () => {
             header: "Vendor Name",
             accessor: "vendor_name",
             sortable: true,
+            filterable: true,
             onClick: () => handleSort("vendor_name")
         },
         {
             header: "Invoice ID",
             accessor: "invoice_number",
             sortable: true,
+            filterable: true,
             onClick: () => handleSort("invoice_number")
         },
         {
             header: "Total Amount ($)",
             accessor: "total_amount",
             sortable: true,
+            filterable: true,
             onClick: () => handleSort("total_amount"),
             render: (val) => `$ ${val}`
         },
@@ -154,11 +157,14 @@ const ApprovalsPage = () => {
             header: "Updated By",
             accessor: "uploaded_by",
             sortable: true,
+            filterable: true,
             onClick: () => handleSort("uploaded_by")
         },
         {
             header: "Status",
             accessor: "status",
+            filterable: true,
+            getFilterValue: (row) => "Waiting for Approval",
             render: () => (
                 <div className="bg-orange-50 text-orange-500 px-3 py-1 rounded-full text-[12px] font-medium inline-block border border-orange-100">
                     Waiting for Approval
@@ -169,6 +175,7 @@ const ApprovalsPage = () => {
             header: "Approver",
             accessor: "approver_name",
             sortable: true,
+            filterable: true,
             onClick: () => handleSort("approver_name")
         },
         {
@@ -236,6 +243,7 @@ const ApprovalsPage = () => {
                         sortDirection={sortDirection}
                         maxHeight="calc(100vh - 320px)"
                         stickyHeader={true}
+                        enableColumnFilters={true}
                     />
                 </div>
             ),

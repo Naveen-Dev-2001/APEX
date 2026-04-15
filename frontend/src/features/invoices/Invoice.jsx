@@ -442,6 +442,7 @@ const Invoice = () => {
                                 sortDirection={sortDirection}
                                 stickyHeader
                                 maxHeight="calc(100vh - 220px)"
+                                enableColumnFilters
                             />
                         </div>
                     )}
