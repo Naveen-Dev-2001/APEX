@@ -19,7 +19,7 @@ dayjs.extend(customParseFormat);
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
-const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading }) => {
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, isAmountMismatch, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading }) => {
     const [localValue, setLocalValue] = useState(storeValue ?? "");
     const debounceRef = useRef(null);
 
@@ -129,6 +129,11 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
             {field.key === "invoiceNumber" && isDuplicate && duplicateMessage && (
                 <div className="text-red-500 text-xs mt-1 font-medium italic">
                     ⚠️ {duplicateMessage}
+                </div>
+            )}
+            {(field.key === "totalPayable") && isAmountMismatch && (
+                <div className="text-red-500 text-xs mt-1 font-medium italic">
+                    ⚠️ Amount Mismatch
                 </div>
             )}
         </div>
@@ -498,6 +503,23 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         return { regularItemsSum, totalAmountPayable };
     }, [lineItems]);
 
+    // added by pricilla
+    useEffect(() => {
+        setQuickViewField("totalPayable", Number(totalAmountPayable).toFixed(2));
+    }, [totalAmountPayable]);
+
+    // ── Amount Mismatch Warning ──────────────────────────────────────────────
+    const isAmountMismatch = useMemo(() => {
+        const parseCurrency = (val) => {
+            if (!val && val !== 0) return 0;
+            const strVal = val.toString().replace(/[^0-9.-]+/g, "");
+            return parseFloat(strVal) || 0;
+        };
+        const totalAmount = parseCurrency(quickViewFormData?.totalAmount);
+        // Compare with the calculated total amount payable from line items
+        return Math.abs(totalAmount - totalAmountPayable) > 0.01;
+    }, [quickViewFormData?.totalAmount, totalAmountPayable]);
+
     // Label for the GST system row
     const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
 
@@ -553,6 +575,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                             onLeave={handleLeaveField}
                                                             isDuplicate={isDuplicate}
                                                             duplicateMessage={duplicateMessage}
+                                                            isAmountMismatch={isAmountMismatch}
                                                             forceDisabled={showOnlyHeader || isViewOnly}
                                                             currencyOptions={currencyOptions}
                                                             fetchCurrencyOptions={fetchCurrencyOptions}
