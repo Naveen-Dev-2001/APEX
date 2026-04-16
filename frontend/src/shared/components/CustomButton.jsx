@@ -46,6 +46,14 @@ export default function CustomButton({
             bg-green-500
             text-white cursor-pointer
         `,
+        danger: `
+            bg-red-500
+            text-white cursor-pointer
+        `,
+        warning: `
+            bg-amber-500
+            text-white cursor-pointer
+        `,
     };
 
     const effectiveVariant = disabled || variant === "disabled" ? "disabled" : variant;

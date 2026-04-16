@@ -11,6 +11,8 @@ import { useAuthStore } from "../../store/authStore";
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate()
     const user = useAuthStore((state) => state.user);
+    const userDept = user?.department?.toLowerCase();
+    console.log("user department", user);
     const userRole = user?.role?.toLowerCase();
     const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView, setInvoiceActiveTab, activeInvoiceData } = useInvoiceStore();
     const { handleSave } = useSaveInvoice();
@@ -70,46 +72,73 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
             {/* Right — actions */}
             <div className="flex items-center gap-3">
-                {!activeInvoiceData?.is_archived && ((userRole === 'scanner' && currentStatus !== 'waiting_coding') || (userRole === 'coder' && currentStatus === 'waiting_coding')) && (
+                {!activeInvoiceData?.is_archived && (
                     <>
-                        <div className="w-[100px]">
+                        {/* Send to Coding / Send to Approval for Scanners and Coders */}
+                        {((userRole === 'scanner' && currentStatus !== 'waiting_coding') || (userRole === 'coder' && currentStatus === 'waiting_coding')) && (
+                            <>
+                                <div className="w-[100px]">
+                                    <CustomButton
+                                        variant="outline"
+                                        className="w-32"
+                                    >
+                                        Discard
+                                    </CustomButton>
+                                </div>
+                                <div className="w-[100px]">
+                                    <CustomButton
+                                        variant="primary"
+                                        className="w-24"
+                                        onClick={handleSaveInvoice}
+                                    >
+                                        Save
+                                    </CustomButton>
+                                </div>
+                                <div className="w-[220px]">
+                                    <CustomButton
+                                        variant="success"
+                                        className="w-40"
+                                        disabled={isDuplicate}
+                                        onClick={currentStatus === 'waiting_coding' ? handleSendToApproval : handleSendToCoding}
+                                    >
+                                        {currentStatus === 'waiting_coding'
+                                            ? "Send to Approval"
+                                            : currentStatus === 'processed'
+                                                ? "Send to Coding"
+                                                : "Send to Coding"}
+                                    </CustomButton>
+                                </div>
+                            </>
+                        )}
 
-                            <CustomButton
-                                variant="outline"
-                                className="w-32"
-                                onClick={() => {/* handle discard */ }}
-                            >
-                                Discard
-                            </CustomButton>
-                        </div>
-                        <div className="w-[100px]">
-
-                            {/* Save - Primary button */}
-                            <CustomButton
-                                variant="primary"
-                                className="w-24"
-                                disabled={isDuplicate}
-                                onClick={handleSaveInvoice}
-                            >
-                                Save
-                            </CustomButton>
-                        </div>
-                        <div className="w-[220px]">
-
-                            {/* Send to Coding / Send to Approval - Green button */}
-                            <CustomButton
-                                variant="success"
-                                className="w-40"
-                                disabled={isDuplicate}
-                                onClick={currentStatus === 'waiting_coding' ? handleSendToApproval : handleSendToCoding}
-                            >
-                                {currentStatus === 'waiting_coding'
-                                    ? "Send to Approval"
-                                    : currentStatus === 'processed'
-                                        ? "Send to Coding"
-                                        : "Send to Coding"}
-                            </CustomButton>
-                        </div>
+                        {/* Approver actions */}
+                        {(userRole === 'approver' && currentStatus === 'waiting_approval') && (
+                            <>
+                                {/* Explicitly check for finance or 'finance team'. Adjust as needed based on your DB values. */}
+                                {(user?.department?.toLowerCase() === 'finance' || user?.department?.toLowerCase() === 'finance') && (
+                                    <div className="w-[130px]">
+                                        <CustomButton variant="primary" className="w-full border-blue-500 text-blue-500">
+                                            Enable Editing
+                                        </CustomButton>
+                                    </div>
+                                )}
+                                <div className="w-[100px]">
+                                    <CustomButton variant="warning" className="w-full border-0">
+                                        Rework
+                                    </CustomButton>
+                                </div>
+                                <div className="w-[100px]">
+                                    <CustomButton variant="danger" className="w-full">
+                                        Reject
+                                    </CustomButton>
+                                </div>
+                                <div className="w-[100px]">
+                                    <CustomButton variant="success" className="w-full border-0">
+                                        Approve
+                                    </CustomButton>
+                                </div>
+                            </>
+                        )}
                     </>
                 )}
             </div>
