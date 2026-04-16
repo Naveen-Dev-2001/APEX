@@ -38,18 +38,21 @@ const UserManagementTab = ({ onEdit }) => {
             header: 'User Name',
             accessor: 'username',
             sortable: true,
+            filterable: true,
             onClick: () => setSort('username')
         },
         {
             header: 'Email',
             accessor: 'email',
             sortable: true,
+            filterable: true,
             onClick: () => setSort('email')
         },
         {
             header: 'Role',
             accessor: 'role',
             sortable: true,
+            filterable: true,
             onClick: () => setSort('role'),
             render: (role) => {
                 const roles = role ? role.split(',') : [];
@@ -68,6 +71,7 @@ const UserManagementTab = ({ onEdit }) => {
             header: 'Department',
             accessor: 'department',
             sortable: true,
+            filterable: true,
             onClick: () => setSort('department'),
             render: (dept) => dept ? (
                 <span className="text-[12px] text-gray-600 capitalize">{dept.replace('-', ' ')}</span>
@@ -77,6 +81,7 @@ const UserManagementTab = ({ onEdit }) => {
             header: 'Status',
             accessor: 'status',
             sortable: true,
+            filterable: true,
             onClick: () => setSort('status'),
             render: (status) => {
                 const s = status?.toLowerCase();
@@ -131,6 +136,7 @@ const UserManagementTab = ({ onEdit }) => {
                 sortDirection={sortDirection}
                 maxHeight="calc(100vh - 280px)"
                 stickyHeader={true}
+                enableColumnFilters={true}
             />
         </div>
     );

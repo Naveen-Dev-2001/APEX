@@ -5,7 +5,7 @@ from app.models.user import User as UserPydantic, UserResponse
 from app.models.db_models import User as UserDB
 from app.repository.repositories import user_repo, otp_repo
 from app.database.database import get_db
-from app.auth.jwt import verify_password, get_password_hash, create_access_token
+from app.auth.jwt import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
 from app.services.email_service import email_service
 from app.services.otp_service import otp_service
 from datetime import datetime, timedelta
@@ -147,8 +147,53 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         data={"sub": user.email},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
+    refresh_token = create_refresh_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+    )
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "username": user.username,
+        "role": user.role,
+        "ispasswordchange": user.ispasswordchange
+    }
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token_endpoint(refresh_token: str, db: Session = Depends(get_db)):
+    email = verify_token(refresh_token, expected_type="refresh")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+    
+    # Find user by email
+    user_list = user_repo.get_multi(db, filters={"email": email}, limit=1)
+    user = user_list[0] if user_list else None
+    
+    if not user or user.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive"
+        )
+        
+    access_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    
+    # Optionally issue a new refresh token (refresh token rotation)
+    new_refresh_token = create_refresh_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+    )
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
         "token_type": "bearer",
         "username": user.username,
         "role": user.role,

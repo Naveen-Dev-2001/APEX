@@ -43,6 +43,32 @@ import asyncio
 import traceback
 from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
+from dateutil import parser
+
+def remove_currency_format(value):
+    if not value or value == "" or value == "N/A":
+        return None
+    try:
+        # Remove commas and $ symbols
+        clean_val = str(value).replace(',', '').replace('$', '').strip()
+        if not clean_val:
+            return None
+        return float(clean_val)
+    except (ValueError, TypeError):
+        return None
+
+def parse_date_safely(value):
+    if not value or value == "" or value == "N/A":
+        return None
+    try:
+        if isinstance(value, datetime):
+            return value.date()
+        # Parse common date formats
+        dt = parser.parse(str(value))
+        return dt.date()
+    except (ValueError, TypeError, parser.ParserError):
+        return None
+
 
 def _flatten_emails(items):
     """Refined helper to extract a flat list of emails from strings or JSON-encoded lists."""
@@ -432,6 +458,21 @@ async def upload_invoices(
                     original_items = deserialize_json_field(new_invoice.original_items) or items
                     extracted_data["Items"]["value"] = original_items
                     new_invoice.extracted_data = serialize_json_field(extracted_data)
+            
+            # Populate numeric columns for filtering/sorting
+            amounts = extracted_data.get("amounts", {})
+            total_val = amounts.get("total_invoice_amount", {}).get("value")
+            due_val = amounts.get("amount_due", {}).get("value")
+            
+            new_invoice.total_amount = remove_currency_format(total_val)
+            new_invoice.amount_due = remove_currency_format(due_val)
+
+            # Populate date columns for filtering/sorting
+            invoice_dt_val = invoice_details.get("invoice_date", {}).get("value")
+            due_dt_val = invoice_details.get("due_date", {}).get("value")
+            
+            new_invoice.invoice_date = parse_date_safely(invoice_dt_val)
+            new_invoice.due_date = parse_date_safely(due_dt_val)
 
             task_db.commit()
 
@@ -589,14 +630,29 @@ async def get_invoices(
     skip: int = 0,
     limit: int = 10,
     search: str = None,
+    filters: Optional[str] = Query(None),
     sort_by: str = "uploaded_at",
     sort_dir: str = "desc",
     show_all: bool = True,
     db: Session = Depends(get_db)
 ):
-    filters = {"entity": entity}
+    repo_filters = {"entity": entity}
     if not show_all:
-        filters["uploaded_by"] = current_user.username
+        repo_filters["uploaded_by"] = current_user.username
+
+    # Parse JSON filters if provided
+    if filters:
+        try:
+            extra_filters = json.loads(filters)
+            if isinstance(extra_filters, dict):
+                # Convert list of values to list if they're not already
+                for k, v in extra_filters.items():
+                    if isinstance(v, list):
+                        repo_filters[k] = v
+                    else:
+                        repo_filters[k] = v
+        except Exception as e:
+            print(f"Error parsing filters: {e}")
 
     expressions = []
     
@@ -625,7 +681,7 @@ async def get_invoices(
         db,
         skip=skip,
         limit=limit,
-        filters=filters,
+        filters=repo_filters,
         search=search,
         search_fields=search_fields,
         order_by=sort_by,
@@ -642,6 +698,42 @@ async def get_invoices(
         "page": paginated_res["page"],
         "page_size": paginated_res["page_size"]
     }
+
+
+@router.get("/filter-options")
+async def get_invoice_filter_options(
+    column: str,
+    filters: Optional[str] = Query(None),
+    entity: str = Depends(get_current_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns all unique values for a specific column in the invoices table, 
+    filtered by the active entity and optionally by other active filters.
+    """
+    if not hasattr(Invoice, column):
+        raise HTTPException(status_code=400, detail=f"Column '{column}' does not exist on Invoice model")
+
+    col_attr = getattr(Invoice, column)
+    
+    repo_filters = {"entity": entity}
+    if filters:
+        try:
+            extra_filters = json.loads(filters)
+            if isinstance(extra_filters, dict):
+                repo_filters.update(extra_filters)
+        except Exception as e:
+            print(f"Error parsing filters in filter-options: {e}")
+
+    # Query unique non-null values for the column with applied filters
+    query = db.query(col_attr)
+    query = invoice_repo._apply_filters(query, repo_filters)
+    results = query.filter(col_attr != None).distinct().all()
+    
+    # Flatten result list (SQLAlchemy returns tuples)
+    options = [r[0] for r in results if r[0] is not None and str(r[0]).strip() != ""]
+    
+    return sorted(list(set(options)), key=lambda x: str(x))
 
 
 @router.get("/{invoice_id}/", response_model=InvoiceResponse)
@@ -1664,12 +1756,19 @@ async def update_invoice(
             if new_vendor_name: 
                 extracted_data["vendor_info"]["name"] = {"value": new_vendor_name}
                 
-            if "invoice_details" not in extracted_data: extracted_data["invoice_details"] = {}
-            if new_invoice_number:
-                if "invoice_number" not in extracted_data["invoice_details"]: extracted_data["invoice_details"]["invoice_number"] = {}
-                extracted_data["invoice_details"]["invoice_number"]["value"] = new_invoice_number
-                
-            update_data["extracted_data"] = extracted_data # Keep as dict for now
+            if "invoice_number" not in extracted_data["invoice_details"]: extracted_data["invoice_details"]["invoice_number"] = {}
+            extracted_data["invoice_details"]["invoice_number"]["value"] = new_invoice_number
+
+        # --- Date Columns Sync ---
+        inv_dt = extracted_data.get("invoice_details", {}).get("invoice_date", {}).get("value")
+        due_dt = extracted_data.get("invoice_details", {}).get("due_date", {}).get("value")
+        
+        if inv_dt is not None:
+            update_data["invoice_date"] = parse_date_safely(inv_dt)
+        if due_dt is not None:
+            update_data["due_date"] = parse_date_safely(due_dt)
+            
+        update_data["extracted_data"] = extracted_data # Keep as dict for now
 
 
     # Merge validation

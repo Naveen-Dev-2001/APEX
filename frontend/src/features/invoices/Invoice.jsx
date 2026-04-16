@@ -3,14 +3,15 @@ import CustomInput from "../../shared/components/CustomInput";
 import { SearchOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
-import ReusableDataTable from "../../shared/components/ReusableDataTable";
+import DataTable from "../../components/ui/DataTable";
+import { Skeleton } from "antd";
+// import DataTable from "../../components/ui/DataTable";
 import { useInvoiceData } from "../hooks/useInvoiceData";
 import { getCondensedColumns, getFullColumns, VIEW_OPTIONS } from "./invoiceColumns";
 import { useInvoiceStore } from "../../store/invoice.store";
-import { Skeleton } from "antd";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
-import { deleteInvoice, uploadInvoices, fetchEntityMaster } from "../../api/invoiceApi";
+import { deleteInvoice, uploadInvoices, fetchEntityMaster, getInvoiceFilterOptions } from "../../api/invoiceApi";
 import { message } from "antd";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
@@ -30,19 +31,63 @@ const Invoice = () => {
     } = useInvoiceStore();
 
     const [localSearch, setLocalSearch] = useState(searchQuery);
+    // const [pageTab, setPageTab] = useState("invoices"); // "invoices" | "archive"
+    // const [archivedRecords, setArchivedRecords] = useState([]);
+
+    // const user = useAuthStore((state) => state.user);
+    // const userRole = user?.role?.toLowerCase();
+
+    const [columnFilters, setColumnFilters] = useState({});
     const [pageTab, setPageTab] = useState("invoices"); // "invoices" | "archive"
     const [archivedRecords, setArchivedRecords] = useState([]);
-    
+
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
+
+    const accessorToDbField = {
+        vendor_name: "vendor_name",
+        vendor_id: "vendor_id",
+        invoice_number: "invoice_number",
+        uploaded_by: "uploaded_by",
+        status: "status",
+        total_amount: "total_amount",
+        amount_due: "amount_due",
+    };
+
+    const backendFilters = useMemo(() => {
+        const filters = {};
+        Object.entries(columnFilters).forEach(([accessor, value]) => {
+            if (!value) return;
+            const dbField = accessorToDbField[accessor] || accessor;
+
+            if (value instanceof Set) {
+                if (value.size > 0) {
+                    filters[dbField] = Array.from(value);
+                }
+            } else if (typeof value === 'object' && value.op && value.val !== "" && value.val !== undefined) {
+                // Numeric condition filter
+                filters[dbField] = {
+                    op: value.op,
+                    val: parseFloat(value.val)
+                };
+            }
+        });
+        return filters;
+    }, [columnFilters]);
 
     const { invoices, total, isLoading, refetch } = useInvoiceData({
         skip,
         limit,
         search: searchQuery,
+        filters: backendFilters,
         sort_by: sortColumn,
         sort_dir: sortDirection
     });
+
+    // Reset pagination when search or filters change
+    useEffect(() => {
+        setSkip(0);
+    }, [searchQuery, columnFilters, sortColumn, sortDirection, setSkip]);
 
     // Debounce search
     useEffect(() => {
@@ -230,12 +275,35 @@ const Invoice = () => {
         });
     }, []);
 
-    const columnDefs = useMemo(
-        () => view === "condensed"
+    const handleResetAll = useCallback(() => {
+        setSearchQuery("");
+        setLocalSearch("");
+        setColumnFilters({});
+        setSkip(0);
+    }, [setSearchQuery, setSkip]);
+
+    const hasColumnFilters = Object.values(columnFilters).some(s => s && s.size > 0);
+    const isFilterApplied = (searchQuery && searchQuery.trim().length > 0) || hasColumnFilters;
+
+    const columnDefs = useMemo(() => {
+        const cols = view === "condensed"
             ? getCondensedColumns(handleView, handleDelete)
-            : getFullColumns(handleView, handleDelete),
-        [view]
-    );
+            : getFullColumns(handleView, handleDelete);
+
+        return cols.map(col => ({
+            ...col,
+            onGetOptions: col.filterable ? async (accessor) => {
+                const dbField = accessorToDbField[accessor] || accessor;
+
+                // For hierarchical filtering: 
+                // Exclude the current column's filter so the user can still see other options in that column
+                const otherFilters = { ...backendFilters };
+                delete otherFilters[dbField];
+
+                return await getInvoiceFilterOptions(dbField, otherFilters);
+            } : undefined
+        }));
+    }, [view, handleView, handleDelete, backendFilters, accessorToDbField]);
 
     const handleCreateInvoice = () => {
         setIsModalOpen(true);
@@ -347,7 +415,7 @@ const Invoice = () => {
                         >
                             {[
                                 { key: "invoices", label: "Invoices" },
-                                { key: "archive",  label: "Archive" },
+                                { key: "archive", label: "Archive" },
                             ].map(({ key, label }, index, arr) => {
                                 const isActive = pageTab === key;
                                 return (
@@ -406,12 +474,23 @@ const Invoice = () => {
                                 </div>
                             )}
                             <div style={{ minWidth: 120 }}>
-                                <ExportButton 
-                                    data={pageTab === 'archive' ? archivedRecords : invoices} 
-                                    columns={pageTab === 'archive' ? ARCHIVE_COLUMNS : columnDefs} 
-                                    fileName={pageTab === 'archive' ? "Archived_Invoices.xlsx" : "Invoices.xlsx"} 
+                                <ExportButton
+                                    data={pageTab === 'archive' ? archivedRecords : invoices}
+                                    columns={pageTab === 'archive' ? ARCHIVE_COLUMNS : columnDefs}
+                                    fileName={pageTab === 'archive' ? "Archived_Invoices.xlsx" : "Invoices.xlsx"}
                                 />
                             </div>
+                            {/* {isFilterApplied && pageTab === 'invoices' && (
+                                <div style={{ minWidth: 100 }}>
+                                    <CustomButton 
+                                        variant="outline" 
+                                        onClick={handleResetAll}
+                                        style={{ height: '36px', fontSize: '12px' }}
+                                    >
+                                        Reset All
+                                    </CustomButton>
+                                </div>
+                            )} */}
                             {userRole === 'scanner' && pageTab === 'invoices' && (
                                 <div style={{ minWidth: 160 }}>
                                     <CustomButton variant="primary" type="button" onClick={handleCreateInvoice}>
@@ -429,14 +508,10 @@ const Invoice = () => {
                                 {isLoading ? (
                                     <Skeleton height={400} borderRadius={16} />
                                 ) : (
-                                    <ReusableDataTable
-                                        columnDefs={columnDefs}
+                                    <DataTable
+                                        columns={columnDefs}
                                         data={invoices ?? []}
-                                        searchText={searchQuery}
-                                        tableHeader={false}
-                                        tableSearch={false}
-                                        defaultPageSize={10}
-                                        shouldUseFlex={false}
+                                        loading={isLoading}
                                         totalItems={total}
                                         currentPage={(skip / limit) + 1}
                                         itemsPerPage={limit}
@@ -445,7 +520,14 @@ const Invoice = () => {
                                             setLimit(newLimit);
                                             setSkip(0);
                                         }}
-                                        onSortChange={(col, dir) => setSort(col, dir)}
+                                        sortColumn={sortColumn}
+                                        sortDirection={sortDirection}
+                                        onSort={(col, dir) => setSort(col, dir)}
+                                        maxHeight="calc(100vh - 250px)"
+                                        stickyHeader={true}
+                                        enableColumnFilters={true}
+                                        columnFilters={columnFilters}
+                                        onColumnFiltersChange={setColumnFilters}
                                     />
                                 )}
                             </div>
@@ -454,8 +536,8 @@ const Invoice = () => {
 
                     {/* ── Archive Tab ── */}
                     {pageTab === "archive" && (
-                        <ArchivedInvoicesTab 
-                            onView={handleView} 
+                        <ArchivedInvoicesTab
+                            onView={handleView}
                             onDataChange={setArchivedRecords}
                             externalSearch={searchQuery}
                         />

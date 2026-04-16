@@ -36,8 +36,8 @@ const LoginPage = () => {
                     email: response.data.email || null,
                     role: response.data.role || null
                 };
-                setAuth(response.data.access_token, userObj);
-                
+                setAuth(response.data.access_token, userObj, response.data.refresh_token);
+
                 // Check if user must change password on first login
                 if (response.data.ispasswordchange === false) {
                     toast.info('Please change your password to continue');
