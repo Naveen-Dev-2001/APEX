@@ -100,6 +100,9 @@ export const fetchDeletedInvoices = (params = {}) =>
             entity: params.entity || undefined,
             vendor_id: params.vendor_id || undefined,
             invoice_number: params.invoice_number || undefined,
+            sort_by: params.sort_by || "deleted_at",
+            sort_dir: params.sort_dir || "desc",
+            search: params.search || undefined,
         }
     }).then(res => res.data);
 

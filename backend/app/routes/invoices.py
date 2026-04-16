@@ -2194,6 +2194,9 @@ async def list_deleted_invoices(
     invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
+    sort_by: str = Query("deleted_at", description="Field to sort by"),
+    sort_dir: str = Query("desc", description="Sort direction (asc/desc)"),
+    search: Optional[str] = Query(None, description="Global search query"),
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -2201,20 +2204,28 @@ async def list_deleted_invoices(
     Return a paginated list of soft-deleted (archived) invoices.
     Accessible by all authenticated users.
     """
-    # [Requirement Update] Deleted invoices can be viewed by all roles.
-    # if current_user.role != "admin":
-    #     raise HTTPException(status_code=403, detail="Only admins can view deleted invoices")
-
-    query = db.query(DeletedInvoice)
+    from app.repository.repositories import deleted_invoice_repo
+    
+    repo_filters = {}
     if entity:
-        query = query.filter(DeletedInvoice.entity == entity)
+        repo_filters["entity"] = entity
     if vendor_id:
-        query = query.filter(DeletedInvoice.vendor_id == vendor_id)
+        repo_filters["vendor_id"] = vendor_id
     if invoice_number:
-        query = query.filter(DeletedInvoice.invoice_number == invoice_number)
+        repo_filters["invoice_number"] = invoice_number
 
-    total = query.count()
-    records = query.order_by(DeletedInvoice.deleted_at.desc()).offset(skip).limit(limit).all()
+    search_fields = ["invoice_number", "vendor_name", "vendor_id", "filename"]
+    
+    paginated_res = deleted_invoice_repo.get_paginated(
+        db,
+        skip=skip,
+        limit=limit,
+        filters=repo_filters,
+        search=search,
+        search_fields=search_fields,
+        order_by=sort_by,
+        descending=(sort_dir.lower() == 'desc')
+    )
 
     def _serialize(r: DeletedInvoice):
         return {
@@ -2234,10 +2245,10 @@ async def list_deleted_invoices(
         }
 
     return {
-        "total": total,
+        "total": paginated_res["total"],
         "skip": skip,
         "limit": limit,
-        "data": [_serialize(r) for r in records]
+        "data": [_serialize(r) for r in paginated_res["data"]]
     }
 
 @router.get("/deleted/{archive_id}", summary="Get deleted invoice details")

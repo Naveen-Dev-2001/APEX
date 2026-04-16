@@ -6,7 +6,8 @@ from app.models.db_models import (
     Currency, Delegation, GlobalSetting, ApproverAmount, ApproverGL, 
     ApproverNumber, ApproverDefault, VendorMetadata, VendorWorkflow, 
     CodificationWorkflow, CodingHistory, RawExtractionData, InvoiceRegistry,
-    InvoiceStatusHistory, InvoiceAssignedApprover, InvoiceApprovedBy
+    InvoiceStatusHistory, InvoiceAssignedApprover, InvoiceApprovedBy,
+    DeletedInvoice
 )
 from pydantic import BaseModel
 from typing import Any
@@ -19,6 +20,7 @@ class GenericSchema(BaseModel):
 # Instantiate repositories for all models
 user_repo = BaseRepository[User, Any, Any](User)
 invoice_repo = BaseRepository[Invoice, Any, Any](Invoice)
+deleted_invoice_repo = BaseRepository[DeletedInvoice, Any, Any](DeletedInvoice)
 entity_master_repo = BaseRepository[EntityMaster, Any, Any](EntityMaster)
 vendor_master_repo = BaseRepository[VendorMaster, Any, Any](VendorMaster)
 tds_rate_repo = BaseRepository[TdsRate, Any, Any](TdsRate)
