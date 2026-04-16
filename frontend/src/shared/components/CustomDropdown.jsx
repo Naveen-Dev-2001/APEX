@@ -28,6 +28,7 @@ const CustomDropdown = ({
             <Select
                 value={value}
                 onChange={onChange}
+                options={options}
                 placeholder={placeholder}
                 showSearch={showSearch}
                 filterOption={filterOption}
@@ -35,13 +36,7 @@ const CustomDropdown = ({
                 size="large"
                 status={error ? "error" : ""}
                 {...props}
-            >
-                {options.map((opt) => (
-                    <Option key={opt.value} value={opt.value}>
-                        {opt.label}
-                    </Option>
-                ))}
-            </Select>
+            />
 
             {error && (
                 <p className="mt-1 text-xs text-red-500">{error}</p>

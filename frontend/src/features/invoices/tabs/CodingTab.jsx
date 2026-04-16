@@ -185,7 +185,7 @@ const CodingTab = () => {
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
 
-    const isViewOnly = (() => {
+    const isViewOnly = useMemo(() => {
         if (activeInvoiceData?.is_archived) return true;
         const status = activeInvoiceData?.status?.toLowerCase();
         if (!status) return false;
@@ -198,7 +198,7 @@ const CodingTab = () => {
 
         const VIEW_ONLY_STATUSES = ["waiting_coding"];
         return VIEW_ONLY_STATUSES.includes(status);
-    })();
+    }, [activeInvoiceData, userRole]);
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);
