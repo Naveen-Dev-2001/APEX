@@ -8,7 +8,7 @@ print(f"Loading .env from: {env_path}")
 load_dotenv(dotenv_path=env_path, override=True)
 
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth, invoices, coding, dashboard, currency
 from app.routes import master_data, workflow, approval, admin, settings as settings_route, workflow_config, delegation, audit
@@ -16,6 +16,7 @@ from app.database.database import engine, Base
 from app.database.init_db import init_database, seed_api_master_data
 
 from app.middleware.trace_middleware import TraceMiddleware
+from app.auth.jwt import get_current_user
 
 app = FastAPI(title="Accounts Payable API", version="1.0.0")
 
@@ -38,19 +39,19 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-app.include_router(invoices.router, prefix="/invoices", tags=["invoices"])
-app.include_router(coding.router, prefix="/coding", tags=["coding"])
-app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
-app.include_router(master_data.router, prefix="/master", tags=["master-data"])
-app.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
+app.include_router(invoices.router, prefix="/invoices", tags=["invoices"], dependencies=[Depends(get_current_user)])
+app.include_router(coding.router, prefix="/coding", tags=["coding"], dependencies=[Depends(get_current_user)])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"], dependencies=[Depends(get_current_user)])
+app.include_router(master_data.router, prefix="/master", tags=["master-data"], dependencies=[Depends(get_current_user)])
+app.include_router(workflow.router, prefix="/workflow", tags=["workflow"], dependencies=[Depends(get_current_user)])
 
-app.include_router(approval.router, prefix="/approval", tags=["approval"])
-app.include_router(admin.router, prefix="/users", tags=["admin"])
-app.include_router(settings_route.router, prefix="/settings", tags=["Settings"])
-app.include_router(currency.router, prefix="/currency", tags=["Currencies"])
-app.include_router(workflow_config.router, prefix="/workflow-config", tags=["workflow-config"])
-app.include_router(delegation.router, prefix="/delegations", tags=["delegation"])
-app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
+app.include_router(approval.router, prefix="/approval", tags=["approval"], dependencies=[Depends(get_current_user)])
+app.include_router(admin.router, prefix="/users", tags=["admin"], dependencies=[Depends(get_current_user)])
+app.include_router(settings_route.router, prefix="/settings", tags=["Settings"], dependencies=[Depends(get_current_user)])
+app.include_router(currency.router, prefix="/currency", tags=["Currencies"], dependencies=[Depends(get_current_user)])
+app.include_router(workflow_config.router, prefix="/workflow-config", tags=["workflow-config"], dependencies=[Depends(get_current_user)])
+app.include_router(delegation.router, prefix="/delegations", tags=["delegation"], dependencies=[Depends(get_current_user)])
+app.include_router(audit.router, prefix="/api/audit", tags=["audit"], dependencies=[Depends(get_current_user)])
 
 
 @app.on_event("startup")
