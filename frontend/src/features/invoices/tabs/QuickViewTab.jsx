@@ -212,9 +212,10 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const fetchCurrencyOptions = useCallback(async () => {
         setCurrencyLoading(true);
         try {
-            const data = await masterDataService.getCurrencyData();
-            // Expecting data as array of { code, name, ... }
-            const options = (data || []).map(c => ({ label: `${c.symbol ? c.symbol + ' ' : ''}${c.code}`, value: c.code }));
+            const res = await masterDataService.getCurrencyData();
+            // Paginated response: { data: [...], total: ... }
+            const data = res.data || [];
+            const options = data.map(c => ({ label: `${c.symbol ? c.symbol + ' ' : ''}${c.code}`, value: c.code }));
             setCurrencyOptions(options);
         } finally {
             setCurrencyLoading(false);
@@ -235,7 +236,50 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         setLineItems
     } = useInvoiceStore();
 
+    // ── Exchange Rate Auto-Fetch Logic ──────────────────────────────────────────
+    const rateCache = useRef({}); // { 'CURRENCY_DATE': rate }
 
+    useEffect(() => {
+        const currency = quickViewFormData?.invoiceCurrency;
+        const date = quickViewFormData?.invoiceDate;
+
+        if (!currency || currency === "USD" || !date) {
+            // No fetch needed for USD or missing fields
+            return;
+        }
+
+        const cacheKey = `${currency}_${date}`;
+        if (rateCache.current[cacheKey] !== undefined) {
+            const cachedRate = rateCache.current[cacheKey];
+            if (quickViewFormData.exchangeRate !== cachedRate) {
+                setQuickViewField("exchangeRate", cachedRate);
+            }
+            return;
+        }
+
+        let isMounted = true;
+        const fetchRate = async () => {
+            try {
+                // Fetch rate: Base = Invoice Currency, Target = USD (Standardizing on USD as company base)
+                const res = await masterDataService.getExchangeRate(currency, "USD", date);
+                if (isMounted) {
+                    if (res?.exchange_rate) {
+                        const newRate = res.exchange_rate;
+                        rateCache.current[cacheKey] = newRate;
+                        setQuickViewField("exchangeRate", newRate);
+                    } else {
+                        setQuickViewField("exchangeRate", "");
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to auto-fetch exchange rate:", err);
+                if (isMounted) setQuickViewField("exchangeRate", "");
+            }
+        };
+
+        fetchRate();
+        return () => { isMounted = false; };
+    }, [quickViewFormData?.invoiceCurrency, quickViewFormData?.invoiceDate, setQuickViewField]);
 
     const { vendorsList } = useVendersListSync();
     const { vendor } = useVendorDetailSync(selectedVendorId);

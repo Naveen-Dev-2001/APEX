@@ -155,8 +155,11 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
+        "id": getattr(user, 'id', None),
         "username": user.username,
+        "email": user.email,
         "role": user.role,
+        "department": getattr(user, 'department', None),
         "ispasswordchange": user.ispasswordchange
     }
 

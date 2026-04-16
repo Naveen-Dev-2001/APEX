@@ -13,7 +13,7 @@ const CodingPage = () => {
     const [loading, setLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(15);
-    
+
     // Sort and Filter state
     const [sortColumn, setSortColumn] = useState("processed_at");
     const [sortDirection, setSortDirection] = useState("desc");
@@ -65,14 +65,14 @@ const CodingPage = () => {
         setLoading(true);
         try {
             const skip = (currentPage - 1) * itemsPerPage;
-            const response = await getInvoices({ 
-                skip, 
+            const response = await getInvoices({
+                skip,
                 limit: itemsPerPage,
                 sort_by: accessorToDbField[sortColumn] || sortColumn,
                 sort_dir: sortDirection,
                 filters: backendFilters
             });
-            
+
             setInvoices(response.data || []);
             setTotal(response.total || 0);
         } catch (error) {
@@ -87,9 +87,9 @@ const CodingPage = () => {
         fetchInvoices();
     }, [currentPage, itemsPerPage, sortColumn, sortDirection, backendFilters]);
 
-    const handleView = useCallback((invoice) => {
-        navigate('/coding/review', { state: { invoice } });
-    }, [navigate]);
+    const handleView = (invoice) => {
+        navigate('/invoices', { state: { viewInvoice: invoice } });
+    };
 
     const columns = useMemo(() => [
         {
@@ -254,14 +254,14 @@ const CodingPage = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <ExportButton 
-                        data={invoices} 
-                        columns={columns} 
-                        fileName="CodingQueue.xlsx" 
+                    <ExportButton
+                        data={invoices}
+                        columns={columns}
+                        fileName="CodingQueue.xlsx"
                     />
                 </div>
             </div>
-            
+
             <DataTable
                 columns={columns}
                 data={invoices}

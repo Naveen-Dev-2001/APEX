@@ -429,4 +429,16 @@ export const masterDataService = {
         const res = await API.delete(`/currency/${currencyId}`);
         return res.data;
     },
+
+    /** Fetch a specific exchange rate based on base, target and date */
+    async getExchangeRate(base, target, date) {
+        const res = await API.get(`/currency/exchange-rate`, {
+            params: {
+                base_currency: base,
+                target_currency: target,
+                invoice_date: date
+            }
+        });
+        return res.data;
+    },
 };

@@ -785,8 +785,17 @@ class DeletedInvoice(Base):
     azure_vendor_address = Column(String(500), nullable=True)
     line_grouping = Column(String(10), nullable=True)
 
+    total_amount = Column(DECIMAL(18, 2), nullable=True)
+    amount_due = Column(DECIMAL(18, 2), nullable=True)
+    invoice_date = Column(Date, nullable=True)
+    due_date = Column(Date, nullable=True)
+
     # ---- Financial ----
     exchange_rate = Column(DECIMAL(18, 6), nullable=True)
+    total_amount = Column(DECIMAL(18, 2), nullable=True)
+    amount_due = Column(DECIMAL(18, 2), nullable=True)
+    invoice_date = Column(Date, nullable=True)
+    due_date = Column(Date, nullable=True)
     sage_bill_number = Column(String(200), nullable=True)
 
     # ---- JSON fields (copied from Invoice) ----

@@ -32,9 +32,11 @@ const LoginPage = () => {
             if (response.data && response.data.access_token) {
                 // Store the auth token and user via Zustand (uses sessionStorage under the hood)
                 const userObj = {
+                    id: response.data.id || null,
                     username: response.data.username || null,
                     email: response.data.email || null,
-                    role: response.data.role || null
+                    role: response.data.role || null,
+                    department: response.data.department || null
                 };
                 setAuth(response.data.access_token, userObj, response.data.refresh_token);
 
