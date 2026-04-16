@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import dayjs from 'dayjs';
+
 import { DownloadOutlined } from '@ant-design/icons';
 import CustomButton from './CustomButton';
 import { exportToExcel } from '../../utils/excelExport';
@@ -31,11 +33,16 @@ const ExportButton = ({
 
         setIsExporting(true);
         try {
+            // Generate dynamic filename with timestamp: invoice_YYYY-MM-DD_HH-mm-ss
+            const timestamp = dayjs().format('YYYY-MM-DD_HH-mm-ss');
+            const baseName = fileName.includes('.') ? fileName.split('.').slice(0, -1).join('.') : fileName;
+            const finalFileName = `${baseName}_${timestamp}.xlsx`;
+
             // Small timeout to allow UI to show loading state if data is large
             setTimeout(() => {
-                exportToExcel(data, columns, fileName);
+                exportToExcel(data, columns, finalFileName);
                 setIsExporting(false);
-                toast.success(`Exported ${data.length} records successfully!`);
+                toast.success(`Export records successfully!`);
             }, 100);
         } catch (error) {
             console.error("Export error:", error);
