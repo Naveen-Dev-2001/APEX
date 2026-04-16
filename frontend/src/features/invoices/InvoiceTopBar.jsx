@@ -22,7 +22,9 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         console.log("Send to coding →", payload);
         if (payload.status == "waiting_coding") {
             toast.success("Invoice sent for coding successfully!")
-            navigate('/coding')
+            resetQuickView();
+            setInvoiceSection(1);
+            navigate('/invoices')
         } else {
             toast.error(payload?.message || "Something went wrong while sending for coding.");
         }
@@ -33,6 +35,8 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         const payload = await saveInvoice(viewInvoiceId, { status: 'waiting_approval' })
         if (payload.status == "waiting_approval") {
             toast.success("Invoice sent for approval successfully!")
+            resetQuickView();
+            setInvoiceSection(1);
             navigate('/invoices')
         } else {
             toast.error(payload?.message || "Something went wrong while sending for approval.");
