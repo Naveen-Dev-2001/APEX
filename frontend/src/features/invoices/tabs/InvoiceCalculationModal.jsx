@@ -1,24 +1,97 @@
 import { useInvoiceStore } from "../../../store/invoice.store";
+import { useVendorDetailSync } from "../../hooks/useInvoiceDetailSync";
 
 const InvoiceCalculationModal = ({ open, onClose }) => {
-    const { quickViewFormData } = useInvoiceStore();
+    const { quickViewFormData, lineItems, originalLineItems, selectedVendorId } = useInvoiceStore();
+    const { vendor: selectedVendorDetails } = useVendorDetailSync(selectedVendorId);
 
     if (!open) return null;
 
-    const lineItemsSubtotal = parseFloat(quickViewFormData?.total_invoice_amount || 0);
-    const totalTax = parseFloat(quickViewFormData?.total_tax_amount || 0);
-    const extractedSubtotal = lineItemsSubtotal;
+    const extractValue = (v) => v?.value !== undefined ? v.value : v;
+    const parseCurrencyValue = (val) => {
+        if (!val && val !== 0) return 0;
+        const strVal = val.toString().replace(/[^0-9.-]+/g, "");
+        return parseFloat(strVal) || 0;
+    };
+
+    const lineItemsForCalculations = (lineItems && lineItems.length > 0 ? lineItems : originalLineItems) || [];
+    
+    const calculatedSubtotal = lineItemsForCalculations.reduce((sum, item) => {
+        const desc = (extractValue(item.description) || item.description?.value || '').toString().trim();
+        const lowDesc = desc.toLowerCase();
+        // Safeguard: Skip system tax lines and OCR-extracted generic tax lines
+        if (desc === 'Total GST' || desc === 'Total GST (Ineligible)' || desc === 'TDS Deduction' || desc === 'Tax' || 
+            lowDesc === 'gst' || lowDesc === 'vat' || lowDesc === 'igst' || lowDesc === 'cgst' || lowDesc === 'sgst') {
+            return sum;
+        }
+        const val = parseCurrencyValue(
+            extractValue(item.amount) || 
+            extractValue(item.netAmount) || 
+            extractValue(item.NetAmount) || 
+            extractValue(item.net_amount)
+        );
+        return sum + val;
+    }, 0);
+    console.log("calculated subtotal ",calculatedSubtotal);
+
+    const lineItemsSubtotal = calculatedSubtotal;
+    const totalTax = parseFloat(quickViewFormData?.totalTaxAmount || 0);
+    const extractedSubtotal = parseFloat(quickViewFormData?.subtotal || 0);
+
     const amountPaid = parseFloat(quickViewFormData?.amountPaid || 0);
-    const shipping = 0;
-    const surcharges = 0;
-    const tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
+
+    const shipping = parseFloat(quickViewFormData?.shippingFees || 0);
+    const surcharges = parseFloat(quickViewFormData?.surcharges || 0);
+    let tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
+
+    const isGstApplicable = totalTax > 0;
+
+    if (selectedVendorDetails) {
+        const findVal = (obj, keys) => {
+            if (!obj) return null;
+            const matchKey = Object.keys(obj).find(k => {
+                const normK = k.toLowerCase().replace(/[\s_\\\-]/g, '');
+                return keys.some(target => normK === target.toLowerCase().replace(/[\s_\\\-]/g, ''));
+            });
+            return matchKey ? obj[matchKey] : null;
+        };
+
+        const tdsApplicabilityVal = findVal(selectedVendorDetails, [
+            'TDS/Withhold Tax Applicability Configuration',
+            'TDS Applicability', 'TDS Applicable', 'Withholding Tax Applicable'
+        ]);
+
+        const isTDSApplicable = tdsApplicabilityVal?.toString().toLowerCase().trim() === 'yes';
+
+        if (isTDSApplicable && isGstApplicable) {
+            const tdsRateVal = findVal(selectedVendorDetails, [
+                'TDS Percentage', 'Percentage', 'Rate', 'TDS Rate', 'Withholding Rate'
+            ]) || '0';
+            tdsRate = parseFloat(tdsRateVal.toString().replace('%', '')) || 0;
+        }
+    }
+
     const tdsDeduction = -Math.abs((tdsRate / 100) * lineItemsSubtotal);
 
-    const baseTotal = lineItemsSubtotal + totalTax;
-    const totalPayable = baseTotal + tdsDeduction;
+    const invoiceTotal_calc1 = parseFloat((lineItemsSubtotal + totalTax).toFixed(2));
+    const invoiceTotal_calc2 = parseFloat((extractedSubtotal + totalTax).toFixed(2));
+    const invoiceTotal_calc3 = parseFloat((lineItemsSubtotal + totalTax - amountPaid + shipping + surcharges).toFixed(2));
 
-    const extractionValue = parseFloat(quickViewFormData?.totalPayable || 0);
-    const hasMismatch = Math.abs(extractionValue - totalPayable) > 0.01;
+    const extractionValue = parseFloat(quickViewFormData?.totalInvoiceAmount || 0);
+
+    const calculations = [
+        { value: invoiceTotal_calc1, name: "Heuristic 1: Line Items + Tax" },
+        { value: invoiceTotal_calc2, name: "Heuristic 2: Subtotal + Tax" },
+        { value: invoiceTotal_calc3, name: "Heuristic 3: Total Reconciliation" }
+    ];
+
+    const match = calculations.find(c => Math.abs(extractionValue - c.value) < 0.01);
+    const invoiceTotalUsed = match ? match.value : invoiceTotal_calc1;
+    const invoiceTotalSourceName = match ? match.name : "Default Calculation (Heuristic 1)";
+    const hasMismatch = match === undefined && extractionValue > 0;
+
+    const baseTotal = invoiceTotalUsed;
+    const totalPayable = baseTotal + tdsDeduction;
 
     const fmt = (val) =>
         Number(val).toLocaleString("en-US", {
@@ -94,7 +167,7 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                                         $ {fmt(baseTotal)}
                                     </div>
                                     <div className="text-[11px] text-gray-400">
-                                        (via Default Calculation (Heuristic 1))
+                                        (via {invoiceTotalSourceName})
                                     </div>
                                 </div>
                             </div>
@@ -117,10 +190,10 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                             Heuristic Calculations:
                         </div>
                         <div className="text-[12px] space-y-1">
-                            <div>1. Line Items + Tax: $ {fmt(baseTotal)}</div>
-                            <div>2. Subtotal + Tax: $ {fmt(baseTotal)}</div>
+                            <div>1. Line Items + Tax: $ {fmt(invoiceTotal_calc1)}</div>
+                            <div>2. Subtotal + Tax: $ {fmt(invoiceTotal_calc2)}</div>
                             <div>
-                                3. Total Reconciliation: $ {fmt(baseTotal)}
+                                3. Total Reconciliation: $ {fmt(invoiceTotal_calc3)}
                                 <div className="text-[11px] text-gray-400">
                                     (Line Items + Tax + Shipping + Surcharges - Amount Paid)
                                 </div>
@@ -128,20 +201,29 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                         </div>
                     </div>
 
-                    {/* Warning */}
-                    {hasMismatch && (
-                        <div className="mt-4 text-[12px] text-orange-500 border-t pt-3">
-                            <div className="font-medium">
-                                Extraction Value: $ {fmt(extractionValue)}
-                            </div>
-                            <div className="flex items-center gap-1 mt-1">
-                                <span className="text-red-500">✕</span>
-                                <span>
-                                    Mismatch detected: The extracted amount does not match any heuristic calculation.
-                                </span>
-                            </div>
+                    {/* Extraction Value Status */}
+                    <div className={`mt-4 text-[12px] border-t pt-3 ${hasMismatch ? 'text-orange-500' : 'text-green-600'}`}>
+                        <div className="font-medium">
+                            Extraction Value: $ {fmt(extractionValue)}
                         </div>
-                    )}
+                        <div className="flex items-center gap-1 mt-1">
+                            {hasMismatch ? (
+                                <>
+                                    <span></span>
+                                    <span>
+                                        Mismatch detected: The extracted amount does not match any heuristic calculation.
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <span></span>
+                                    <span>
+                                        Match found: The extracted amount matches {match?.name ?? 'a heuristic calculation'}.
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Footer */}
