@@ -639,7 +639,7 @@ const DataTable = ({
                                             className={`px-4 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
                                                 ${isSticky ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}`}
                                         >
-                                            {col.render ? col.render(row[col.accessor], row) : row[col.accessor] || '-'}
+                                            {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
                                         </td>
                                     );
                                 })}
