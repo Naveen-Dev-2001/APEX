@@ -2194,6 +2194,8 @@ async def list_deleted_invoices(
     invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
+    sort_by: str = Query("deleted_at", description="Field to sort by"),
+    sort_dir: str = Query("desc", description="Sort direction (asc/desc)"),
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -2213,8 +2215,18 @@ async def list_deleted_invoices(
     if invoice_number:
         query = query.filter(DeletedInvoice.invoice_number == invoice_number)
 
+    # Dynamic sorting
+    if hasattr(DeletedInvoice, sort_by):
+        col = getattr(DeletedInvoice, sort_by)
+        if sort_dir.lower() == "desc":
+            query = query.order_by(col.desc())
+        else:
+            query = query.order_by(col.asc())
+    else:
+        query = query.order_by(DeletedInvoice.deleted_at.desc())
+
     total = query.count()
-    records = query.order_by(DeletedInvoice.deleted_at.desc()).offset(skip).limit(limit).all()
+    records = query.offset(skip).limit(limit).all()
 
     def _serialize(r: DeletedInvoice):
         return {

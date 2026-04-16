@@ -3,7 +3,7 @@ import { SearchOutlined, CloseCircleOutlined, EyeOutlined } from "@ant-design/ic
 import { Skeleton, Tag, Tooltip, Button } from "antd";
 import { fetchDeletedInvoices, fetchDeletedInvoiceById } from "../../api/invoiceApi";
 import CustomInput from "../../shared/components/CustomInput";
-import ReusableDataTable from "../../shared/components/ReusableDataTable";
+import DataTable from "../../components/ui/DataTable";
 
 const STATUS_COLORS = {
     waiting_coding:   { bg: "#FFF8E1", text: "#F59E0B", label: "Waiting Coding" },
@@ -44,92 +44,87 @@ const formatDate = (iso) => {
 
 export const ARCHIVE_COLUMNS = [
     {
-        headerName: "Invoice #",
-        field: "invoice_number",
-        flex: 1,
-        minWidth: 130,
-        cellRenderer: ({ value }) => (
+        header: "Invoice #",
+        accessor: "invoice_number",
+        sortable: true,
+        filterable: true,
+        render: (value) => (
             <span style={{ fontWeight: 600, color: "#1A1A2E" }}>{value || "—"}</span>
         ),
     },
     {
-        headerName: "Vendor",
-        field: "vendor_name",
-        flex: 1.5,
-        minWidth: 160,
-        cellRenderer: ({ value, data }) => (
-            <Tooltip title={data.vendor_id}>
+        header: "Vendor",
+        accessor: "vendor_name",
+        sortable: true,
+        filterable: true,
+        render: (value, row) => (
+            <Tooltip title={row.vendor_id}>
                 <span>{value || "—"}</span>
             </Tooltip>
         ),
     },
     {
-        headerName: "Entity",
-        field: "entity",
-        flex: 0.8,
-        minWidth: 100,
+        header: "Entity",
+        accessor: "entity",
+        sortable: true,
+        filterable: true,
     },
     {
-        headerName: "Status at Deletion",
-        field: "status",
-        flex: 1,
-        minWidth: 150,
-        cellRenderer: ({ value }) => <StatusBadge status={value} />,
+        header: "Status at Deletion",
+        accessor: "status",
+        sortable: true,
+        filterable: true,
+        render: (value) => <StatusBadge status={value} />,
     },
     {
-        headerName: "Uploaded By",
-        field: "uploaded_by",
-        flex: 0.9,
-        minWidth: 120,
+        header: "Uploaded By",
+        accessor: "uploaded_by",
+        sortable: true,
+        filterable: true,
     },
     {
-        headerName: "Uploaded At",
-        field: "uploaded_at",
-        flex: 1,
-        minWidth: 150,
-        cellRenderer: ({ value }) => (
+        header: "Uploaded At",
+        accessor: "uploaded_at",
+        sortable: true,
+        render: (value) => (
             <span style={{ color: "#555", fontSize: "12px" }}>{formatDate(value)}</span>
         ),
     },
     {
-        headerName: "Deleted By",
-        field: "deleted_by",
-        flex: 0.9,
-        minWidth: 120,
-        cellRenderer: ({ value }) => (
+        header: "Deleted By",
+        accessor: "deleted_by",
+        sortable: true,
+        render: (value) => (
             <span style={{ color: "#C62828", fontWeight: 500 }}>{value || "—"}</span>
         ),
     },
     {
-        headerName: "Deleted At",
-        field: "deleted_at",
-        flex: 1,
-        minWidth: 150,
-        cellRenderer: ({ value }) => (
+        header: "Deleted At",
+        accessor: "deleted_at",
+        sortable: true,
+        render: (value) => (
             <span style={{ color: "#AD1457", fontSize: "12px" }}>{formatDate(value)}</span>
         ),
     },
     {
-        headerName: "Sage Bill #",
-        field: "sage_bill_number",
-        flex: 0.9,
-        minWidth: 110,
-        cellRenderer: ({ value }) => (
+        header: "Sage Bill #",
+        accessor: "sage_bill_number",
+        sortable: true,
+        render: (value) => (
             <span style={{ color: "#00695C" }}>{value || "—"}</span>
         ),
     },
     {
-        headerName: "Action",
-        field: "action",
+        header: "Action",
+        accessor: "actions",
         width: 100,
-        pinned: "right",
-        cellRenderer: (params) => (
+        render: (value, row, index, onView) => (
             <div style={{ display: "flex", justifyContent: "center" }}>
                 <Tooltip title="View Snapshot">
                     <Button
                         type="text"
                         icon={<EyeOutlined style={{ color: "#4F46E5", fontSize: "16px" }} />}
-                        onClick={() => params.onView(params.data)}
+                        onClick={() => onView(row)}
                     />
                 </Tooltip>
             </div>
@@ -145,14 +140,20 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch }) => {
     const [isLoading, setIsLoading]   = useState(false);
     const [error, setError]           = useState(null);
     const [skip, setSkip]             = useState(0);
+    const [limit, setLimit]           = useState(50);
     const [search, setSearch]         = useState(externalSearch || "");
-    const load = useCallback((currentSkip = 0, searchVal = "") => {
+    const [sortColumn, setSortColumn] = useState("deleted_at");
+    const [sortDirection, setSortDirection] = useState("desc");
+
+    const load = useCallback((currentSkip = 0, currentLimit = 50, searchVal = "", sCol = "deleted_at", sDir = "desc") => {
         setIsLoading(true);
         setError(null);
         fetchDeletedInvoices({
             skip: currentSkip,
-            limit: PAGE_SIZE,
+            limit: currentLimit,
             invoice_number: searchVal || undefined,
+            sort_by: sCol,
+            sort_dir: sDir
         })
             .then((data) => {
                 const recs = data.data || [];
@@ -168,24 +169,27 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch }) => {
                 );
             })
             .finally(() => setIsLoading(false));
-    }, []);
+    }, [onDataChange]);
 
     // Initial load
     useEffect(() => {
-        load(0, "");
-    }, [load]);
+        load(skip, limit, search, sortColumn, sortDirection);
+    }, [load, skip, limit, search, sortColumn, sortDirection]);
 
     // Re-load when search query from parent changes
     useEffect(() => {
         setSearch(externalSearch || "");
         setSkip(0);
-        load(0, externalSearch || "");
-    }, [externalSearch, load]);
+    }, [externalSearch]);
 
     const handlePageChange = (page) => {
-        const newSkip = (page - 1) * PAGE_SIZE;
-        setSkip(newSkip);
-        load(newSkip, search);
+        setSkip((page - 1) * limit);
+    };
+
+    const handleSort = (col, dir) => {
+        setSortColumn(col);
+        setSortDirection(dir);
+        setSkip(0);
     };
 
     const handleView = async (data) => {
@@ -224,26 +228,28 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch }) => {
             )}
 
             {/* ── Table ── */}
-            {isLoading ? (
-                <Skeleton active paragraph={{ rows: 8 }} />
-            ) : (
-                <ReusableDataTable
-                    columnDefs={ARCHIVE_COLUMNS.map(col => 
-                        col.field === "action" 
-                        ? { ...col, cellRendererParams: { onView: handleView } } 
-                        : col
-                    )}
-                    data={records}
-                    tableHeader={false}
-                    tableSearch={false}
-                    defaultPageSize={PAGE_SIZE}
-                    shouldUseFlex={false}
-                    totalItems={total}
-                    currentPage={Math.floor(skip / PAGE_SIZE) + 1}
-                    itemsPerPage={PAGE_SIZE}
-                    onPageChange={handlePageChange}
-                />
-            )}
+            <DataTable
+                columns={ARCHIVE_COLUMNS.map(col => 
+                    col.accessor === "actions" 
+                    ? { ...col, render: (v, r, i) => col.render(v, r, i, handleView) } 
+                    : col
+                )}
+                data={records}
+                loading={isLoading}
+                totalItems={total}
+                currentPage={Math.floor(skip / limit) + 1}
+                itemsPerPage={limit}
+                onPageChange={handlePageChange}
+                onItemsPerPageChange={(l) => {
+                    setLimit(l);
+                    setSkip(0);
+                }}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                maxHeight="calc(100vh - 250px)"
+                stickyHeader={true}
+            />
         </div>
     );
 };
