@@ -108,7 +108,7 @@ const addSystemRows = (rows, formData) => {
     );
 
     if (isTdsApplicable) {
-        const tdsValue = -Math.abs(tdsRate * totalInvoiceAmount);
+        const tdsValue = -Math.abs((tdsRate / 100) * totalInvoiceAmount);
 
         const tdsRow = {
             id: "tds-row",
