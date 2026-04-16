@@ -88,6 +88,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                             <CustomButton
                                 variant="primary"
                                 className="w-24"
+                                disabled={isDuplicate}
                                 onClick={handleSaveInvoice}
                             >
                                 Save

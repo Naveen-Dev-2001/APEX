@@ -6,6 +6,7 @@ export default function CustomButton({
     rightIcon = false, // square-box icon
     className = "",
     onClick,
+    disabled = false,
     ...props
 }) {
 
@@ -15,7 +16,7 @@ export default function CustomButton({
     rounded-lg
     !font-creato custom-font-creato text-base leading-4
     transition-all duration-150 
-    hover:opacity-85 active:opacity-75
+    ${!disabled ? "hover:opacity-85 active:opacity-75" : ""}
   `;
 
     const variantClasses = {
@@ -47,18 +48,21 @@ export default function CustomButton({
         `,
     };
 
+    const effectiveVariant = disabled || variant === "disabled" ? "disabled" : variant;
+
     const iconColorClass = {
         primary: "outline-Colors-Icon-Static-white",
         disabled: "outline-Colors-Icon-Action-action-disabled",
         outline: "outline-Colors-Border-Action-action",
+        success: "outline-green-200",
         link: "hidden"
-    }[variant];
+    }[effectiveVariant] || "outline-white";
 
     return (
         <button
-            onClick={onClick}
-            disabled={variant === "disabled"}
-            className={`${className} ${baseClasses} ${variantClasses[variant]} `}
+            onClick={disabled ? undefined : onClick}
+            disabled={disabled || variant === "disabled"}
+            className={`${className} ${baseClasses} ${variantClasses[effectiveVariant]} `}
             {...props}
         >
             {/* children now render FULLY, including icons */}
