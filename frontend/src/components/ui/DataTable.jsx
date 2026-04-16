@@ -405,7 +405,16 @@ const DataTable = ({
   columnFilters: externalColumnFilters,
   onColumnFiltersChange: onExternalColumnFiltersChange,
   onSort,
+  expandable = true,
+  renderExpandedRow,
 }) => {
+    // ── Row Expansion state ──────────────────────────────────────────────────
+    const [expandedRow, setExpandedRow] = useState(null);
+
+    const toggleRow = (idx) => {
+        setExpandedRow(prev => prev === idx ? null : idx);
+    };
+
     // ── Filter state ──────────────────────────────────────────────────────────
     // columnFilters: { [accessor]: Set<string> }
     const [internalColumnFilters, setInternalColumnFilters] = useState({});
@@ -659,23 +668,62 @@ const DataTable = ({
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {filteredData.map((row, rowIdx) => (
-                            <tr key={rowIdx} className="hover:bg-gray-50 transition-colors group">
-                                {columns.map((col, colIdx) => {
-                                    const isLastColumn = colIdx === columns.length - 1;
-                                    const isSticky = isLastColumn && col.accessor === 'actions';
-                                    return (
-                                        <td 
-                                            key={colIdx} 
-                                            className={`px-4 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
-                                                ${isSticky ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}`}
-                                        >
-                                            {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        ))}
+                        {filteredData.map((row, rowIdx) => {
+                            const isExpanded = expandedRow === rowIdx;
+                            return (
+                                <React.Fragment key={rowIdx}>
+                                    <tr 
+                                        className={`hover:bg-gray-50 transition-colors group ${expandable ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-gray-50' : ''}`}
+                                        onClick={(e) => {
+                                            // Don't expand if user clicked a button, anchor, or anything interactive
+                                            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) {
+                                                return;
+                                            }
+                                            if (expandable) toggleRow(rowIdx);
+                                        }}
+                                    >
+                                        {columns.map((col, colIdx) => {
+                                            const isLastColumn = colIdx === columns.length - 1;
+                                            const isSticky = isLastColumn && col.accessor === 'actions';
+                                            return (
+                                                <td 
+                                                    key={colIdx} 
+                                                    className={`px-4 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
+                                                        ${isSticky ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}
+                                                        ${isExpanded && isSticky ? 'bg-gray-50' : ''}`}
+                                                >
+                                                    {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                    {isExpanded && (
+                                        <tr>
+                                            <td colSpan={columns.length} className="p-0 bg-[#f9fafb]">
+                                                <div className="border-l-4 border-[#1D71AB] px-8 py-6 animate-fadeIn">
+                                                    {renderExpandedRow ? (
+                                                        renderExpandedRow(row, rowIdx)
+                                                    ) : (
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
+                                                            {columns.filter(col => col.accessor !== 'actions').map((col, cIdx) => (
+                                                                <div key={cIdx} className="flex flex-col gap-1">
+                                                                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                                                        {col.header}
+                                                                    </span>
+                                                                    <div className="text-[13px] text-gray-700 font-medium">
+                                                                        {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
                         {filteredData.length === 0 && (
                             <tr>
                                 <td colSpan={columns.length} className="px-5 py-8 text-center text-gray-500">
