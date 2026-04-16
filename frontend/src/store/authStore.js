@@ -27,7 +27,6 @@ export const useAuthStore = create((set) => ({
   setActiveRole: (role) => {
     sessionStorage.setItem('active_role', role);
     set({ activeRole: role });
-    set({ token, user, refreshToken: refreshToken || sessionStorage.getItem('refresh_token') });
   },
 
   logout: () => {
