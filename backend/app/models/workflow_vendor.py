@@ -4,7 +4,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 
 class VendorWorkflow(BaseModel):
-    vendor_name: str
+    vendor_name: Optional[str] = None
     vendor_id: Optional[str] = None
     mandatory_approver_1: Optional[Union[EmailStr, List[EmailStr]]] = None
     mandatory_approver_2: Optional[Union[EmailStr, List[EmailStr]]] = None
@@ -14,16 +14,19 @@ class VendorWorkflow(BaseModel):
     threshold_approver: Optional[Union[EmailStr, List[EmailStr]]] = None
     amount_threshold: Optional[float] = None
     approver_count: int = 1
-    is_parallel: bool = False
+    is_threshold_enabled: bool = False          # ── ADD
+    posting_approver: Optional[EmailStr] = None  # ── ADD
+    approver_flags: Optional[dict] = None        # ── ADD
+    # is_parallel: bool = False
 
     entity: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     @field_validator(
-        'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3', 
+        'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3',
         'mandatory_approver_4', 'mandatory_approver_5',
-        'threshold_approver', 
+        'threshold_approver',
         mode='before'
     )
     @classmethod
@@ -36,9 +39,10 @@ class VendorWorkflow(BaseModel):
 class VendorWorkflowInDB(VendorWorkflow):
     id: str
 
+
 class VendorWorkflowResponse(BaseModel):
     id: int
-    vendor_name: str
+    vendor_name: Optional[str] = None
     vendor_id: Optional[str] = None
     mandatory_approver_1: Optional[Union[str, List[str]]] = None
     mandatory_approver_2: Optional[Union[str, List[str]]] = None
@@ -48,7 +52,10 @@ class VendorWorkflowResponse(BaseModel):
     threshold_approver: Optional[Union[str, List[str]]] = None
     amount_threshold: Optional[float] = None
     approver_count: int
-    is_parallel: bool = False
+    is_threshold_enabled: bool = False          # ── ADD
+    posting_approver: Optional[str] = None      # ── ADD
+    approver_flags: Optional[dict] = None       # ── ADD
+    # is_parallel: bool = False
 
     entity: str
     created_at: datetime

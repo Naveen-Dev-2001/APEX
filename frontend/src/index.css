@@ -186,6 +186,19 @@
     }
 }
 
+/* AG Grid Sort Icons - SVG Alternative */
+.ag-theme-alpine .ag-icon-asc::before {
+    content: "▲";
+    color: white;
+    font-size: 10px;
+}
+
+.ag-theme-alpine .ag-icon-desc::before {
+    content: "▼";
+    color: white;
+    font-size: 10px;
+}
+
 @keyframes pulse {
 
     0%,

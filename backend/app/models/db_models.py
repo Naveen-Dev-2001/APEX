@@ -663,9 +663,11 @@ class VendorWorkflow(Base):
     is_threshold_enabled = Column(Boolean, default=False)
     amount_threshold = Column(Float, default=0.0)
     threshold_approver = Column(Text, nullable=True)
-    is_parallel = Column(Boolean, default=False, nullable=False)
+    # is_parallel = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    approver_flags = Column(Text, nullable=True)
+    posting_approver = Column(String(255), nullable=True)
 
 
 class CodificationWorkflow(Base):
@@ -689,6 +691,7 @@ class CodificationWorkflow(Base):
     # is_parallel = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    approver_flags = Column(Text, nullable=True)
 
 
 class ExchangeRateMaster(Base):

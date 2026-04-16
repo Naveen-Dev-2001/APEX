@@ -115,21 +115,35 @@ def transform_workflow_response(w):
         "department_id": getattr(w, 'department_id', None),
         #  Use deserialize_approver_schema (returns dict | None) instead of
         #    deserialize_users (returns list) to match Optional[dict] response model
-        "mandatory_approver_1": deserialize_approver_schema(w.mandatory_approver_1),
-        "mandatory_approver_2": deserialize_approver_schema(w.mandatory_approver_2),
-        "mandatory_approver_3": deserialize_approver_schema(w.mandatory_approver_3),
-        "mandatory_approver_4": deserialize_approver_schema(w.mandatory_approver_4),
-        "mandatory_approver_5": deserialize_approver_schema(w.mandatory_approver_5),
+        "mandatory_approver_1": deserialize_approver(w.mandatory_approver_1),
+        "mandatory_approver_2": deserialize_approver(w.mandatory_approver_2),
+        "mandatory_approver_3": deserialize_approver(w.mandatory_approver_3),
+        "mandatory_approver_4": deserialize_approver(w.mandatory_approver_4),
+        "mandatory_approver_5": deserialize_approver(w.mandatory_approver_5),
         "is_threshold_enabled": getattr(w, 'is_threshold_enabled', False),
         "amount_threshold": w.amount_threshold,
         #  Same fix here
-        "threshold_approver": deserialize_approver_schema(w.threshold_approver),
+        "threshold_approver": deserialize_approver(w.threshold_approver),
         "approver_count": w.approver_count or 1,
         "posting_approver": getattr(w, 'posting_approver', None),
         "entity": getattr(w, 'entity', None),
         "created_at": getattr(w, 'created_at', datetime.utcnow()),
-        "updated_at": getattr(w, 'updated_at', None)
+        "updated_at": getattr(w, 'updated_at', None),
+        "approver_flags": deserialize_approver_flags(w.approver_flags),
     }
+
+
+def deserialize_approver_flags(val) -> dict:
+    """Returns dict like {"1": True, "2": False} or empty dict."""
+    if not val:
+        return {}
+    if isinstance(val, dict):
+        return val
+    try:
+        parsed = json.loads(val)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
 
 # ==================== VENDOR WORKFLOW ====================
 
@@ -156,6 +170,7 @@ async def create_vendor_workflow(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
+    print("workflow", workflow)
     existing_list = vendor_workflow_repo.get_multi(
         db,
         filters={"vendor_id": workflow.vendor_id, "entity": entity},
@@ -170,23 +185,24 @@ async def create_vendor_workflow(
     try:
         new_wf_data = {
             "entity": entity,
-            "lob": workflow.lob,
-            "department_id": workflow.department_id,
+            "vendor_id": workflow.vendor_id,
+            "vendor_name": workflow.vendor_name,
             "approver_count": workflow.approver_count,
 
-            "mandatory_approver_1": json.dumps(workflow.mandatory_approver_1 or []),
-            "mandatory_approver_2": json.dumps(workflow.mandatory_approver_2 or []),
-            "mandatory_approver_3": json.dumps(workflow.mandatory_approver_3 or []),
-            "mandatory_approver_4": json.dumps(workflow.mandatory_approver_4 or []),
-            "mandatory_approver_5": json.dumps(workflow.mandatory_approver_5 or []),
+            "mandatory_approver_1": json.dumps(workflow.mandatory_approver_1) if workflow.mandatory_approver_1 else None,
+            "mandatory_approver_2": json.dumps(workflow.mandatory_approver_2) if workflow.mandatory_approver_2 else None,
+            "mandatory_approver_3": json.dumps(workflow.mandatory_approver_3) if workflow.mandatory_approver_3 else None,
+            "mandatory_approver_4": json.dumps(workflow.mandatory_approver_4) if workflow.mandatory_approver_4 else None,
+            "mandatory_approver_5": json.dumps(workflow.mandatory_approver_5) if workflow.mandatory_approver_5 else None,
 
             "is_threshold_enabled": workflow.is_threshold_enabled,
             "amount_threshold": workflow.amount_threshold if workflow.is_threshold_enabled else None,
 
-            "threshold_approver": json.dumps(workflow.threshold_approver or []),
+            "threshold_approver": json.dumps(workflow.threshold_approver) if workflow.threshold_approver else None,
 
             "created_at": datetime.utcnow(),
-            "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None
+            "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None,
+            "approver_flags": json.dumps(workflow.approver_flags) if workflow.approver_flags else None,
         }
         new_workflow = vendor_workflow_repo.create(db, obj_in=new_wf_data)
 
@@ -219,15 +235,21 @@ async def update_vendor_workflow(
             "vendor_id": workflow.vendor_id,
             "vendor_name": workflow.vendor_name,
             "approver_count": workflow.approver_count,
-            "mandatory_approver_1": serialize_approver(workflow.mandatory_approver_1),
-            "mandatory_approver_2": serialize_approver(workflow.mandatory_approver_2),
-            "mandatory_approver_3": serialize_approver(workflow.mandatory_approver_3),
-            "mandatory_approver_4": serialize_approver(workflow.mandatory_approver_4),
-            "mandatory_approver_5": serialize_approver(workflow.mandatory_approver_5),
-            "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
-            "amount_threshold": workflow.amount_threshold,
-            "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "is_parallel": workflow.is_parallel,
+
+            "mandatory_approver_1": json.dumps(workflow.mandatory_approver_1) if workflow.mandatory_approver_1 else None,
+            "mandatory_approver_2": json.dumps(workflow.mandatory_approver_2) if workflow.mandatory_approver_2 else None,
+            "mandatory_approver_3": json.dumps(workflow.mandatory_approver_3) if workflow.mandatory_approver_3 else None,
+            "mandatory_approver_4": json.dumps(workflow.mandatory_approver_4) if workflow.mandatory_approver_4 else None,
+            "mandatory_approver_5": json.dumps(workflow.mandatory_approver_5) if workflow.mandatory_approver_5 else None,
+
+            "is_threshold_enabled": workflow.is_threshold_enabled,
+            "amount_threshold": workflow.amount_threshold if workflow.is_threshold_enabled else None,
+
+            "threshold_approver": json.dumps(workflow.threshold_approver) if workflow.threshold_approver else None,
+
+            "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None,
+            "approver_flags": json.dumps(workflow.approver_flags) if workflow.approver_flags else None,
+
             "entity": entity,
             "updated_at": datetime.utcnow()
         }
@@ -351,6 +373,7 @@ async def create_codification_workflow(
             "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None,
             "created_at": datetime.utcnow(),
             "updated_at": None,
+            "approver_flags": json.dumps(workflow.approver_flags) if workflow.approver_flags else None,
         }
 
         new_workflow = codification_workflow_repo.create(
@@ -385,17 +408,21 @@ async def update_codification_workflow(
             "lob": workflow.lob,
             "department_id": workflow.department_id,
             "approver_count": workflow.approver_count,
-            "mandatory_approver_1": serialize_approver(workflow.mandatory_approver_1),
-            "mandatory_approver_2": serialize_approver(workflow.mandatory_approver_2),
-            "mandatory_approver_3": serialize_approver(workflow.mandatory_approver_3),
-            "mandatory_approver_4": serialize_approver(workflow.mandatory_approver_4),
-            "mandatory_approver_5": serialize_approver(workflow.mandatory_approver_5),
-            "is_threshold_enabled": getattr(workflow, 'is_threshold_enabled', False),
-            "amount_threshold": workflow.amount_threshold,
-            "threshold_approver": serialize_approver(workflow.threshold_approver),
-            "is_parallel": workflow.is_parallel,
+
+            "mandatory_approver_1": json.dumps(workflow.mandatory_approver_1) if workflow.mandatory_approver_1 else None,
+            "mandatory_approver_2": json.dumps(workflow.mandatory_approver_2) if workflow.mandatory_approver_2 else None,
+            "mandatory_approver_3": json.dumps(workflow.mandatory_approver_3) if workflow.mandatory_approver_3 else None,
+            "mandatory_approver_4": json.dumps(workflow.mandatory_approver_4) if workflow.mandatory_approver_4 else None,
+            "mandatory_approver_5": json.dumps(workflow.mandatory_approver_5) if workflow.mandatory_approver_5 else None,
+
+            "is_threshold_enabled": workflow.is_threshold_enabled,
+            "amount_threshold": workflow.amount_threshold if workflow.is_threshold_enabled else None,
+            "threshold_approver": json.dumps(workflow.threshold_approver) if workflow.threshold_approver else None,
+
+            "posting_approver": workflow.posting_approver,
             "entity": entity,
-            "updated_at": datetime.utcnow()
+            "updated_at": datetime.utcnow(),
+            "approver_flags": json.dumps(workflow.approver_flags) if workflow.approver_flags else None,
         }
 
         updated_wf = codification_workflow_repo.update(

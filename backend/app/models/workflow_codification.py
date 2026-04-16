@@ -20,6 +20,7 @@ class CodificationWorkflow(BaseModel):
     threshold_approver: Optional[List[EmailStr]] = None
 
     posting_approver: Optional[EmailStr] = None
+    approver_flags: Optional[dict] = None
 
     @field_validator(
         'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3',
@@ -44,7 +45,6 @@ class CodificationWorkflowInDB(CodificationWorkflow):
     id: int
 
 
-# ── Response model ──
 class CodificationWorkflowResponse(BaseModel):
     id: int
     lob: Optional[str] = None
@@ -65,6 +65,7 @@ class CodificationWorkflowResponse(BaseModel):
     entity: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    approver_flags: Optional[dict] = None
 
     @field_validator(
         'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3',
@@ -73,7 +74,6 @@ class CodificationWorkflowResponse(BaseModel):
     )
     @classmethod
     def parse_json_string(cls, v):
-        """Parse JSON string back to list when reading from DB."""
         if isinstance(v, str):
             try:
                 parsed = json.loads(v)
@@ -86,6 +86,17 @@ class CodificationWorkflowResponse(BaseModel):
         if isinstance(v, list):
             cleaned = [x for x in v if x and str(x).strip()]
             return cleaned if cleaned else None
+        return v
+
+    # ── ADD THIS ──
+    @field_validator('approver_flags', mode='before')
+    @classmethod
+    def parse_approver_flags(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return {}
         return v
 
     class Config:
