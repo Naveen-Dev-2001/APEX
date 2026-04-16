@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Modal } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
 import CustomButton from "../../shared/components/CustomButton";
@@ -12,6 +12,14 @@ const AddInvoiceModal = ({
 }) => {
     const [files, setFiles] = useState([]);
     const [isDragging, setIsDragging] = useState(false);
+
+    // Reset state when modal is closed
+    useEffect(() => {
+        if (!open) {
+            setFiles([]);
+            setIsDragging(false);
+        }
+    }, [open]);
 
     const fileInputRef = useRef(null);
     const folderInputRef = useRef(null);
@@ -87,7 +95,7 @@ const AddInvoiceModal = ({
             title={null}
             width={660}
             centered
-            destroyOnHidden
+            destroyOnClose
             maskClosable={false}
             closeIcon={null}
             styles={{

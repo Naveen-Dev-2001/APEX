@@ -448,7 +448,7 @@ class VendorMaster(Base):
     # Configuration Columns (Boolean for DB compatibility with BIT columns)
     gst_eligibility = Column(Boolean, nullable=True, default=False)
     tds_applicability = Column(Boolean, nullable=True, default=False)
-    tds_percentage = Column(String(20), nullable=True)
+    tds_percentage = Column(DECIMAL(10, 4), nullable=True)
     tds_section_code = Column(String(255), nullable=True)
     workflow_applicable = Column(Boolean, nullable=True, default=True)
     line_grouping = Column(Boolean, nullable=True, default=False)
@@ -476,7 +476,7 @@ class TdsRate(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     section = Column(String(50), nullable=False, index=True)
     nature_of_payment = Column(String(255), nullable=False)
-    tds_rate = Column(DECIMAL(5, 2), nullable=False)
+    tds_rate = Column(DECIMAL(10, 4), nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
