@@ -282,27 +282,29 @@ async def get_workflow_vendors(
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user)
 ):
-    vendors = vendor_repo.get_multi(db, limit=2000000)
+    # Move filtering to DB level. 
+    # workflow_applicable is a Boolean column. 
+    # We want True or NULL (for backward compatibility).
+    vendors = vendor_repo.get_multi(
+        db,
+        expressions=[or_(
+            VendorMaster.workflow_applicable == True,
+            VendorMaster.workflow_applicable == None
+        )],
+        limit=10000,
+        order_by="vendor_name"
+    )
+    
     workflow_vendors = []
-
     for v in vendors:
-        # Robust check for both boolean (new) and legacy string "Yes"
-        is_val = v.workflow_applicable
-        # Treat None as True for backward compatibility or if not specified
-        if is_val is None or is_val is True or is_val == 1 or str(is_val).strip().lower() in ["yes", "true"]:
-            vendor_name = v.vendor_name
-            vendor_id = v.vendor_id
-            if vendor_name:
-                label = f"{vendor_id} - {vendor_name}" if vendor_id else str(
-                    vendor_name)
-                unique_val = f"{vendor_id}|{vendor_name}" if vendor_id else str(
-                    vendor_name)
-                workflow_vendors.append({
-                    "id": str(vendor_id) if vendor_id else "",
-                    "value": unique_val,
-                    "label": label,
-                    "vendor_name": str(vendor_name)
-                })
+        label = f"{v.vendor_id} - {v.vendor_name}" if v.vendor_id else str(v.vendor_name)
+        unique_val = f"{v.vendor_id}|{v.vendor_name}" if v.vendor_id else str(v.vendor_name)
+        workflow_vendors.append({
+            "id": str(v.vendor_id) if v.vendor_id else "",
+            "value": unique_val,
+            "label": label,
+            "vendor_name": str(v.vendor_name)
+        })
     return workflow_vendors
 
 # ==================== CODIFICATION WORKFLOW ====================
@@ -450,10 +452,10 @@ async def delete_codification_workflow(
 
 @router.get("/codification/lobs")
 async def get_lobs(db: Session = Depends(get_db)):
-    lobs = lob_repo.get_multi(db, limit=1000)
+    # Sort by lob_id in DB
+    lobs = lob_repo.get_multi(db, limit=1000, order_by="lob_id")
     result = []
-    # lob_id and name are correct for LOBMaster
-    for w in sorted(lobs, key=lambda x: str(x.lob_id or "")):
+    for w in lobs:
         val = str(w.lob_id) if w.lob_id is not None else str(w.id)
         result.append({
             "value": val,
@@ -464,10 +466,10 @@ async def get_lobs(db: Session = Depends(get_db)):
 
 @router.get("/codification/departments")
 async def get_departments(db: Session = Depends(get_db)):
-    depts = dept_repo.get_multi(db, limit=1000)
+    # Sort by department_id in DB
+    depts = dept_repo.get_multi(db, limit=1000, order_by="department_id")
     result = []
-    # DepartmentMaster uses department_name, not name
-    for w in sorted(depts, key=lambda x: str(x.department_id or "")):
+    for w in depts:
         val = str(w.department_id) if w.department_id is not None else str(w.id)
         name = getattr(w, 'department_name', None) or getattr(w, 'name', None)
         result.append({
