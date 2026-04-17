@@ -9,8 +9,8 @@ import CustomDatePicker from '../../components/ui/CustomDatePicker';
 
 const DelegationsTab = () => {
     const {
-        users, delegations, loading, isUpdating,
-        fetchUsers, fetchDelegations, addDelegation, removeDelegation,
+        users, delegations, loading, isUpdating, approvers: storeApprovers,
+        fetchUsers, fetchDelegations, addDelegation, removeDelegation, fetchApprovers,
         sortColumn, sortDirection, setSort
     } = useAdminStore();
     const { showConfirm } = useToastStore();
@@ -29,15 +29,14 @@ const DelegationsTab = () => {
     useEffect(() => {
         fetchUsers();
         fetchDelegations();
-    }, [fetchUsers, fetchDelegations, currentPage, itemsPerPage, sortColumn, sortDirection]);
+        fetchApprovers();
+    }, [fetchUsers, fetchDelegations, fetchApprovers, currentPage, itemsPerPage, sortColumn, sortDirection]);
 
-    const approvers = (users || []).filter(u => u.role?.toLowerCase() === 'approver');
-    
     const approverOptions = [
         { label: 'Select Approver', value: '' },
-        ...approvers.map(u => ({
-            label: `${u.username} (${u.email})`,
-            value: u.email
+        ...(storeApprovers || []).map(u => ({
+            label: u.label,
+            value: u.value
         }))
     ];
 

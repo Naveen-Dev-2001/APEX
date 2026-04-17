@@ -16,6 +16,7 @@ const useAdminStore = create((set, get) => ({
     sortDirection: 'asc',
     isUpdating: false,
     delegations: [],
+    approvers: [],
 
     setSearchQuery: (query) => set({ searchQuery: query }),
     setCurrentPage: (page) => set({ currentPage: page }),
@@ -282,6 +283,15 @@ const useAdminStore = create((set, get) => ({
             console.error("Failed to remove delegation", error);
             toast.error(error.response?.data?.detail || 'Failed to remove delegation');
             return false;
+        }
+    },
+
+    fetchApprovers: async () => {
+        try {
+            const data = await adminService.getApprovers();
+            set({ approvers: data || [] });
+        } catch (error) {
+            console.error("Failed to fetch approvers", error);
         }
     }
 }));
