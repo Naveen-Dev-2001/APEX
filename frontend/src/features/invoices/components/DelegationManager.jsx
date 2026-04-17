@@ -12,8 +12,8 @@ import { ReloadOutlined } from '@ant-design/icons';
 
 const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = false, approvers: approversProp = [] }) => {
     const {
-        users, delegations, loading: storeLoading, isUpdating,
-        fetchUsers, fetchDelegations, addDelegation, removeDelegation,
+        users, delegations, loading: storeLoading, isUpdating, approvers: storeApprovers,
+        fetchUsers, fetchDelegations, addDelegation, removeDelegation, fetchApprovers,
         sortColumn, sortDirection, setSort
     } = useAdminStore();
     const { showConfirm } = useToastStore();
@@ -33,9 +33,10 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
     useEffect(() => {
         if (isAdmin) {
             fetchUsers();
+            fetchApprovers();
         }
         fetchDelegations();
-    }, [isAdmin, fetchUsers, fetchDelegations]);
+    }, [isAdmin, fetchUsers, fetchDelegations, fetchApprovers]);
 
     // Handle pre-filling for non-admins
     useEffect(() => {
@@ -47,9 +48,9 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
     const approverOptions = isAdmin 
         ? [
             { label: 'Select Approver', value: '' },
-            ...((users || []).filter(u => u.role?.toLowerCase() === 'approver')).map(u => ({
-                label: `${u.username} (${u.email})`,
-                value: u.email.toLowerCase()
+            ...(storeApprovers || []).map(u => ({
+                label: u.label,
+                value: u.value.toLowerCase()
             }))
         ]
         : [

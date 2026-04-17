@@ -41,5 +41,10 @@ export const adminService = {
   async deleteDelegation(id) {
     const response = await API.delete(`/delegations/${id}`);
     return response.data;
+  },
+
+  async getApprovers() {
+    const response = await API.get('/workflow-config/approvers');
+    return response.data;
   }
 };
