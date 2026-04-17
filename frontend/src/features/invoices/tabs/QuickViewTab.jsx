@@ -575,8 +575,12 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         const status = activeInvoiceData?.status?.toLowerCase();
         if (!status) return false;
 
+        if (userRole === 'scanner') {
+            return status !== 'processed';
+        }
+
         if (userRole === 'coder') {
-            if (status === 'processed') return true;
+            if (status === 'processed' || status === 'waiting_approval') return true;
             if (status === 'waiting_coding') return false;
             return false;
         }
@@ -704,7 +708,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                     </td>
                                                                 ))}
                                                                 <td className="p-2 w-[60px]">
-                                                                    {!isSystem && (
+                                                                    {!isSystem && !isViewOnly && (
                                                                         <span
                                                                             className="text-red-500 cursor-pointer flex justify-center"
                                                                             onClick={() => handleDeleteLineItem(row.id)}
@@ -721,13 +725,15 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                         </div>
                                     </div>
 
-                                    <button
-                                        onClick={handleAddLineItem}
-                                        className="w-full flex items-center justify-center gap-2 py-2 mt-1 mb-4 border border-dashed border-[#2F5D7C] rounded-md text-[#2F5D7C] hover:bg-[#eaf2f8] transition-colors font-medium text-sm"
-                                    >
-                                        <span className="text-lg leading-none">+</span>
-                                        Add Line Item
-                                    </button>
+                                    {!isViewOnly && (
+                                        <button
+                                            onClick={handleAddLineItem}
+                                            className="w-full flex items-center justify-center gap-2 py-2 mt-1 mb-4 border border-dashed border-[#2F5D7C] rounded-md text-[#2F5D7C] hover:bg-[#eaf2f8] transition-colors font-medium text-sm"
+                                        >
+                                            <span className="text-lg leading-none">+</span>
+                                            Add Line Item
+                                        </button>
+                                    )}
 
                                     <div className="border-t border-gray-200 pt-3 space-y-2">
                                         <div className="flex justify-end items-center gap-4 pr-2">

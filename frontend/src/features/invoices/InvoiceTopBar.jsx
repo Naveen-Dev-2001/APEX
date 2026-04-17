@@ -75,7 +75,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                 {!activeInvoiceData?.is_archived && (
                     <>
                         {/* Send to Coding / Send to Approval for Scanners and Coders */}
-                        {((userRole === 'scanner' && currentStatus !== 'waiting_coding') || (userRole === 'coder' && currentStatus === 'waiting_coding')) && (
+                        {((userRole === 'scanner' && currentStatus === 'processed') || (userRole === 'coder' && currentStatus === 'waiting_coding')) && (
                             <>
                                 <div className="w-[100px]">
                                     <CustomButton
