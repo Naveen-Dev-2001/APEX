@@ -699,24 +699,35 @@ const DataTable = ({
                                     </tr>
                                     {isExpanded && (
                                         <tr>
-                                            <td colSpan={columns.length} className="p-0 bg-[#f9fafb]">
-                                                <div className="border-l-4 border-[#1D71AB] px-8 py-6 animate-fadeIn">
-                                                    {renderExpandedRow ? (
-                                                        renderExpandedRow(row, rowIdx)
-                                                    ) : (
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
-                                                            {columns.filter(col => col.accessor !== 'actions').map((col, cIdx) => (
-                                                                <div key={cIdx} className="flex flex-col gap-1">
-                                                                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                                                                        {col.header}
-                                                                    </span>
-                                                                    <div className="text-[13px] text-gray-700 font-medium">
-                                                                        {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
+                                            <td colSpan={columns.length} className="p-0 bg-white border-none">
+                                                <div className="px-4 py-4 sm:px-8 sm:py-5 bg-[#fbfcfd] border-y border-gray-100 animate-slideDown overflow-hidden">
+                                                    <div className="max-w-6xl mx-auto">
+                                                        <div className="flex items-center gap-2 mb-4">
+                                                            <div className="w-1 h-4 bg-[#24A1DD] rounded-full"></div>
+                                                            <h3 className="text-xs font-bold text-gray-800 uppercase tracking-tight">
+                                                                Detailed View
+                                                            </h3>
                                                         </div>
-                                                    )}
+                                                        
+                                                        {renderExpandedRow ? (
+                                                            renderExpandedRow(row, rowIdx)
+                                                        ) : (
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-4">
+                                                                {columns.filter(col => col.accessor !== 'actions').map((col, cIdx) => (
+                                                                    <div key={cIdx} className="flex flex-col gap-1.5 group/field">
+                                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest transition-colors group-hover/field:text-[#24A1DD]">
+                                                                            {col.header}
+                                                                        </span>
+                                                                        <div className="text-[14px] text-gray-700 font-medium leading-relaxed">
+                                                                            {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || (
+                                                                                <span className="text-gray-300">—</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>
