@@ -6,8 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import useToastStore from '../../store/useToastStore';
 import toast from '../../utils/toast';
 import DataTable from '../../components/ui/DataTable';
-import VendorWorkflowModal from './VendorWorkflowModal';
-import CodificationWorkflowModal from './CodificationWorkflowModal';
+import RuleModal from './RuleModal';
 
 const SettingsPage = () => {
     const {
@@ -400,18 +399,19 @@ const SettingsPage = () => {
             </div>
 
             {/* Modals */}
-            {modalState.open && activeTab === 'Vendor Based Workflow' && (
-                <VendorWorkflowModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                />
-            )}
-            {modalState.open && activeTab === 'Config Based Workflow' && (
-                <CodificationWorkflowModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
+            {modalState.open && (
+                <RuleModal
+                    open={modalState.open}
+                    mode={activeTab === 'Vendor Based Workflow' ? 'vendor' : 'codification'}
+                    editData={modalState.rowData}
+                    onCancel={closeModal}
+                    onSuccess={() => {
+                        if (activeTab === 'Vendor Based Workflow') {
+                            fetchVendorWorkflows();
+                        } else {
+                            fetchCodificationWorkflows();
+                        }
+                    }}
                 />
             )}
         </div>

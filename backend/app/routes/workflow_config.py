@@ -291,7 +291,7 @@ async def get_workflow_vendors(
             VendorMaster.workflow_applicable == True,
             VendorMaster.workflow_applicable == None
         )],
-        limit=10000,
+        limit=100000,
         order_by="vendor_name"
     )
     
