@@ -479,10 +479,13 @@ async def get_departments(db: Session = Depends(get_db)):
 
 @router.get("/approvers")
 async def get_approvers(db: Session = Depends(get_db)):
-    # Query all users with role 'approver' regardless of status for debugging/robustness
-    # or at least include 'pending' if 'active' is too restrictive
+    # Include users who have the 'approver' role, including those with dual roles like 'admin,approver'
+    # but excluding those who are only 'admin'.
     approvers = user_repo.get_multi(
-        db, filters={"role": "approver"}, limit=1000)
+        db,
+        expressions=[DBUser.role.ilike('%approver%')],
+        limit=1000
+    )
     return [{
         "value": a.email,
         "label": f"{a.username or a.email.split('@')[0]} ({a.email})",
