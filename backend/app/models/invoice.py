@@ -40,6 +40,8 @@ class InvoiceBase(BaseModel):
     invoice_number: Optional[str] = None
     invoice_date: Optional[date] = None
     due_date: Optional[date] = None
+    total_amount: Optional[float] = None
+    amount_due: Optional[float] = None
 
 class InvoiceCreate(InvoiceBase):
     pass
@@ -49,9 +51,14 @@ class InvoiceUpdate(BaseModel):
     status: Optional[InvoiceStatus] = None
     status_history: Optional[List[Dict[str, Any]]] = None
     validation_results: Optional[Dict[str, Any]] = None
-    exchange_rate: Optional[float] = None
-    invoice_date: Optional[date] = None
-    due_date: Optional[date] = None
+    exchange_rate: Optional[Any] = None
+    invoice_date: Optional[Any] = None
+    due_date: Optional[Any] = None
+    total_amount: Optional[Any] = None
+    amount_due: Optional[Any] = None
+    vendor_id: Optional[str] = None
+    vendor_name: Optional[str] = None
+    invoice_number: Optional[str] = None
 
 class Invoice(InvoiceBase):
     model_config = ConfigDict(from_attributes=True)
