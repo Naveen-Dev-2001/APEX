@@ -711,7 +711,7 @@ const DataTable = ({
                                         <tr>
                                             <td colSpan={columns.length} className="p-0 bg-white border-none">
                                                 <div className="px-4 py-4 sm:px-8 sm:py-5 bg-[#fbfcfd] border-y border-gray-100 animate-slideDown overflow-hidden">
-                                                    <div className="max-w-6xl mx-auto">
+                                                    <div className="sticky left-0 w-fit max-w-[calc(100vw-100px)] px-4">
                                                         <div className="flex items-center gap-2 mb-4">
                                                             <div className="w-1 h-4 bg-[#24A1DD] rounded-full"></div>
                                                             <h3 className="text-xs font-bold text-gray-800 uppercase tracking-tight">
