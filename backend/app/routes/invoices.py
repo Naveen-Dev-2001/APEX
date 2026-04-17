@@ -1768,6 +1768,15 @@ async def update_invoice(
         if due_dt is not None:
             update_data["due_date"] = parse_date_safely(due_dt)
             
+        # --- Amount Columns Sync ---
+        total_amt = extracted_data.get("amounts", {}).get("total_invoice_amount", {}).get("value")
+        amt_due = extracted_data.get("amounts", {}).get("amount_due", {}).get("value")
+        
+        if total_amt is not None:
+            update_data["total_amount"] = remove_currency_format(total_amt)
+        if amt_due is not None:
+            update_data["amount_due"] = remove_currency_format(amt_due)
+
         update_data["extracted_data"] = extracted_data # Keep as dict for now
 
 
@@ -1790,10 +1799,28 @@ async def update_invoice(
              invoice.required_approvers = requirement_data["required"]
              invoice.approver_breakdown = serialize_json_field(requirement_data["breakdown"])
 
-    # Update simple fields
-    for field in ["vendor_id", "vendor_name", "invoice_number", "status", "exchange_rate", "confidence_score"]:
+    # Update attributes
+    update_fields = [
+        "vendor_id", "vendor_name", "invoice_number", "status", 
+        "exchange_rate", "confidence_score", "total_amount", 
+        "amount_due", "invoice_date", "due_date"
+    ]
+    
+    # Process potentially raw strings for financial and date fields
+    for field in ["exchange_rate", "total_amount", "amount_due"]:
+        if field in update_data:
+            update_data[field] = remove_currency_format(update_data[field])
+            
+    for field in ["invoice_date", "due_date"]:
+        if field in update_data:
+            update_data[field] = parse_date_safely(update_data[field])
+
+    for field in update_fields:
         if field in update_data:
             setattr(invoice, field, update_data[field])
+            
+    if "extracted_data" in update_data:
+        invoice.extracted_data = serialize_json_field(update_data["extracted_data"])
             
     if "original_items" in update_data:
         invoice.original_items = serialize_json_field(update_data["original_items"])

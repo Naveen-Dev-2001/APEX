@@ -58,6 +58,10 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True) -> Dic
         "confidence_score": invoice.confidence_score,
         "uploaded_at": invoice.uploaded_at,
         "processed_at": invoice.processed_at,
+        "total_amount": float(invoice.total_amount) if invoice.total_amount else None,
+        "amount_due": float(invoice.amount_due) if invoice.amount_due else None,
+        "invoice_date": invoice.invoice_date,
+        "due_date": invoice.due_date,
         "required_approvers": invoice.required_approvers,
         "current_approver_level": invoice.current_approver_level,
         

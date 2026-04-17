@@ -177,7 +177,7 @@ export const useSaveInvoice = () => {
                 ...activeInvoiceData.extracted_data?.amounts,
                 subtotal: { ...activeInvoiceData.extracted_data?.amounts?.subtotal, value: f.subtotal },
                 total_tax_amount: { ...activeInvoiceData.extracted_data?.amounts?.total_tax_amount, value: f.totalTaxAmount },
-                total_invoice_amount: { ...activeInvoiceData.extracted_data?.amounts?.total_invoice_amount, value: f.totalInvoiceAmount },
+                total_invoice_amount: { ...activeInvoiceData.extracted_data?.amounts?.total_invoice_amount, value: f.totalAmount || f.totalInvoiceAmount },
                 amount_paid: { ...activeInvoiceData.extracted_data?.amounts?.amount_paid, value: f.amountPaid },
                 amount_due: { ...activeInvoiceData.extracted_data?.amounts?.amount_due, value: f.amountDue },
                 shipping_handling_fees: { ...activeInvoiceData.extracted_data?.amounts?.shipping_handling_fees, value: f.shippingFees },
@@ -227,8 +227,14 @@ export const useSaveInvoice = () => {
 
         const object = {
             extracted_data: payload.extracted_data,   // already has isModified: true
-            exchange_rate: null,
-            vender_id: payload.vendor_id,
+            exchange_rate: payload.exchange_rate,
+            vendor_id: payload.vendor_id,
+            vendor_name: payload.vendor_name,
+            invoice_number: payload.invoice_number,
+            total_amount: payload.extracted_data?.amounts?.total_invoice_amount?.value,
+            amount_due: payload.extracted_data?.amounts?.amount_due?.value,
+            invoice_date: payload.extracted_data?.invoice_details?.invoice_date?.value,
+            due_date: payload.extracted_data?.invoice_details?.due_date?.value,
         };
 
         const response = await saveInvoice(viewInvoiceId, object);

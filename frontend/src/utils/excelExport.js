@@ -33,9 +33,12 @@ export const exportToExcel = (data, columns, fileName = "export.xlsx") => {
             const accessor = col.accessor || col.field || col.valueGetter;
             
             let value = "";
-            if (typeof accessor === 'function') {
-                // If valueGetter/accessor is a function, we try to call it.
-                // ReusableDataTable/DataTable often use functions.
+            const getFilterValue = col.getFilterValue;
+            const render = col.render;
+
+            if (typeof getFilterValue === 'function') {
+                value = getFilterValue(row) || "";
+            } else if (typeof accessor === 'function') {
                 try {
                     value = accessor({ data: row }) || "";
                 } catch (e) {
@@ -45,8 +48,21 @@ export const exportToExcel = (data, columns, fileName = "export.xlsx") => {
                 value = getNestedValue(row, accessor);
             }
 
+            // Fallback to render if value is still empty/undefined and render is a simple function
+            if ((value === undefined || value === "" || value === "-") && typeof render === 'function') {
+                try {
+                    const rendered = render(value, row);
+                    // If render returns a string or number, use it. If it returns JSX, it won't work well here.
+                    if (typeof rendered === 'string' || typeof rendered === 'number') {
+                        value = rendered;
+                    }
+                } catch (e) {
+                    // Ignore render errors for excel export
+                }
+            }
+
             // Fallback to field if nothing else
-            if (value === undefined || value === "") {
+            if (value === undefined || value === "" || value === "-") {
                 value = row[col.field] || "";
             }
 
