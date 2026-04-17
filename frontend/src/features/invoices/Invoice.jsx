@@ -68,12 +68,22 @@ const Invoice = () => {
                 if (value.size > 0) {
                     filters[dbField] = Array.from(value);
                 }
-            } else if (typeof value === 'object' && value.op && value.val !== "" && value.val !== undefined) {
-                // Numeric condition filter
-                filters[dbField] = {
-                    op: value.op,
-                    val: parseFloat(value.val)
-                };
+            } else if (typeof value === 'object' && value.op) {
+                if (value.op === 'between') {
+                    // Date range filter: value.val is [from, to]
+                    if (Array.isArray(value.val) && (value.val[0] || value.val[1])) {
+                        filters[dbField] = {
+                            op: 'between',
+                            val: value.val
+                        };
+                    }
+                } else if (value.val !== "" && value.val !== undefined) {
+                    // Numeric condition filter
+                    filters[dbField] = {
+                        op: value.op,
+                        val: parseFloat(value.val)
+                    };
+                }
             }
         });
         return filters;

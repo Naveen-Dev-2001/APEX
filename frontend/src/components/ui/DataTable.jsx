@@ -488,7 +488,7 @@ const DataTable = ({
     // Helper to filter data by a specific subset of filters
     const getFilteredDataCommon = useCallback((filters) => {
         // If server side filtering is enabled, we assume 'data' is already filtered
-        if (enableColumnFilters) return data;
+        if (onExternalColumnFiltersChange) return data;
         
         return data.filter(row =>
             columns.every(col => {
@@ -503,17 +503,22 @@ const DataTable = ({
                     } else if (typeof selected === 'object' && selected.op) {
                     if (selected.op === 'between') {
                         const rowVal = getColFilterValue(col, row);
-                        if (!rowVal) return false;
+                        if (!rowVal || rowVal === '-') return false;
                         const rowDate = new Date(rowVal);
                         if (isNaN(rowDate.getTime())) return false;
+                        
+                        // Normalize dates to midnight for fair comparison
+                        rowDate.setHours(0, 0, 0, 0);
                         
                         const [from, to] = selected.val;
                         if (from) {
                             const fromDate = new Date(from);
+                            fromDate.setHours(0, 0, 0, 0);
                             if (rowDate < fromDate) return false;
                         }
                         if (to) {
                             const toDate = new Date(to);
+                            toDate.setHours(0, 0, 0, 0);
                             if (rowDate > toDate) return false;
                         }
                         return true;
@@ -537,7 +542,7 @@ const DataTable = ({
                 return true;
             })
         );
-    }, [data, columns, enableColumnFilters]);
+    }, [data, columns, onExternalColumnFiltersChange]);
 
     // Main filtered data for the table body
     const filteredData = useMemo(() => {
@@ -706,7 +711,7 @@ const DataTable = ({
                                         <tr>
                                             <td colSpan={columns.length} className="p-0 bg-white border-none">
                                                 <div className="px-4 py-4 sm:px-8 sm:py-5 bg-[#fbfcfd] border-y border-gray-100 animate-slideDown overflow-hidden">
-                                                    <div className="max-w-6xl mx-auto">
+                                                    <div className="sticky left-0 w-fit max-w-[calc(100vw-100px)] px-4">
                                                         <div className="flex items-center gap-2 mb-4">
                                                             <div className="w-1 h-4 bg-[#24A1DD] rounded-full"></div>
                                                             <h3 className="text-xs font-bold text-gray-800 uppercase tracking-tight">
