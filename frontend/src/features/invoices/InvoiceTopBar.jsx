@@ -3,6 +3,7 @@ import { icons } from "../../file";
 import { useInvoiceStore } from "../../store/invoice.store";
 import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 import { useSaveInvoice } from "../hooks/useSaveInvoice";
+import { useWorkflowDataSync } from "../hooks/useWorkflow";
 import toast from "../../utils/toast";
 import { saveInvoice } from "../../api/invoiceApi";
 import { useNavigate } from "react-router-dom";
@@ -12,11 +13,31 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate()
     const user = useAuthStore((state) => state.user);
     const userDept = user?.department?.toLowerCase();
-    console.log("user department", user);
     const userRole = user?.role?.toLowerCase();
-    const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView, setInvoiceActiveTab, activeInvoiceData } = useInvoiceStore();
+    
+    const { 
+        setInvoiceSection, 
+        isDuplicate, 
+        viewInvoiceId, 
+        resetQuickView, 
+        setInvoiceActiveTab, 
+        activeInvoiceData,
+        lineItems,
+        selectedVendorId
+    } = useInvoiceStore();
+
     const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
+
+    const firstLine = lineItems?.[0] || {};
+    const { workflowData } = useWorkflowDataSync(viewInvoiceId, {
+        preview_vendor_id: selectedVendorId,
+        preview_lob: firstLine.lob,
+        preview_department_id: firstLine.department
+    });
+
+    const isWaitingCoding = (activeInvoiceData?.status || invoice?.status) === 'waiting_coding';
+    const isWorkflowMissing = isWaitingCoding && !selectedVendorId && workflowData?.workflow_type !== 'codification';
 
     const handleSendToCoding = async () => {
         const response = await handleSave()
@@ -98,7 +119,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                     <CustomButton
                                         variant="success"
                                         className="w-40"
-                                        disabled={isDuplicate}
+                                        disabled={isDuplicate || isWorkflowMissing}
                                         onClick={currentStatus === 'waiting_coding' ? handleSendToApproval : handleSendToCoding}
                                     >
                                         {currentStatus === 'waiting_coding'

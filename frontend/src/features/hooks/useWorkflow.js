@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
 import { getAudit, getworkflowApprovers, getWorkflowData } from "../../api/invoiceApi";
 
-export const useWorkflowDataSync = (invoiceId) => {
+export const useWorkflowDataSync = (invoiceId, params = {}) => {
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: ["workflow", invoiceId],
-        queryFn: () => getWorkflowData(invoiceId),
+        queryKey: ["workflow", invoiceId, params],
+        queryFn: () => getWorkflowData(invoiceId, params),
         enabled: !!invoiceId,
         staleTime: 5 * 60 * 1000,
     });
