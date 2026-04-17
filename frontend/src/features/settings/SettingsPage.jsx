@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Tooltip } from 'antd';
 import { Plus, Search, Pencil, Trash2, AlertCircle } from 'lucide-react';
 import useWorkflowStore from '../../store/workflow.store';
 import { useAuthStore } from '../../store/authStore';
@@ -51,7 +52,15 @@ const SettingsPage = () => {
     const openEdit = (row) => setModalState({ open: true, mode: 'edit', rowData: row });
     const closeModal = () => setModalState({ open: false, mode: 'add', rowData: null });
     
-    const getApproverName = (email) => {
+    const getApproverName = useCallback((email, isFinance = false) => {
+        if (isFinance) {
+            return (
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-200 whitespace-nowrap">
+                    Finance Team
+                </span>
+            );
+        }
+
         if (!email) return <span className="text-gray-400">-</span>;
         
         const formatSingle = (e) => {
@@ -62,19 +71,39 @@ const SettingsPage = () => {
 
         if (Array.isArray(email)) {
             if (email.length === 0) return <span className="text-gray-400">-</span>;
-            return (
-                <div className="flex flex-wrap gap-1 max-w-[200px]">
+            
+            const tooltipContent = (
+                <div className="flex flex-col gap-1 py-1">
                     {email.map((e, i) => (
-                        <span key={i} className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] text-gray-600 border border-gray-200">
-                            {formatSingle(e)}
-                        </span>
+                        <span key={i} className="text-[11px] text-white font-medium">{e}</span>
                     ))}
                 </div>
             );
+
+            return (
+                <Tooltip title={tooltipContent} placement="top" mouseEnterDelay={0.3}>
+                    <div className="flex flex-wrap gap-1 max-w-[200px] cursor-help">
+                        {email.map((e, i) => (
+                            <span key={i} className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] text-gray-600 border border-gray-200">
+                                {formatSingle(e)}
+                            </span>
+                        ))}
+                        {email.length > 1 && (
+                            <span className="text-[10px] text-blue-500 font-bold ml-0.5">
+                                +{email.length - 1}
+                            </span>
+                        )}
+                    </div>
+                </Tooltip>
+            );
         }
 
-        return formatSingle(email);
-    };
+        return (
+            <Tooltip title={email} placement="top" mouseEnterDelay={0.3}>
+                <span className="cursor-help">{formatSingle(email)}</span>
+            </Tooltip>
+        );
+    }, [approversList]);
 
     const handleDelete = (row) => {
         showConfirm({
@@ -114,27 +143,27 @@ const SettingsPage = () => {
         { 
             header: 'Approver 1', 
             accessor: 'mandatory_approver_1',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['1'] || row?.approver_flags?.[1])
         },
         { 
             header: 'Approver 2', 
             accessor: 'mandatory_approver_2',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['2'] || row?.approver_flags?.[2])
         },
         { 
             header: 'Approver 3', 
             accessor: 'mandatory_approver_3',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['3'] || row?.approver_flags?.[3])
         },
         { 
             header: 'Approver 4', 
             accessor: 'mandatory_approver_4',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['4'] || row?.approver_flags?.[4])
         },
         { 
             header: 'Approver 5', 
             accessor: 'mandatory_approver_5',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['5'] || row?.approver_flags?.[5])
         },
         { 
             header: 'Threshold Approver', 
@@ -144,7 +173,7 @@ const SettingsPage = () => {
         { 
             header: 'Amount Threshold', 
             accessor: 'amount_threshold',
-            render: (val) => val ? `$ ${val.toLocaleString()}` : <span className="text-gray-400">-</span>
+            render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
         },
         ...(!isCoder ? [{
             header: 'Actions',
@@ -202,27 +231,27 @@ const SettingsPage = () => {
         { 
             header: 'Approver 1', 
             accessor: 'mandatory_approver_1',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['1'] || row?.approver_flags?.[1])
         },
         { 
             header: 'Approver 2', 
             accessor: 'mandatory_approver_2',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['2'] || row?.approver_flags?.[2])
         },
         { 
             header: 'Approver 3', 
             accessor: 'mandatory_approver_3',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['3'] || row?.approver_flags?.[3])
         },
         { 
             header: 'Approver 4', 
             accessor: 'mandatory_approver_4',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['4'] || row?.approver_flags?.[4])
         },
         { 
             header: 'Approver 5', 
             accessor: 'mandatory_approver_5',
-            render: (val) => getApproverName(val)
+            render: (val, row) => getApproverName(val, row?.approver_flags?.['5'] || row?.approver_flags?.[5])
         },
         { 
             header: 'Threshold Approver', 
@@ -232,7 +261,7 @@ const SettingsPage = () => {
         { 
             header: 'Amount Threshold', 
             accessor: 'amount_threshold',
-            render: (val) => val ? `$ ${val.toLocaleString()}` : <span className="text-gray-400">-</span>
+            render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
         },
         ...(!isCoder ? [{
             header: 'Actions',

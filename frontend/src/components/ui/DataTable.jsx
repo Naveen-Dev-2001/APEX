@@ -411,6 +411,11 @@ const DataTable = ({
     // ── Row Expansion state ──────────────────────────────────────────────────
     const [expandedRow, setExpandedRow] = useState(null);
 
+    // Reset expansion when data changes (e.g. switching tabs or pages)
+    useEffect(() => {
+        setExpandedRow(null);
+    }, [data]);
+
     const toggleRow = (idx) => {
         setExpandedRow(prev => prev === idx ? null : idx);
     };
