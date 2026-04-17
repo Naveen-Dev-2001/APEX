@@ -10,8 +10,8 @@ const FunnelIcon = ({ active }) => (
     >
         <path
             d="M1 3h14l-5 6v5l-4-2V9L1 3z"
-            fill={active ? '#40a9ff' : 'rgba(255,255,255,0.55)'}
-            stroke={active ? '#40a9ff' : 'rgba(255,255,255,0.55)'}
+            fill={active ? '#24A1DD' : 'rgba(255,255,255,0.55)'}
+            stroke={active ? '#24A1DD' : 'rgba(255,255,255,0.55)'}
             strokeWidth="1.2"
             strokeLinejoin="round"
         />
@@ -121,26 +121,29 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
             background: '#fff',
             border: '1px solid #e5e7eb',
             borderRadius: 12,
-            boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
             zIndex: 9999,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
+            fontFamily: '"Creato Display", sans-serif',
         };
     }, [anchorPos]);
 
     return (
         <div ref={popRef} style={style}>
             {(isNumber || isDate) && (
-                <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0', background: '#f9fafb' }}>
                     <button
                         onClick={() => setFilterMode('list')}
                         style={{
-                            flex: 1, padding: '10px', fontSize: 12, fontWeight: 500,
-                            background: filterMode === 'list' ? '#fff' : '#f9fafb',
-                            border: 'none', borderBottom: filterMode === 'list' ? '2px solid #1677ff' : '2px solid transparent',
-                            color: filterMode === 'list' ? '#1677ff' : '#6b7280',
-                            cursor: 'pointer'
+                            flex: 1, padding: '12px', fontSize: 13, fontWeight: 600,
+                            background: filterMode === 'list' ? '#fff' : 'transparent',
+                            border: 'none', 
+                            borderBottom: filterMode === 'list' ? '2px solid #24A1DD' : '2px solid transparent',
+                            color: filterMode === 'list' ? '#24A1DD' : '#6b7280',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
                         }}
                     >
                         List
@@ -148,11 +151,13 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                     <button
                         onClick={() => setFilterMode('condition')}
                         style={{
-                            flex: 1, padding: '10px', fontSize: 12, fontWeight: 500,
-                            background: filterMode === 'condition' ? '#fff' : '#f9fafb',
-                            border: 'none', borderBottom: filterMode === 'condition' ? '2px solid #1677ff' : '2px solid transparent',
-                            color: filterMode === 'condition' ? '#1677ff' : '#6b7280',
-                            cursor: 'pointer'
+                            flex: 1, padding: '12px', fontSize: 13, fontWeight: 600,
+                            background: filterMode === 'condition' ? '#fff' : 'transparent',
+                            border: 'none', 
+                            borderBottom: filterMode === 'condition' ? '2px solid #24A1DD' : '2px solid transparent',
+                            color: filterMode === 'condition' ? '#24A1DD' : '#6b7280',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
                         }}
                     >
                         Condition
@@ -163,31 +168,39 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
             {filterMode === 'list' ? (
                 <>
                     {/* Search box */}
-                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
+                    <div style={{ padding: '12px 14px', borderBottom: '1px solid #f0f0f0' }}>
                         <div style={{
-                            display: 'flex', alignItems: 'center', gap: 6,
-                            background: '#f7f8fa', border: '1px solid #e5e7eb',
-                            borderRadius: 6, padding: '5px 10px',
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            background: '#f9fafb', border: '1px solid #e5e7eb',
+                            borderRadius: 8, padding: '8px 12px',
+                            transition: 'border-color 0.2s',
                         }}>
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="6.5" cy="6.5" r="5" stroke="#9ca3af" strokeWidth="1.5" />
-                                <path d="M10.5 10.5L14 14" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="6.5" cy="6.5" r="5" stroke="#9ca3af" strokeWidth="1.8" />
+                                <path d="M10.5 10.5L14 14" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" />
                             </svg>
                             <input
                                 ref={searchRef}
                                 type="text"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                placeholder="Search in filters"
+                                placeholder="Search values..."
                                 style={{
                                     border: 'none', outline: 'none', background: 'transparent',
-                                    fontSize: 12, color: '#374151', width: '100%',
+                                    fontSize: 13, color: '#303030', width: '100%',
+                                    fontFamily: 'inherit'
                                 }}
+                                onFocus={e => e.currentTarget.parentElement.style.borderColor = '#24A1DD'}
+                                onBlur={e => e.currentTarget.parentElement.style.borderColor = '#e5e7eb'}
                             />
                             {search && (
                                 <button
                                     onClick={() => setSearch('')}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, fontSize: 12 }}
+                                    style={{ 
+                                        background: 'none', border: 'none', cursor: 'pointer', 
+                                        color: '#9ca3af', padding: 0, fontSize: 14,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}
                                 >✕</button>
                             )}
                         </div>
@@ -211,11 +224,11 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                                     style={{
                                         display: 'flex', alignItems: 'center', gap: 10,
                                         padding: '7px 14px', cursor: 'pointer',
-                                        background: checked ? '#e6f4ff' : 'transparent',
+                                        background: checked ? '#f0f9ff' : 'transparent',
                                         transition: 'background 0.15s',
                                     }}
-                                    onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f5f5f5'; }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = checked ? '#e6f4ff' : 'transparent'; }}
+                                    onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f9fafb'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = checked ? '#f0f9ff' : 'transparent'; }}
                                 >
                                     <input
                                         type="checkbox"
@@ -225,9 +238,9 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                                     />
                                     {/* Custom checkbox */}
                                     <span style={{
-                                        width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                                        border: checked ? '2px solid #1677ff' : '2px solid #d1d5db',
-                                        background: checked ? '#1677ff' : '#fff',
+                                        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                                        border: checked ? '2px solid #24A1DD' : '2px solid #d1d5db',
+                                        background: checked ? '#24A1DD' : '#fff',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         transition: 'all 0.15s',
                                     }}>
@@ -238,8 +251,8 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                                         )}
                                     </span>
                                     <span style={{
-                                        fontSize: 13, color: checked ? '#1677ff' : '#374151',
-                                        fontWeight: checked ? 500 : 400,
+                                        fontSize: 13, color: checked ? '#24A1DD' : '#374151',
+                                        fontWeight: checked ? 600 : 400,
                                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                         maxWidth: 190,
                                     }}>
@@ -254,42 +267,51 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                 <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {isDate ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>From</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>From</span>
                                 <input
                                     type="date"
                                     value={pendingCond.val[0] || ''}
                                     onChange={e => setPendingCond(prev => ({ ...prev, op: 'between', val: [e.target.value, prev.val[1] || ''] }))}
                                     style={{
-                                        width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
-                                        fontSize: 13, color: '#374151', outline: 'none'
+                                        width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                                        fontSize: 13, color: '#303030', outline: 'none', transition: 'border-color 0.2s',
+                                        fontFamily: 'inherit'
                                     }}
+                                    onFocus={e => e.target.style.borderColor = '#24A1DD'}
+                                    onBlur={e => e.target.style.borderColor = '#d1d5db'}
                                 />
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>To</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>To</span>
                                 <input
                                     type="date"
                                     value={pendingCond.val[1] || ''}
                                     onChange={e => setPendingCond(prev => ({ ...prev, op: 'between', val: [prev.val[0] || '', e.target.value] }))}
                                     style={{
-                                        width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
-                                        fontSize: 13, color: '#374151', outline: 'none'
+                                        width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                                        fontSize: 13, color: '#303030', outline: 'none', transition: 'border-color 0.2s',
+                                        fontFamily: 'inherit'
                                     }}
+                                    onFocus={e => e.target.style.borderColor = '#24A1DD'}
+                                    onBlur={e => e.target.style.borderColor = '#d1d5db'}
                                 />
                             </div>
                         </div>
                     ) : (
                         <>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Operator</span>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Operator</span>
                                 <select
                                     value={pendingCond.op}
                                     onChange={e => setPendingCond(prev => ({ ...prev, op: e.target.value }))}
                                     style={{
-                                        width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db',
-                                        fontSize: 13, color: '#374151', outline: 'none'
+                                        width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                                        fontSize: 13, color: '#303030', outline: 'none', background: '#fff',
+                                        cursor: 'pointer', transition: 'border-color 0.2s'
                                     }}
+                                    onFocus={e => e.target.style.borderColor = '#24A1DD'}
+                                    onBlur={e => e.target.style.borderColor = '#d1d5db'}
                                 >
                                     <option value="=">=</option>
                                     <option value=">">&gt;</option>
@@ -300,16 +322,18 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                                 </select>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Value</span>
+                                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Value</span>
                                 <input
                                     type="number"
                                     value={pendingCond.val}
                                     onChange={e => setPendingCond(prev => ({ ...prev, val: e.target.value }))}
                                     placeholder="Enter value"
                                     style={{
-                                        width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
-                                        fontSize: 13, color: '#374151', outline: 'none'
+                                        width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                                        fontSize: 13, color: '#303030', outline: 'none', transition: 'border-color 0.2s'
                                     }}
+                                    onFocus={e => e.target.style.borderColor = '#24A1DD'}
+                                    onBlur={e => e.target.style.borderColor = '#d1d5db'}
                                 />
                             </div>
                         </>
@@ -331,8 +355,11 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                     }}
                     style={{
                         background: 'none', border: 'none', cursor: 'pointer',
-                        color: '#1677ff', fontSize: 13, fontWeight: 500, padding: 0,
+                        color: '#24A1DD', fontSize: 13, fontWeight: 600, padding: '4px 8px',
+                        borderRadius: 4, transition: 'background 0.2s'
                     }}
+                    onMouseEnter={e => e.target.style.background = '#f0f9ff'}
+                    onMouseLeave={e => e.target.style.background = 'none'}
                 >
                     Reset
                 </button>
@@ -342,10 +369,14 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                         else onApply(pendingCond);
                     }}
                     style={{
-                        background: '#1677ff', border: 'none', cursor: 'pointer',
-                        color: '#fff', fontSize: 13, fontWeight: 500,
-                        padding: '4px 18px', borderRadius: 5,
+                        background: '#24A1DD', border: 'none', cursor: 'pointer',
+                        color: '#fff', fontSize: 13, fontWeight: 600,
+                        padding: '6px 20px', borderRadius: 8,
+                        boxShadow: '0 2px 4px rgba(36,161,221,0.2)',
+                        transition: 'all 0.2s'
                     }}
+                    onMouseEnter={e => { e.target.style.opacity = '0.9'; e.target.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={e => { e.target.style.opacity = '1'; e.target.style.transform = 'translateY(0)'; }}
                 >
                     OK
                 </button>
@@ -374,7 +405,16 @@ const DataTable = ({
   columnFilters: externalColumnFilters,
   onColumnFiltersChange: onExternalColumnFiltersChange,
   onSort,
+  expandable = true,
+  renderExpandedRow,
 }) => {
+    // ── Row Expansion state ──────────────────────────────────────────────────
+    const [expandedRow, setExpandedRow] = useState(null);
+
+    const toggleRow = (idx) => {
+        setExpandedRow(prev => prev === idx ? null : idx);
+    };
+
     // ── Filter state ──────────────────────────────────────────────────────────
     // columnFilters: { [accessor]: Set<string> }
     const [internalColumnFilters, setInternalColumnFilters] = useState({});
@@ -628,23 +668,73 @@ const DataTable = ({
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {filteredData.map((row, rowIdx) => (
-                            <tr key={rowIdx} className="hover:bg-gray-50 transition-colors group">
-                                {columns.map((col, colIdx) => {
-                                    const isLastColumn = colIdx === columns.length - 1;
-                                    const isSticky = isLastColumn && col.accessor === 'actions';
-                                    return (
-                                        <td 
-                                            key={colIdx} 
-                                            className={`px-4 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
-                                                ${isSticky ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}`}
-                                        >
-                                            {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        ))}
+                        {filteredData.map((row, rowIdx) => {
+                            const isExpanded = expandedRow === rowIdx;
+                            return (
+                                <React.Fragment key={rowIdx}>
+                                    <tr 
+                                        className={`hover:bg-gray-50 transition-colors group ${expandable ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-gray-50' : ''}`}
+                                        onClick={(e) => {
+                                            // Don't expand if user clicked a button, anchor, or anything interactive
+                                            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) {
+                                                return;
+                                            }
+                                            if (expandable) toggleRow(rowIdx);
+                                        }}
+                                    >
+                                        {columns.map((col, colIdx) => {
+                                            const isLastColumn = colIdx === columns.length - 1;
+                                            const isSticky = isLastColumn && col.accessor === 'actions';
+                                            return (
+                                                <td 
+                                                    key={colIdx} 
+                                                    className={`px-4 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
+                                                        ${isSticky ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}
+                                                        ${isExpanded && isSticky ? 'bg-gray-50' : ''}`}
+                                                >
+                                                    {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                    {isExpanded && (
+                                        <tr>
+                                            <td colSpan={columns.length} className="p-0 bg-white border-none">
+                                                <div className="px-4 py-4 sm:px-8 sm:py-5 bg-[#fbfcfd] border-y border-gray-100 animate-slideDown overflow-hidden">
+                                                    <div className="max-w-6xl mx-auto">
+                                                        <div className="flex items-center gap-2 mb-4">
+                                                            <div className="w-1 h-4 bg-[#24A1DD] rounded-full"></div>
+                                                            <h3 className="text-xs font-bold text-gray-800 uppercase tracking-tight">
+                                                                Detailed View
+                                                            </h3>
+                                                        </div>
+                                                        
+                                                        {renderExpandedRow ? (
+                                                            renderExpandedRow(row, rowIdx)
+                                                        ) : (
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-4">
+                                                                {columns.filter(col => col.accessor !== 'actions').map((col, cIdx) => (
+                                                                    <div key={cIdx} className="flex flex-col gap-1.5 group/field">
+                                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest transition-colors group-hover/field:text-[#24A1DD]">
+                                                                            {col.header}
+                                                                        </span>
+                                                                        <div className="text-[14px] text-gray-700 font-medium leading-relaxed">
+                                                                            {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || (
+                                                                                <span className="text-gray-300">—</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
                         {filteredData.length === 0 && (
                             <tr>
                                 <td colSpan={columns.length} className="px-5 py-8 text-center text-gray-500">
@@ -681,8 +771,8 @@ const DataTable = ({
                         <button
                             onClick={() => setColumnFilters({})}
                             style={{
-                                fontSize: 12, color: '#1677ff', background: 'none',
-                                border: '1px solid #1677ff', borderRadius: 4,
+                                fontSize: 12, color: '#24A1DD', background: 'none',
+                                border: '1px solid #24A1DD', borderRadius: 4,
                                 padding: '2px 8px', cursor: 'pointer',
                             }}
                         >
