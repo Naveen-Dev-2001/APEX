@@ -14,32 +14,80 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     const userDept = user?.department?.toLowerCase();
     console.log("user department", user);
     const userRole = user?.role?.toLowerCase();
-    const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView, setInvoiceActiveTab, activeInvoiceData } = useInvoiceStore();
+    const { setInvoiceSection, isDuplicate, viewInvoiceId, resetQuickView, setInvoiceActiveTab, activeInvoiceData, setInvoiceData } = useInvoiceStore();
     const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
 
+    const handleDiscard = () => {
+        setInvoiceData(activeInvoiceData);
+        toast.success("Changes discarded!");
+    };
+
     const handleSendToCoding = async () => {
         const response = await handleSave()
-        const payload = await saveInvoice(viewInvoiceId, { status: 'waiting_coding' })
-        console.log("Send to coding →", payload);
-        if (payload.status == "waiting_coding") {
-            toast.success("Invoice sent for coding successfully!")
-            navigate('/coding')
-        } else {
-            toast.error(payload?.message || "Something went wrong while sending for coding.");
+        if (response) {
+            const payload = await saveInvoice(viewInvoiceId, { status: 'waiting_coding' })
+            console.log("Send to coding →", payload);
+            if (payload.status == "waiting_coding") {
+                toast.success("Invoice sent for coding successfully!")
+                navigate('/coding')
+            } else {
+                toast.error(payload?.message || "Something went wrong while sending for coding.");
+            }
         }
     };
 
     const handleSendToApproval = async () => {
         const response = await handleSave()
-        const payload = await saveInvoice(viewInvoiceId, { status: 'waiting_approval' })
-        if (payload.status == "waiting_approval") {
-            toast.success("Invoice sent for approval successfully!")
-            navigate('/invoices')
-        } else {
-            toast.error(payload?.message || "Something went wrong while sending for approval.");
+        if (response) {
+            const payload = await saveInvoice(viewInvoiceId, { status: 'waiting_approval' })
+            if (payload.status == "waiting_approval") {
+                toast.success("Invoice sent for approval successfully!")
+                navigate('/invoices')
+            } else {
+                toast.error(payload?.message || "Something went wrong while sending for approval.");
+            }
         }
     };
+
+    const handleApprove = async () => {
+        const response = await handleSave()
+        if (response) {
+            const payload = await saveInvoice(viewInvoiceId, { status: 'approved' })
+            if (payload.status == "approved") {
+                toast.success("Invoice Approved successfully!")
+                navigate('/invoices')
+            } else {
+                toast.error(payload?.message || "Something went wrong while approving.");
+            }
+        }
+    }
+
+    const handleReject = async () => {
+        const response = await handleSave()
+        if (response) {
+            const payload = await saveInvoice(viewInvoiceId, { status: 'rejected' })
+            if (payload.status == "rejected") {
+                toast.success("Invoice Rejected successfully!")
+                navigate('/invoices')
+            } else {
+                toast.error(payload?.message || "Something went wrong while rejecting.");
+            }
+        }
+    }
+
+    const handleRework = async () => {
+        const response = await handleSave()
+        if (response) {
+            const payload = await saveInvoice(viewInvoiceId, { status: 'rework' })
+            if (payload.status == "rework") {
+                toast.success("Invoice sent for Rework successfully!")
+                navigate('/invoices')
+            } else {
+                toast.error(payload?.message || "Something went wrong while sending for rework.");
+            }
+        }
+    }
 
     const handleSaveInvoice = async () => {
         const response = await handleSave()
@@ -81,6 +129,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                     <CustomButton
                                         variant="outline"
                                         className="w-32"
+                                        onClick={handleDiscard}
                                     >
                                         Discard
                                     </CustomButton>
@@ -123,17 +172,17 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                     </div>
                                 )}
                                 <div className="w-[100px]">
-                                    <CustomButton variant="warning" className="w-full border-0">
+                                    <CustomButton variant="warning" className="w-full border-0" onClick={handleRework}>
                                         Rework
                                     </CustomButton>
                                 </div>
                                 <div className="w-[100px]">
-                                    <CustomButton variant="danger" className="w-full">
+                                    <CustomButton variant="danger" className="w-full" onClick={handleReject}>
                                         Reject
                                     </CustomButton>
                                 </div>
                                 <div className="w-[100px]">
-                                    <CustomButton variant="success" className="w-full border-0">
+                                    <CustomButton variant="success" className="w-full border-0" onClick={handleApprove}>
                                         Approve
                                     </CustomButton>
                                 </div>
