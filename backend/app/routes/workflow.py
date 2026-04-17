@@ -110,6 +110,12 @@ def get_invoice_total_from_invoice(db: Session, invoice_id: int):
         except:
             return None
 
+    # 1. Primary source: Database column (already a Decimal/Number)
+    if getattr(invoice, 'total_amount', None) is not None:
+        try: return float(invoice.total_amount)
+        except: pass
+
+    # 2. Fallback: Parse from extracted_data JSON
     if "amounts" in extracted:
         amounts = extracted["amounts"]
         if isinstance(amounts, dict):
@@ -132,7 +138,9 @@ def get_required_approver_count(
     currency: str = "USD", 
     entity: str = None, 
     force_vendor_id: str = None, 
-    force_vendor_name: str = None
+    force_vendor_name: str = None,
+    force_lob: str = None,
+    force_dept: str = None
 ):
     """
     Get the required approvers based on Workflow rules in SQL Server.
@@ -220,6 +228,14 @@ def get_required_approver_count(
                     except: return [val]
                 return [val] if val else []
 
+            def parse_flags(val):
+                if not val: return {}
+                if isinstance(val, dict): return val
+                try: return json.loads(val)
+                except: return {}
+
+            flags = parse_flags(v_workflow.approver_flags)
+
             mandatory_fields = [
                 parse_approvers(v_workflow.mandatory_approver_1),
                 parse_approvers(v_workflow.mandatory_approver_2),
@@ -227,66 +243,109 @@ def get_required_approver_count(
                 parse_approvers(v_workflow.mandatory_approver_4),
                 parse_approvers(v_workflow.mandatory_approver_5)
             ]
-            assigned_approvers = [a for a in mandatory_fields[:count] if a]
+            assigned_approvers = []
+            for i, a in enumerate(mandatory_fields[:count]):
+                is_fin = flags.get(str(i+1)) == True or flags.get(i+1) == True
+                assigned_approvers.append({
+                    "emails": a, 
+                    "type": "mandatory", 
+                    "level": i+1,
+                    "is_finance": is_fin
+                })
             is_parallel = getattr(v_workflow, 'is_parallel', False)
             
-            # Threshold Approver
             if getattr(v_workflow, 'is_threshold_enabled', False):
-                if amount is not None and v_workflow.amount_threshold is not None:
-                     if amount >= v_workflow.amount_threshold and v_workflow.threshold_approver:
-                        assigned_approvers.append(v_workflow.threshold_approver)
+                threshold = float(v_workflow.amount_threshold) if v_workflow.amount_threshold is not None else 0.0
+                if amount is not None and amount >= threshold and v_workflow.threshold_approver:
+                    assigned_approvers.append({"emails": parse_approvers(v_workflow.threshold_approver), "type": "threshold"})
+
+            # Posting Approver
+            has_posting_approver = False
+            if getattr(v_workflow, 'posting_approver', None):
+                assigned_approvers.append({"emails": parse_approvers(v_workflow.posting_approver), "type": "posting"})
+                has_posting_approver = True
 
 
     # 3. Try Codification Based Workflow
-    if not workflow_found and invoice_id and entity:
-        coding_list = coding_repo.get_multi(db, filters={"invoice_id": invoice_id}, limit=1)
-        coding = coding_list[0] if coding_list else None
-        if coding and coding.line_items:
-            items = json.loads(coding.line_items)
-            for item in items:
-                lob_raw = item.get("lob")
-                dept_raw = item.get("department_id") or item.get("department")
-                lob = lob_raw.split(" - ")[0].strip() if lob_raw and " - " in str(lob_raw) else lob_raw
-                dept = dept_raw.split(" - ")[0].strip() if dept_raw and " - " in str(dept_raw) else dept_raw
+    if not workflow_found and entity:
+        # Use forced values if provided (preview mode)
+        if force_lob and force_dept:
+            items = [{"lob": force_lob, "department_id": force_dept}]
+        elif invoice_id:
+            coding_list = coding_repo.get_multi(db, filters={"invoice_id": invoice_id}, limit=1)
+            coding = coding_list[0] if coding_list else None
+            items = json.loads(coding.line_items) if coding and coding.line_items else []
+        else:
+            items = []
 
-                if lob and dept:
-                    cod_workflow_list = codification_workflow_repo.get_multi(
-                        db,
-                        filters={
-                            "lob": lob,
-                            "department_id": dept,
-                            "entity": entity
-                        },
-                        limit=1
-                    )
-                    cod_workflow = cod_workflow_list[0] if cod_workflow_list else None
+        # User requested to only check the first line item
+        if items:
+            item = items[0]
+            lob_raw = item.get("lob")
+            dept_raw = item.get("department_id") or item.get("department")
+            lob = lob_raw.split(" - ")[0].strip() if lob_raw and " - " in str(lob_raw) else lob_raw
+            dept = dept_raw.split(" - ")[0].strip() if dept_raw and " - " in str(dept_raw) else dept_raw
+
+            if lob and dept:
+                cod_workflow_list = codification_workflow_repo.get_multi(
+                    db,
+                    filters={
+                        "lob": lob,
+                        "department_id": dept,
+                        "entity": entity
+                    },
+                    limit=1
+                )
+                cod_workflow = cod_workflow_list[0] if cod_workflow_list else None
+                
+                if cod_workflow:
+                    workflow_found = True
+                    workflow_type = "codification"
+                    count = cod_workflow.approver_count
                     
-                    if cod_workflow:
-                        workflow_found = True
-                        workflow_type = "codification"
-                        count = cod_workflow.approver_count
-                        def parse_approvers(val):
-                            if not val: return []
-                            if isinstance(val, str) and val.startswith("["):
-                                try: return json.loads(val)
-                                except: return [val]
-                            return [val] if val else []
+                    def parse_approvers(val):
+                        if not val: return []
+                        if isinstance(val, str) and val.startswith("["):
+                            try: return json.loads(val)
+                            except: return [val]
+                        return [val] if val else []
 
-                        mandatory_fields = [
-                            parse_approvers(cod_workflow.mandatory_approver_1),
-                            parse_approvers(cod_workflow.mandatory_approver_2),
-                            parse_approvers(cod_workflow.mandatory_approver_3),
-                            parse_approvers(cod_workflow.mandatory_approver_4),
-                            parse_approvers(cod_workflow.mandatory_approver_5)
-                        ]
-                        assigned_approvers = [a for a in mandatory_fields[:count] if a]
-                        is_parallel = getattr(cod_workflow, 'is_parallel', False)
-                        
-                        # Threshold Approver
-                        if getattr(cod_workflow, 'is_threshold_enabled', False):
-                            if amount is not None and amount >= cod_workflow.amount_threshold and cod_workflow.threshold_approver:
-                                assigned_approvers.append(cod_workflow.threshold_approver)
-                        break
+                    def parse_flags(val):
+                        if not val: return {}
+                        if isinstance(val, dict): return val
+                        try: return json.loads(val)
+                        except: return {}
+
+                    flags = parse_flags(cod_workflow.approver_flags)
+
+                    mandatory_fields = [
+                        parse_approvers(cod_workflow.mandatory_approver_1),
+                        parse_approvers(cod_workflow.mandatory_approver_2),
+                        parse_approvers(cod_workflow.mandatory_approver_3),
+                        parse_approvers(cod_workflow.mandatory_approver_4),
+                        parse_approvers(cod_workflow.mandatory_approver_5)
+                    ]
+                    assigned_approvers = []
+                    for i, a in enumerate(mandatory_fields[:count]):
+                        is_fin = flags.get(str(i+1)) == True or flags.get(i+1) == True
+                        assigned_approvers.append({
+                            "emails": a, 
+                            "type": "mandatory", 
+                            "level": i+1,
+                            "is_finance": is_fin
+                        })
+                    is_parallel = getattr(cod_workflow, 'is_parallel', False)
+                    
+                    if getattr(cod_workflow, 'is_threshold_enabled', False):
+                        threshold = float(cod_workflow.amount_threshold) if cod_workflow.amount_threshold is not None else 0.0
+                        if amount is not None and amount >= threshold and cod_workflow.threshold_approver:
+                            assigned_approvers.append({"emails": parse_approvers(cod_workflow.threshold_approver), "type": "threshold"})
+
+                    # Posting Approver
+                    has_posting_approver = False
+                    if getattr(cod_workflow, 'posting_approver', None):
+                        assigned_approvers.append({"emails": parse_approvers(cod_workflow.posting_approver), "type": "posting"})
+                        has_posting_approver = True
 
     # 4. Fallback Logic (Progressive check of other config tables)
     if not workflow_found and entity:
@@ -355,15 +414,7 @@ def get_required_approver_count(
             "breakdown": {"default": 1}
         }
 
-    assigned_approvers = [a for a in assigned_approvers if a]
-    
     # total required = number of levels
-    # each level is a parallel group if is_parallel is true
-    # If is_parallel is false, assigned_approvers might still be lists of 1
-    # We should flatten if not parallel, or keep as is.
-    
-    # Clean assigned_approvers (ensure no empty lists)
-    assigned_approvers = [a for a in assigned_approvers if a]
     
     # Parallel means: each level requires 1 approval.
     # Total required = number of stages.
@@ -375,7 +426,12 @@ def get_required_approver_count(
         "assigned_approvers": assigned_approvers,
         "workflow_type": workflow_type,
         "is_parallel": is_parallel,
-        "breakdown": {"type": workflow_type, "vendor_eligible": vendor_eligible, "is_parallel": is_parallel}
+        "breakdown": {
+            "type": workflow_type, 
+            "vendor_eligible": vendor_eligible, 
+            "is_parallel": is_parallel,
+            "has_posting_approver": has_posting_approver if 'has_posting_approver' in locals() else False
+        }
     }
 
 @router.get("/{invoice_id}", response_model=WorkflowHistoryResponse)
@@ -383,6 +439,8 @@ async def get_workflow_history(
     invoice_id: int,
     preview_vendor_id: Optional[str] = None,
     preview_vendor_name: Optional[str] = None,
+    preview_lob: Optional[str] = None,
+    preview_department_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
@@ -408,7 +466,8 @@ async def get_workflow_history(
 
     requirement_data = get_required_approver_count(
         db, vendor_name, total_amount, invoice_id, invoice_data=invoice, 
-        currency=currency, entity=entity, force_vendor_id=vendor_id, force_vendor_name=vendor_name
+        currency=currency, entity=entity, force_vendor_id=vendor_id, force_vendor_name=vendor_name,
+        force_lob=preview_lob, force_dept=preview_department_id
     )
     
     steps = workflow_step_repo.get_multi(

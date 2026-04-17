@@ -1806,10 +1806,29 @@ async def update_invoice(
                 ext_data_dict = json.loads(ext_data_dict)
             except:
                 pass
-        # Persist the extracted_data to the invoice record
-        invoice.extracted_data = serialize_json_field(ext_data_dict)
-
     db.commit()
+
+    # --- Record Coding Completion Step ---
+    if "status" in update_data and update_data["status"] == InvoiceStatusEnum.WAITING_APPROVAL:
+        # Check if already exists to avoid duplicates
+        existing_coding_step = db.query(WorkflowStep).filter(
+            WorkflowStep.invoice_id == invoice_id,
+            WorkflowStep.step_type == WorkflowStepTypeEnum.CODING,
+            WorkflowStep.status == WorkflowStepStatusEnum.COMPLETED
+        ).first()
+        
+        if not existing_coding_step:
+            db.add(WorkflowStep(
+                invoice_id=invoice_id,
+                step_name="Coding",
+                step_type=WorkflowStepTypeEnum.CODING,
+                user=current_user.username,
+                status=WorkflowStepStatusEnum.COMPLETED,
+                timestamp=datetime.utcnow(),
+                entity=invoice.entity
+            ))
+            db.commit()
+            logger.info(f"[Workflow] Recorded coding completion for invoice {invoice_id} by {current_user.username}")
 
     # --- Auto-Coding Suggestions on transition to waiting_coding ---
     # When an invoice is sent to coding, automatically apply AI-based GL suggestions

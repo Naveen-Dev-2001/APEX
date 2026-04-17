@@ -65,8 +65,8 @@ export const checkDuplicate = (payload) =>
         return res.data;
     });
 
-export const getWorkflowData = async (invoiceId) => {
-    const res = await API.get(`/workflow/${invoiceId}`);
+export const getWorkflowData = async (invoiceId, params = {}) => {
+    const res = await API.get(`/workflow/${invoiceId}`, { params });
     return res.data;
 };
 
