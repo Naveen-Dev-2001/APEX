@@ -114,7 +114,16 @@ const DashboardPage = React.memo(() => {
                 ) : (
                     <>
                         <Card icon={icons.invoice} title="Total Invoices" value={summary?.total_invoices} />
-                        <Card icon={icons.overdue} title="Total Overdue" value={Number(summary?.total_due || 0).toFixed(2)} />
+                        <Card 
+                            icon={icons.overdue} 
+                            title="Total Overdue" 
+                            value={new Intl.NumberFormat('en-US', { 
+                                style: 'currency', 
+                                currency: 'USD',
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                            }).format(summary?.total_due || 0)} 
+                        />
                         <Card icon={icons.approved} title="Approved" value={summary?.approved} />
                         <Card icon={icons.pending} title="Pending Approval" value={summary?.waiting_approval} />
                     </>
