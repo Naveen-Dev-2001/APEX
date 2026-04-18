@@ -1034,6 +1034,20 @@ async def rework_invoice(
             403, "You are not authorized to send this invoice for rework"
         )
 
+    # ── Early check: level 1 can never have a previous finance approver ──
+    if current_level == 1:
+        raise HTTPException(
+            400,
+            detail={
+                "code": "NO_FINANCE_APPROVER",
+                "message": (
+                    "You are the first approver. There is no previous Finance Team approver "
+                    "to send this invoice for rework. "
+                    "Please use 'Enable Editing' to edit the invoice directly."
+                ),
+            },
+        )
+
     assigned: List[Dict] = workflow.get("assigned_approvers", [])
     prev_finance_level = _find_previous_finance_level(assigned, current_level)
 

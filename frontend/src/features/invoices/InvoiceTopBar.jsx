@@ -175,21 +175,19 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                 await fetchUIStatus();
             }
         } catch (err) {
-            const detail = err?.response?.data?.detail;
+            debugger
+            const errorData = err?.response?.data;
+            let detail = errorData?.detail;
 
-            // Rework: no previous finance approver → show warning modal, not toast
+            // normalize
+            if (typeof detail === "string") {
+                detail = { message: detail };
+            }
+
             if (detail?.code === "NO_FINANCE_APPROVER") {
-                Modal.warning({
-                    title: "Cannot Send for Rework",
-                    content: detail.message,
-                    okText: "Got it",
-                    centered: true,
-                });
+                toast.error(detail.message || "Cannot send for rework");
             } else {
-                const msg =
-                    typeof detail === "string"
-                        ? detail
-                        : detail?.message || "An error occurred. Please try again.";
+                const msg = detail?.message || "Something went wrong";
                 toast.error(msg);
             }
         } finally {
