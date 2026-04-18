@@ -95,7 +95,7 @@ const AddInvoiceModal = ({
             title={null}
             width={660}
             centered
-            destroyOnClose
+            destroyOnHidden
             maskClosable={false}
             closeIcon={null}
             styles={{

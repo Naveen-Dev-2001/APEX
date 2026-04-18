@@ -839,3 +839,69 @@ class DeletedInvoice(Base):
               'vendor_id', 'invoice_number'),
         Index('ix_deleted_invoices_entity', 'entity'),
     )
+
+
+class InvoiceWorkflowState(Base):
+    __tablename__ = "invoice_workflow_states"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, nullable=False, unique=True, index=True)
+
+    # Which workflow matched this invoice
+    workflow_id = Column(Integer, nullable=True)
+    # "vendor" | "codification"
+    workflow_type = Column(String(20), nullable=True)
+
+    # Current position in the approval ladder
+    # current_level: 1–5 for mandatory, 0 for threshold/posting/done
+    # current_level_type: "mandatory" | "threshold" | "posting" | "done"
+    current_level = Column(Integer, default=1)
+    current_level_type = Column(String(20), default="mandatory")
+
+    # JSON dict: { "1": "who@approved.com", "2": null, ... }
+    # null means that level is not yet approved in the current round
+    approved_levels = Column(Text, nullable=True)
+
+    # Dedicated columns for non-mandatory stages
+    threshold_approved_by = Column(String(255), nullable=True)
+    posting_approved_by = Column(String(255), nullable=True)
+
+    # Rework state
+    # rework_level         : mandatory level that triggered rework (the finance-team level we go back to)
+    # rework_assigned_to   : JSON list of finance-team email addresses
+    rework_level = Column(Integer, nullable=True)
+    rework_assigned_to = Column(Text, nullable=True)
+
+    # Editing flag — set by approver "Enable Editing" action
+    is_editing_enabled = Column(Boolean, default=False)
+    editing_enabled_by = Column(String(255), nullable=True)
+
+    entity = Column(String(100), nullable=True)
+    created_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+
+
+class InvoiceApprovalLog(Base):
+    __tablename__ = "invoice_approval_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, nullable=False, index=True)
+
+    # level is null for threshold / posting rows
+    level = Column(Integer, nullable=True)
+    # mandatory | threshold | posting
+    level_type = Column(String(20), nullable=True)
+
+    approver_email = Column(String(255), nullable=False)
+    approver_name = Column(String(255), nullable=True)
+
+    # approved | rejected | rework | editing_enabled | sent_for_approval | repost_sage
+    action = Column(String(30), nullable=False)
+    comments = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, nullable=True)
+    entity = Column(String(100), nullable=True)
+
+    __table_args__ = (
+        Index("ix_approval_logs_invoice_action", "invoice_id", "action"),
+    )

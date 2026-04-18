@@ -1,7 +1,8 @@
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import Optional, Any, List
 from datetime import datetime
 from enum import Enum
+
 
 class WorkflowStepType(str, Enum):
     PROCESSED = "processed"
@@ -13,24 +14,31 @@ class WorkflowStepType(str, Enum):
     APPROVER_4 = "approver_4"
     SAGE_POSTED = "sage_posted"
 
+
 class WorkflowStepStatus(str, Enum):
     COMPLETED = "completed"
     APPROVED = "approved"
     REJECTED = "rejected"
     PENDING = "pending"
     REWORKED = "reworked"
+    POSTED = "posted"
+    POST_FAILED = "post_failed"
+    EDITING_ENABLED = "editing_enabled"
+
 
 class WorkflowStepBase(BaseModel):
     invoice_id: str
-    step_name: str  # Human-readable name like "Processed", "Coding", "1st Approver", etc.
-    step_type: WorkflowStepType
-    user: str  # Username who performed this step
-    status: WorkflowStepStatus
-    approver_number: Optional[int] = None  # For approver steps (1-4)
+    step_name: str
+    step_type: str          # plain str — accepts any value from workflow_actions.py
+    user: Optional[str] = None
+    status: str             # plain str — don't restrict with enum
+    approver_number: Optional[int] = None
     comment: Optional[str] = None
+
 
 class WorkflowStepCreate(WorkflowStepBase):
     pass
+
 
 class WorkflowStep(WorkflowStepBase):
     id: str
@@ -39,17 +47,19 @@ class WorkflowStep(WorkflowStepBase):
     class Config:
         from_attributes = True
 
+
 class WorkflowStepResponse(WorkflowStep):
     pass
+
 
 class WorkflowHistoryResponse(BaseModel):
     invoice_id: str
     vendor_name: Optional[str] = None
     required_approvers: int
-    assigned_approvers: Optional[list[Any]] = None
+    assigned_approvers: Optional[List[Any]] = None
     current_approver_level: Optional[int] = 1
     current_status: Optional[str] = None
     approver_breakdown: Optional[dict] = None
-    delegations: Optional[dict[str, list[str]]] = None
+    delegations: Optional[dict[str, List[str]]] = None
     workflow_type: Optional[str] = None
-    steps: list[WorkflowStepResponse]
+    steps: List[WorkflowStepResponse] = []  # ← was `str`, must be a list
