@@ -1886,56 +1886,87 @@ async def update_invoice(
                 from app.routes.coding import update_coding_history
                 from app.models.coding import LineItemCoding
                 from app.models.db_models import Coding as DBCoding
-                
-                inv = bg_db.query(Invoice).filter(Invoice.id == inv_id).first()
-                if not inv: 
-                    return
-                
-                items = data_dict.get("Items", {}).get("value", [])
-                if items:
-                    coding_line_items = []
-                    for idx, item in enumerate(items):
-                        def get_val(item_obj, key, default=""):
-                            val_obj = item_obj.get(key)
-                            if isinstance(val_obj, dict):
-                                return val_obj.get("value", default)
-                            return val_obj if val_obj is not None else default
 
-                        coding_line_items.append(LineItemCoding(
-                            s_no=idx + 1,
-                            description=get_val(item, "description"),
-                            line_type="Expense",
-                            quantity=float(get_val(item, "qty", 1)),
-                            unit_price=float(get_val(item, "unit_price", 0)),
-                            net_amount=float(get_val(item, "amount", 0)),
-                            gl_code=get_val(item, "gl_code", ""),
-                            lob=get_val(item, "lob"),
-                            department=get_val(item, "department"),
-                            customer=get_val(item, "customer"),
-                            item=get_val(item, "item"),
-                            original_index=idx
-                        ))
-                    
-                    line_items_json = json.dumps([item.dict() for item in coding_line_items])
-                    existing_coding = bg_db.query(DBCoding).filter(DBCoding.invoice_id == inv_id).first()
-                    
-                    if existing_coding:
-                        existing_coding.line_items = line_items_json
-                        existing_coding.updated_at = datetime.utcnow()
-                    else:
-                        new_coding = DBCoding(
-                            invoice_id=inv_id,
-                            line_items=line_items_json,
-                            entity=inv.entity,
-                            created_at=datetime.utcnow()
-                        )
-                        bg_db.add(new_coding)
-                    
-                    update_coding_history(bg_db, v_name, coding_line_items, vendor_id=v_id)
-                    bg_db.commit()
-                    logger.info(f"[CodingSync] Background: Synced coding for invoice {inv_id}")
+                inv = bg_db.query(Invoice).filter(Invoice.id == inv_id).first()
+                if not inv:
+                    return
+
+                items = data_dict.get("Items", {}).get("value", [])
+                if not items:
+                    return
+
+                # ── lineItemsSnapshot is the authoritative coding source ───────
+                # useSaveInvoice.js stores the full Zustand lineItems array
+                # (including user-filled glCode/lob/department) as lineItemsSnapshot
+                # inside extracted_data at save time. extracted_data.Items always
+                # has empty gl_code/lob/department because those are never written
+                # back to the nested Items structure.
+                snapshot = data_dict.get("lineItemsSnapshot") or []
+                # Build lookup by description (lowercased) for fast matching
+                snap_by_desc = {}
+                snap_by_idx  = {}
+                for i, s in enumerate(snapshot):
+                    desc_key = (s.get("description") or "").strip().lower()
+                    if desc_key:
+                        snap_by_desc[desc_key] = s
+                    snap_by_idx[i] = s
+
+                def get_val(item_obj, key, default=""):
+                    val_obj = item_obj.get(key)
+                    if isinstance(val_obj, dict):
+                        return val_obj.get("value", default)
+                    return val_obj if val_obj is not None else default
+
+                coding_line_items = []
+                for idx, item in enumerate(items):
+                    desc = get_val(item, "description")
+                    desc_key = desc.strip().lower()
+
+                    # Resolve coding from snapshot first (has glCode/lob/etc.)
+                    snap = snap_by_desc.get(desc_key) or snap_by_idx.get(idx) or {}
+
+                    # Snapshot uses camelCase keys (glCode, lob, department ...)
+                    gl_code    = snap.get("glCode")    or get_val(item, "gl_code",    "")
+                    lob        = snap.get("lob")        or get_val(item, "lob",        "")
+                    department = snap.get("department") or get_val(item, "department", "")
+                    customer   = snap.get("customer")   or get_val(item, "customer",   "")
+                    item_val   = snap.get("item")       or get_val(item, "item",       "")
+
+                    coding_line_items.append(LineItemCoding(
+                        s_no=idx + 1,
+                        description=desc,
+                        line_type="Expense",
+                        quantity=float(get_val(item, "qty", 1) or 1),
+                        unit_price=float(get_val(item, "unit_price", 0) or 0),
+                        net_amount=float(get_val(item, "amount", 0) or 0),
+                        gl_code=gl_code,
+                        lob=lob,
+                        department=department,
+                        customer=customer,
+                        item=item_val,
+                        original_index=idx
+                    ))
+
+                line_items_json = json.dumps([li.dict() for li in coding_line_items])
+                existing_coding = bg_db.query(DBCoding).filter(DBCoding.invoice_id == inv_id).first()
+
+                if existing_coding:
+                    existing_coding.line_items = line_items_json
+                    existing_coding.updated_at = datetime.utcnow()
+                else:
+                    bg_db.add(DBCoding(
+                        invoice_id=inv_id,
+                        line_items=line_items_json,
+                        entity=inv.entity,
+                        created_at=datetime.utcnow()
+                    ))
+
+                logger.info(f"[CodingSync] invoice {inv_id} gl_codes: {[(li.description, li.gl_code) for li in coding_line_items]}")
+                update_coding_history(bg_db, v_name, coding_line_items, vendor_id=v_id)
+                bg_db.commit()
+                logger.info(f"[CodingSync] Committed coding_history for invoice {inv_id}")
             except Exception as e:
-                logger.error(f"[CodingSync] Background Error for invoice {inv_id}: {e}")
+                logger.error(f"[CodingSync] Background Error for invoice {inv_id}: {e}", exc_info=True)
             finally:
                 bg_db.close()
 
