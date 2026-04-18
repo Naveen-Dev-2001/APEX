@@ -4,7 +4,7 @@ import { masterDataService } from "../../api/masterdataAPI";
 export const useGLMasterSync = () => {
     return useQuery({
         queryKey: ["gl-master"],
-        queryFn: () => masterDataService.getGLMasterData(),
+        queryFn: () => masterDataService.getGLMasterData({ page_size: 2000 }),
         staleTime: 5 * 60 * 1000,
     });
 };
@@ -12,7 +12,7 @@ export const useGLMasterSync = () => {
 export const useLOBMasterSync = () => {
     return useQuery({
         queryKey: ["lob-master"],
-        queryFn: () => masterDataService.getLOBMasterData(),
+        queryFn: () => masterDataService.getLOBMasterData({ page_size: 2000 }),
         staleTime: 5 * 60 * 1000,
     });
 };
@@ -20,7 +20,7 @@ export const useLOBMasterSync = () => {
 export const useDepartmentMasterSync = () => {
     return useQuery({
         queryKey: ["department-master"],
-        queryFn: () => masterDataService.getDepartmentMasterData(),
+        queryFn: () => masterDataService.getDepartmentMasterData({ page_size: 2000 }),
         staleTime: 5 * 60 * 1000,
     });
 };
@@ -28,7 +28,7 @@ export const useDepartmentMasterSync = () => {
 export const useCustomerMasterSync = () => {
     return useQuery({
         queryKey: ["customer-master"],
-        queryFn: () => masterDataService.getCustomerMasterData(),
+        queryFn: () => masterDataService.getCustomerMasterData({ page_size: 2000 }),
         staleTime: 5 * 60 * 1000,
     });
 };
@@ -36,7 +36,7 @@ export const useCustomerMasterSync = () => {
 export const useItemMasterSync = () => {
     return useQuery({
         queryKey: ["item-master"],
-        queryFn: () => masterDataService.getItemMasterData(),
+        queryFn: () => masterDataService.getItemMasterData({ page_size: 2000 }),
         staleTime: 5 * 60 * 1000,
     });
 };

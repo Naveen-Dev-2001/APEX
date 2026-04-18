@@ -433,7 +433,7 @@ async def delete_tab_data(
 async def get_sheet_data(
     identifier: str,
     page: int = 1,
-    page_size: int = 100,
+    page_size: int = 1000,
     search: str = None,
     sort_by: str = None,
     sort_dir: str = 'asc',
