@@ -147,7 +147,8 @@ def _get_finance_users(db: Session, entity: str) -> List[str]:
             db.query(User)
             .filter(
                 User.department != None,
-                func.lower(User.department).like("%finance%")
+                func.lower(User.department).like("%finance%"),
+                ~func.lower(User.department).like("%non-finance%")
             )
             .all()
         )
@@ -442,7 +443,8 @@ async def get_ui_status_from_frontend(
     email = current_user.email.lower()
     finance_users = _get_finance_users(db, entity)
     is_finance = email in [f.lower() for f in finance_users]
-
+    print('finance_users', finance_users)
+    print('is_finance', is_finance)
     steps = _steps_for_invoice(db, invoice_id)
 
     # ── Determine what stage we're currently at ──────────────────────────
