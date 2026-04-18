@@ -444,18 +444,30 @@ async def get_ui_status_from_frontend(
     email = current_user.email.lower()
     finance_users = _get_finance_users(db, entity)
     is_finance = email in [f.lower() for f in finance_users]
-    print('finance_users', finance_users)
-    print('is_finance', is_finance)
+
     steps = _steps_for_invoice(db, invoice_id)
 
-    # ── Determine what stage we're currently at ──────────────────────────
     mandatory = [a for a in assigned if a.get("type") == "mandatory"]
     threshold_entries = [a for a in assigned if a.get("type") == "threshold"]
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
 
-    approved_levels = _get_approved_levels(steps)
-    threshold_done = _threshold_approved(steps)
-    posting_done = _posting_approved(steps)
+    # ── If reworked, only count level_approved steps AFTER the last rework ──
+    if current_status == InvoiceStatus.REWORKED:
+        rework_steps = [s for s in steps if s.step_type == StepType.REWORKED]
+        last_rework_ts = max((s.timestamp for s in rework_steps), default=None)
+        if last_rework_ts:
+            steps_for_level_check = [
+                s for s in steps
+                if s.step_type != StepType.LEVEL_APPROVED or s.timestamp > last_rework_ts
+            ]
+        else:
+            steps_for_level_check = steps
+    else:
+        steps_for_level_check = steps
+
+    approved_levels = _get_approved_levels(steps_for_level_check)
+    threshold_done = _threshold_approved(steps_for_level_check)
+    posting_done = _posting_approved(steps_for_level_check)
 
     mandatory_levels_done = all(
         bool(approved_levels.get(e.get("level"))) for e in mandatory
@@ -463,23 +475,21 @@ async def get_ui_status_from_frontend(
     has_threshold = bool(threshold_entries)
     has_posting = bool(posting_entries)
 
-    # ── Check if user is a posting approver ─────────────────────────────
+    # ── Posting approver check ──
     posting_emails = []
     for pe in posting_entries:
         posting_emails.extend(_parse_list(pe.get("emails", [])))
     is_posting_approver = email in [e.lower() for e in posting_emails]
 
-    # ── Check if user is a threshold approver ───────────────────────────
+    # ── Threshold approver check ──
     threshold_emails = []
     for te in threshold_entries:
         threshold_emails.extend(_parse_list(te.get("emails", [])))
     is_threshold_approver = email in [e.lower() for e in threshold_emails]
 
-    # ── Determine can_act based on CURRENT STAGE, not blanket already_acted ──
     can_act = False
 
     if not mandatory_levels_done:
-        # Still in mandatory stage — check current level entry
         current_entry = next(
             (a for a in mandatory if a.get("level") == current_level), None
         )
@@ -491,34 +501,33 @@ async def get_ui_status_from_frontend(
             user_in_level = (
                 (is_finance_level and is_finance) or (email in emails_at_level)
             )
-            # already_acted at THIS specific level only
+
+            # Use post-rework steps to check if already acted at this level
             already_acted_this_level = any(
                 (s.user or "").lower() == email
                 and s.step_type == StepType.LEVEL_APPROVED
                 and s.approver_number == current_level
-                for s in steps
+                for s in steps_for_level_check
             )
             can_act = user_in_level and not already_acted_this_level
 
     elif has_threshold and not threshold_done:
-        # Threshold stage — only threshold approver, check if they already did it
         already_threshold = any(
             (s.user or "").lower() == email
             and s.step_type == StepType.THRESHOLD_APPROVED
-            for s in steps
+            for s in steps_for_level_check
         )
         can_act = is_threshold_approver and not already_threshold
 
     elif has_posting and not posting_done:
-        # Posting stage — only posting approver, check if they already posted
         already_posted = any(
             (s.user or "").lower() == email
             and s.step_type == StepType.POSTING_APPROVED
-            for s in steps
+            for s in steps_for_level_check
         )
         can_act = is_posting_approver and not already_posted
 
-    # ── already_acted for display purposes only (not used for can_act) ──
+    # already_acted is for display only
     already_acted = any((s.user or "").lower() == email for s in steps)
 
     return ApproverUIStatus(
@@ -540,9 +549,6 @@ async def get_ui_status_from_frontend(
         assigned_approvers=assigned,
         sage_post_error=None,
     )
-# ─────────────────────────────────────────────
-# POST /workflow/action/approve/{invoice_id}
-# ─────────────────────────────────────────────
 
 
 @router.post("/approve/{invoice_id}", response_model=ActionResponse)
@@ -554,17 +560,6 @@ async def approve_invoice(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity),
 ):
-    """
-    Approve the invoice at the current user's level.
-
-    Flow:
-      1. Validate user can approve.
-      2. Record the individual approval step.
-      3. Check if the level/stage is now complete (any-one-of rule).
-      4. If complete → advance to next level (or threshold, posting).
-      5. Posting approver's approval → set status=APPROVED → attempt Sage post.
-      6. Sage success → SAGE_POSTED | Sage failure → SAGE_POST_FAILED.
-    """
     invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         raise HTTPException(404, "Invoice not found")
@@ -575,12 +570,7 @@ async def approve_invoice(
         else str(invoice.status)
     )
 
-    print("current_status", current_status)
-    # return
-    if current_status not in (
-        InvoiceStatus.WAITING_APPROVAL,
-        InvoiceStatus.REWORKED,
-    ):
+    if current_status not in (InvoiceStatus.WAITING_APPROVAL, InvoiceStatus.REWORKED):
         raise HTTPException(
             400, f"Invoice is not awaiting approval (status: {current_status})")
 
@@ -594,24 +584,33 @@ async def approve_invoice(
     mandatory = [a for a in assigned if a.get("type") == "mandatory"]
     threshold_entries = [a for a in assigned if a.get("type") == "threshold"]
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
-    print("steps", steps)
-    approved_levels = _get_approved_levels(steps)
-    print("approved_levels", approved_levels)
-    threshold_done = _threshold_approved(steps)
-    posting_done_already = _posting_approved(steps)
+
+    # ── If reworked, only count level_approved steps AFTER the last rework ──
+    if current_status == InvoiceStatus.REWORKED:
+        rework_steps = [s for s in steps if s.step_type == StepType.REWORKED]
+        last_rework_ts = max((s.timestamp for s in rework_steps), default=None)
+        if last_rework_ts:
+            steps_for_level_check = [
+                s for s in steps
+                if s.step_type != StepType.LEVEL_APPROVED or s.timestamp > last_rework_ts
+            ]
+        else:
+            steps_for_level_check = steps
+    else:
+        steps_for_level_check = steps
+
+    approved_levels = _get_approved_levels(steps_for_level_check)
+    threshold_done = _threshold_approved(steps_for_level_check)
+    posting_done_already = _posting_approved(steps_for_level_check)
 
     mandatory_levels_done = all(
-        bool(approved_levels.get(e.get("level")))
-        for e in mandatory
+        bool(approved_levels.get(e.get("level"))) for e in mandatory
     )
     has_threshold = bool(threshold_entries)
     has_posting = bool(posting_entries)
 
-    # ──────────────────────────────────────────
-    # CASE A: Still working through mandatory levels
-    # ──────────────────────────────────────────
+    # ── CASE A: Mandatory levels ──
     if not mandatory_levels_done:
-        # Find the current level entry
         level_entry = next(
             (e for e in mandatory if e.get("level") == current_level), None
         )
@@ -623,56 +622,46 @@ async def approve_invoice(
         emails_at_level = [e.lower()
                            for e in _parse_list(level_entry.get("emails", []))]
 
-        # Validate current user belongs to this level
         user_eligible = (
             (is_finance_level and email in [f.lower() for f in finance_users])
             or (not is_finance_level and email in emails_at_level)
         )
         if not user_eligible:
             raise HTTPException(
-                403,
-                f"You are not an approver for level {current_level}",
-            )
+                403, f"You are not an approver for level {current_level}")
 
-        # Check if this level already approved
         if bool(approved_levels.get(current_level)):
             raise HTTPException(
                 400, f"Level {current_level} has already been approved")
 
-        # Check if user already approved individually at this level
+        # Check if user already approved at this level (post-rework only)
         already = any(
             (s.user or "").lower() == email
             and s.step_type == StepType.LEVEL_APPROVED
             and s.approver_number == current_level
-            for s in steps
+            for s in steps_for_level_check
         )
         if already:
             raise HTTPException(400, "You have already approved at this level")
 
-        # Record individual approval
         _record_step(
-            db,
-            invoice_id,
+            db, invoice_id,
             step_name=f"Level {current_level} Approval",
             step_type=StepType.LEVEL_APPROVED,
             user_email=email,
             approver_number=current_level,
             comment=payload.comment,
-            entity=entity
+            entity=entity,
         )
 
-        # Check level completion (any-one-of rule)
-        # Reload approved emails including the one we just added
         updated_approved_at_level = list(
             approved_levels.get(current_level, [])) + [email]
         level_complete = _level_is_complete(
             level_entry, updated_approved_at_level, finance_users)
 
         if level_complete:
-            # Find next mandatory level
             next_mandatory = next(
-                (e for e in mandatory if e.get("level", 0) > current_level),
-                None,
+                (e for e in mandatory if e.get("level", 0) > current_level), None
             )
             if next_mandatory:
                 _advance_level(db, invoice, next_mandatory["level"])
@@ -684,15 +673,13 @@ async def approve_invoice(
                     next_level=next_mandatory["level"],
                 )
             else:
-                # All mandatory done — go to threshold or posting
                 if has_threshold and not threshold_done:
-                    # Threshold level uses a virtual level index beyond mandatory
                     threshold_virtual_level = len(mandatory) + 1
                     _advance_level(db, invoice, threshold_virtual_level)
                     db.commit()
                     return ActionResponse(
                         success=True,
-                        message=f"All mandatory levels approved. Awaiting threshold approver.",
+                        message="All mandatory levels approved. Awaiting threshold approver.",
                         new_status=current_status,
                         next_level=threshold_virtual_level,
                     )
@@ -708,16 +695,14 @@ async def approve_invoice(
                         next_level=posting_virtual_level,
                     )
                 else:
-                    # No threshold, no posting — final approve
                     _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
                     _record_step(
-                        db,
-                        invoice_id,
+                        db, invoice_id,
                         step_name="Invoice Approved",
                         step_type=StepType.APPROVED,
                         user_email=email,
                         comment=payload.comment,
-                        entity=entity
+                        entity=entity,
                     )
                     db.commit()
                     return ActionResponse(
@@ -726,7 +711,6 @@ async def approve_invoice(
                         new_status=InvoiceStatus.APPROVED,
                     )
         else:
-            # Level not yet complete — awaiting other approvers at same level
             db.commit()
             return ActionResponse(
                 success=True,
@@ -735,26 +719,21 @@ async def approve_invoice(
                 next_level=current_level,
             )
 
-    # ──────────────────────────────────────────
-    # CASE B: Threshold stage
-    # ──────────────────────────────────────────
+    # ── CASE B: Threshold stage ──
     if has_threshold and not threshold_done:
         threshold_emails = []
         for te in threshold_entries:
             threshold_emails.extend(_parse_list(te.get("emails", [])))
-        threshold_emails_lower = [e.lower() for e in threshold_emails]
-
-        if email not in threshold_emails_lower:
+        if email not in [e.lower() for e in threshold_emails]:
             raise HTTPException(403, "You are not the threshold approver")
 
         _record_step(
-            db,
-            invoice_id,
+            db, invoice_id,
             step_name="Threshold Approval",
             step_type=StepType.THRESHOLD_APPROVED,
             user_email=email,
             comment=payload.comment,
-            entity=entity
+            entity=entity,
         )
 
         if has_posting:
@@ -770,12 +749,12 @@ async def approve_invoice(
         else:
             _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
             _record_step(
-                db,
-                invoice_id,
+                db, invoice_id,
                 step_name="Invoice Approved",
                 step_type=StepType.APPROVED,
                 user_email=email,
                 comment=payload.comment,
+                entity=entity,
             )
             db.commit()
             return ActionResponse(
@@ -784,55 +763,46 @@ async def approve_invoice(
                 new_status=InvoiceStatus.APPROVED,
             )
 
-    # ──────────────────────────────────────────
-    # CASE C: Posting approver stage
-    # ──────────────────────────────────────────
+    # ── CASE C: Posting approver stage ──
     if has_posting and not posting_done_already:
         posting_emails = []
         for pe in posting_entries:
             posting_emails.extend(_parse_list(pe.get("emails", [])))
-        posting_emails_lower = [e.lower() for e in posting_emails]
-
-        if email not in posting_emails_lower:
+        if email not in [e.lower() for e in posting_emails]:
             raise HTTPException(403, "You are not the posting approver")
 
-        # Mark invoice as APPROVED first
         _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
         _record_step(
-            db,
-            invoice_id,
+            db, invoice_id,
             step_name="Posting Approver Approved",
             step_type=StepType.POSTING_APPROVED,
             user_email=email,
             comment=payload.comment,
-            entity=entity
+            entity=entity,
         )
         _record_step(
-            db,
-            invoice_id,
+            db, invoice_id,
             step_name="Invoice Approved",
             step_type=StepType.APPROVED,
             user_email=email,
             comment=payload.comment,
-            entity=entity
+            entity=entity,
         )
         db.commit()
 
-        # Attempt Sage posting
         sage_result = await _post_to_sage(invoice_id, entity)
 
         if sage_result["success"]:
-            invoice = invoice_repo.get(db, invoice_id)  # re-fetch after commit
+            invoice = invoice_repo.get(db, invoice_id)
             _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
             invoice.sage_bill_id = sage_result.get("sage_bill_id")
             _record_step(
-                db,
-                invoice_id,
+                db, invoice_id,
                 step_name="Posted to Sage",
                 step_type=StepType.POSTED,
                 user_email=email,
                 comment=f"Sage Bill ID: {sage_result.get('sage_bill_id')}",
-                entity=entity
+                entity=entity,
             )
             db.commit()
             return ActionResponse(
@@ -845,13 +815,12 @@ async def approve_invoice(
             invoice = invoice_repo.get(db, invoice_id)
             _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POST_FAILED)
             _record_step(
-                db,
-                invoice_id,
+                db, invoice_id,
                 step_name="Sage Post Failed",
                 step_type=StepType.POST_FAILED,
                 user_email=email,
                 comment=sage_result.get("message"),
-                entity=entity
+                entity=entity,
             )
             db.commit()
             return ActionResponse(
@@ -864,10 +833,10 @@ async def approve_invoice(
     raise HTTPException(
         400, "No pending approval stage found for this invoice")
 
-
 # ─────────────────────────────────────────────
 # POST /workflow/action/reject/{invoice_id}
 # ─────────────────────────────────────────────
+
 
 @router.post("/reject/{invoice_id}", response_model=ActionResponse)
 async def reject_invoice(
@@ -877,12 +846,7 @@ async def reject_invoice(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity),
 ):
-    """
-    Permanently reject an invoice. No further actions are possible after rejection.
-    """
     invoice = invoice_repo.get(db, invoice_id)
-    print("invoice", invoice)
-    # return
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
@@ -891,7 +855,7 @@ async def reject_invoice(
         if hasattr(invoice.status, "value")
         else str(invoice.status)
     )
-    if current_status != InvoiceStatus.WAITING_APPROVAL:
+    if current_status not in (InvoiceStatus.WAITING_APPROVAL, InvoiceStatus.REWORKED):
         raise HTTPException(
             400, f"Invoice cannot be rejected from status: {current_status}")
 
@@ -908,7 +872,98 @@ async def reject_invoice(
         raise HTTPException(
             403, "You are not authorized to reject this invoice at its current stage")
 
-    _update_invoice_status(db, invoice, InvoiceStatus.REJECTED)
+    import json as _json
+
+    # ── 1. Snapshot all child tables into DeletedInvoice ──────────────────
+    from app.models.db_models import (
+        DeletedInvoice, InvoiceStatusHistory, InvoiceApprovedBy,
+        InvoiceAssignedApprover, Coding, AuditLog, WorkflowStep as WFStep
+    )
+
+    # Fetch child data
+    status_history = db.query(InvoiceStatusHistory).filter_by(
+        invoice_id=invoice_id).all()
+    workflow_steps_rows = db.query(WFStep).filter_by(
+        invoice_id=invoice_id).all()
+    approved_by_rows = db.query(InvoiceApprovedBy).filter_by(
+        invoice_id=invoice_id).all()
+    assigned_approvers_rows = db.query(
+        InvoiceAssignedApprover).filter_by(invoice_id=invoice_id).all()
+    coding_row = db.query(Coding).filter_by(invoice_id=invoice_id).first()
+    audit_logs_rows = db.query(AuditLog).filter_by(invoice_id=invoice_id).all()
+
+    deleted = DeletedInvoice(
+        original_invoice_id=invoice.id,
+        filename=invoice.filename,
+        original_filename=invoice.original_filename,
+        file_path=invoice.file_path,
+        uploaded_by=invoice.uploaded_by,
+        uploaded_by_id=invoice.uploaded_by_id,
+        status="rejected",
+        entity=invoice.entity,
+        vendor_id=invoice.vendor_id,
+        vendor_name=invoice.vendor_name,
+        invoice_number=invoice.invoice_number,
+        azure_vendor_name=invoice.azure_vendor_name,
+        azure_vendor_address=invoice.azure_vendor_address,
+        line_grouping=invoice.line_grouping,
+        exchange_rate=invoice.exchange_rate,
+        total_amount=invoice.total_amount,
+        amount_due=invoice.amount_due,
+        invoice_date=invoice.invoice_date,
+        due_date=invoice.due_date,
+        sage_bill_number=invoice.sage_bill_number,
+        extracted_data=invoice.extracted_data,
+        vendor_details=invoice.vendor_details,
+        processing_steps=invoice.processing_steps,
+        validation_results=invoice.validation_results,
+        duplicate_info=invoice.duplicate_info,
+        original_items=invoice.original_items,
+        approver_breakdown=invoice.approver_breakdown,
+        gl_summary=invoice.gl_summary,
+        confidence_score=invoice.confidence_score,
+        uploaded_at=invoice.uploaded_at,
+        processed_at=invoice.processed_at,
+        required_approvers=invoice.required_approvers,
+        current_approver_level=invoice.current_approver_level,
+
+        # Child table snapshots as JSON
+        status_history_json=_json.dumps([
+            {"status": s.status, "user": s.user, "timestamp": str(s.timestamp),
+             "comment": s.comment, "approver_level": s.approver_level}
+            for s in status_history
+        ]),
+        workflow_steps_json=_json.dumps([
+            {"step_name": s.step_name, "step_type": s.step_type, "user": s.user,
+             "status": s.status, "timestamp": str(s.timestamp),
+             "approver_number": s.approver_number, "comment": s.comment}
+            for s in workflow_steps_rows
+        ]),
+        approved_by_json=_json.dumps([
+            {"approver_email": a.approver_email} for a in approved_by_rows
+        ]),
+        assigned_approvers_json=_json.dumps([
+            {"approver_email": a.approver_email,
+                "sequence_order": a.sequence_order}
+            for a in assigned_approvers_rows
+        ]),
+        coding_json=_json.dumps({
+            "header_coding": coding_row.header_coding,
+            "line_items": coding_row.line_items,
+        }) if coding_row else None,
+        audit_logs_json=_json.dumps([
+            {"action": a.action, "user": a.user, "details": a.details,
+             "timestamp": str(a.timestamp)}
+            for a in audit_logs_rows
+        ]),
+
+        deleted_at=datetime.utcnow(),
+        deleted_by=email,
+    )
+    db.add(deleted)
+    db.flush()  # get deleted.id before deleting invoice
+
+    # ── 2. Record the rejection step BEFORE deleting ──────────────────────
     _record_step(
         db,
         invoice_id,
@@ -916,19 +971,24 @@ async def reject_invoice(
         step_type=StepType.REJECTED,
         user_email=email,
         comment=payload.comment,
+        entity=entity,
     )
+    db.flush()
+
+    # ── 3. Delete the invoice (cascades to all child tables) ──────────────
+    db.delete(invoice)
     db.commit()
 
     return ActionResponse(
         success=True,
-        message="Invoice has been rejected. No further actions are possible.",
+        message="Invoice has been rejected and permanently removed. No further actions are possible.",
         new_status=InvoiceStatus.REJECTED,
     )
-
 
 # ─────────────────────────────────────────────
 # POST /workflow/action/rework/{invoice_id}
 # ─────────────────────────────────────────────
+
 
 @router.post("/rework/{invoice_id}", response_model=ActionResponse)
 async def rework_invoice(
@@ -966,9 +1026,13 @@ async def rework_invoice(
     role = _resolve_user_role_in_workflow(
         email, workflow, steps, finance_users, current_level
     )
-    if not role["can_act"]:
+    is_current_level_user = role["user_level"] == current_level
+    is_finance_user = role["is_finance_team"]
+
+    if not (role["can_act"] or is_current_level_user or is_finance_user):
         raise HTTPException(
-            403, "You are not authorized to send this invoice for rework")
+            403, "You are not authorized to send this invoice for rework"
+        )
 
     assigned: List[Dict] = workflow.get("assigned_approvers", [])
     prev_finance_level = _find_previous_finance_level(assigned, current_level)
@@ -998,6 +1062,7 @@ async def rework_invoice(
         user_email=email,
         approver_number=prev_finance_level,
         comment=payload.comment,
+        entity=entity,
     )
     db.commit()
 

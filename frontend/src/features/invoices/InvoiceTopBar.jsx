@@ -11,7 +11,7 @@ import { useAuthStore } from "../../store/authStore";
 import workflowActionsAPI from "../../api/workflowActionsAPI";
 import { useEffect, useState, useRef } from "react";
 import { Modal } from "antd";
- 
+
 // Actions that open the comment modal before executing
 const MODAL_ACTIONS = {
     approve: { label: "Approve", okText: "Approve", danger: false },
@@ -20,12 +20,12 @@ const MODAL_ACTIONS = {
     "enable-editing": { label: "Enable Editing", okText: "Enable Editing", danger: false },
     "repost-sage": { label: "Repost to Sage", okText: "Repost", danger: false },
 };
- 
+
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate();
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
- 
+
     const {
         setInvoiceSection,
         isDuplicate,
@@ -36,41 +36,41 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         lineItems,
         selectedVendorId,
     } = useInvoiceStore();
- 
+
     const { handleSave } = useSaveInvoice();
     useDuplicateCheck();
- 
+
     const firstLine = lineItems?.[0] || {};
     const { workflowData } = useWorkflowDataSync(viewInvoiceId, {
         preview_vendor_id: selectedVendorId,
         preview_lob: firstLine.lob,
         preview_department_id: firstLine.department,
     });
- 
+
     const currentStatus = activeInvoiceData?.status || invoice?.status;
     const isWaitingCoding = currentStatus === "waiting_coding";
     const isWorkflowMissing = isWaitingCoding && !selectedVendorId && workflowData?.workflow_type !== "codification";
- 
+
     // ── Approver UI state ──────────────────────────────────────────────────
     const [uiStatus, setUiStatus] = useState(null);
     const [actionLoading, setActionLoading] = useState(null); // action key currently running
     const [modal, setModal] = useState(null); // { action } | null
     const [comment, setComment] = useState("");
     const prevWorkflowRef = useRef(null);
- 
- 
- 
+
+
+
     useEffect(() => {
         if (!workflowData) return;
- 
+
         // Only re-fetch if workflowData actually changed in value
         const key = JSON.stringify(workflowData);
         if (key === prevWorkflowRef.current) return;
         prevWorkflowRef.current = key;
- 
+
         fetchUIStatus();
     }, [workflowData]);
- 
+
     // ── Fetch approver button states from backend ──────────────────────────
     const fetchUIStatus = async () => {
         debugger
@@ -86,13 +86,13 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             const result = await workflowActionsAPI.getApproverUIStatus(payload);
             setUiStatus(result);
             console.log("res", result);
- 
+
         } catch (err) {
             console.error("fetchUIStatus error:", err);
             setUiStatus(null);
         }
     };
- 
+
     // ── Scanner / Coder actions ────────────────────────────────────────────
     const handleSendToCoding = async () => {
         await handleSave();
@@ -106,7 +106,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             toast.error(payload?.message || "Something went wrong while sending for coding.");
         }
     };
- 
+
     const handleSendToApproval = async () => {
         await handleSave();
         const payload = await saveInvoice(viewInvoiceId, { status: "waiting_approval" });
@@ -119,18 +119,18 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             toast.error(payload?.message || "Something went wrong while sending for approval.");
         }
     };
- 
+
     const handleSaveInvoice = async () => {
         const response = await handleSave();
         if (response) toast.success("Invoice Saved Successfully!");
     };
- 
+
     const Back = () => {
         resetQuickView();
         setInvoiceSection(1);
         setInvoiceActiveTab("Quick View");
     };
- 
+
     // ── Core action executor (runs after modal confirms) ───────────────────
     const executeAction = async (action, commentText = "") => {
         setActionLoading(action);
@@ -155,10 +155,10 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                 default:
                     return;
             }
- 
+
             if (result?.success) {
                 toast.success(result.message || "Action completed successfully.");
- 
+
                 // Leave the invoice view for terminal / handoff statuses
                 const leaveStatuses = ["rejected", "sage_posted", "reworked", "approved"];
                 if (leaveStatuses.includes(result.new_status)) {
@@ -176,7 +176,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             }
         } catch (err) {
             const detail = err?.response?.data?.detail;
- 
+
             // Rework: no previous finance approver → show warning modal, not toast
             if (detail?.code === "NO_FINANCE_APPROVER") {
                 Modal.warning({
@@ -198,13 +198,13 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             setComment("");
         }
     };
- 
+
     // ── Modal open / confirm / cancel ──────────────────────────────────────
     const openModal = (action) => {
         setComment("");
         setModal({ action });
     };
- 
+
     const handleModalOk = () => {
         if (!modal) return;
         // Reject requires a comment
@@ -214,26 +214,26 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         }
         executeAction(modal.action, comment.trim());
     };
- 
+
     const handleModalCancel = () => {
         if (actionLoading) return; // block close while request is in-flight
         setModal(null);
         setComment("");
     };
- 
+
     const busy = (key) => actionLoading === key;
- 
+
     // ── Derived render flags ───────────────────────────────────────────────
     const isApproverView =
         userRole === "approver" &&
         ["waiting_approval", "reworked", "sage_post_failed"].includes(currentStatus);
- 
+
     const btnBase =
         "px-3 py-1 rounded-lg border bg-white transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
- 
+
     const getBtnClass = (type, enabled) => {
         if (!enabled) return `${btnBase} border-gray-300 text-gray-400`;
- 
+
         const styles = {
             green: "border-green-500 text-green-600 hover:bg-green-50",
             red: "border-red-500 text-red-600 hover:bg-red-50",
@@ -241,15 +241,15 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             blue: "border-blue-500 text-blue-600 hover:bg-blue-50",
             orange: "border-orange-500 text-orange-600 hover:bg-orange-50",
         };
- 
+
         return `${btnBase} ${styles[type]}`;
     };
- 
+
     // ── Render ─────────────────────────────────────────────────────────────
     return (
         <>
             <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4 flex items-center justify-between">
- 
+
                 {/* Left — Back */}
                 <div
                     onClick={Back}
@@ -258,7 +258,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                     <img src={icons.arrowLeft} alt="Back" />
                     <span className="text-lg font-bold text-gray-500 custom-font-jura">Back</span>
                 </div>
- 
+
                 {/* Right — Action buttons */}
                 <div className="flex items-center gap-3">
                     {!activeInvoiceData?.is_archived && (
@@ -292,7 +292,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                         </div>
                                     </>
                                 )}
- 
+
                             {/* ── Approver buttons ──────────────────────────────── */}
                             {
                                 isApproverView && (
@@ -307,7 +307,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                                 {busy("repost-sage") ? "Reposting…" : "Repost"}
                                             </button>
                                         )}
- 
+
                                         {/* Approval Actions */}
                                         {["waiting_approval", "reworked"].includes(currentStatus) && (
                                             <>
@@ -321,7 +321,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                                         {busy("enable-editing") ? "Enabling…" : "Enable Editing"}
                                                     </button>
                                                 )}
- 
+
                                                 {/* Rework */}
                                                 <button
                                                     onClick={() => openModal("rework")}
@@ -330,7 +330,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                                 >
                                                     {busy("rework") ? "Sending…" : "Rework"}
                                                 </button>
- 
+
                                                 {/* Reject */}
                                                 <button
                                                     onClick={() => openModal("reject")}
@@ -339,7 +339,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                                 >
                                                     {busy("reject") ? "Rejecting…" : "Reject"}
                                                 </button>
- 
+
                                                 {/* Approve */}
                                                 <button
                                                     onClick={() => openModal("approve")}
@@ -348,7 +348,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                                 >
                                                     {busy("approve") ? "Approving…" : "Approve"}
                                                 </button>
- 
+
                                                 {/* Info label */}
                                                 {uiStatus &&
                                                     !uiStatus.can_approve &&
@@ -372,7 +372,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                     )}
                 </div>
             </div>
- 
+
             {/* ── Comment / Confirm Modal ──────────────────────────────────────── */}
             <Modal
                 open={!!modal}
@@ -386,10 +386,16 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                 centered
                 maskClosable={!actionLoading}
                 destroyOnHidden
+                styles={{
+                    content: { padding: 20 },
+                    header: { padding: "15px 20px" },
+                    // body: { padding: "15px 20px" },
+                    footer: { padding: "10px 20px" },
+                }}
             >
                 {modal && (
-                    <div className="py-2 flex flex-col gap-3">
- 
+                    <div className="px-4 flex flex-col gap-3">
+
                         {/* Contextual info banners */}
                         {modal.action === "reject" && (
                             <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
@@ -409,7 +415,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                 Re-submit for approval once your changes are complete.
                             </div>
                         )}
- 
+
                         {/* Comment input */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -435,5 +441,5 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         </>
     );
 };
- 
+
 export default InvoiceTopBar;
