@@ -58,13 +58,19 @@ const getStatusConfig = (status) => {
 };
 
 const WorkflowTab = () => {
-    const { viewInvoiceId, activeInvoiceData } = useInvoiceStore();
+    const { viewInvoiceId, activeInvoiceData, lineItems, selectedVendorId } = useInvoiceStore();
     const isArchived = activeInvoiceData?.is_archived;
 
+    // Pass the same preview params as InvoiceTopBar so codification workflows resolve correctly
+    const firstLine = lineItems?.[0] || {};
     const {
         workflowData,
         isLoadingWorkflowData
-    } = useWorkflowDataSync(!isArchived ? viewInvoiceId : null);
+    } = useWorkflowDataSync(!isArchived ? viewInvoiceId : null, {
+        preview_vendor_id: selectedVendorId,
+        preview_lob: firstLine.lob,
+        preview_department_id: firstLine.department,
+    });
 
     if (isLoadingWorkflowData) {
         return <div className="p-6 text-gray-400 font-normal">Loading analysis...</div>;
@@ -97,6 +103,8 @@ const WorkflowTab = () => {
     const assignedApprovers = workflowData?.assigned_approvers || [];
     const currentApproverLevel = workflowData?.current_approver_level || 1;
     const isWaitingApproval = currentStatus === "waiting_approval";
+    // delegations: { original_email: [delegate_email, ...] }
+    const delegations = workflowData?.delegations || {};
 
     assignedApprovers.forEach((stage, index) => {
         const level = index + 1;
