@@ -570,20 +570,29 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
 
-    const isViewOnly = (() => {
+    const isViewOnly = useMemo(() => {
         if (activeInvoiceData?.is_archived) return true;
         const status = activeInvoiceData?.status?.toLowerCase();
         if (!status) return false;
 
+        // ── Finance approver with active editing session → unlock all fields ──
+        const isMyEditingSession =
+            activeInvoiceData?.is_editing_enabled === true &&
+            activeInvoiceData?.editing_enabled_by?.toLowerCase() === user?.email?.toLowerCase();
+
+        if (isMyEditingSession) return false;
+
         if (userRole === 'coder') {
-            if (status === 'processed') return true;
             if (status === 'waiting_coding') return false;
-            return false;
+            return true;
         }
+
+        // All approvers are view-only unless editing session is active (handled above)
+        if (userRole === 'approver') return true;
 
         const VIEW_ONLY_STATUSES = ["waiting_coding"];
         return VIEW_ONLY_STATUSES.includes(status);
-    })();
+    }, [activeInvoiceData, userRole, user?.email]);
 
     return (
         <div className="p-2">

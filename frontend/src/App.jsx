@@ -17,7 +17,7 @@ import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
 import CodingPage from './features/invoices/CodingPage';
 import ApprovalsPage from './features/invoices/ApprovalsPage';
-// import Settings from './features/settings/Settings';
+import Settings from './features/settings/Settings';
 
 import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
 
@@ -53,7 +53,7 @@ function App() {
               <Route path="/coding" element={<CodingPage />} />
               <Route path="/approvals" element={<ApprovalsPage />} />
               <Route path="/master-data" element={<MasterDataPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/admin" element={<AdminPage />} />
             </Route>
           </Route>
