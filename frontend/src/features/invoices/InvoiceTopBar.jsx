@@ -12,12 +12,10 @@ import workflowActionsAPI from "../../api/workflowActionsAPI";
 import { useEffect, useState, useRef } from "react";
 import { Modal } from "antd";
 
-// Actions that open the comment modal before executing
 const MODAL_ACTIONS = {
     approve: { label: "Approve", okText: "Approve", danger: false },
     reject: { label: "Reject Invoice", okText: "Reject", danger: true },
     rework: { label: "Send for Rework", okText: "Send for Rework", danger: false },
-    "enable-editing": { label: "Enable Editing", okText: "Enable Editing", danger: false },
     "repost-sage": { label: "Repost to Sage", okText: "Repost", danger: false },
 };
 
@@ -33,6 +31,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         resetQuickView,
         setInvoiceActiveTab,
         activeInvoiceData,
+        setActiveInvoiceData,
         lineItems,
         selectedVendorId,
     } = useInvoiceStore();
@@ -49,31 +48,40 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
     const currentStatus = activeInvoiceData?.status || invoice?.status;
     const isWaitingCoding = currentStatus === "waiting_coding";
-    const isWorkflowMissing = isWaitingCoding && !selectedVendorId && workflowData?.workflow_type !== "codification";
+    const isWorkflowMissing =
+        isWaitingCoding && !selectedVendorId && workflowData?.workflow_type !== "codification";
+
+    // ── Editing toggle — purely local, no API call needed ─────────────────
+    // Clicking "Enable Editing" just flips this and updates activeInvoiceData
+    // so QuickViewTab's isViewOnly useMemo immediately returns false.
+    const [editingEnabled, setEditingEnabled] = useState(false);
+
+    const handleEnableEditing = () => {
+        setEditingEnabled(true);
+        setActiveInvoiceData({
+            ...activeInvoiceData,
+            is_editing_enabled: true,
+            editing_enabled_by: user?.email,
+        });
+        toast.success("Editing enabled. Make your changes and save.");
+    };
 
     // ── Approver UI state ──────────────────────────────────────────────────
     const [uiStatus, setUiStatus] = useState(null);
-    const [actionLoading, setActionLoading] = useState(null); // action key currently running
-    const [modal, setModal] = useState(null); // { action } | null
+    const [actionLoading, setActionLoading] = useState(null);
+    const [modal, setModal] = useState(null);
     const [comment, setComment] = useState("");
     const prevWorkflowRef = useRef(null);
 
-
-
     useEffect(() => {
         if (!workflowData) return;
-
-        // Only re-fetch if workflowData actually changed in value
         const key = JSON.stringify(workflowData);
         if (key === prevWorkflowRef.current) return;
         prevWorkflowRef.current = key;
-
         fetchUIStatus();
     }, [workflowData]);
 
-    // ── Fetch approver button states from backend ──────────────────────────
     const fetchUIStatus = async () => {
-        debugger
         if (!viewInvoiceId || !workflowData) return;
         try {
             const payload = {
@@ -81,12 +89,10 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                 assigned_approvers: workflowData.assigned_approvers,
                 current_approver_level: workflowData.current_approver_level,
                 current_status: workflowData.current_status,
-                workflow_type: workflowData.workflow_type
+                workflow_type: workflowData.workflow_type,
             };
             const result = await workflowActionsAPI.getApproverUIStatus(payload);
             setUiStatus(result);
-            console.log("res", result);
-
         } catch (err) {
             console.error("fetchUIStatus error:", err);
             setUiStatus(null);
@@ -121,6 +127,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     };
 
     const handleSaveInvoice = async () => {
+        debugger
         const response = await handleSave();
         if (response) toast.success("Invoice Saved Successfully!");
     };
@@ -131,7 +138,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         setInvoiceActiveTab("Quick View");
     };
 
-    // ── Core action executor (runs after modal confirms) ───────────────────
+    // ── Approver workflow actions ──────────────────────────────────────────
     const executeAction = async (action, commentText = "") => {
         setActionLoading(action);
         try {
@@ -146,9 +153,6 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                 case "rework":
                     result = await workflowActionsAPI.rework(viewInvoiceId, { comment: commentText });
                     break;
-                case "enable-editing":
-                    result = await workflowActionsAPI.enableEditing(viewInvoiceId, { comment: commentText });
-                    break;
                 case "repost-sage":
                     result = await workflowActionsAPI.repostSage(viewInvoiceId, { comment: commentText });
                     break;
@@ -158,37 +162,27 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
             if (result?.success) {
                 toast.success(result.message || "Action completed successfully.");
-
-                // Leave the invoice view for terminal / handoff statuses
                 const leaveStatuses = ["rejected", "sage_posted", "reworked", "approved"];
                 if (leaveStatuses.includes(result.new_status)) {
                     resetQuickView();
                     setInvoiceSection(1);
                     navigate("/invoices");
                 } else {
-                    // Level advanced, sage failed after approve, etc. → refresh buttons
                     await fetchUIStatus();
                 }
             } else {
-                // Non-throwing failure (e.g. sage_post_failed returned from approve endpoint)
                 toast.error(result?.message || "Action failed. Please try again.");
                 await fetchUIStatus();
             }
         } catch (err) {
-            debugger
             const errorData = err?.response?.data;
             let detail = errorData?.detail;
-
-            // normalize
-            if (typeof detail === "string") {
-                detail = { message: detail };
-            }
+            if (typeof detail === "string") detail = { message: detail };
 
             if (detail?.code === "NO_FINANCE_APPROVER") {
                 toast.error(detail.message || "Cannot send for rework");
             } else {
-                const msg = detail?.message || "Something went wrong";
-                toast.error(msg);
+                toast.error(detail?.message || "Something went wrong");
             }
         } finally {
             setActionLoading(null);
@@ -197,7 +191,6 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         }
     };
 
-    // ── Modal open / confirm / cancel ──────────────────────────────────────
     const openModal = (action) => {
         setComment("");
         setModal({ action });
@@ -205,7 +198,6 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
     const handleModalOk = () => {
         if (!modal) return;
-        // Reject requires a comment
         if (modal.action === "reject" && !comment.trim()) {
             toast.error("A comment is required when rejecting an invoice.");
             return;
@@ -214,14 +206,13 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     };
 
     const handleModalCancel = () => {
-        if (actionLoading) return; // block close while request is in-flight
+        if (actionLoading) return;
         setModal(null);
         setComment("");
     };
 
     const busy = (key) => actionLoading === key;
 
-    // ── Derived render flags ───────────────────────────────────────────────
     const isApproverView =
         userRole === "approver" &&
         ["waiting_approval", "reworked", "sage_post_failed"].includes(currentStatus);
@@ -231,7 +222,6 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
     const getBtnClass = (type, enabled) => {
         if (!enabled) return `${btnBase} border-gray-300 text-gray-400`;
-
         const styles = {
             green: "border-green-500 text-green-600 hover:bg-green-50",
             red: "border-red-500 text-red-600 hover:bg-red-50",
@@ -239,11 +229,9 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             blue: "border-blue-500 text-blue-600 hover:bg-blue-50",
             orange: "border-orange-500 text-orange-600 hover:bg-orange-50",
         };
-
         return `${btnBase} ${styles[type]}`;
     };
 
-    // ── Render ─────────────────────────────────────────────────────────────
     return (
         <>
             <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4 flex items-center justify-between">
@@ -292,80 +280,85 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                 )}
 
                             {/* ── Approver buttons ──────────────────────────────── */}
-                            {
-                                isApproverView && (
-                                    <>
-                                        {/* Repost to Sage */}
-                                        {currentStatus === "sage_post_failed" && uiStatus?.can_repost_sage && (
+                            {isApproverView && (
+                                <>
+                                    {/* Repost to Sage */}
+                                    {currentStatus === "sage_post_failed" && uiStatus?.can_repost_sage && (
+                                        <button
+                                            onClick={() => openModal("repost-sage")}
+                                            disabled={busy("repost-sage")}
+                                            className={getBtnClass("orange", true)}
+                                        >
+                                            {busy("repost-sage") ? "Reposting…" : "Repost"}
+                                        </button>
+                                    )}
+
+                                    {["waiting_approval", "reworked"].includes(currentStatus) && (
+                                        <>
+                                            {/* Enable Editing — no API, flips local state only */}
+                                            {uiStatus?.can_enable_editing && !editingEnabled && (
+                                                <button
+                                                    onClick={handleEnableEditing}
+                                                    className={getBtnClass("blue", true)}
+                                                >
+                                                    Enable Editing
+                                                </button>
+                                            )}
+
+                                            {/* Save — appears once editing is unlocked */}
+                                            {editingEnabled && (
+                                                <div className="w-[100px]">
+                                                    <CustomButton variant="primary" onClick={handleSaveInvoice}>
+                                                        Save
+                                                    </CustomButton>
+                                                </div>
+                                            )}
+
+                                            {/* Rework */}
                                             <button
-                                                onClick={() => openModal("repost-sage")}
-                                                disabled={busy("repost-sage")}
-                                                className={getBtnClass("orange", true)}
+                                                onClick={() => openModal("rework")}
+                                                disabled={!uiStatus?.can_rework || !!actionLoading}
+                                                className={getBtnClass("yellow", uiStatus?.can_rework && !actionLoading)}
                                             >
-                                                {busy("repost-sage") ? "Reposting…" : "Repost"}
+                                                {busy("rework") ? "Sending…" : "Rework"}
                                             </button>
-                                        )}
 
-                                        {/* Approval Actions */}
-                                        {["waiting_approval", "reworked"].includes(currentStatus) && (
-                                            <>
-                                                {/* Enable Editing */}
-                                                {uiStatus?.can_enable_editing && (
-                                                    <button
-                                                        onClick={() => openModal("enable-editing")}
-                                                        disabled={busy("enable-editing")}
-                                                        className={getBtnClass("blue", true)}
-                                                    >
-                                                        {busy("enable-editing") ? "Enabling…" : "Enable Editing"}
-                                                    </button>
+                                            {/* Reject */}
+                                            <button
+                                                onClick={() => openModal("reject")}
+                                                disabled={!uiStatus?.can_reject || !!actionLoading}
+                                                className={getBtnClass("red", uiStatus?.can_reject && !actionLoading)}
+                                            >
+                                                {busy("reject") ? "Rejecting…" : "Reject"}
+                                            </button>
+
+                                            {/* Approve */}
+                                            <button
+                                                onClick={() => openModal("approve")}
+                                                disabled={!uiStatus?.can_approve || !!actionLoading}
+                                                className={getBtnClass("green", uiStatus?.can_approve && !actionLoading)}
+                                            >
+                                                {busy("approve") ? "Approving…" : "Approve"}
+                                            </button>
+
+                                            {/* Info label */}
+                                            {uiStatus &&
+                                                !uiStatus.can_approve &&
+                                                !uiStatus.can_reject &&
+                                                !uiStatus.can_rework &&
+                                                !uiStatus.can_enable_editing && (
+                                                    <span className="text-xs text-gray-400 italic select-none">
+                                                        {uiStatus.level_already_approved
+                                                            ? "Your level approved"
+                                                            : uiStatus.already_acted
+                                                                ? "Already acted"
+                                                                : "Awaiting approver"}
+                                                    </span>
                                                 )}
-
-                                                {/* Rework */}
-                                                <button
-                                                    onClick={() => openModal("rework")}
-                                                    disabled={!uiStatus?.can_rework || !!actionLoading}
-                                                    className={getBtnClass("yellow", uiStatus?.can_rework && !actionLoading)}
-                                                >
-                                                    {busy("rework") ? "Sending…" : "Rework"}
-                                                </button>
-
-                                                {/* Reject */}
-                                                <button
-                                                    onClick={() => openModal("reject")}
-                                                    disabled={!uiStatus?.can_reject || !!actionLoading}
-                                                    className={getBtnClass("red", uiStatus?.can_reject && !actionLoading)}
-                                                >
-                                                    {busy("reject") ? "Rejecting…" : "Reject"}
-                                                </button>
-
-                                                {/* Approve */}
-                                                <button
-                                                    onClick={() => openModal("approve")}
-                                                    disabled={!uiStatus?.can_approve || !!actionLoading}
-                                                    className={getBtnClass("green", uiStatus?.can_approve && !actionLoading)}
-                                                >
-                                                    {busy("approve") ? "Approving…" : "Approve"}
-                                                </button>
-
-                                                {/* Info label */}
-                                                {uiStatus &&
-                                                    !uiStatus.can_approve &&
-                                                    !uiStatus.can_reject &&
-                                                    !uiStatus.can_rework &&
-                                                    !uiStatus.can_enable_editing && (
-                                                        <span className="text-xs text-gray-400 italic select-none">
-                                                            {uiStatus.level_already_approved
-                                                                ? "Your level approved"
-                                                                : uiStatus.already_acted
-                                                                    ? "Already acted"
-                                                                    : "Awaiting approver"}
-                                                        </span>
-                                                    )}
-                                            </>
-                                        )}
-                                    </>
-                                )
-                            }
+                                        </>
+                                    )}
+                                </>
+                            )}
                         </>
                     )}
                 </div>
@@ -387,14 +380,11 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                 styles={{
                     content: { padding: 20 },
                     header: { padding: "15px 20px" },
-                    // body: { padding: "15px 20px" },
                     footer: { padding: "10px 20px" },
                 }}
             >
                 {modal && (
                     <div className="px-4 flex flex-col gap-3">
-
-                        {/* Contextual info banners */}
                         {modal.action === "reject" && (
                             <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
                                 ⚠ This action is <strong>permanent</strong>. No further actions
@@ -407,14 +397,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                 approver for corrections.
                             </div>
                         )}
-                        {modal.action === "enable-editing" && (
-                            <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
-                                You will have full edit access to all invoice tabs.
-                                Re-submit for approval once your changes are complete.
-                            </div>
-                        )}
 
-                        {/* Comment input */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
                                 Comment{" "}

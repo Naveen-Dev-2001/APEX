@@ -487,6 +487,7 @@ async def get_ui_status_from_frontend(
         threshold_emails.extend(_parse_list(te.get("emails", [])))
     is_threshold_approver = email in [e.lower() for e in threshold_emails]
 
+    # ── can_act logic ────────────────────────────────────────────────────────
     can_act = False
 
     if not mandatory_levels_done:
@@ -501,8 +502,6 @@ async def get_ui_status_from_frontend(
             user_in_level = (
                 (is_finance_level and is_finance) or (email in emails_at_level)
             )
-
-            # Use post-rework steps to check if already acted at this level
             already_acted_this_level = any(
                 (s.user or "").lower() == email
                 and s.step_type == StepType.LEVEL_APPROVED
@@ -527,7 +526,36 @@ async def get_ui_status_from_frontend(
         )
         can_act = is_posting_approver and not already_posted
 
-    # already_acted is for display only
+    # ── can_enable_editing logic ─────────────────────────────────────────────
+    # Show "Enable Editing" if:
+    # 1. User is finance team
+    # 2. Current level is a finance-team level
+    # 3. User has NOT yet approved at this level
+    # 4. Mandatory levels not all done yet
+    current_level_entry = next(
+        (a for a in mandatory if a.get("level") == current_level), None
+    )
+    is_current_level_finance = (
+        current_level_entry.get("is_finance", False)
+        if current_level_entry else False
+    )
+
+    # Has this finance user already approved at current level?
+    already_approved_this_level = any(
+        (s.user or "").lower() == email
+        and s.step_type == StepType.LEVEL_APPROVED
+        and s.approver_number == current_level
+        for s in steps_for_level_check  # respects rework timestamp filter
+    )
+
+    can_enable_editing = (
+        is_finance
+        and is_current_level_finance
+        and not mandatory_levels_done
+        and not already_approved_this_level
+    )
+
+    # ── already_acted for display only ───────────────────────────────────────
     already_acted = any((s.user or "").lower() == email for s in steps)
 
     return ApproverUIStatus(
@@ -538,7 +566,7 @@ async def get_ui_status_from_frontend(
         can_approve=can_act,
         can_reject=can_act,
         can_rework=can_act,
-        can_enable_editing=is_finance and not mandatory_levels_done and current_level == 1,
+        can_enable_editing=can_enable_editing,
         can_repost_sage=current_status == InvoiceStatus.SAGE_POST_FAILED and is_posting_approver,
         is_posting_approver=is_posting_approver,
         is_threshold_approver=is_threshold_approver,
@@ -1130,12 +1158,12 @@ async def enable_editing(
             403, "Only Finance Team members can enable editing")
 
     _record_step(
-        db,
-        invoice_id,
+        db, invoice_id,
         step_name="Editing Enabled by Finance Team",
         step_type=StepType.EDITING_ENABLED,
         user_email=email,
         comment=payload.comment,
+        entity=entity,
     )
     db.commit()
 

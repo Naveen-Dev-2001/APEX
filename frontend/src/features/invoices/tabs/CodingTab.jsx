@@ -70,6 +70,7 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabl
         prev.value === next.value &&
         prev.type === next.type &&
         prev.placeholder === next.placeholder &&
+        prev.disabled === next.disabled &&
         prev.onChange === next.onChange
 );
 
@@ -189,16 +190,26 @@ const CodingTab = () => {
         if (activeInvoiceData?.is_archived) return true;
         const status = activeInvoiceData?.status?.toLowerCase();
         if (!status) return false;
-        
+
+        // ── Finance approver with editing enabled → allow editing ──
+        const isMyEditingSession =
+            activeInvoiceData?.is_editing_enabled === true &&
+            activeInvoiceData?.editing_enabled_by?.toLowerCase() === user?.email?.toLowerCase();
+
+        if (isMyEditingSession) return false; // unlock all fields
+
         if (userRole === 'coder') {
             if (status === 'processed') return true;
             if (status === 'waiting_coding') return false;
             return false;
         }
 
+        // Approvers always view-only UNLESS editing session active (handled above)
+        if (userRole === 'approver') return true;
+
         const VIEW_ONLY_STATUSES = ["waiting_coding"];
         return VIEW_ONLY_STATUSES.includes(status);
-    }, [activeInvoiceData, userRole]);
+    }, [activeInvoiceData, userRole, user?.email]);
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);
@@ -526,26 +537,26 @@ const CodingTab = () => {
                                                 </td>
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (
-                                                    <button
-                                                        onClick={() => handleDelete(row.id)}
-                                                        className="text-gray-400 hover:text-red-500 transition-colors"
-                                                        style={{
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            width: 28,
-                                                            height: 28,
-                                                            borderRadius: 6,
-                                                            border: "1px solid #e5e7eb",
-                                                            background: "#fafafa",
-                                                            cursor: "pointer",
-                                                            flexShrink: 0,
-                                                        }}
-                                                        onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.borderColor = "#fca5a5"; }}
-                                                        onMouseLeave={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.borderColor = "#e5e7eb"; }}
-                                                    >
-                                                        <DeleteOutlined style={{ fontSize: 12, color: "inherit" }} />
-                                                    </button>
+                                                        <button
+                                                            onClick={() => handleDelete(row.id)}
+                                                            className="text-gray-400 hover:text-red-500 transition-colors"
+                                                            style={{
+                                                                display: "inline-flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                width: 28,
+                                                                height: 28,
+                                                                borderRadius: 6,
+                                                                border: "1px solid #e5e7eb",
+                                                                background: "#fafafa",
+                                                                cursor: "pointer",
+                                                                flexShrink: 0,
+                                                            }}
+                                                            onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.borderColor = "#fca5a5"; }}
+                                                            onMouseLeave={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.borderColor = "#e5e7eb"; }}
+                                                        >
+                                                            <DeleteOutlined style={{ fontSize: 12, color: "inherit" }} />
+                                                        </button>
                                                     )}
                                                 </td>
                                             </tr>
@@ -561,23 +572,23 @@ const CodingTab = () => {
                             style={{ position: "sticky", left: 0 }}
                         >
                             {!isViewOnly && (
-                            <button
-                                onClick={handleAdd}
-                                className="flex items-center gap-1.5 text-[12px] font-medium text-[#2F5D7C] transition-all"
-                                style={{
-                                    padding: "5px 12px",
-                                    borderRadius: 6,
-                                    border: "1.5px dashed #2F5D7C",
-                                    background: "transparent",
-                                    cursor: "pointer",
-                                    letterSpacing: "0.01em",
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.background = "#f0f7ff"; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
-                            >
-                                <PlusOutlined style={{ fontSize: 11 }} />
-                                Add Line
-                            </button>
+                                <button
+                                    onClick={handleAdd}
+                                    className="flex items-center gap-1.5 text-[12px] font-medium text-[#2F5D7C] transition-all"
+                                    style={{
+                                        padding: "5px 12px",
+                                        borderRadius: 6,
+                                        border: "1.5px dashed #2F5D7C",
+                                        background: "transparent",
+                                        cursor: "pointer",
+                                        letterSpacing: "0.01em",
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = "#f0f7ff"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                                >
+                                    <PlusOutlined style={{ fontSize: 11 }} />
+                                    Add Line
+                                </button>
                             )}
                         </div>
                     </div>
