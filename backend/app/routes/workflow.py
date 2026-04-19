@@ -508,6 +508,22 @@ async def get_workflow_history(
             subs = check_active_delegation(db, email, entity)
             if subs: delegations_map[email.lower()] = subs
 
+    # Fetch User Names for Display
+    user_names_map = {}
+    involved_emails = set(flat_emails)
+    for s in steps:
+        if s.user: involved_emails.add(s.user.lower())
+    for orig, substitutes in delegations_map.items():
+        involved_emails.add(orig.lower())
+        for sub in substitutes:
+            involved_emails.add(sub.lower())
+    
+    if involved_emails:
+        from app.models.db_models import User
+        user_list = db.query(User).filter(User.email.in_(list(involved_emails))).all()
+        for u in user_list:
+            user_names_map[u.email.lower()] = u.username
+
     return WorkflowHistoryResponse(
         invoice_id=str(invoice_id),
         vendor_name=vendor_name,
@@ -517,6 +533,7 @@ async def get_workflow_history(
         current_status=invoice.status.value if hasattr(invoice.status, "value") else str(invoice.status),
         approver_breakdown=requirement_data["breakdown"],
         delegations=delegations_map,
+        user_names=user_names_map,
         workflow_type=requirement_data.get("workflow_type", "unknown"),
         steps=[
             WorkflowStepResponse(

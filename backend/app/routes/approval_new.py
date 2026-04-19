@@ -39,6 +39,7 @@ from app.repository.repositories import (
 )
 
 from app.routes.workflow import get_invoice_total_from_invoice, get_required_approver_count
+from app.models.delegation import check_active_delegation
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workflow/action", tags=["Workflow Actions"])
@@ -250,19 +251,21 @@ def _posting_approved(steps: List[WorkflowStep]) -> bool:
 
 
 def _level_is_complete(
+    db: Session,
     level_entry: Dict,
     approved_emails_at_level: List[str],
     finance_users: List[str],
+    entity: str,
 ) -> bool:
     """
-    A level is complete when ANY ONE eligible approver has approved.
-    - is_finance=True  → any finance-team user counts
-    - is_finance=False → any of the specified emails counts
+    A level is complete when ANY ONE authorized approver (original or delegate) has approved.
     """
-    if level_entry.get("is_finance"):
-        return bool(set(approved_emails_at_level) & set(finance_users))
-    emails = [e.lower() for e in _parse_list(level_entry.get("emails", []))]
-    return bool(set(approved_emails_at_level) & set(emails))
+    if not approved_emails_at_level:
+        return False
+
+    # Short circuit: Since approve_invocie already validates eligibility,
+    # any recorded approval for this level counts as completion.
+    return True
 
 
 def _find_previous_finance_level(
@@ -323,11 +326,13 @@ async def _post_to_sage(invoice_id: int, entity: str) -> Dict:
 # ─────────────────────────────────────────────
 
 def _resolve_user_role_in_workflow(
+    db: Session,
     current_user_email: str,
     workflow: Dict,
     steps: List[WorkflowStep],
     finance_users: List[str],
     current_level: int,
+    entity: str,
 ) -> Dict:
     """
     Returns a dict describing the logged-in user's current position in the workflow.
@@ -391,9 +396,19 @@ def _resolve_user_role_in_workflow(
         emails_at_level = [e.lower()
                            for e in _parse_list(entry.get("emails", []))]
 
+        # Delegation check
+        delegated_at_level = False
+        for o_email in emails_at_level:
+            if not o_email: continue
+            subs = check_active_delegation(db, o_email, entity)
+            if email in [s.lower() for s in subs]:
+                delegated_at_level = True
+                break
+
         user_in_level = (
             (is_finance and result["is_finance_team"])
             or (email in emails_at_level)
+            or delegated_at_level
         )
         if user_in_level:
             result["user_level"] = lvl
@@ -421,9 +436,23 @@ def _resolve_user_role_in_workflow(
         if user_lvl is not None and user_lvl == current_level:
             result["can_act"] = not result["level_already_approved"]
     elif has_threshold and not threshold_done:
-        result["can_act"] = result["is_threshold_approver"] and not result["already_acted"]
+        delegated_threshold = False
+        for o_email in [e.lower() for te in threshold_entries for e in _parse_list(te.get("emails", []))]:
+            if not o_email: continue
+            subs = check_active_delegation(db, o_email, entity)
+            if email in [s.lower() for s in subs]:
+                delegated_threshold = True
+                break
+        result["can_act"] = (result["is_threshold_approver"] or delegated_threshold) and not result["already_acted"]
     elif has_posting and not posting_done:
-        result["can_act"] = result["is_posting_approver"] and not result["already_acted"]
+        delegated_posting = False
+        for o_email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]:
+            if not o_email: continue
+            subs = check_active_delegation(db, o_email, entity)
+            if email in [s.lower() for s in subs]:
+                delegated_posting = True
+                break
+        result["can_act"] = (result["is_posting_approver"] or delegated_posting) and not result["already_acted"]
     # else: all done — no one can act
 
     return result
@@ -498,37 +527,74 @@ async def get_ui_status_from_frontend(
             emails_at_level = [e.lower() for e in _parse_list(
                 current_entry.get("emails", []))]
 
+            # Delegation check
+            delegated_authority = False
+            for orig_email in emails_at_level:
+                if not orig_email: continue
+                substitutes = check_active_delegation(db, orig_email, entity)
+                if email in [s.lower() for s in substitutes]:
+                    delegated_authority = True
+                    break
+
             user_in_level = (
-                (is_finance_level and is_finance) or (email in emails_at_level)
+                (is_finance_level and is_finance) 
+                or (email in emails_at_level)
+                or delegated_authority
             )
 
-            # Use post-rework steps to check if already acted at this level
-            already_acted_this_level = any(
-                (s.user or "").lower() == email
-                and s.step_type == StepType.LEVEL_APPROVED
-                and s.approver_number == current_level
-                for s in steps_for_level_check
-            )
-            can_act = user_in_level and not already_acted_this_level
-
+            # Use post-rework steps to check if already acted at this level (by anyone)
+            level_is_done = bool(approved_levels.get(current_level))
+            can_act = user_in_level and not level_is_done
     elif has_threshold and not threshold_done:
+        delegated_threshold = False
+        for orig_email in threshold_emails:
+            if not orig_email: continue
+            substitutes = check_active_delegation(db, orig_email, entity)
+            if email in [s.lower() for s in substitutes]:
+                delegated_threshold = True
+                break
+
         already_threshold = any(
             (s.user or "").lower() == email
             and s.step_type == StepType.THRESHOLD_APPROVED
             for s in steps_for_level_check
         )
-        can_act = is_threshold_approver and not already_threshold
+        can_act = (is_threshold_approver or delegated_threshold) and not already_threshold
 
     elif has_posting and not posting_done:
+        delegated_posting = False
+        for orig_email in posting_emails:
+            if not orig_email: continue
+            substitutes = check_active_delegation(db, orig_email, entity)
+            if email in [s.lower() for s in substitutes]:
+                delegated_posting = True
+                break
+
         already_posted = any(
             (s.user or "").lower() == email
             and s.step_type == StepType.POSTING_APPROVED
             for s in steps_for_level_check
         )
-        can_act = is_posting_approver and not already_posted
+        can_act = (is_posting_approver or delegated_posting) and not already_posted
 
     # already_acted is for display only
     already_acted = any((s.user or "").lower() == email for s in steps)
+
+    # Pre-calculate flags for the response
+    delegated_finance = False
+    for f_user in finance_users:
+        subs = check_active_delegation(db, f_user, entity)
+        if email in [s.lower() for s in subs]:
+            delegated_finance = True
+            break
+
+    delegated_posting = False
+    for p_email in posting_emails:
+        if not p_email: continue
+        subs = check_active_delegation(db, p_email, entity)
+        if email in [s.lower() for s in subs]:
+            delegated_posting = True
+            break
 
     return ApproverUIStatus(
         invoice_id=str(invoice_id),
@@ -538,11 +604,11 @@ async def get_ui_status_from_frontend(
         can_approve=can_act,
         can_reject=can_act,
         can_rework=can_act,
-        can_enable_editing=is_finance and not mandatory_levels_done and current_level == 1,
-        can_repost_sage=current_status == InvoiceStatus.SAGE_POST_FAILED and is_posting_approver,
-        is_posting_approver=is_posting_approver,
-        is_threshold_approver=is_threshold_approver,
-        is_finance_team=is_finance,
+        can_enable_editing=(is_finance or delegated_finance) and not mandatory_levels_done and current_level == 1,
+        can_repost_sage=current_status == InvoiceStatus.SAGE_POST_FAILED and (is_posting_approver or delegated_posting),
+        is_posting_approver=is_posting_approver or delegated_posting,
+        is_threshold_approver=is_threshold_approver or (any(email in [s.lower() for s in check_active_delegation(db, te, entity)] for te in threshold_emails)),
+        is_finance_team=is_finance or delegated_finance,
         user_level=current_level,
         level_already_approved=bool(approved_levels.get(current_level)),
         already_acted=already_acted,
@@ -622,9 +688,19 @@ async def approve_invoice(
         emails_at_level = [e.lower()
                            for e in _parse_list(level_entry.get("emails", []))]
 
+        # Delegation check
+        delegated_authority = False
+        for orig_email in emails_at_level:
+            if not orig_email: continue
+            substitutes = check_active_delegation(db, orig_email, entity)
+            if email in [s.lower() for s in substitutes]:
+                delegated_authority = True
+                break
+
         user_eligible = (
             (is_finance_level and email in [f.lower() for f in finance_users])
             or (not is_finance_level and email in emails_at_level)
+            or delegated_authority
         )
         if not user_eligible:
             raise HTTPException(
@@ -657,7 +733,7 @@ async def approve_invoice(
         updated_approved_at_level = list(
             approved_levels.get(current_level, [])) + [email]
         level_complete = _level_is_complete(
-            level_entry, updated_approved_at_level, finance_users)
+            db, level_entry, updated_approved_at_level, finance_users, entity)
 
         if level_complete:
             next_mandatory = next(
@@ -724,7 +800,16 @@ async def approve_invoice(
         threshold_emails = []
         for te in threshold_entries:
             threshold_emails.extend(_parse_list(te.get("emails", [])))
-        if email not in [e.lower() for e in threshold_emails]:
+
+        delegated_threshold = False
+        for orig_email in threshold_emails:
+            if not orig_email: continue
+            substitutes = check_active_delegation(db, orig_email, entity)
+            if email in [s.lower() for s in substitutes]:
+                delegated_threshold = True
+                break
+
+        if email not in [e.lower() for e in threshold_emails] and not delegated_threshold:
             raise HTTPException(403, "You are not the threshold approver")
 
         _record_step(
@@ -768,7 +853,16 @@ async def approve_invoice(
         posting_emails = []
         for pe in posting_entries:
             posting_emails.extend(_parse_list(pe.get("emails", [])))
-        if email not in [e.lower() for e in posting_emails]:
+
+        delegated_posting = False
+        for orig_email in posting_emails:
+            if not orig_email: continue
+            substitutes = check_active_delegation(db, orig_email, entity)
+            if email in [s.lower() for s in substitutes]:
+                delegated_posting = True
+                break
+
+        if email not in [e.lower() for e in posting_emails] and not delegated_posting:
             raise HTTPException(403, "You are not the posting approver")
 
         _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
@@ -866,7 +960,7 @@ async def reject_invoice(
     email = current_user.email.lower()
 
     role = _resolve_user_role_in_workflow(
-        email, workflow, steps, finance_users, current_level
+        db, email, workflow, steps, finance_users, current_level, entity
     )
     if not role["can_act"]:
         raise HTTPException(
@@ -1024,7 +1118,7 @@ async def rework_invoice(
     email = current_user.email.lower()
 
     role = _resolve_user_role_in_workflow(
-        email, workflow, steps, finance_users, current_level
+        db, email, workflow, steps, finance_users, current_level, entity
     )
     is_current_level_user = role["user_level"] == current_level
     is_finance_user = role["is_finance_team"]
@@ -1125,9 +1219,16 @@ async def enable_editing(
     finance_users = _get_finance_users(db, entity)
     email = current_user.email.lower()
 
-    if email not in [f.lower() for f in finance_users]:
+    delegated_finance = False
+    for f_user in finance_users:
+        subs = check_active_delegation(db, f_user, entity)
+        if email in [s.lower() for s in subs]:
+            delegated_finance = True
+            break
+
+    if email not in [f.lower() for f in finance_users] and not delegated_finance:
         raise HTTPException(
-            403, "Only Finance Team members can enable editing")
+            403, "Only Finance Team members (or their delegates) can enable editing")
 
     _record_step(
         db,
@@ -1184,9 +1285,17 @@ async def repost_to_sage(
         posting_emails.extend(_parse_list(pe.get("emails", [])))
 
     email = current_user.email.lower()
-    if email not in [e.lower() for e in posting_emails]:
+    delegated_posting = False
+    for orig_email in posting_emails:
+        if not orig_email: continue
+        substitutes = check_active_delegation(db, orig_email, entity)
+        if email in [s.lower() for s in substitutes]:
+            delegated_posting = True
+            break
+
+    if email not in [e.lower() for e in posting_emails] and not delegated_posting:
         raise HTTPException(
-            403, "Only the posting approver can repost to Sage")
+            403, "Only the posting approver (or their delegate) can repost to Sage")
 
     # Attempt repost
     sage_result = await _post_to_sage(invoice_id, entity)

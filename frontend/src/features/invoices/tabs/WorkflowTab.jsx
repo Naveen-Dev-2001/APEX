@@ -105,22 +105,42 @@ const WorkflowTab = () => {
     const isWaitingApproval = currentStatus === "waiting_approval";
     // delegations: { original_email: [delegate_email, ...] }
     const delegations = workflowData?.delegations || {};
+    const userNamesMap = workflowData?.user_names || {};
+    const getUserDisplayName = (email) => userNamesMap[email?.toLowerCase()] || email;
 
     assignedApprovers.forEach((stage, index) => {
         const level = index + 1;
-        const type = `approver_${level}`;
-        const historicalActions = historySteps.filter(s => s.step_type === type && (s.status === 'approved' || s.status === 'completed'));
-        
         const stageType = stage?.type || "mandatory";
+        
+        let historicalActions = [];
+        if (stageType === "threshold") {
+            historicalActions = historySteps.filter(s => s.step_type === "threshold_approved");
+        } else if (stageType === "posting") {
+            historicalActions = historySteps.filter(s => s.step_type === "posting_approved");
+        } else {
+            historicalActions = historySteps.filter(s => s.step_type === "level_approved" && s.approver_number === level);
+        }
+
         const emails = Array.isArray(stage?.emails) ? stage.emails : (stage?.emails ? [stage.emails] : []);
         
-        // Dynamic Finance Team logic
+        const subtitleParts = emails.map(email => {
+            if (!email) return "";
+            const displayName = getUserDisplayName(email);
+            const lowEmail = email.toLowerCase();
+            const substitutes = delegations[lowEmail];
+            if (substitutes && substitutes.length > 0) {
+                const substituteNames = substitutes.map(s => getUserDisplayName(s)).join(", ");
+                return `${displayName} (Delegated to ${substituteNames})`;
+            }
+            return displayName;
+        });
+
         const isFinanceTeam = stage?.is_finance || emails.some(e => String(e).toLowerCase().includes("finance team")) || (stageType === "mandatory" && stage?.level === 2 && emails.length === 0);
         
-        // Define Title based on status
         let status = "queued";
         if (historicalActions.length > 0) status = "approved";
         else if (level === currentApproverLevel && isWaitingApproval) status = "pending";
+        else if (stageType === "mandatory" && level < currentApproverLevel) status = "approved"; 
 
         const ord = getOrdinal(level);
         let title = `${ord} Approver`;
@@ -130,16 +150,18 @@ const WorkflowTab = () => {
         if (status === "approved") title = `${title} Completed`;
         else if (status === "pending") title = `Pending ${title}`;
 
-        let subtitle = isFinanceTeam ? "Finance Team" : emails.filter(e => e).join(", ");
+        let subtitle = isFinanceTeam ? "Finance Team" : subtitleParts.filter(e => e).join(", ");
         let time = "";
+        let comment = "";
 
         if (historicalActions.length > 0) {
             const lastAction = historicalActions[historicalActions.length - 1];
-            subtitle = lastAction.user;
-            time = new Date(lastAction.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true });
+            subtitle = getUserDisplayName(lastAction.user) || subtitle;
+            time = lastAction.timestamp ? new Date(lastAction.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : "";
+            comment = lastAction.comment;
         }
 
-        steps.push({ title, subtitle, status, time });
+        steps.push({ title, subtitle, status, time, comment });
     });
 
     // Step 4: Sage Posting
@@ -175,14 +197,21 @@ const WorkflowTab = () => {
                                 {item.title}
                             </div>
 
-                            <div className="mt-1 flex items-baseline gap-3">
-                                <span className={`text-[12px] font-normal ${config.subtitleColor}`}>
-                                    {item.subtitle || config.defaultSubtitle}
-                                </span>
-                                {item.time && (
-                                    <span className={`text-[12px] font-normal ${config.timeColor}`}>
-                                        {item.time}
+                            <div className="mt-1 flex flex-col gap-1">
+                                <div className="flex items-baseline gap-3">
+                                    <span className={`text-[12px] font-normal ${config.subtitleColor}`}>
+                                        {item.subtitle || config.defaultSubtitle}
                                     </span>
+                                    {item.time && (
+                                        <span className={`text-[12px] font-normal ${config.timeColor}`}>
+                                            {item.time}
+                                        </span>
+                                    )}
+                                </div>
+                                {item.comment && (
+                                    <div className="mt-1 text-[11px] italic text-gray-500 bg-gray-50 p-2 rounded border-l-2 border-[#1AB394] max-w-md shadow-sm">
+                                        "{item.comment}"
+                                    </div>
                                 )}
                             </div>
                         </div>
