@@ -484,18 +484,24 @@ async def get_workflow_history(
     
     def _flatten_emails(items):
         res = []
-        for item in items:
+        if items is None: return res
+        
+        # Wrap single item in list for unified processing
+        work_list = items if isinstance(items, list) else [items]
+        
+        for item in work_list:
             if isinstance(item, list):
                 res.extend(_flatten_emails(item))
+            elif isinstance(item, dict):
+                # Recursively extract from 'emails' key if present
+                emails_val = item.get("emails", [])
+                res.extend(_flatten_emails(emails_val))
             elif isinstance(item, str):
                 item = item.strip()
                 if item.startswith("["):
                     try:
                         parsed = json.loads(item)
-                        if isinstance(parsed, list):
-                            res.extend(_flatten_emails(parsed))
-                        else:
-                            res.append(item)
+                        res.extend(_flatten_emails(parsed))
                     except:
                         res.append(item)
                 else:
