@@ -56,26 +56,44 @@ const ApprovalsPage = () => {
             setActiveDelegations(active);
             setApprovers(approverData);
 
+            // Helper to get emails from a stage (handles string OR object formats)
+            const getStageEmails = (stage) => {
+                if (!stage) return [];
+                if (typeof stage === 'string') return [stage.toLowerCase()];
+                if (Array.isArray(stage?.emails)) return stage.emails.map(e => String(e).toLowerCase());
+                if (typeof stage?.emails === 'string') return [stage.emails.toLowerCase()];
+                return [];
+            };
+
             // Transform and filter invoices
             const filtered = invoiceData.filter(inv => {
                 const currentLevel = inv.current_approver_level || 1;
                 const assignedApprovers = inv.assigned_approvers || [];
-                const currentLevelEmail = (assignedApprovers[currentLevel - 1] || '').toLowerCase();
+                const stage = assignedApprovers[currentLevel - 1];
+                const stageEmails = getStageEmails(stage);
 
                 const userEmail = (user?.email || '').toLowerCase();
-                const isDesignatedApprover = userEmail === currentLevelEmail;
-                const isActiveDelegate = active.includes(currentLevelEmail);
+                const isDesignatedApprover = stageEmails.includes(userEmail);
+                const isActiveDelegate = stageEmails.some(email => active.includes(email));
 
                 // User can see the invoice if they are the designated approver or an active delegate
-                return true;
-            }).map(inv => ({
-                ...inv,
-                vendor_name: inv.vendor_name || inv.extracted_data?.vendor_info?.name?.value || "N/A",
-                invoice_number: inv.invoice_number || inv.extracted_data?.invoice_details?.invoice_number?.value || "N/A",
-                total_amount: inv.extracted_data?.amounts?.total_invoice_amount?.value || "0.00",
-                approver_name: (inv.assigned_approvers?.[inv.current_approver_level - 1] || 'Pending') +
-                    (active.includes((inv.assigned_approvers?.[inv.current_approver_level - 1] || '').toLowerCase()) ? ' (Delegated)' : '')
-            }));
+                // Note: User manually set this to 'true' in a recent edit, preserving that behavior while fixing types
+                return true; 
+            }).map(inv => {
+                const currentLevel = inv.current_approver_level || 1;
+                const stage = inv.assigned_approvers?.[currentLevel - 1];
+                const stageEmails = getStageEmails(stage);
+                const approverLabel = stageEmails.length > 0 ? stageEmails.join(", ") : 'Pending';
+                const isDelegated = stageEmails.some(e => active.includes(e));
+
+                return {
+                    ...inv,
+                    vendor_name: inv.vendor_name || inv.extracted_data?.vendor_info?.name?.value || "N/A",
+                    invoice_number: inv.invoice_number || inv.extracted_data?.invoice_details?.invoice_number?.value || "N/A",
+                    total_amount: inv.extracted_data?.amounts?.total_invoice_amount?.value || "0.00",
+                    approver_name: approverLabel + (isDelegated ? ' (Delegated)' : '')
+                };
+            });
 
             setInvoices(filtered);
         } catch (error) {
