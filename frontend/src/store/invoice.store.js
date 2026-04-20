@@ -128,12 +128,15 @@ export const useInvoiceStore = create((set, get) => ({
         const existingGstRow = lineItems.find(i => i.type === "GST");
         const existingTdsRow = lineItems.find(i => i.type === "TDS");
 
+        const entityMaster = get().entityMaster;
+        const gstLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
+
         if (isModified) {
             // Preserve saved system rows exactly as-is
             const gstRow = existingGstRow ?? {
                 id: "gst-row",
                 type: "GST",
-                description: "Total GST",
+                description: gstLabel,
                 qty: 1,
                 unitPrice: 0,
                 discount: 0,
@@ -158,7 +161,7 @@ export const useInvoiceStore = create((set, get) => ({
         const gstRow = {
             id: "gst-row",
             type: "GST",
-            description: "Total GST",
+            description: gstLabel,
             qty: 1,
             unitPrice: gstValue,
             discount: 0,

@@ -180,7 +180,7 @@ const applyCalculation = (item, key, value) => {
 };
 
 const CodingTab = () => {
-    const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData } = useInvoiceStore();
+    const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData, entityMaster } = useInvoiceStore();
     const rows = lineItems;
 
     const user = useAuthStore((state) => state.user);
@@ -486,6 +486,8 @@ const CodingTab = () => {
                                     {lineItems.map((row, index) => {
                                         const isSelected = selectedIds.has(row.id);
                                         const isSystem = !!row.isSystemRow;
+                                        const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
+                                        const rowLabel = row.type === "GST" ? gstTaxLabel : row.description;
 
                                         return (
                                             <tr
@@ -506,7 +508,12 @@ const CodingTab = () => {
 
                                                 {/* All cells below are IDENTICAL to original — no isSystem branching */}
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <EditableCell disabled={isViewOnly} value={row.description} onChange={(v) => handleUpdate(row.id, "description", v)} placeholder="Description" />
+                                                    <EditableCell
+                                                        disabled={isViewOnly || isSystem}
+                                                        value={isSystem && row.type === "GST" ? rowLabel : row.description}
+                                                        onChange={(v) => handleUpdate(row.id, "description", v)}
+                                                        placeholder="Description"
+                                                    />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
                                                     <DropdownCell disabled={isViewOnly} value={row.lineType} onChange={(v) => handleUpdate(row.id, "lineType", v)} options={LINE_TYPE_OPTIONS} filterOption={filterOption} />

@@ -72,17 +72,18 @@ const mergeIntoFirstRow = (data) => {
     return [updatedData[0]]; // only one grouped row
 };
 
-const addSystemRows = (rows, formData) => {
+const addSystemRows = (rows, formData, entityMaster) => {
 
     let result = [...rows];
 
     //  GST
     const gstValue = Number(formData?.totalTaxAmount || 0);
+    const gstLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
 
     const gstRow = {
         id: "gst-row",
         type: "GST",
-        description: "Total GST",
+        description: gstLabel,
         qty: 1,
         unitPrice: gstValue,
         discount: 0,
@@ -135,7 +136,7 @@ const addSystemRows = (rows, formData) => {
 };
 
 const loadLineItemTable = (props) => {
-    const { activeInvoiceData, quickViewFormData, vendor, isVendorChanged } = props;
+    const { activeInvoiceData, quickViewFormData, vendor, isVendorChanged, entityMaster } = props;
 
     const isSaved = activeInvoiceData?.extracted_data?.isModified || false;
 
@@ -171,7 +172,7 @@ const loadLineItemTable = (props) => {
             ? mergeIntoFirstRow(baseItems)
             : baseItems;
 
-    const finalData = addSystemRows(processedRows, quickViewFormData);
+    const finalData = addSystemRows(processedRows, quickViewFormData, entityMaster);
 
     return finalData;
 };

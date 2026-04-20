@@ -366,7 +366,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             activeInvoiceData,
             quickViewFormData: updatedFormData,
             vendor,
-            isVendorChanged
+            isVendorChanged,
+            entityMaster
         });
 
         if (result) setLineItems(result);
