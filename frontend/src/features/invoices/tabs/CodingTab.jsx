@@ -191,6 +191,8 @@ const CodingTab = () => {
         const status = activeInvoiceData?.status?.toLowerCase();
         if (!status) return false;
 
+        if (userRole === 'admin') return true;
+
         // ── Finance approver with editing enabled → allow editing ──
         const isMyEditingSession =
             activeInvoiceData?.is_editing_enabled === true &&
