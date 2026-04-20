@@ -113,6 +113,11 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         }
     };
 
+     const handleDiscard = () => {
+        setInvoiceData(activeInvoiceData);
+        toast.success("Changes discarded!");
+    };
+
     const handleSendToApproval = async () => {
         await handleSave();
         const payload = await saveInvoice(viewInvoiceId, { status: "waiting_approval" });
@@ -125,6 +130,45 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             toast.error(payload?.message || "Something went wrong while sending for approval.");
         }
     };
+
+    const handleApprove = async () => {
+        const response = await handleSave()
+        if (response) {
+            const payload = await saveInvoice(viewInvoiceId, { status: 'approved' })
+            if (payload.status == "approved") {
+                toast.success("Invoice Approved successfully!")
+                navigate('/invoices')
+            } else {
+                toast.error(payload?.message || "Something went wrong while approving.");
+            }
+        }
+    }
+
+    const handleReject = async () => {
+        const response = await handleSave()
+        if (response) {
+            const payload = await saveInvoice(viewInvoiceId, { status: 'rejected' })
+            if (payload.status == "rejected") {
+                toast.success("Invoice Rejected successfully!")
+                navigate('/invoices')
+            } else {
+                toast.error(payload?.message || "Something went wrong while rejecting.");
+            }
+        }
+    }
+
+    const handleRework = async () => {
+        const response = await handleSave()
+        if (response) {
+            const payload = await saveInvoice(viewInvoiceId, { status: 'rework' })
+            if (payload.status == "rework") {
+                toast.success("Invoice sent for Rework successfully!")
+                navigate('/invoices')
+            } else {
+                toast.error(payload?.message || "Something went wrong while sending for rework.");
+            }
+        }
+    }
 
     const handleSaveInvoice = async () => {
         debugger
