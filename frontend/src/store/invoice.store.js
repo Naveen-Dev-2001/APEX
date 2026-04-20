@@ -5,6 +5,9 @@ export const useInvoiceStore = create((set, get) => ({
     invoiceSection: 1,
     setInvoiceSection: (section) => set({ invoiceSection: section }),
 
+    navigationOrigin: null,
+    setNavigationOrigin: (origin) => set({ navigationOrigin: origin }),
+
     entityList: [],
     setEntityList: (entities) => set({ entityList: entities }),
 

@@ -84,7 +84,7 @@ const CodingPage = () => {
     }, [currentPage, itemsPerPage, sortColumn, sortDirection, backendFilters]);
 
     const handleView = (invoice) => {
-        navigate('/invoices', { state: { viewInvoice: invoice } });
+        navigate('/invoices', { state: { viewInvoice: invoice, from: '/coding' } });
     };
 
     const columns = useMemo(() => [

@@ -112,7 +112,7 @@ const ApprovalsPage = () => {
 
     const handleView = (invoice) => {
         // Navigate to invoices page to show the invoices screen
-        navigate('/invoices', { state: { viewInvoice: invoice } });
+        navigate('/invoices', { state: { viewInvoice: invoice, from: '/approvals' } });
     };
 
     const handleDelete = (invoice) => {

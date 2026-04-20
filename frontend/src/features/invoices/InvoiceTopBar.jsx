@@ -36,6 +36,8 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         setActiveInvoiceData,
         lineItems,
         selectedVendorId,
+        navigationOrigin,
+        setNavigationOrigin
     } = useInvoiceStore();
 
     const { handleSave } = useSaveInvoice();
@@ -194,8 +196,15 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
     const Back = () => {
         resetQuickView();
-        setInvoiceSection(1);
-        setInvoiceActiveTab("Quick View");
+        
+        if (navigationOrigin) {
+            const origin = navigationOrigin;
+            setNavigationOrigin(null); // Clear origin
+            navigate(origin);
+        } else {
+            setInvoiceSection(1);
+            setInvoiceActiveTab("Quick View");
+        }
     };
 
     // ── Approver workflow actions ──────────────────────────────────────────

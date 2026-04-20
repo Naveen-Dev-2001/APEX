@@ -157,6 +157,10 @@ const Invoice = () => {
 
      useEffect(() => {
         if (location.state?.viewInvoice && handleView) {
+            const { setNavigationOrigin } = useInvoiceStore.getState();
+            if (location.state.from) {
+                setNavigationOrigin(location.state.from);
+            }
             handleView(location.state.viewInvoice);
             // Clear state so it doesn't reopen on refresh
             navigate(location.pathname, { replace: true, state: {} });
