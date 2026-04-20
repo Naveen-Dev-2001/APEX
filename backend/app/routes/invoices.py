@@ -657,10 +657,18 @@ async def get_invoices(
     expressions = []
     
     # Extra role filtering for non-finance approvers
-    user_dept = getattr(current_user, "department", "finance") or "finance"
-    if current_user.role.lower() == "approver" and user_dept.lower() == "non-finance":
+    user_roles = [r.strip().lower() for r in current_user.role.split(",")]
+    user_dept = (getattr(current_user, "department", "finance") or "finance").lower()
+    
+    # Non-finance approvers (who are NOT admins) only see invoices where they are assigned
+    is_approver = "approver" in user_roles
+    is_admin = "admin" in user_roles
+    is_finance = "finance" in user_dept and "non-finance" not in user_dept
+    
+    if is_approver and not is_admin and not is_finance:
         from app.models.delegation import Delegation
         curr_time = datetime.utcnow()
+        # Find delegators who have assigned this user as substitute
         active_delegations = db.query(Delegation.delegator_email).filter(
             Delegation.substitute_email.ilike(current_user.email),
             Delegation.entity == entity,
@@ -2301,6 +2309,35 @@ async def list_deleted_invoices(
             query = query.order_by(col.asc())
     else:
         query = query.order_by(DeletedInvoice.deleted_at.desc())
+
+    # Extra role filtering for non-finance approvers in archived invoices
+    user_roles = [r.strip().lower() for r in current_user.role.split(",")]
+    user_dept = (getattr(current_user, "department", "finance") or "finance").lower()
+    
+    is_approver = "approver" in user_roles
+    is_admin = "admin" in user_roles
+    is_finance = "finance" in user_dept and "non-finance" not in user_dept
+
+    if is_approver and not is_admin and not is_finance:
+        from app.models.delegation import Delegation
+        curr_time = datetime.utcnow()
+        active_delegations = db.query(Delegation.delegator_email).filter(
+            Delegation.substitute_email.ilike(current_user.email),
+            Delegation.entity == entity,
+            Delegation.start_date <= curr_time,
+            Delegation.end_date >= curr_time
+        ).all()
+        target_emails = [current_user.email.lower()] + [d[0].lower() for d in active_delegations]
+        
+        from sqlalchemy import or_
+        # DeletedInvoice has assigned_approvers_json (JSON string snapshot)
+        # We use ILIKE to search for any target email within the JSON string
+        email_filters = [DeletedInvoice.assigned_approvers_json.ilike(f"%{email}%") for email in target_emails]
+        if email_filters:
+            query = query.filter(or_(*email_filters))
+        else:
+            # If no target emails (shouldn't happen), return nothing for safety
+            query = query.filter(DeletedInvoice.id == -1)
 
     total = query.count()
     records = query.offset(skip).limit(limit).all()
