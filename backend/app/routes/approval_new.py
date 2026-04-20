@@ -69,6 +69,7 @@ class StepType:
     LEVEL_APPROVED = "level_approved"
     THRESHOLD_APPROVED = "threshold_approved"
     POSTING_APPROVED = "posting_approved"
+    RECALLED = "recalled"
 
 
 # ─────────────────────────────────────────────
@@ -1310,3 +1311,61 @@ async def repost_to_sage(
             new_status=InvoiceStatus.SAGE_POST_FAILED,
             sage_post_result=sage_result,
         )
+
+
+@router.post("/recall/{invoice_id}")
+async def recall_invoice(
+    invoice_id: int,
+    request: ActionRequest = Body(...),
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Allows a Coder to recall an invoice that is currently sitting with the Level 1 approvers.
+    Resets the status to 'waiting_coding'.
+    Only available if current_approver_level is 1.
+    """
+    invoice = invoice_repo.get(db, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Strictly Coder check
+    user_role = (current_user.role or "").lower()
+    if "coder" not in user_role:
+        raise HTTPException(status_code=403, detail="Only Coders can recall invoices.")
+
+    # Status check: strictly waiting_approval
+    if invoice.status != InvoiceStatus.WAITING_APPROVAL:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot recall invoice in current status: {invoice.status}"
+        )
+
+    # Level check: strictly level 1
+    if invoice.current_approver_level != 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Recall is only available before Level 1 approval has been completed."
+        )
+
+    # Action: Reset to waiting_coding
+    _update_invoice_status(db, invoice, InvoiceStatus.WAITING_CODING)
+
+    # Record the action
+    _record_step(
+        db,
+        invoice_id,
+        step_name="Recalled to Coding",
+        step_type=StepType.RECALLED,
+        user_email=current_user.email,
+        comment=request.comment or "Recalled by Coder",
+        entity=invoice.entity
+    )
+
+    db.commit()
+
+    return ActionResponse(
+        success=True,
+        message="Invoice successfully recalled to coding stage.",
+        new_status=InvoiceStatus.WAITING_CODING
+    )

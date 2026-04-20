@@ -90,6 +90,15 @@ const workflowActionsAPI = {
      */
     repostSage: (invoiceId, payload = {}) =>
         API.post(`${BASE}/repost-sage/${invoiceId}`, payload).then((res) => res.data),
+
+    /**
+     * POST /workflow/action/recall/{invoiceId}
+     * Body: { comment?: string }
+     *
+     * Coder only. Recalls the invoice from Level 1 approval back to waiting_coding.
+     */
+    recall: (invoiceId, payload = {}) =>
+        API.post(`${BASE}/recall/${invoiceId}`, payload).then((res) => res.data),
 };
 
 export default workflowActionsAPI;

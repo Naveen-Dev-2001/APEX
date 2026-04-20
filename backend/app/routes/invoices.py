@@ -640,11 +640,28 @@ async def get_invoices(
     if not show_all:
         repo_filters["uploaded_by"] = current_user.username
 
+    expressions = []
+
     # Parse JSON filters if provided
     if filters:
         try:
             extra_filters = json.loads(filters)
             if isinstance(extra_filters, dict):
+                # Apply special coding_view logic if requested
+                if extra_filters.get("coding_view"):
+                    from sqlalchemy import or_, and_
+                    expressions.append(
+                        or_(
+                            Invoice.status == InvoiceStatusEnum.WAITING_CODING,
+                            and_(
+                                Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                Invoice.current_approver_level == 1
+                            ),
+                            Invoice.status == InvoiceStatusEnum.REWORKED
+                        )
+                    )
+                    del extra_filters["coding_view"]
+
                 # Convert list of values to list if they're not already
                 for k, v in extra_filters.items():
                     if isinstance(v, list):
@@ -653,8 +670,6 @@ async def get_invoices(
                         repo_filters[k] = v
         except Exception as e:
             print(f"Error parsing filters: {e}")
-
-    expressions = []
     
     # Extra role filtering for non-finance approvers
     user_dept = getattr(current_user, "department", "finance") or "finance"

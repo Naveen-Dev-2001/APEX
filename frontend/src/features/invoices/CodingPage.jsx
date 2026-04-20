@@ -31,7 +31,7 @@ const CodingPage = () => {
 
     const backendFilters = useMemo(() => {
         const filters = {
-            status: ['waiting_coding', 'waiting_approval', 'reworked']
+            coding_view: true
         };
 
         Object.entries(columnFilters).forEach(([accessor, value]) => {
@@ -39,12 +39,8 @@ const CodingPage = () => {
             const dbField = accessorToDbField[accessor] || accessor;
 
             if (dbField === 'status') {
-                // If user filters by status, we must ensure they only see coding-related statuses
                 if (value instanceof Set && value.size > 0) {
-                    const selected = Array.from(value);
-                    const codingStatuses = ['waiting_coding', 'waiting_approval', 'reworked'];
-                    const restricted = selected.filter(v => codingStatuses.includes(v));
-                    filters[dbField] = restricted.length > 0 ? restricted : codingStatuses;
+                    filters[dbField] = Array.from(value);
                 }
             } else if (value instanceof Set) {
                 if (value.size > 0) {

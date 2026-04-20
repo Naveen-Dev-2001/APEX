@@ -19,6 +19,7 @@ import {
     useItemMasterSync
 } from "../../hooks/useMasterDataSync";
 import { fetchCodingSuggestions } from "../../../api/invoiceApi";
+import { useWorkflowDataSync } from "../../hooks/useWorkflow";
 
 const LINE_TYPE_OPTIONS = [
     { label: "Expense", value: "Expense" },
@@ -186,6 +187,9 @@ const CodingTab = () => {
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
 
+    const { workflowData } = useWorkflowDataSync(viewInvoiceId);
+    const currentApproverLevel = workflowData?.current_approver_level || 1;
+
     const isViewOnly = useMemo(() => {
         if (activeInvoiceData?.is_archived) return true;
         const status = activeInvoiceData?.status?.toLowerCase();
@@ -201,15 +205,16 @@ const CodingTab = () => {
         if (userRole === 'coder') {
             if (status === 'processed') return true;
             if (status === 'waiting_coding') return false;
+            if (status === 'waiting_approval' && currentApproverLevel > 1) return true;
             return false;
         }
 
         // Approvers always view-only UNLESS editing session active (handled above)
         if (userRole === 'approver') return true;
 
-        const VIEW_ONLY_STATUSES = ["waiting_coding"];
+        const VIEW_ONLY_STATUSES = ["waiting_coding", "processed", "sage_posted"];
         return VIEW_ONLY_STATUSES.includes(status);
-    }, [activeInvoiceData, userRole, user?.email]);
+    }, [activeInvoiceData, userRole, user?.email, currentApproverLevel]);
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);

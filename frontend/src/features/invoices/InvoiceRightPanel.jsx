@@ -20,11 +20,11 @@ const TAB_COMPONENTS = {
 
 const InvoiceRightPanel = ({ invoice = {} }) => {
 
-    const { invoiceActiveTab, setInvoiceActiveTab, tabList } = useInvoiceStore();
+    const { invoiceActiveTab, setInvoiceActiveTab, tabList, viewInvoiceId } = useInvoiceStore();
     
     // Determine status and explicitly filter out Coding tab if processed
     const status = (invoice?.status || "").toLowerCase();
-    const visibleTabs = tabList.filter(t => status === "processed" ? t !== "Coding" : true);
+    const visibleTabs = tabList; // Always show all tabs for transparency; let components handle read-only state.
     
     // Safety check just in case state gets out of sync with the visible tabs
     const validActiveTab = visibleTabs.includes(invoiceActiveTab) ? invoiceActiveTab : "Quick View";
