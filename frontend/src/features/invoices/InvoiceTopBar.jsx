@@ -48,8 +48,8 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
     const currentStatus = activeInvoiceData?.status || invoice?.status;
     const isWaitingCoding = currentStatus === "waiting_coding";
-    const isWorkflowMissing =
-        isWaitingCoding && !selectedVendorId && workflowData?.workflow_type !== "codification";
+    const hasAssignedApprovers = workflowData?.assigned_approvers?.length > 0;
+    const isWorkflowMissing = isWaitingCoding && !hasAssignedApprovers;
 
     // ── Editing toggle — purely local, no API call needed ─────────────────
     // Clicking "Enable Editing" just flips this and updates activeInvoiceData
@@ -119,6 +119,20 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     };
 
     const handleSendToApproval = async () => {
+        // 1. Mandatory field validation (all rows)
+        const hasMissingCoding = lineItems
+            .some(item => !item.glCode || !item.lob || !item.department);
+
+        if (hasMissingCoding) {
+            toast.error("GL, LOB, and Department are mandatory for all line items.");
+            return;
+        }
+
+        // 2. Workflow validation
+        if (isWorkflowMissing) {
+            toast.error("No workflow defined for this invoice. Please configure a vendor or codification workflow.");
+            return;
+        }
         await handleSave();
         const payload = await saveInvoice(viewInvoiceId, { status: "waiting_approval" });
         if (payload?.status === "waiting_approval") {
@@ -294,7 +308,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                     {!activeInvoiceData?.is_archived && (
                         <>
                             {/* ── Scanner / Coder buttons ───────────────────────── */}
-                            {((userRole === "scanner" && currentStatus !== "waiting_coding") ||
+                            {((userRole === "scanner" && currentStatus == "processed") ||
                                 (userRole === "coder" && currentStatus === "waiting_coding")) && (
                                     <>
                                         <div className="w-[100px]">
@@ -308,7 +322,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                         <div className="w-[220px]">
                                             <CustomButton
                                                 variant="success"
-                                                disabled={isDuplicate || isWorkflowMissing}
+                                                disabled={isDuplicate}
                                                 onClick={
                                                     currentStatus === "waiting_coding"
                                                         ? handleSendToApproval
@@ -431,8 +445,8 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                     <div className="px-4 flex flex-col gap-3">
                         {modal.action === "reject" && (
                             <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
-                                ⚠ This action is <strong>permanent</strong>. No further actions
-                                will be possible on this invoice once rejected.
+                                This invoice will be marked as <strong>Rejected</strong>.
+                                No further approval actions will be possible.
                             </div>
                         )}
                         {modal.action === "rework" && (

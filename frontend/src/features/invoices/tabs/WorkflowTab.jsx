@@ -1,4 +1,4 @@
-import { CheckOutlined, ExclamationOutlined, ClockCircleOutlined, UserOutlined } from "@ant-design/icons";
+import { CheckOutlined, ExclamationOutlined, ClockCircleOutlined, UserOutlined, CloseOutlined, RollbackOutlined } from "@ant-design/icons";
 import { Tag } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useWorkflowDataSync } from "../../hooks/useWorkflow";
@@ -39,6 +39,34 @@ const getStatusConfig = (status) => {
                 lineColor: "bg-gray-200",
                 lineStyle: "dashed",
                 defaultSubtitle: "Awaiting Review"
+            };
+        case "rejected":
+            return {
+                titleColor: "text-[#ED5565]",
+                subtitleColor: "text-gray-600",
+                timeColor: "text-gray-400",
+                icon: (
+                    <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#ED5565]">
+                        <CloseOutlined className="!text-white text-[10px] font-black" />
+                    </div>
+                ),
+                lineColor: "bg-gray-200",
+                lineStyle: "dashed",
+                defaultSubtitle: "Rejected"
+            };
+        case "reworked":
+            return {
+                titleColor: "text-[#F8AC59]",
+                subtitleColor: "text-gray-600",
+                timeColor: "text-gray-400",
+                icon: (
+                    <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#F8AC59]">
+                        <RollbackOutlined className="!text-white text-[10px] font-black" />
+                    </div>
+                ),
+                lineColor: "bg-gray-200",
+                lineStyle: "dashed",
+                defaultSubtitle: "Sent for Rework"
             };
         case "queued":
         case "upcoming":
@@ -111,18 +139,25 @@ const WorkflowTab = () => {
     assignedApprovers.forEach((stage, index) => {
         const level = index + 1;
         const stageType = stage?.type || "mandatory";
-        
         let historicalActions = [];
         if (stageType === "threshold") {
-            historicalActions = historySteps.filter(s => s.step_type === "threshold_approved");
+            historicalActions = historySteps.filter(s => 
+                (s.step_type === "threshold_approved") ||
+                (["rejected", "reworked"].includes(s.step_type) && s.approver_number === level)
+            );
         } else if (stageType === "posting") {
-            historicalActions = historySteps.filter(s => s.step_type === "posting_approved");
+            historicalActions = historySteps.filter(s => 
+                (s.step_type === "posting_approved") ||
+                (["rejected", "reworked"].includes(s.step_type) && s.approver_number === level)
+            );
         } else {
-            historicalActions = historySteps.filter(s => s.step_type === "level_approved" && s.approver_number === level);
+            historicalActions = historySteps.filter(s => 
+                ["level_approved", "rejected", "reworked"].includes(s.step_type) && 
+                s.approver_number === level
+            );
         }
-
-        const emails = Array.isArray(stage?.emails) ? stage.emails : (stage?.emails ? [stage.emails] : []);
         
+        const emails = Array.isArray(stage?.emails) ? stage.emails : (stage?.emails ? [stage.emails] : []);
         const subtitleParts = emails.map(email => {
             if (!email) return "";
             const displayName = getUserDisplayName(email);
@@ -137,10 +172,19 @@ const WorkflowTab = () => {
 
         const isFinanceTeam = stage?.is_finance || emails.some(e => String(e).toLowerCase().includes("finance team")) || (stageType === "mandatory" && stage?.level === 2 && emails.length === 0);
         
+        // Determine Status logic
         let status = "queued";
-        if (historicalActions.length > 0) status = "approved";
-        else if (level === currentApproverLevel && isWaitingApproval) status = "pending";
-        else if (stageType === "mandatory" && level < currentApproverLevel) status = "approved"; 
+        const lastAction = historicalActions.length > 0 ? historicalActions[historicalActions.length - 1] : null;
+        
+        if (lastAction) {
+            if (lastAction.step_type === "rejected") status = "rejected";
+            else if (lastAction.step_type === "reworked") status = "reworked";
+            else status = "approved";
+        } else if (level === currentApproverLevel && isWaitingApproval) {
+            status = "pending";
+        } else if (stageType === "mandatory" && level < currentApproverLevel) {
+            status = "approved"; 
+        }
 
         const ord = getOrdinal(level);
         let title = `${ord} Approver`;
@@ -148,14 +192,15 @@ const WorkflowTab = () => {
         if (stageType === "posting") title = "Posting Approver";
 
         if (status === "approved") title = `${title} Completed`;
+        else if (status === "rejected") title = `${title} Rejected`;
+        else if (status === "reworked") title = `${title} Reworked`;
         else if (status === "pending") title = `Pending ${title}`;
 
         let subtitle = isFinanceTeam ? "Finance Team" : subtitleParts.filter(e => e).join(", ");
         let time = "";
         let comment = "";
 
-        if (historicalActions.length > 0) {
-            const lastAction = historicalActions[historicalActions.length - 1];
+        if (lastAction) {
             subtitle = getUserDisplayName(lastAction.user) || subtitle;
             time = lastAction.timestamp ? new Date(lastAction.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : "";
             comment = lastAction.comment;
@@ -209,7 +254,7 @@ const WorkflowTab = () => {
                                     )}
                                 </div>
                                 {item.comment && (
-                                    <div className="mt-1 text-[11px] italic text-gray-500 bg-gray-50 p-2 rounded border-l-2 border-[#1AB394] max-w-md shadow-sm">
+                                    <div className={`mt-1 text-[11px] italic text-gray-500 bg-gray-50 p-2 rounded border-l-2 ${item.status === 'rejected' ? 'border-[#ED5565]' : 'border-[#1AB394]'} max-w-md shadow-sm`}>
                                         "{item.comment}"
                                     </div>
                                 )}

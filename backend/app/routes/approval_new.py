@@ -1016,96 +1016,13 @@ async def reject_invoice(
 
     import json as _json
 
-    # ── 1. Snapshot all child tables into DeletedInvoice ──────────────────
-    from app.models.db_models import (
-        DeletedInvoice, InvoiceStatusHistory, InvoiceApprovedBy,
-        InvoiceAssignedApprover, Coding, AuditLog, WorkflowStep as WFStep
-    )
+    # ── 1. Update status to REJECTED ──────────────────────
+    from app.models.db_models import InvoiceStatusEnum
+    _update_invoice_status(db, invoice, InvoiceStatus.REJECTED)
+    invoice.current_approver_level = 1
+    invoice.approved_by_list = []
 
-    # Fetch child data
-    status_history = db.query(InvoiceStatusHistory).filter_by(
-        invoice_id=invoice_id).all()
-    workflow_steps_rows = db.query(WFStep).filter_by(
-        invoice_id=invoice_id).all()
-    approved_by_rows = db.query(InvoiceApprovedBy).filter_by(
-        invoice_id=invoice_id).all()
-    assigned_approvers_rows = db.query(
-        InvoiceAssignedApprover).filter_by(invoice_id=invoice_id).all()
-    coding_row = db.query(Coding).filter_by(invoice_id=invoice_id).first()
-    audit_logs_rows = db.query(AuditLog).filter_by(invoice_id=invoice_id).all()
-
-    deleted = DeletedInvoice(
-        original_invoice_id=invoice.id,
-        filename=invoice.filename,
-        original_filename=invoice.original_filename,
-        file_path=invoice.file_path,
-        uploaded_by=invoice.uploaded_by,
-        uploaded_by_id=invoice.uploaded_by_id,
-        status="rejected",
-        entity=invoice.entity,
-        vendor_id=invoice.vendor_id,
-        vendor_name=invoice.vendor_name,
-        invoice_number=invoice.invoice_number,
-        azure_vendor_name=invoice.azure_vendor_name,
-        azure_vendor_address=invoice.azure_vendor_address,
-        line_grouping=invoice.line_grouping,
-        exchange_rate=invoice.exchange_rate,
-        total_amount=invoice.total_amount,
-        amount_due=invoice.amount_due,
-        invoice_date=invoice.invoice_date,
-        due_date=invoice.due_date,
-        sage_bill_number=invoice.sage_bill_number,
-        extracted_data=invoice.extracted_data,
-        vendor_details=invoice.vendor_details,
-        processing_steps=invoice.processing_steps,
-        validation_results=invoice.validation_results,
-        duplicate_info=invoice.duplicate_info,
-        original_items=invoice.original_items,
-        approver_breakdown=invoice.approver_breakdown,
-        gl_summary=invoice.gl_summary,
-        confidence_score=invoice.confidence_score,
-        uploaded_at=invoice.uploaded_at,
-        processed_at=invoice.processed_at,
-        required_approvers=invoice.required_approvers,
-        current_approver_level=invoice.current_approver_level,
-
-        # Child table snapshots as JSON
-        status_history_json=_json.dumps([
-            {"status": s.status, "user": s.user, "timestamp": str(s.timestamp),
-             "comment": s.comment, "approver_level": s.approver_level}
-            for s in status_history
-        ]),
-        workflow_steps_json=_json.dumps([
-            {"step_name": s.step_name, "step_type": s.step_type, "user": s.user,
-             "status": s.status, "timestamp": str(s.timestamp),
-             "approver_number": s.approver_number, "comment": s.comment}
-            for s in workflow_steps_rows
-        ]),
-        approved_by_json=_json.dumps([
-            {"approver_email": a.approver_email} for a in approved_by_rows
-        ]),
-        assigned_approvers_json=_json.dumps([
-            {"approver_email": a.approver_email,
-                "sequence_order": a.sequence_order}
-            for a in assigned_approvers_rows
-        ]),
-        coding_json=_json.dumps({
-            "header_coding": coding_row.header_coding,
-            "line_items": coding_row.line_items,
-        }) if coding_row else None,
-        audit_logs_json=_json.dumps([
-            {"action": a.action, "user": a.user, "details": a.details,
-             "timestamp": str(a.timestamp)}
-            for a in audit_logs_rows
-        ]),
-
-        deleted_at=datetime.utcnow(),
-        deleted_by=email,
-    )
-    db.add(deleted)
-    db.flush()  # get deleted.id before deleting invoice
-
-    # ── 2. Record the rejection step BEFORE deleting ──────────────────────
+    # ── 2. Record the rejection step ──────────────────────
     _record_step(
         db,
         invoice_id,
@@ -1114,16 +1031,26 @@ async def reject_invoice(
         user_email=email,
         comment=payload.comment,
         entity=entity,
+        approver_number=current_level,
     )
-    db.flush()
 
-    # ── 3. Delete the invoice (cascades to all child tables) ──────────────
-    db.delete(invoice)
+    # ── 3. Audit Log ──────────────────────
+    from app.services.audit_service import audit_service
+    from app.models.audit_log import AuditAction
+    await audit_service.log_action(
+        db=db,
+        invoice_id=invoice_id,
+        action=AuditAction.REJECTED.value if hasattr(AuditAction.REJECTED, 'value') else "REJECTED",
+        user=current_user.username,
+        entity=entity,
+        details={"comment": payload.comment}
+    )
+
     db.commit()
 
     return ActionResponse(
         success=True,
-        message="Invoice has been rejected and permanently removed. No further actions are possible.",
+        message="Invoice has been rejected. It remains in the system with status REJECTED.",
         new_status=InvoiceStatus.REJECTED,
     )
 
