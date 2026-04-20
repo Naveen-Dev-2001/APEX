@@ -26,6 +26,11 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
     const [form, setForm] = useState(initialFormState);
     const [loading, setLoading] = useState(false);
 
+    // Remote Vendor Search State
+    const [searchedVendors, setSearchedVendors] = useState([]);
+    const [vendorSearchLoading, setVendorSearchLoading] = useState(false);
+    const [lastSearch, setLastSearch] = useState("");
+
     const {
         approvers: allApprovers,
         lobs,
@@ -73,8 +78,18 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                 thresholdApprover: editData.threshold_approver?.[0] ?? null,
                 postingApprover: editData.posting_approver ?? null,
             });
+
+            // Initialize searchedVendors with the current vendor if editing
+            if (mode === 'vendor' && vendorValue) {
+                setSearchedVendors([{
+                    value: vendorValue,
+                    label: editData.vendor_id && editData.vendor_name 
+                           ? `${editData.vendor_id} - ${editData.vendor_name}` 
+                           : editData.vendor_name
+                }]);
+            }
         }
-    }, [editData, isEdit]);
+    }, [editData, isEdit, mode]);
 
     // ── Reconcile vendor dropdown value once vendors list loads (edit mode) ──
     useEffect(() => {
@@ -109,7 +124,27 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
 
     const handleClose = () => {
         resetForm();
+        setSearchedVendors([]);
+        setLastSearch("");
         onCancel(false);
+    };
+
+    const handleVendorSearch = async (val) => {
+        if (!val || val.length < 2) {
+            if (!val) setSearchedVendors([]);
+            return;
+        }
+        
+        try {
+            setVendorSearchLoading(true);
+            const data = await workflowAPI.getWorkflowVendors(val);
+            setSearchedVendors(data || []);
+            setLastSearch(val);
+        } catch (err) {
+            console.error("Vendor search failed", err);
+        } finally {
+            setVendorSearchLoading(false);
+        }
     };
 
     const validateForm = () => {
@@ -306,11 +341,11 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                                     required
                                     value={form.vendorName}
                                     onChange={(val) => setForm({ ...form, vendorName: val })}
-                                    options={vendors}
-                                    filterOption={filterOption}
-                                    loading={vendorsLoading}
-                                    disabled={vendorsLoading}
-                                    placeholder={vendorsLoading ? "Loading vendors..." : "Select Vendor"}
+                                    options={searchedVendors}
+                                    onSearch={handleVendorSearch}
+                                    loading={vendorSearchLoading}
+                                    disabled={loading}
+                                    placeholder={vendorSearchLoading ? "Searching..." : "Type to search vendor (Min 2 chars)..."}
                                 />
                             </div>
                         )}

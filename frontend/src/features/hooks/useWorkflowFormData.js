@@ -56,14 +56,13 @@ export const useDepartments = (enabled = true) => {
     return { departments: data ?? [], isLoading, isError };
 };
 
-export const useWorkflowVendors = (enabled = true) => {
+export const useWorkflowVendors = (enabled = false) => {
     const { data, isLoading, isError } = useQuery({
         queryKey: ["workflow-vendors"],
         queryFn: async () => {
-            const start = performance.now();
-            const res = await workflowAPI.getWorkflowVendors();
-            console.log(`Vendors fetch: ${(performance.now() - start).toFixed(2)}ms`);
-            return res ?? [];
+            // This is now discouraged for large datasets. 
+            // RuleModal uses handleVendorSearch instead.
+            return []; 
         },
         staleTime: STALE_TIME,
         gcTime: CACHE_TIME,

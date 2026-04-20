@@ -35,25 +35,18 @@ const useWorkflowStore = create((set, get) => ({
         }
     },
 
-    // Fetch Metadata for Vendor Workflow
+    // Fetch Metadata for Vendor Workflow (Table labels)
     fetchVendorMetadata: async () => {
         try {
-            const [vendors, approvers] = await Promise.all([
-                workflowAPI.getWorkflowVendors(),
-                workflowAPI.getApprovers()
-            ]);
+            const approvers = await workflowAPI.getApprovers();
             set({
-                workflowVendors: (vendors || []).map(v => ({
-                    value: v.value,
-                    label: v.label
-                })),
                 approversList: (approvers || []).map(a => ({ 
                     value: a.value, 
                     label: a.label 
                 }))
             });
         } catch (err) {
-            console.error('Failed to fetch vendor metadata', err);
+            console.error('Failed to fetch vendor table metadata', err);
         }
     },
 

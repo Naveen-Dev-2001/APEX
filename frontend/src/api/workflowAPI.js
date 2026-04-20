@@ -18,8 +18,10 @@ const workflowAPI = {
         const response = await API.delete(`/workflow-config/vendor/${id}`);
         return response.data;
     },
-    getWorkflowVendors: async () => {
-        const response = await API.get("/workflow-config/vendor/vendors");
+    getWorkflowVendors: async (search = "") => {
+        const response = await API.get("/workflow-config/vendor/vendors", {
+            params: { search }
+        });
         return response.data;
     },
 

@@ -279,19 +279,30 @@ async def delete_vendor_workflow(
 
 @router.get("/vendor/vendors")
 async def get_workflow_vendors(
+    search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user)
 ):
     # Move filtering to DB level. 
     # workflow_applicable is a Boolean column. 
     # We want True or NULL (for backward compatibility).
+    
+    query_filters = [or_(
+        VendorMaster.workflow_applicable == True,
+        VendorMaster.workflow_applicable == None
+    )]
+    
+    if search:
+        search_filter = or_(
+            VendorMaster.vendor_id.ilike(f"%{search}%"),
+            VendorMaster.vendor_name.ilike(f"%{search}%")
+        )
+        query_filters.append(search_filter)
+
     vendors = vendor_repo.get_multi(
         db,
-        expressions=[or_(
-            VendorMaster.workflow_applicable == True,
-            VendorMaster.workflow_applicable == None
-        )],
-        limit=100000,
+        expressions=query_filters,
+        limit=100 if search else 50, # Return more if searching, but still limited
         order_by="vendor_name"
     )
     
@@ -306,6 +317,7 @@ async def get_workflow_vendors(
             "vendor_name": str(v.vendor_name)
         })
     return workflow_vendors
+
 
 # ==================== CODIFICATION WORKFLOW ====================
 
