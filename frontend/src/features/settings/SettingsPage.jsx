@@ -6,7 +6,8 @@ import { useAuthStore } from '../../store/authStore';
 import useToastStore from '../../store/useToastStore';
 import toast from '../../utils/toast';
 import DataTable from '../../components/ui/DataTable';
-import RuleModal from './RuleModal';
+import VendorWorkflowModal from './VendorWorkflowModal';
+import CodificationWorkflowModal from './CodificationWorkflowModal';
 
 const SettingsPage = () => {
     const {
@@ -126,16 +127,46 @@ const SettingsPage = () => {
     };
 
     const vendorColumns = [
-        { header: 'Vendor Name', accessor: 'vendor_name', sortable: true },
+        { 
+            header: 'Vendor Name', 
+            accessor: 'vendor_name', 
+            sortable: true,
+            filterable: true
+        },
+        {
+            header: 'Approvers',
+            accessor: 'approver_count',
+            render: (val) => (
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                    {val}
+                </span>
+            )
+        },
         {
             header: 'Type',
             accessor: 'is_parallel',
+            filterable: true,
+            getFilterValue: (row) => row.is_parallel ? 'Parallel' : 'Sequential',
             render: (val) => (
                 <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
                     ${val 
                         ? 'bg-blue-50 text-blue-600 border-blue-100' 
                         : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
                     {val ? 'Parallel' : 'Sequential'}
+                </span>
+            )
+        },
+        {
+            header: 'Threshold',
+            accessor: 'is_threshold_enabled',
+            filterable: true,
+            getFilterValue: (row) => row.is_threshold_enabled ? 'Yes' : 'No',
+            render: (val) => (
+                <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
+                    ${val 
+                        ? 'bg-green-50 text-green-600 border-green-100' 
+                        : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                    {val ? 'Yes' : 'No'}
                 </span>
             )
         },
@@ -173,6 +204,11 @@ const SettingsPage = () => {
             header: 'Amount Threshold', 
             accessor: 'amount_threshold',
             render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
+        },
+        { 
+            header: 'Posting Approver', 
+            accessor: 'posting_approver',
+            render: (val) => getApproverName(val)
         },
         ...(!isCoder ? [{
             header: 'Actions',
@@ -202,6 +238,11 @@ const SettingsPage = () => {
         { 
             header: 'LOB', 
             accessor: 'lob',
+            filterable: true,
+            getFilterValue: (row) => {
+                const opt = useWorkflowStore.getState().lobsList.find(o => o.value === row.lob);
+                return opt ? opt.label : row.lob;
+            },
             render: (val) => {
                 const opt = useWorkflowStore.getState().lobsList.find(o => o.value === val);
                 return opt ? opt.label : val;
@@ -210,20 +251,50 @@ const SettingsPage = () => {
         { 
             header: 'Dept ID', 
             accessor: 'department_id',
+            filterable: true,
+            getFilterValue: (row) => {
+                const opt = useWorkflowStore.getState().departmentsList.find(o => o.value === row.department_id);
+                return opt ? opt.label : row.department_id;
+            },
             render: (val) => {
                 const opt = useWorkflowStore.getState().departmentsList.find(o => o.value === val);
                 return opt ? opt.label : val;
             }
         },
         {
+            header: 'Approvers',
+            accessor: 'approver_count',
+            render: (val) => (
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                    {val}
+                </span>
+            )
+        },
+        {
             header: 'Type',
             accessor: 'is_parallel',
+            filterable: true,
+            getFilterValue: (row) => row.is_parallel ? 'Parallel' : 'Sequential',
             render: (val) => (
                 <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
                     ${val 
                         ? 'bg-blue-50 text-blue-600 border-blue-100' 
                         : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
                     {val ? 'Parallel' : 'Sequential'}
+                </span>
+            )
+        },
+        {
+            header: 'Threshold',
+            accessor: 'is_threshold_enabled',
+            filterable: true,
+            getFilterValue: (row) => row.is_threshold_enabled ? 'Yes' : 'No',
+            render: (val) => (
+                <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
+                    ${val 
+                        ? 'bg-green-50 text-green-600 border-green-100' 
+                        : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                    {val ? 'Yes' : 'No'}
                 </span>
             )
         },
@@ -261,6 +332,11 @@ const SettingsPage = () => {
             header: 'Amount Threshold', 
             accessor: 'amount_threshold',
             render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
+        },
+        { 
+            header: 'Posting Approver', 
+            accessor: 'posting_approver',
+            render: (val) => getApproverName(val)
         },
         ...(!isCoder ? [{
             header: 'Actions',
@@ -319,7 +395,7 @@ const SettingsPage = () => {
         return (
             <DataTable
                 columns={columns}
-                data={data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+                data={data}
                 loading={loading}
                 skeletonRows={itemsPerPage}
                 totalItems={data.length}
@@ -329,6 +405,8 @@ const SettingsPage = () => {
                 onItemsPerPageChange={setItemsPerPage}
                 maxHeight="calc(100vh - 280px)"
                 stickyHeader={true}
+                isClientSide={true}
+                enableColumnFilters={true}
             />
         );
     };
@@ -399,19 +477,21 @@ const SettingsPage = () => {
             </div>
 
             {/* Modals */}
-            {modalState.open && (
-                <RuleModal
-                    open={modalState.open}
-                    mode={activeTab === 'Vendor Based Workflow' ? 'vendor' : 'codification'}
-                    editData={modalState.rowData}
-                    onCancel={closeModal}
-                    onSuccess={() => {
-                        if (activeTab === 'Vendor Based Workflow') {
-                            fetchVendorWorkflows();
-                        } else {
-                            fetchCodificationWorkflows();
-                        }
-                    }}
+            {modalState.open && activeTab === 'Vendor Based Workflow' && (
+                <VendorWorkflowModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSuccess={() => fetchVendorWorkflows()}
+                />
+            )}
+
+            {modalState.open && activeTab === 'Config Based Workflow' && (
+                <CodificationWorkflowModal
+                    mode={modalState.mode}
+                    rowData={modalState.rowData}
+                    onClose={closeModal}
+                    onSuccess={() => fetchCodificationWorkflows()}
                 />
             )}
         </div>

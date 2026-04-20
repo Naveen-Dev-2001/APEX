@@ -13,7 +13,11 @@ const Dropdown = ({
     getPopupContainer,
     style = {},
     mode,
-    filterOption
+    filterOption,
+    onSearch,
+    loading,
+    onClear,
+    searchValue
 }) => {
     return (
         <div className={`flex flex-col gap-1.5 ${className}`}>
@@ -35,6 +39,11 @@ const Dropdown = ({
                 placeholder={placeholder}
                 size="large"
                 status={error ? 'error' : ''}
+                loading={loading}
+                onSearch={onSearch}
+                onClear={onClear}
+                searchValue={searchValue}
+                allowClear
                 className={`${mode ? 'min-h-[40px]' : 'h-[40px]'}`}
                 style={{
                     borderRadius: '8px',
@@ -43,7 +52,7 @@ const Dropdown = ({
                     ...style
                 }}
                 optionFilterProp="label"
-                filterOption={filterOption}
+                filterOption={onSearch ? false : filterOption}
                 getPopupContainer={getPopupContainer ?? (node => node.parentNode)}
                 styles={{
                     popup: { root: { zIndex: 9999 } }

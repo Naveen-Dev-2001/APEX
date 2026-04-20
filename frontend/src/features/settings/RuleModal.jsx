@@ -26,6 +26,11 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
     const [form, setForm] = useState(initialFormState);
     const [loading, setLoading] = useState(false);
 
+    // Remote Vendor Search State
+    const [searchedVendors, setSearchedVendors] = useState([]);
+    const [vendorSearchLoading, setVendorSearchLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+
     const {
         approvers: allApprovers,
         lobs,
@@ -73,8 +78,18 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                 thresholdApprover: editData.threshold_approver?.[0] ?? null,
                 postingApprover: editData.posting_approver ?? null,
             });
+
+            // Initialize searchedVendors with the current vendor if editing
+            if (mode === 'vendor' && vendorValue) {
+                setSearchedVendors([{
+                    value: vendorValue,
+                    label: editData.vendor_id && editData.vendor_name 
+                           ? `${editData.vendor_id} - ${editData.vendor_name}` 
+                           : editData.vendor_name
+                }]);
+            }
         }
-    }, [editData, isEdit]);
+    }, [editData, isEdit, mode]);
 
     // ── Reconcile vendor dropdown value once vendors list loads (edit mode) ──
     useEffect(() => {
@@ -109,7 +124,68 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
 
     const handleClose = () => {
         resetForm();
+        setSearchedVendors([]);
         onCancel(false);
+    };
+
+    // ── Debounced Vendor Search Logic ──
+    useEffect(() => {
+        if (!open || mode !== 'vendor') return;
+
+        // If search is empty, fetch top 10
+        if (!searchTerm) {
+            const fetchInitial = async () => {
+                try {
+                    setVendorSearchLoading(true);
+                    const data = await workflowAPI.getWorkflowVendors("");
+                    
+                    // If editing, ensure current vendor is always in the list
+                    const vendorValue = editData && editData.vendor_id && editData.vendor_name
+                        ? `${editData.vendor_id}|${editData.vendor_name}`
+                        : editData?.vendor_id ?? null;
+
+                    if (isEdit && vendorValue) {
+                        const exists = (data || []).find(v => v.value === vendorValue);
+                        if (!exists) {
+                            data.unshift({
+                                value: vendorValue,
+                                label: editData.vendor_id && editData.vendor_name 
+                                       ? `${editData.vendor_id} - ${editData.vendor_name}` 
+                                       : editData.vendor_name
+                            });
+                        }
+                    }
+                    setSearchedVendors(data || []);
+                } catch (err) {
+                    console.error("Initial vendor fetch failed", err);
+                } finally {
+                    setVendorSearchLoading(false);
+                }
+            };
+            fetchInitial();
+            return;
+        }
+
+        // Only search if term is 2+ chars
+        if (searchTerm.length < 2) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                setVendorSearchLoading(true);
+                const data = await workflowAPI.getWorkflowVendors(searchTerm);
+                setSearchedVendors(data || []);
+            } catch (err) {
+                console.error("Vendor search failed", err);
+            } finally {
+                setVendorSearchLoading(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm, mode, open, isEdit, editData]);
+
+    const handleVendorSearch = (val) => {
+        setSearchTerm(val);
     };
 
     const validateForm = () => {
@@ -306,11 +382,11 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                                     required
                                     value={form.vendorName}
                                     onChange={(val) => setForm({ ...form, vendorName: val })}
-                                    options={vendors}
-                                    filterOption={filterOption}
-                                    loading={vendorsLoading}
-                                    disabled={vendorsLoading}
-                                    placeholder={vendorsLoading ? "Loading vendors..." : "Select Vendor"}
+                                    options={searchedVendors}
+                                    onSearch={handleVendorSearch}
+                                    loading={vendorSearchLoading}
+                                    disabled={loading}
+                                    placeholder={vendorSearchLoading ? "Searching..." : "Type to search vendor (Min 2 chars)..."}
                                 />
                             </div>
                         )}
