@@ -364,7 +364,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                             )}
 
                                             {/* Save — appears once editing is unlocked */}
-                                            {editingEnabled && (
+                                            {editingEnabled &&(currentStatus === "waiting_approval" || currentStatus === "reworked") && (
                                                 <div className="w-[100px]">
                                                     <CustomButton variant="primary" onClick={handleSaveInvoice}>
                                                         Save

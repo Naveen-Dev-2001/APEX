@@ -576,6 +576,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         const status = activeInvoiceData?.status?.toLowerCase();
         if (!status) return false;
 
+        if (userRole === 'admin') return true;
+
         // ── Finance approver with active editing session → unlock all fields ──
         const isMyEditingSession =
             activeInvoiceData?.is_editing_enabled === true &&
@@ -636,7 +638,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                             isDuplicate={isDuplicate}
                                                             duplicateMessage={duplicateMessage}
                                                             isAmountMismatch={isAmountMismatch}
-                                                            forceDisabled={showOnlyHeader || isViewOnly}
+                                                            forceDisabled={isViewOnly}
                                                             currencyOptions={currencyOptions}
                                                             fetchCurrencyOptions={fetchCurrencyOptions}
                                                             currencyLoading={currencyLoading}
