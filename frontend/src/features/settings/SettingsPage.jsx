@@ -128,6 +128,15 @@ const SettingsPage = () => {
     const vendorColumns = [
         { header: 'Vendor Name', accessor: 'vendor_name', sortable: true },
         {
+            header: 'Approvers',
+            accessor: 'approver_count',
+            render: (val) => (
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                    {val}
+                </span>
+            )
+        },
+        {
             header: 'Type',
             accessor: 'is_parallel',
             render: (val) => (
@@ -136,6 +145,18 @@ const SettingsPage = () => {
                         ? 'bg-blue-50 text-blue-600 border-blue-100' 
                         : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
                     {val ? 'Parallel' : 'Sequential'}
+                </span>
+            )
+        },
+        {
+            header: 'Threshold',
+            accessor: 'is_threshold_enabled',
+            render: (val) => (
+                <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
+                    ${val 
+                        ? 'bg-green-50 text-green-600 border-green-100' 
+                        : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                    {val ? 'Yes' : 'No'}
                 </span>
             )
         },
@@ -173,6 +194,11 @@ const SettingsPage = () => {
             header: 'Amount Threshold', 
             accessor: 'amount_threshold',
             render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
+        },
+        { 
+            header: 'Posting Approver', 
+            accessor: 'posting_approver',
+            render: (val) => getApproverName(val)
         },
         ...(!isCoder ? [{
             header: 'Actions',
@@ -216,6 +242,15 @@ const SettingsPage = () => {
             }
         },
         {
+            header: 'Approvers',
+            accessor: 'approver_count',
+            render: (val) => (
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                    {val}
+                </span>
+            )
+        },
+        {
             header: 'Type',
             accessor: 'is_parallel',
             render: (val) => (
@@ -224,6 +259,18 @@ const SettingsPage = () => {
                         ? 'bg-blue-50 text-blue-600 border-blue-100' 
                         : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
                     {val ? 'Parallel' : 'Sequential'}
+                </span>
+            )
+        },
+        {
+            header: 'Threshold',
+            accessor: 'is_threshold_enabled',
+            render: (val) => (
+                <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
+                    ${val 
+                        ? 'bg-green-50 text-green-600 border-green-100' 
+                        : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                    {val ? 'Yes' : 'No'}
                 </span>
             )
         },
@@ -261,6 +308,11 @@ const SettingsPage = () => {
             header: 'Amount Threshold', 
             accessor: 'amount_threshold',
             render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
+        },
+        { 
+            header: 'Posting Approver', 
+            accessor: 'posting_approver',
+            render: (val) => getApproverName(val)
         },
         ...(!isCoder ? [{
             header: 'Actions',
