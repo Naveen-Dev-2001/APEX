@@ -7,6 +7,7 @@ const useWorkflowStore = create((set, get) => ({
     vendorLoading: false,
     vendorError: null,
     workflowVendors: [], // Eligible vendors for rules
+    vendorSearchLoading: false,
     approversList: [],
 
     // Codification Workflow State
@@ -38,15 +39,30 @@ const useWorkflowStore = create((set, get) => ({
     // Fetch Metadata for Vendor Workflow (Table labels)
     fetchVendorMetadata: async () => {
         try {
-            const approvers = await workflowAPI.getApprovers();
+            const [approvers, vendors] = await Promise.all([
+                workflowAPI.getApprovers(),
+                workflowAPI.getWorkflowVendors()
+            ]);
             set({
                 approversList: (approvers || []).map(a => ({ 
                     value: a.value, 
                     label: a.label 
-                }))
+                })),
+                workflowVendors: vendors || []
             });
         } catch (err) {
             console.error('Failed to fetch vendor table metadata', err);
+        }
+    },
+
+    searchWorkflowVendors: async (search) => {
+        set({ vendorSearchLoading: true });
+        try {
+            const vendors = await workflowAPI.getWorkflowVendors(search);
+            set({ workflowVendors: vendors || [], vendorSearchLoading: false });
+        } catch (err) {
+            console.error('Failed to search vendors', err);
+            set({ vendorSearchLoading: false });
         }
     },
 

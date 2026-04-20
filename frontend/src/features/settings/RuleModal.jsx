@@ -29,7 +29,7 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
     // Remote Vendor Search State
     const [searchedVendors, setSearchedVendors] = useState([]);
     const [vendorSearchLoading, setVendorSearchLoading] = useState(false);
-    const [lastSearch, setLastSearch] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
 
     const {
         approvers: allApprovers,
@@ -125,26 +125,67 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
     const handleClose = () => {
         resetForm();
         setSearchedVendors([]);
-        setLastSearch("");
         onCancel(false);
     };
 
-    const handleVendorSearch = async (val) => {
-        if (!val || val.length < 2) {
-            if (!val) setSearchedVendors([]);
+    // ── Debounced Vendor Search Logic ──
+    useEffect(() => {
+        if (!open || mode !== 'vendor') return;
+
+        // If search is empty, fetch top 10
+        if (!searchTerm) {
+            const fetchInitial = async () => {
+                try {
+                    setVendorSearchLoading(true);
+                    const data = await workflowAPI.getWorkflowVendors("");
+                    
+                    // If editing, ensure current vendor is always in the list
+                    const vendorValue = editData && editData.vendor_id && editData.vendor_name
+                        ? `${editData.vendor_id}|${editData.vendor_name}`
+                        : editData?.vendor_id ?? null;
+
+                    if (isEdit && vendorValue) {
+                        const exists = (data || []).find(v => v.value === vendorValue);
+                        if (!exists) {
+                            data.unshift({
+                                value: vendorValue,
+                                label: editData.vendor_id && editData.vendor_name 
+                                       ? `${editData.vendor_id} - ${editData.vendor_name}` 
+                                       : editData.vendor_name
+                            });
+                        }
+                    }
+                    setSearchedVendors(data || []);
+                } catch (err) {
+                    console.error("Initial vendor fetch failed", err);
+                } finally {
+                    setVendorSearchLoading(false);
+                }
+            };
+            fetchInitial();
             return;
         }
-        
-        try {
-            setVendorSearchLoading(true);
-            const data = await workflowAPI.getWorkflowVendors(val);
-            setSearchedVendors(data || []);
-            setLastSearch(val);
-        } catch (err) {
-            console.error("Vendor search failed", err);
-        } finally {
-            setVendorSearchLoading(false);
-        }
+
+        // Only search if term is 2+ chars
+        if (searchTerm.length < 2) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                setVendorSearchLoading(true);
+                const data = await workflowAPI.getWorkflowVendors(searchTerm);
+                setSearchedVendors(data || []);
+            } catch (err) {
+                console.error("Vendor search failed", err);
+            } finally {
+                setVendorSearchLoading(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm, mode, open, isEdit, editData]);
+
+    const handleVendorSearch = (val) => {
+        setSearchTerm(val);
     };
 
     const validateForm = () => {

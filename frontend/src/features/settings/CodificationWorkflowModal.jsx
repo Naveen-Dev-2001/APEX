@@ -64,7 +64,7 @@ const RadioGroup = ({ label, value, options, onChange }) => (
     </div>
 );
 
-const CodificationWorkflowModal = ({ mode, rowData, onClose }) => {
+const CodificationWorkflowModal = ({ mode, rowData, onClose, onSuccess }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -143,6 +143,7 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose }) => {
                 await addCodificationWorkflow(payload);
                 toast.success('Workflow rule added successfully');
             }
+            onSuccess?.();
             onClose();
         } catch (err) {
             let errorMsg = err.message;

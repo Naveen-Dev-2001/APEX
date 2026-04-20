@@ -407,6 +407,7 @@ const DataTable = ({
   onSort,
   expandable = true,
   renderExpandedRow,
+  isClientSide = false,
 }) => {
     // ── Row Expansion state ──────────────────────────────────────────────────
     const [expandedRow, setExpandedRow] = useState(null);
@@ -556,13 +557,20 @@ const DataTable = ({
         return getFilteredDataCommon(otherFilters);
     }, [getFilteredDataCommon, columnFilters]);
 
+    const displayData = useMemo(() => {
+        if (!isClientSide) return filteredData;
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredData.slice(start, start + itemsPerPage);
+    }, [filteredData, isClientSide, currentPage, itemsPerPage]);
+
     if (loading) {
         return <TableSkeleton rowCount={skeletonRows} columnCount={columns.length} />;
     }
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-    const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+    const effectiveTotalItems = isClientSide ? filteredData.length : totalItems;
+    const totalPages = Math.ceil(effectiveTotalItems / itemsPerPage) || 1;
+    const startItem = effectiveTotalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, effectiveTotalItems);
 
     const handlePageClick = (page) => {
         if (page >= 1 && page <= totalPages && onPageChange) {
@@ -678,7 +686,7 @@ const DataTable = ({
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {filteredData.map((row, rowIdx) => {
+                        {displayData.map((row, rowIdx) => {
                             const isExpanded = expandedRow === rowIdx;
                             return (
                                 <React.Fragment key={rowIdx}>
@@ -775,7 +783,7 @@ const DataTable = ({
                     </div>
                     <span>
                         {hasActiveFilters ? `${filteredData.length} filtered / ` : ''}
-                        {startItem}-{endItem} of {totalItems}
+                        {startItem}-{endItem} of {effectiveTotalItems}
                     </span>
                     {hasActiveFilters && (
                         <button

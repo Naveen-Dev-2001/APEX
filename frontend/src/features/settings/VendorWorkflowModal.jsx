@@ -64,15 +64,23 @@ const RadioGroup = ({ label, value, options, onChange }) => (
     </div>
 );
 
-const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
+const VendorWorkflowModal = ({ mode, rowData, onClose, onSuccess }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const {
-        workflowVendors, approversList,
-        addVendorWorkflow, updateVendorWorkflow
+        workflowVendors, approversList, vendorSearchLoading,
+        addVendorWorkflow, updateVendorWorkflow, searchWorkflowVendors,
+        fetchVendorMetadata
     } = useWorkflowStore();
+
+    useEffect(() => {
+        // Initial load if lists are empty
+        if (approversList.length === 0 || workflowVendors.length === 0) {
+            fetchVendorMetadata();
+        }
+    }, [fetchVendorMetadata, approversList.length, workflowVendors.length]);
 
     useEffect(() => {
         if (isEdit && rowData) {
@@ -100,6 +108,10 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
         }
         const [id, name] = val.split('|');
         setForm(prev => ({ ...prev, vendor_id: id, vendor_name: name }));
+    };
+
+    const handleVendorSearch = (query) => {
+        searchWorkflowVendors(query);
     };
 
     const handleSave = async () => {
@@ -153,6 +165,7 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
                 await addVendorWorkflow(payload);
                 toast.success('Workflow rule added successfully');
             }
+            onSuccess?.();
             onClose();
         } catch (err) {
             let errorMsg = err.message;
@@ -235,6 +248,8 @@ const VendorWorkflowModal = ({ mode, rowData, onClose }) => {
                             value={form.vendor_id ? `${form.vendor_id}|${form.vendor_name}` : ''}
                             options={workflowVendors}
                             onChange={handleVendorChange}
+                            onSearch={handleVendorSearch}
+                            loading={vendorSearchLoading}
                             placeholder="Select Vendor"
                         />
 

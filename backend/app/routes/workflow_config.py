@@ -302,7 +302,7 @@ async def get_workflow_vendors(
     vendors = vendor_repo.get_multi(
         db,
         expressions=query_filters,
-        limit=100 if search else 50, # Return more if searching, but still limited
+        limit=100 if search else 10, # Return more if searching, but still limited (initially 10)
         order_by="vendor_name"
     )
     
