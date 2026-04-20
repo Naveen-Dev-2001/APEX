@@ -89,8 +89,19 @@ const SelectEntityPage = () => {
     setEntity(entity.entityId || entity.name);
     sessionStorage.setItem('selected_entity', entity.entityId || entity.name); // entity_id for DB FK
     sessionStorage.setItem('selected_entity_name', entity.displayName);         // Display name for UI
-    setActiveTab('Dashboard');
-    navigate("/dashboard");
+    
+    let targetRoute = "/dashboard";
+    const roleForRouting = activeRole.toLowerCase();
+    
+    if (roleForRouting === 'scanner') {
+        targetRoute = "/invoices";
+    } else if (roleForRouting === 'coder') {
+        targetRoute = "/coding";
+    } else if (roleForRouting === 'approver') {
+        targetRoute = "/approvals";
+    }
+
+    navigate(targetRoute);
   };
 
   // Close dropdown if clicked outside

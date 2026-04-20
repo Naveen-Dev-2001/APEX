@@ -137,12 +137,20 @@ const Invoice = () => {
         const id = Number(data.id);
         if (!id) return;
 
-        const { setInvoiceData, setFileName, setViewInvoiceId, setSelectedVendorId, setInvoiceSection } = useInvoiceStore.getState();
+        const { setInvoiceData, setFileName, setViewInvoiceId, setSelectedVendorId, setInvoiceSection, setInvoiceActiveTab } = useInvoiceStore.getState();
 
         setFileName(data.original_filename ?? "");
         setInvoiceData(data);
         setViewInvoiceId(id);
         setSelectedVendorId(data.vendor_id);
+        
+        const status = (data.status || "").toLowerCase();
+        if (status === "processed") {
+            setInvoiceActiveTab("Quick View");
+        } else {
+            setInvoiceActiveTab("Coding");
+        }
+
         setInvoiceSection(2);
     }, []);
 

@@ -21,7 +21,14 @@ const TAB_COMPONENTS = {
 const InvoiceRightPanel = ({ invoice = {} }) => {
 
     const { invoiceActiveTab, setInvoiceActiveTab, tabList } = useInvoiceStore();
-    const ActiveComponent = TAB_COMPONENTS[invoiceActiveTab];
+    
+    // Determine status and explicitly filter out Coding tab if processed
+    const status = (invoice?.status || "").toLowerCase();
+    const visibleTabs = tabList.filter(t => status === "processed" ? t !== "Coding" : true);
+    
+    // Safety check just in case state gets out of sync with the visible tabs
+    const validActiveTab = visibleTabs.includes(invoiceActiveTab) ? invoiceActiveTab : "Quick View";
+    const ActiveComponent = TAB_COMPONENTS[validActiveTab];
 
     return (
         <div className="h-full flex flex-col">
@@ -29,8 +36,8 @@ const InvoiceRightPanel = ({ invoice = {} }) => {
             {/* Tabs (FIXED) */}
             <div className="flex-shrink-0">
                 <CustomTabs
-                    tabs={tabList}
-                    activeTab={invoiceActiveTab}
+                    tabs={visibleTabs}
+                    activeTab={validActiveTab}
                     onChange={setInvoiceActiveTab}
                 />
             </div>
