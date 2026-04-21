@@ -799,33 +799,39 @@ async def approve_invoice(
             )
             if next_mandatory:
                 _advance_level(db, invoice, next_mandatory["level"])
+                if invoice.status == InvoiceStatus.REWORKED:
+                    _update_invoice_status(db, invoice, InvoiceStatus.WAITING_APPROVAL)
                 db.commit()
                 return ActionResponse(
                     success=True,
                     message=f"Level {current_level} approved. Moved to level {next_mandatory['level']}.",
-                    new_status=current_status,
+                    new_status=invoice.status,
                     next_level=next_mandatory["level"],
                 )
             else:
                 if has_threshold and not threshold_done:
                     threshold_virtual_level = len(mandatory) + 1
                     _advance_level(db, invoice, threshold_virtual_level)
+                    if invoice.status == InvoiceStatus.REWORKED:
+                        _update_invoice_status(db, invoice, InvoiceStatus.WAITING_APPROVAL)
                     db.commit()
                     return ActionResponse(
                         success=True,
                         message="All mandatory levels approved. Awaiting threshold approver.",
-                        new_status=current_status,
+                        new_status=invoice.status,
                         next_level=threshold_virtual_level,
                     )
                 elif has_posting and not posting_done_already:
                     posting_virtual_level = len(
                         mandatory) + (2 if has_threshold else 1)
                     _advance_level(db, invoice, posting_virtual_level)
+                    if invoice.status == InvoiceStatus.REWORKED:
+                        _update_invoice_status(db, invoice, InvoiceStatus.WAITING_APPROVAL)
                     db.commit()
                     return ActionResponse(
                         success=True,
                         message="All mandatory levels approved. Awaiting posting approver.",
-                        new_status=current_status,
+                        new_status=invoice.status,
                         next_level=posting_virtual_level,
                     )
                 else:
@@ -900,11 +906,13 @@ async def approve_invoice(
         if has_posting:
             posting_virtual_level = len(mandatory) + 2
             _advance_level(db, invoice, posting_virtual_level)
+            if invoice.status == InvoiceStatus.REWORKED:
+                _update_invoice_status(db, invoice, InvoiceStatus.WAITING_APPROVAL)
             db.commit()
             return ActionResponse(
                 success=True,
                 message="Threshold approved. Awaiting posting approver.",
-                new_status=current_status,
+                new_status=invoice.status,
                 next_level=posting_virtual_level,
             )
         else:
@@ -1195,7 +1203,7 @@ async def rework_invoice(
         step_name=f"Sent for Rework — Level {prev_finance_level} (Finance Team)",
         step_type=StepType.REWORKED,
         user_email=email,
-        approver_number=prev_finance_level,
+        approver_number=current_level,
         comment=payload.comment,
         entity=entity,
     )

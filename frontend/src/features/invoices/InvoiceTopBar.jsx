@@ -189,9 +189,18 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     }
 
     const handleSaveInvoice = async () => {
-        debugger
-        const response = await handleSave();
-        if (response) toast.success("Invoice Saved Successfully!");
+        const extraFields = {};
+        if (currentStatus === "reworked") {
+            extraFields.status = "waiting_approval";
+        }
+        
+        const response = await handleSave(extraFields);
+        if (response) {
+            toast.success("Invoice Saved Successfully!");
+            if (currentStatus === "reworked") {
+                await fetchUIStatus();
+            }
+        }
     };
 
     const Back = () => {
@@ -209,6 +218,20 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
     // ── Approver workflow actions ──────────────────────────────────────────
     const executeAction = async (action, commentText = "") => {
+        if (editingEnabled) {
+            try {
+                const saveResponse = await handleSave();
+                if (!saveResponse) {
+                    toast.error("Failed to save changes before action.");
+                    return;
+                }
+            } catch (err) {
+                console.error("Auto-save failed:", err);
+                toast.error("Failed to save changes. Please try again.");
+                return;
+            }
+        }
+
         setActionLoading(action);
         try {
             let result;

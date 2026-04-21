@@ -218,23 +218,30 @@ export const useSaveInvoice = () => {
         return payload;
     }, [quickViewFormData, lineItems, activeInvoiceData]);
 
-    const handleSave = useCallback(async () => {
+    const handleSave = useCallback(async (extraFields = {}) => {
         debugger
         const payload = buildPayload();
+        
+        // Apply any extra field overrides (e.g. status)
+        const finalPayload = {
+            ...payload,
+            ...extraFields
+        };
 
         // Optimistically update the store so UI stays in sync
-        setActiveInvoiceData(payload);
+        setActiveInvoiceData(finalPayload);
 
         const object = {
-            extracted_data: payload.extracted_data,   // already has isModified: true
-            exchange_rate: payload.exchange_rate,
-            vendor_id: payload.vendor_id,
-            vendor_name: payload.vendor_name,
-            invoice_number: payload.invoice_number,
-            total_amount: payload.extracted_data?.amounts?.total_invoice_amount?.value,
-            amount_due: payload.extracted_data?.amounts?.amount_due?.value,
-            invoice_date: payload.extracted_data?.invoice_details?.invoice_date?.value,
-            due_date: payload.extracted_data?.invoice_details?.due_date?.value,
+            extracted_data: finalPayload.extracted_data,   // already has isModified: true
+            exchange_rate: finalPayload.exchange_rate,
+            vendor_id: finalPayload.vendor_id,
+            vendor_name: finalPayload.vendor_name,
+            invoice_number: finalPayload.invoice_number,
+            total_amount: finalPayload.extracted_data?.amounts?.total_invoice_amount?.value,
+            amount_due: finalPayload.extracted_data?.amounts?.amount_due?.value,
+            invoice_date: finalPayload.extracted_data?.invoice_details?.invoice_date?.value,
+            due_date: finalPayload.extracted_data?.invoice_details?.due_date?.value,
+            ...extraFields // Merge extra fields (like status) into the final object
         };
 
         const response = await saveInvoice(viewInvoiceId, object);

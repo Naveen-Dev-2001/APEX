@@ -106,116 +106,92 @@ const WorkflowTab = () => {
 
     const currentStatus = (activeInvoiceData?.status || "processed").toLowerCase();
     const historySteps = workflowData?.steps || [];
-    const steps = [];
-
-    // Step 1: Processed
-    const processedStep = historySteps.find(s => s.step_type === "processed");
-    steps.push({
-        title: "Processed For Approval",
-        subtitle: processedStep?.user || activeInvoiceData?.uploaded_by || "Scanner",
-        time: processedStep?.timestamp ? new Date(processedStep.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : "",
-        status: "completed"
-    });
-
-    // Step 2: Coding
-    const codingStep = historySteps.find(s => s.step_type === "coding");
-    const isCodingFinished = !!codingStep || !["processed", "waiting_coding"].includes(currentStatus);
-    steps.push({
-        title: isCodingFinished ? "Coding Completed" : "Pending Coding",
-        subtitle: codingStep?.user || (isCodingFinished ? (activeInvoiceData?.uploaded_by || "") : ""),
-        time: codingStep?.timestamp ? new Date(codingStep.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : "",
-        status: isCodingFinished ? "completed" : (currentStatus === "waiting_coding" ? "pending" : "queued")
-    });
-
-    // Step 3: Approvers
     const assignedApprovers = workflowData?.assigned_approvers || [];
     const currentApproverLevel = workflowData?.current_approver_level || 1;
-    const isWaitingApproval = currentStatus === "waiting_approval";
-    // delegations: { original_email: [delegate_email, ...] }
     const delegations = workflowData?.delegations || {};
     const userNamesMap = workflowData?.user_names || {};
     const getUserDisplayName = (email) => userNamesMap[email?.toLowerCase()] || email;
 
-    assignedApprovers.forEach((stage, index) => {
-        const level = index + 1;
-        const stageType = stage?.type || "mandatory";
-        let historicalActions = [];
-        if (stageType === "threshold") {
-            historicalActions = historySteps.filter(s => 
-                (s.step_type === "threshold_approved") ||
-                (["rejected", "reworked"].includes(s.step_type) && s.approver_number === level)
-            );
-        } else if (stageType === "posting") {
-            historicalActions = historySteps.filter(s => 
-                (s.step_type === "posting_approved") ||
-                (["rejected", "reworked"].includes(s.step_type) && s.approver_number === level)
-            );
-        } else {
-            historicalActions = historySteps.filter(s => 
-                ["level_approved", "rejected", "reworked"].includes(s.step_type) && 
-                s.approver_number === level
-            );
+    const steps = [];
+
+    // Part 1: History (Audit Trail)
+    historySteps.forEach(s => {
+        let title = s.step_name;
+        let status = "completed";
+        if (["reworked", "rejected", "post_failed"].includes(s.step_type)) {
+            status = s.step_type === "reworked" ? "reworked" : "rejected";
         }
-        
-        const emails = Array.isArray(stage?.emails) ? stage.emails : (stage?.emails ? [stage.emails] : []);
-        const subtitleParts = emails.map(email => {
-            if (!email) return "";
-            const displayName = getUserDisplayName(email);
-            const lowEmail = email.toLowerCase();
-            const substitutes = delegations[lowEmail];
-            if (substitutes && substitutes.length > 0) {
-                const substituteNames = substitutes.map(s => getUserDisplayName(s)).join(", ");
-                return `${displayName} (Delegated to ${substituteNames})`;
-            }
-            return displayName;
+
+        // Format titles for approver stages
+        if (s.approver_number) {
+            const ord = getOrdinal(s.approver_number);
+            if (s.step_type === "level_approved") title = `${ord} Approver Completed`;
+            else if (s.step_type === "reworked") title = `${ord} Approver Reworked`;
+            else if (s.step_type === "rejected") title = `${ord} Approver Rejected`;
+        }
+
+        steps.push({
+            title,
+            subtitle: getUserDisplayName(s.user),
+            time: s.timestamp ? new Date(s.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : "",
+            comment: s.comment,
+            status
         });
-
-        const isFinanceTeam = stage?.is_finance || emails.some(e => String(e).toLowerCase().includes("finance team")) || (stageType === "mandatory" && stage?.level === 2 && emails.length === 0);
-        
-        // Determine Status logic
-        let status = "queued";
-        const lastAction = historicalActions.length > 0 ? historicalActions[historicalActions.length - 1] : null;
-        
-        if (lastAction) {
-            if (lastAction.step_type === "rejected") status = "rejected";
-            else if (lastAction.step_type === "reworked") status = "reworked";
-            else status = "approved";
-        } else if (level === currentApproverLevel && isWaitingApproval) {
-            status = "pending";
-        } else if (stageType === "mandatory" && level < currentApproverLevel) {
-            status = "approved"; 
-        }
-
-        const ord = getOrdinal(level);
-        let title = `${ord} Approver`;
-        if (stageType === "threshold") title = "Threshold Approver";
-        if (stageType === "posting") title = "Posting Approver";
-
-        if (status === "approved") title = `${title} Completed`;
-        else if (status === "rejected") title = `${title} Rejected`;
-        else if (status === "reworked") title = `${title} Reworked`;
-        else if (status === "pending") title = `Pending ${title}`;
-
-        let subtitle = isFinanceTeam ? "Finance Team" : subtitleParts.filter(e => e).join(", ");
-        let time = "";
-        let comment = "";
-
-        if (lastAction) {
-            subtitle = getUserDisplayName(lastAction.user) || subtitle;
-            time = lastAction.timestamp ? new Date(lastAction.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : "";
-            comment = lastAction.comment;
-        }
-
-        steps.push({ title, subtitle, status, time, comment });
     });
 
-    // Step 4: Sage Posting
-    const isSageCompleted = currentStatus === "sage_posted";
-    steps.push({
-        title: isSageCompleted ? "Posted to Sage" : (currentStatus === "approved" ? "Pending Final Posting" : "Final Posting"),
-        subtitle: isSageCompleted ? "System" : "",
-        status: isSageCompleted ? "completed" : (currentStatus === "approved" ? "pending" : "queued")
-    });
+    // Part 2: Pending and Future Stages (if not finished)
+    const isFinished = ["sage_posted", "rejected"].includes(currentStatus);
+    if (!isFinished) {
+        // 1. Coding
+        const hasCoding = historySteps.some(s => s.step_type === "coding");
+        if (!hasCoding && currentStatus === "waiting_coding") {
+            steps.push({ title: "Pending Coding", status: "pending" });
+        }
+
+        // 2. Approvers
+        const isWaitingApproval = ["waiting_approval", "reworked"].includes(currentStatus);
+        if (isWaitingApproval || currentStatus === "waiting_coding" || currentStatus === "processed") {
+            assignedApprovers.forEach((stage, index) => {
+                const level = index + 1;
+                const stageType = stage?.type || "mandatory";
+                const emails = Array.isArray(stage?.emails) ? stage.emails : (stage?.emails ? [stage.emails] : []);
+                
+                if (level === currentApproverLevel && isWaitingApproval) {
+                    let title = `Pending ${getOrdinal(level)} Approver`;
+                    if (stageType === "threshold") title = "Pending Threshold Approver";
+                    if (stageType === "posting") title = "Pending Posting Approver";
+
+                    const isFinanceTeam = stage?.is_finance || emails.some(e => String(e).toLowerCase().includes("finance team")) || (stageType === "mandatory" && stage?.level === 2 && emails.length === 0);
+                    const subtitle = isFinanceTeam ? "Finance Team" : emails.map(email => {
+                        if (!email) return "";
+                        const displayName = getUserDisplayName(email);
+                        const substitutes = delegations[email.toLowerCase()];
+                        if (substitutes?.length > 0) {
+                            const subNames = substitutes.map(s => getUserDisplayName(s)).join(", ");
+                            return `${displayName} (Delegated to ${subNames})`;
+                        }
+                        return displayName;
+                    }).join(", ");
+
+                    steps.push({ title, subtitle, status: "pending" });
+                } else if (level > currentApproverLevel) {
+                    let title = `${getOrdinal(level)} Approver`;
+                    if (stageType === "threshold") title = "Threshold Approver";
+                    if (stageType === "posting") title = "Posting Approver";
+
+                    steps.push({ title, status: "queued" });
+                }
+            });
+        }
+
+        // 3. Final Posting
+        if (currentStatus !== "sage_posted") {
+            steps.push({
+                title: currentStatus === "approved" ? "Pending Final Posting" : "Final Posting",
+                status: currentStatus === "approved" ? "pending" : "queued"
+            });
+        }
+    }
 
     return (
         <div className="bg-white p-10 overflow-y-auto max-h-full font-sans">
@@ -254,7 +230,7 @@ const WorkflowTab = () => {
                                     )}
                                 </div>
                                 {item.comment && (
-                                    <div className={`mt-1 text-[11px] italic text-gray-500 bg-gray-50 p-2 rounded border-l-2 ${item.status === 'rejected' ? 'border-[#ED5565]' : 'border-[#1AB394]'} max-w-md shadow-sm`}>
+                                    <div className={`mt-1 text-[11px] italic text-gray-500 bg-gray-50 p-2 rounded border-l-2 ${item.status === 'rejected' ? 'border-[#ED5565]' : (item.status === 'reworked' ? 'border-[#F8AC59]' : 'border-[#1AB394]')} max-w-md shadow-sm`}>
                                         "{item.comment}"
                                     </div>
                                 )}
