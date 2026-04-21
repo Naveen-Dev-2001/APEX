@@ -491,6 +491,7 @@ const Invoice = () => {
                 cancelText="Discard"
                 type="danger"
                 loading={deleteModalState.loading}
+                confirmBtnVariant="primary"
             />
         </>
     );

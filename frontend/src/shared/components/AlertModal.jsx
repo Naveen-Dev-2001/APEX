@@ -14,7 +14,8 @@ const AlertModal = ({
     confirmText = 'Confirm',
     cancelText = 'Cancel',
     type = 'danger', // 'danger' | 'warning' | 'info' | 'success'
-    loading = false
+    loading = false,
+    confirmBtnVariant
 }) => {
     const config = {
         danger: { icon: <ExclamationCircleOutlined className="text-red-500 text-2xl" />, btnVariant: 'danger' },
@@ -79,7 +80,7 @@ const AlertModal = ({
                     </div>
                     <div className="w-auto min-w-[120px]">
                         <CustomButton 
-                            variant={currentConfig.btnVariant} 
+                            variant={confirmBtnVariant || currentConfig.btnVariant} 
                             onClick={onConfirm} 
                             disabled={loading}
                         >
