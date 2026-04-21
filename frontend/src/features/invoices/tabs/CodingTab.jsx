@@ -4,8 +4,11 @@ import {
     PlusOutlined,
     DownloadOutlined,
     UploadOutlined,
-    CaretUpOutlined
+    UploadOutlined,
+    CaretUpOutlined,
+    ExclamationCircleOutlined
 } from "@ant-design/icons";
+import { Modal } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
 import QuickViewTab from "./QuickViewTab";
@@ -182,6 +185,7 @@ const applyCalculation = (item, key, value) => {
 
 const CodingTab = () => {
     const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData, entityMaster } = useInvoiceStore();
+    const [modal, modalContextHolder] = Modal.useModal();
     const rows = lineItems;
 
     const user = useAuthStore((state) => state.user);
@@ -346,8 +350,29 @@ const CodingTab = () => {
 
     // ── handleDelete — original logic, zero changes ───────────────────────────
     const handleDelete = useCallback((id) => {
-        setLineItems(prev => prev.filter(item => item.id !== id));
-    }, [setLineItems]);
+        console.log("CodingTab handleDelete triggered for ID:", id);
+        modal.confirm({
+            title: 'Delete Line Item?',
+            className: "premium-delete-modal",
+            icon: <ExclamationCircleOutlined />,
+            content: (
+                <div>
+                    <p>Are you sure you want to delete this line item?</p>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '16px' }}>
+                        This row will be removed from the invoice coding.
+                    </p>
+                </div>
+            ),
+            okText: 'Delete Row',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            centered: true,
+            onOk: () => {
+                console.log("Line item deletion confirmed for ID:", id);
+                setLineItems(prev => prev.filter(item => item.id !== id));
+            },
+        });
+    }, [modal, setLineItems]);
 
     // ── handleAdd — original logic, zero changes ──────────────────────────────
     const handleAdd = useCallback(() => {
@@ -387,6 +412,7 @@ const CodingTab = () => {
 
     return (
         <div className="flex flex-col gap-4">
+            {modalContextHolder}
             <QuickViewTab showOnlyHeader={true} />
 
             <div
@@ -552,7 +578,11 @@ const CodingTab = () => {
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (
                                                         <button
-                                                            onClick={() => handleDelete(row.id)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                console.log("CodingTab Delete icon clicked for ID:", row.id);
+                                                                handleDelete(row.id);
+                                                            }}
                                                             className="text-gray-400 hover:text-red-500 transition-colors"
                                                             style={{
                                                                 display: "inline-flex",

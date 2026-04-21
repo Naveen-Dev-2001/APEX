@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CustomInput from "../../shared/components/CustomInput";
-import { SearchOutlined, CloseCircleOutlined } from "@ant-design/icons";
+import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
 import DataTable from "../../components/ui/DataTable";
@@ -12,7 +12,8 @@ import { useInvoiceStore } from "../../store/invoice.store";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
 import { deleteInvoice, uploadInvoices, fetchEntityMaster, getInvoiceFilterOptions } from "../../api/invoiceApi";
-import { message } from "antd";
+import { message, Modal } from "antd";
+import toast from "../../utils/toast";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
@@ -20,6 +21,7 @@ import ExportButton from "../../shared/components/ExportButton";
 import { useAuthStore } from "../../store/authStore";
 import ArchivedInvoicesTab, { ARCHIVE_COLUMNS } from "./ArchivedInvoicesTab";
 import { useLocation, useNavigate } from "react-router-dom";
+import AlertModal from "../../shared/components/AlertModal";
 
 const Invoice = () => {
     const {
@@ -111,10 +113,13 @@ const Invoice = () => {
         return () => clearTimeout(timer);
     }, [localSearch, setSearchQuery]);
 
-    const [messageApi, contextHolder] = message.useMessage();
+    const [modal, modalContextHolder] = Modal.useModal();
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const { isLoadingVendorDetail, vendor } = useVendorDetailSync(selectedVendorId);
+    
+    // AlertModal state for deletion
+    const [deleteModalState, setDeleteModalState] = useState({ isOpen: false, data: null, loading: false });
 
     useEffect(() => {
         fetchEntityMaster().then((res) => {
@@ -143,7 +148,7 @@ const Invoice = () => {
         setInvoiceData(data);
         setViewInvoiceId(id);
         setSelectedVendorId(data.vendor_id);
-        
+
         const status = (data.status || "").toLowerCase();
         if (status === "processed") {
             setInvoiceActiveTab("Quick View");
@@ -155,7 +160,7 @@ const Invoice = () => {
     }, []);
 
 
-     useEffect(() => {
+    useEffect(() => {
         if (location.state?.viewInvoice && handleView) {
             const { setNavigationOrigin } = useInvoiceStore.getState();
             if (location.state.from) {
@@ -168,13 +173,26 @@ const Invoice = () => {
     }, [location.state?.viewInvoice, handleView, navigate, location.pathname]);
 
     const handleDelete = useCallback((data) => {
-        deleteInvoice(data.id).then(() => {
-            messageApi.success("Invoice deleted successfully");
-            refetch();
-        }).catch(() => {
-            messageApi.error("Failed to delete invoice");
-        });
+        console.log("handleDelete triggered for invoice:", data);
+        setDeleteModalState({ isOpen: true, data, loading: false });
     }, []);
+
+    const confirmDelete = async () => {
+        const { data } = deleteModalState;
+        if (!data?.id) return;
+        
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+            await deleteInvoice(data.id);
+            toast.success("Invoice deleted successfully");
+            refetch();
+            setDeleteModalState({ isOpen: false, data: null, loading: false });
+        } catch (err) {
+            console.error("Delete invoice error:", err);
+            toast.error("Failed to delete invoice");
+            setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
+    };
 
     const handleResetAll = useCallback(() => {
         setSearchQuery("");
@@ -212,7 +230,7 @@ const Invoice = () => {
 
     const handleUpload = async (files) => {
         if (!files || files.length === 0) {
-            messageApi.warning("Please select at least one file");
+            toast.warning("Please select at least one file");
             return;
         }
 
@@ -262,7 +280,7 @@ const Invoice = () => {
             const duration = ((Date.now() - startTime) / 1000).toFixed(2);
             setUploadProgress(100);
 
-            messageApi.success(
+            toast.success(
                 `${response?.data?.count ?? files.length} file(s) processed successfully! (${duration}s)`
             );
 
@@ -278,7 +296,7 @@ const Invoice = () => {
 
         } catch (error) {
             const err = error?.response?.data?.detail || "Upload failed";
-            messageApi.error(err);
+            toast.error(err);
             setUploadProgress(0);
         } finally {
             if (eventSource) eventSource.close();
@@ -289,7 +307,7 @@ const Invoice = () => {
 
     return (
         <>
-            {contextHolder}
+            {modalContextHolder}
             {invoiceSection === 1 && (
                 <>
                     <div
@@ -461,6 +479,19 @@ const Invoice = () => {
             )}
 
             {invoiceSection === 2 && <ViewInvoicePage />}
+            
+            <AlertModal
+                isOpen={deleteModalState.isOpen}
+                onClose={() => setDeleteModalState({ isOpen: false, data: null, loading: false })}
+                onConfirm={confirmDelete}
+                title="Delete Invoice?"
+                message="Are you sure you want to delete this invoice?"
+                confirmText="Delete Permanently"
+                cancelText="Discard"
+                type="danger"
+                loading={deleteModalState.loading}
+                confirmBtnVariant="primary"
+            />
         </>
     );
 };
