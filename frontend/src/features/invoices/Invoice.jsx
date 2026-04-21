@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
 import { deleteInvoice, uploadInvoices, fetchEntityMaster, getInvoiceFilterOptions } from "../../api/invoiceApi";
 import { message, Modal } from "antd";
+import toast from "../../utils/toast";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
@@ -112,7 +113,6 @@ const Invoice = () => {
         return () => clearTimeout(timer);
     }, [localSearch, setSearchQuery]);
 
-    const [messageApi, messageContextHolder] = message.useMessage();
     const [modal, modalContextHolder] = Modal.useModal();
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -184,12 +184,12 @@ const Invoice = () => {
         setDeleteModalState(prev => ({ ...prev, loading: true }));
         try {
             await deleteInvoice(data.id);
-            messageApi.success("Invoice deleted successfully");
+            toast.success("Invoice deleted successfully");
             refetch();
             setDeleteModalState({ isOpen: false, data: null, loading: false });
         } catch (err) {
             console.error("Delete invoice error:", err);
-            messageApi.error("Failed to delete invoice");
+            toast.error("Failed to delete invoice");
             setDeleteModalState(prev => ({ ...prev, loading: false }));
         }
     };
@@ -230,7 +230,7 @@ const Invoice = () => {
 
     const handleUpload = async (files) => {
         if (!files || files.length === 0) {
-            messageApi.warning("Please select at least one file");
+            toast.warning("Please select at least one file");
             return;
         }
 
@@ -280,7 +280,7 @@ const Invoice = () => {
             const duration = ((Date.now() - startTime) / 1000).toFixed(2);
             setUploadProgress(100);
 
-            messageApi.success(
+            toast.success(
                 `${response?.data?.count ?? files.length} file(s) processed successfully! (${duration}s)`
             );
 
@@ -296,7 +296,7 @@ const Invoice = () => {
 
         } catch (error) {
             const err = error?.response?.data?.detail || "Upload failed";
-            messageApi.error(err);
+            toast.error(err);
             setUploadProgress(0);
         } finally {
             if (eventSource) eventSource.close();
@@ -307,7 +307,6 @@ const Invoice = () => {
 
     return (
         <>
-            {messageContextHolder}
             {modalContextHolder}
             {invoiceSection === 1 && (
                 <>

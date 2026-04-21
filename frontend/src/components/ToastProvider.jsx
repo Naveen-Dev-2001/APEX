@@ -106,7 +106,7 @@ const ToastProvider = () => {
             <Toaster
                 position="bottom-right"
                 gutter={8}
-                containerStyle={{ top: 80, right: 20, zIndex: 9998 }}
+                containerStyle={{ bottom: 40, right: 20, zIndex: 9998 }}
                 toastOptions={{
                     style: {
                         fontFamily: '"Creato Display", sans-serif',
