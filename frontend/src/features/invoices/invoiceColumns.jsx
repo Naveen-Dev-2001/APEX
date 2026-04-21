@@ -33,7 +33,11 @@ const actionsCol = (onView, onDelete) => ({
                 <EyeOutlined style={{ fontSize: 16 }} />
             </button>
             <button
-                onClick={() => onDelete(row)}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    console.log("Delete button clicked for row:", row);
+                    onDelete(row);
+                }}
                 className="text-red-400 hover:text-red-600 transition-colors cursor-pointer"
                 title="Delete"
             >

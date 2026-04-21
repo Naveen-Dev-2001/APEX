@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, CaretUpOutlined, CaretDownOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, CaretUpOutlined, CaretDownOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { Modal } from "antd";
 import ReusableDataTable from '../../../shared/components/ReusableDataTable' // adjust path
 
 const LINE_TYPE_OPTIONS = ["Expense", "Revenue", "Asset", "Liability"];
@@ -117,11 +118,23 @@ const LineItemsTable = () => {
     };
 
     const deleteRow = (id) => {
-        setRows((prev) => prev.filter((r) => r.id !== id));
-        setSelectedRows((prev) => {
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
+        console.log("LineItemsTable deleteRow triggered for ID:", id);
+        Modal.confirm({
+            title: 'Delete Row',
+            icon: <ExclamationCircleOutlined />,
+            content: 'Are you sure you want to delete this row?',
+            okText: 'Yes, Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            onOk: () => {
+                console.log("Row deletion confirmed for ID:", id);
+                setRows((prev) => prev.filter((r) => r.id !== id));
+                setSelectedRows((prev) => {
+                    const next = new Set(prev);
+                    next.delete(id);
+                    return next;
+                });
+            },
         });
     };
 
@@ -307,7 +320,11 @@ const LineItemsTable = () => {
             sortable: false,
             cellRenderer: ({ data }) => (
                 <button
-                    onClick={() => deleteRow(data.id)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        console.log("LineItemsTable Delete icon clicked for ID:", data.id);
+                        deleteRow(data.id);
+                    }}
                     className="text-red-400 hover:text-red-600 transition-colors p-1 rounded hover:bg-red-50"
                 >
                     <DeleteOutlined style={{ fontSize: 15 }} />

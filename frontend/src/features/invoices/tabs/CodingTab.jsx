@@ -4,8 +4,11 @@ import {
     PlusOutlined,
     DownloadOutlined,
     UploadOutlined,
-    CaretUpOutlined
+    UploadOutlined,
+    CaretUpOutlined,
+    ExclamationCircleOutlined
 } from "@ant-design/icons";
+import { Modal } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
 import QuickViewTab from "./QuickViewTab";
@@ -346,7 +349,19 @@ const CodingTab = () => {
 
     // ── handleDelete — original logic, zero changes ───────────────────────────
     const handleDelete = useCallback((id) => {
-        setLineItems(prev => prev.filter(item => item.id !== id));
+        console.log("CodingTab handleDelete triggered for ID:", id);
+        Modal.confirm({
+            title: 'Delete Line Item',
+            icon: <ExclamationCircleOutlined />,
+            content: 'Are you sure you want to delete this line item?',
+            okText: 'Yes, Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            onOk: () => {
+                console.log("Line item deletion confirmed for ID:", id);
+                setLineItems(prev => prev.filter(item => item.id !== id));
+            },
+        });
     }, [setLineItems]);
 
     // ── handleAdd — original logic, zero changes ──────────────────────────────
@@ -552,7 +567,11 @@ const CodingTab = () => {
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (
                                                         <button
-                                                            onClick={() => handleDelete(row.id)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                console.log("CodingTab Delete icon clicked for ID:", row.id);
+                                                                handleDelete(row.id);
+                                                            }}
                                                             className="text-gray-400 hover:text-red-500 transition-colors"
                                                             style={{
                                                                 display: "inline-flex",

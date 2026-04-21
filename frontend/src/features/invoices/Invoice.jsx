@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CustomInput from "../../shared/components/CustomInput";
-import { SearchOutlined, CloseCircleOutlined } from "@ant-design/icons";
+import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
 import DataTable from "../../components/ui/DataTable";
@@ -12,7 +12,7 @@ import { useInvoiceStore } from "../../store/invoice.store";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
 import { deleteInvoice, uploadInvoices, fetchEntityMaster, getInvoiceFilterOptions } from "../../api/invoiceApi";
-import { message } from "antd";
+import { message, Modal } from "antd";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
@@ -111,7 +111,8 @@ const Invoice = () => {
         return () => clearTimeout(timer);
     }, [localSearch, setSearchQuery]);
 
-    const [messageApi, contextHolder] = message.useMessage();
+    const [messageApi, messageContextHolder] = message.useMessage();
+    const [modal, modalContextHolder] = Modal.useModal();
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const { isLoadingVendorDetail, vendor } = useVendorDetailSync(selectedVendorId);
@@ -168,13 +169,26 @@ const Invoice = () => {
     }, [location.state?.viewInvoice, handleView, navigate, location.pathname]);
 
     const handleDelete = useCallback((data) => {
-        deleteInvoice(data.id).then(() => {
-            messageApi.success("Invoice deleted successfully");
-            refetch();
-        }).catch(() => {
-            messageApi.error("Failed to delete invoice");
+        console.log("handleDelete triggered for invoice:", data);
+        modal.confirm({
+            title: 'Are you sure you want to delete this invoice?',
+            icon: <ExclamationCircleOutlined />,
+            content: `Invoice Number: ${data.invoice_number || 'N/A'}`,
+            okText: 'Yes, Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            onOk: () => {
+                console.log("Deletion confirmed for invoice ID:", data.id);
+                return deleteInvoice(data.id).then(() => {
+                    messageApi.success("Invoice deleted successfully");
+                    refetch();
+                }).catch((err) => {
+                    console.error("Delete invoice error:", err);
+                    messageApi.error("Failed to delete invoice");
+                });
+            },
         });
-    }, []);
+    }, [modal, messageApi, refetch]);
 
     const handleResetAll = useCallback(() => {
         setSearchQuery("");
@@ -289,7 +303,8 @@ const Invoice = () => {
 
     return (
         <>
-            {contextHolder}
+            {messageContextHolder}
+            {modalContextHolder}
             {invoiceSection === 1 && (
                 <>
                     <div
