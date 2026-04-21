@@ -11,6 +11,7 @@ import { useAuthStore } from "../../store/authStore";
 import workflowActionsAPI from "../../api/workflowActionsAPI";
 import { useEffect, useState, useRef } from "react";
 import { Modal } from "antd";
+import { useQueryClient } from "@tanstack/react-query";
 
 
 const MODAL_ACTIONS = {
@@ -23,6 +24,7 @@ const MODAL_ACTIONS = {
 
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const { user, activeRole } = useAuthStore();
     const userRole = (activeRole || user?.role || "").toLowerCase();
 
@@ -109,6 +111,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         const payload = await saveInvoice(viewInvoiceId, { status: "waiting_coding" });
         if (payload?.status === "waiting_coding") {
             toast.success("Invoice sent for coding successfully!");
+            queryClient.invalidateQueries(["invoices"]);
             resetQuickView();
             setInvoiceSection(1);
             navigate("/invoices");
@@ -141,6 +144,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         const payload = await saveInvoice(viewInvoiceId, { status: "waiting_approval" });
         if (payload?.status === "waiting_approval") {
             toast.success("Invoice sent for approval successfully!");
+            queryClient.invalidateQueries(["invoices"]);
             resetQuickView();
             setInvoiceSection(1);
             navigate("/coding");
@@ -155,6 +159,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             const payload = await saveInvoice(viewInvoiceId, { status: 'approved' })
             if (payload.status == "approved") {
                 toast.success("Invoice Approved successfully!")
+                queryClient.invalidateQueries(["invoices"]);
                 navigate('/invoices')
             } else {
                 toast.error(payload?.message || "Something went wrong while approving.");
@@ -168,6 +173,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             const payload = await saveInvoice(viewInvoiceId, { status: 'rejected' })
             if (payload.status == "rejected") {
                 toast.success("Invoice Rejected successfully!")
+                queryClient.invalidateQueries(["invoices"]);
                 navigate('/invoices')
             } else {
                 toast.error(payload?.message || "Something went wrong while rejecting.");
@@ -181,6 +187,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             const payload = await saveInvoice(viewInvoiceId, { status: 'rework' })
             if (payload.status == "rework") {
                 toast.success("Invoice sent for Rework successfully!")
+                queryClient.invalidateQueries(["invoices"]);
                 navigate('/invoices')
             } else {
                 toast.error(payload?.message || "Something went wrong while sending for rework.");
@@ -257,6 +264,11 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
             if (result?.success) {
                 toast.success(result.message || "Action completed successfully.");
+                
+                // Invalidate cache to ensure fresh data on next view
+                queryClient.invalidateQueries(["workflow", viewInvoiceId]);
+                queryClient.invalidateQueries(["auditFlow", viewInvoiceId]);
+                queryClient.invalidateQueries(["invoices"]);
                 
                 // If it was a recall, navigate back to the coding queue
                 if (action === "recall") {

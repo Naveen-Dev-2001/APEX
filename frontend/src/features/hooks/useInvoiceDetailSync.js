@@ -7,7 +7,6 @@ export const useVendorDetailSync = (vendorId) => {
         queryKey: ["vendor", vendorId],
         queryFn: () => getVendorById(vendorId),
         enabled: !!vendorId,
-        staleTime: 5 * 60 * 1000,
     });
 
     // Normalize data here
@@ -25,7 +24,6 @@ export const useVendersListSync = () => {
         queryKey: ["vendors"],
         queryFn: () => fetchAllVendors(),
         enabled: true,
-        staleTime: 5 * 60 * 1000,
     });
 
     return {

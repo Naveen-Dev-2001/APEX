@@ -156,22 +156,22 @@ const WorkflowTab = () => {
                 const stageType = stage?.type || "mandatory";
                 const emails = Array.isArray(stage?.emails) ? stage.emails : (stage?.emails ? [stage.emails] : []);
                 
+                const isFinanceTeam = stage?.is_finance || emails.some(e => String(e).toLowerCase().includes("finance team")) || (stageType === "mandatory" && stage?.level === 2 && emails.length === 0);
+                const subtitle = isFinanceTeam ? "Finance Team" : emails.map(email => {
+                    if (!email) return "";
+                    const displayName = getUserDisplayName(email);
+                    const substitutes = delegations[email.toLowerCase()];
+                    if (substitutes?.length > 0) {
+                        const subNames = substitutes.map(s => getUserDisplayName(s)).join(", ");
+                        return `${displayName} (Delegated to ${subNames})`;
+                    }
+                    return displayName;
+                }).join(", ");
+
                 if (level === currentApproverLevel && isWaitingApproval) {
                     let title = `Pending ${getOrdinal(level)} Approver`;
                     if (stageType === "threshold") title = "Pending Threshold Approver";
                     if (stageType === "posting") title = "Pending Posting Approver";
-
-                    const isFinanceTeam = stage?.is_finance || emails.some(e => String(e).toLowerCase().includes("finance team")) || (stageType === "mandatory" && stage?.level === 2 && emails.length === 0);
-                    const subtitle = isFinanceTeam ? "Finance Team" : emails.map(email => {
-                        if (!email) return "";
-                        const displayName = getUserDisplayName(email);
-                        const substitutes = delegations[email.toLowerCase()];
-                        if (substitutes?.length > 0) {
-                            const subNames = substitutes.map(s => getUserDisplayName(s)).join(", ");
-                            return `${displayName} (Delegated to ${subNames})`;
-                        }
-                        return displayName;
-                    }).join(", ");
 
                     steps.push({ title, subtitle, status: "pending" });
                 } else if (level > currentApproverLevel) {
@@ -179,7 +179,7 @@ const WorkflowTab = () => {
                     if (stageType === "threshold") title = "Threshold Approver";
                     if (stageType === "posting") title = "Posting Approver";
 
-                    steps.push({ title, status: "queued" });
+                    steps.push({ title, subtitle, status: "queued" });
                 }
             });
         }
