@@ -8,6 +8,7 @@ import toast from '../../utils/toast';
 import DataTable from '../../components/ui/DataTable';
 import VendorWorkflowModal from './VendorWorkflowModal';
 import CodificationWorkflowModal from './CodificationWorkflowModal';
+import RuleModal from './RuleModal';
 
 const SettingsPage = () => {
     const {
@@ -51,7 +52,7 @@ const SettingsPage = () => {
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null });
     const openEdit = (row) => setModalState({ open: true, mode: 'edit', rowData: row });
     const closeModal = () => setModalState({ open: false, mode: 'add', rowData: null });
-    
+
     const getApproverName = useCallback((email, isFinance = false) => {
         if (isFinance) {
             return (
@@ -62,7 +63,7 @@ const SettingsPage = () => {
         }
 
         if (!email) return <span className="text-gray-400">-</span>;
-        
+
         const formatSingle = (e) => {
             const approver = (approversList || []).find(a => a.value === e);
             if (approver) return approver.label.split(' (')[0];
@@ -71,7 +72,7 @@ const SettingsPage = () => {
 
         if (Array.isArray(email)) {
             if (email.length === 0) return <span className="text-gray-400">-</span>;
-            
+
             const tooltipContent = (
                 <div className="flex flex-col gap-1 py-1">
                     {email.map((e, i) => (
@@ -127,9 +128,9 @@ const SettingsPage = () => {
     };
 
     const vendorColumns = [
-        { 
-            header: 'Vendor Name', 
-            accessor: 'vendor_name', 
+        {
+            header: 'Vendor Name',
+            accessor: 'vendor_name',
             sortable: true,
             filterable: true
         },
@@ -149,8 +150,8 @@ const SettingsPage = () => {
             getFilterValue: (row) => row.is_parallel ? 'Parallel' : 'Sequential',
             render: (val) => (
                 <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
-                    ${val 
-                        ? 'bg-blue-50 text-blue-600 border-blue-100' 
+                    ${val
+                        ? 'bg-blue-50 text-blue-600 border-blue-100'
                         : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
                     {val ? 'Parallel' : 'Sequential'}
                 </span>
@@ -163,50 +164,50 @@ const SettingsPage = () => {
             getFilterValue: (row) => row.is_threshold_enabled ? 'Yes' : 'No',
             render: (val) => (
                 <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
-                    ${val 
-                        ? 'bg-green-50 text-green-600 border-green-100' 
+                    ${val
+                        ? 'bg-green-50 text-green-600 border-green-100'
                         : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
                     {val ? 'Yes' : 'No'}
                 </span>
             )
         },
-        { 
-            header: 'Approver 1', 
+        {
+            header: 'Approver 1',
             accessor: 'mandatory_approver_1',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['1'] || row?.approver_flags?.[1])
         },
-        { 
-            header: 'Approver 2', 
+        {
+            header: 'Approver 2',
             accessor: 'mandatory_approver_2',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['2'] || row?.approver_flags?.[2])
         },
-        { 
-            header: 'Approver 3', 
+        {
+            header: 'Approver 3',
             accessor: 'mandatory_approver_3',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['3'] || row?.approver_flags?.[3])
         },
-        { 
-            header: 'Approver 4', 
+        {
+            header: 'Approver 4',
             accessor: 'mandatory_approver_4',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['4'] || row?.approver_flags?.[4])
         },
-        { 
-            header: 'Approver 5', 
+        {
+            header: 'Approver 5',
             accessor: 'mandatory_approver_5',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['5'] || row?.approver_flags?.[5])
         },
-        { 
-            header: 'Threshold Approver', 
+        {
+            header: 'Threshold Approver',
             accessor: 'threshold_approver',
             render: (val) => getApproverName(val)
         },
-        { 
-            header: 'Amount Threshold', 
+        {
+            header: 'Amount Threshold',
             accessor: 'amount_threshold',
             render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
         },
-        { 
-            header: 'Posting Approver', 
+        {
+            header: 'Posting Approver',
             accessor: 'posting_approver',
             render: (val) => getApproverName(val)
         },
@@ -235,8 +236,8 @@ const SettingsPage = () => {
     ];
 
     const codificationColumns = [
-        { 
-            header: 'LOB', 
+        {
+            header: 'LOB',
             accessor: 'lob',
             filterable: true,
             getFilterValue: (row) => {
@@ -248,8 +249,8 @@ const SettingsPage = () => {
                 return opt ? opt.label : val;
             }
         },
-        { 
-            header: 'Dept ID', 
+        {
+            header: 'Dept ID',
             accessor: 'department_id',
             filterable: true,
             getFilterValue: (row) => {
@@ -277,8 +278,8 @@ const SettingsPage = () => {
             getFilterValue: (row) => row.is_parallel ? 'Parallel' : 'Sequential',
             render: (val) => (
                 <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
-                    ${val 
-                        ? 'bg-blue-50 text-blue-600 border-blue-100' 
+                    ${val
+                        ? 'bg-blue-50 text-blue-600 border-blue-100'
                         : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
                     {val ? 'Parallel' : 'Sequential'}
                 </span>
@@ -291,50 +292,50 @@ const SettingsPage = () => {
             getFilterValue: (row) => row.is_threshold_enabled ? 'Yes' : 'No',
             render: (val) => (
                 <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
-                    ${val 
-                        ? 'bg-green-50 text-green-600 border-green-100' 
+                    ${val
+                        ? 'bg-green-50 text-green-600 border-green-100'
                         : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
                     {val ? 'Yes' : 'No'}
                 </span>
             )
         },
-        { 
-            header: 'Approver 1', 
+        {
+            header: 'Approver 1',
             accessor: 'mandatory_approver_1',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['1'] || row?.approver_flags?.[1])
         },
-        { 
-            header: 'Approver 2', 
+        {
+            header: 'Approver 2',
             accessor: 'mandatory_approver_2',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['2'] || row?.approver_flags?.[2])
         },
-        { 
-            header: 'Approver 3', 
+        {
+            header: 'Approver 3',
             accessor: 'mandatory_approver_3',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['3'] || row?.approver_flags?.[3])
         },
-        { 
-            header: 'Approver 4', 
+        {
+            header: 'Approver 4',
             accessor: 'mandatory_approver_4',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['4'] || row?.approver_flags?.[4])
         },
-        { 
-            header: 'Approver 5', 
+        {
+            header: 'Approver 5',
             accessor: 'mandatory_approver_5',
             render: (val, row) => getApproverName(val, row?.approver_flags?.['5'] || row?.approver_flags?.[5])
         },
-        { 
-            header: 'Threshold Approver', 
+        {
+            header: 'Threshold Approver',
             accessor: 'threshold_approver',
             render: (val) => getApproverName(val)
         },
-        { 
-            header: 'Amount Threshold', 
+        {
+            header: 'Amount Threshold',
             accessor: 'amount_threshold',
             render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
         },
-        { 
-            header: 'Posting Approver', 
+        {
+            header: 'Posting Approver',
             accessor: 'posting_approver',
             render: (val) => getApproverName(val)
         },
@@ -477,21 +478,19 @@ const SettingsPage = () => {
             </div>
 
             {/* Modals */}
-            {modalState.open && activeTab === 'Vendor Based Workflow' && (
-                <VendorWorkflowModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSuccess={() => fetchVendorWorkflows()}
-                />
-            )}
-
-            {modalState.open && activeTab === 'Config Based Workflow' && (
-                <CodificationWorkflowModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSuccess={() => fetchCodificationWorkflows()}
+            {modalState.open && (
+                <RuleModal
+                    open={modalState.open}
+                    mode={activeTab === 'Vendor Based Workflow' ? 'vendor' : 'codification'}
+                    editData={modalState.rowData}
+                    onCancel={closeModal}
+                    onSuccess={() => {
+                        if (activeTab === 'Vendor Based Workflow') {
+                            fetchVendorWorkflows();
+                        } else {
+                            fetchCodificationWorkflows();
+                        }
+                    }}
                 />
             )}
         </div>
