@@ -1,6 +1,7 @@
 import { useInvoiceStore } from "../../store/invoice.store";
 import CustomTabs from "./CustomTabs";
 import { lazy, Suspense } from "react";
+import { Skeleton } from "antd";
 
 const QuickViewTab = lazy(() => import("./tabs/QuickViewTab"));
 const GLSummaryTab = lazy(() => import("./tabs/GLSummaryTab"));
@@ -44,7 +45,7 @@ const InvoiceRightPanel = ({ invoice = {} }) => {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto mt-4">
-                <Suspense fallback={<div className="p-4">Loading...</div>}>
+                <Suspense fallback={<div className="p-4"><Skeleton active paragraph={{ rows: 12 }} /></div>}>
                     {ActiveComponent && <ActiveComponent invoice={invoice} />}
                 </Suspense>
             </div>
