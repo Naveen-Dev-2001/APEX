@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.auth.jwt import get_current_user
 from app.database.database import get_db
 from app.dependencies import get_current_entity
-from app.models.db_models import Invoice, User, WorkflowStep
+from app.models.db_models import Invoice, User, WorkflowStep, EntityMaster
 from app.models.user import UserResponse
 from app.repository.repositories import (
     coding_repo,
@@ -287,38 +287,89 @@ def _find_previous_finance_level(
     return None
 
 
-async def _post_to_sage(invoice_id: int, entity: str) -> Dict:
+async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
     """
-    Call the Sage posting endpoint.
-    Replace the URL / auth with your actual Sage integration.
-    Returns {"success": bool, "message": str, "sage_bill_id": str|None}.
+    Call the Sage posting logic.
+    Returns {"success": bool, "message": str, "sage_bill_number": str|None}.
     """
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"https://your-sage-api/postapbill",   # ← Replace with real URL
-                json={"invoice_id": invoice_id, "entity": entity},
-                # ← Replace
-                headers={"Authorization": "Bearer YOUR_SAGE_TOKEN"},
-            )
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    "success": True,
-                    "message": "Posted to Sage successfully",
-                    "sage_bill_id": data.get("bill_id"),
-                }
+        from app.postapbill import post_ap_bill
+        from app.services.pdf_service import generate_approval_pdf
+
+        # 1. Fetch invoice
+        invoice = invoice_repo.get(db, invoice_id)
+        if not invoice:
+            return {"success": False, "message": "Invoice not found", "sage_bill_number": None}
+
+        # 2. Ensure Approval PDF exists (or regenerate it)
+        pdf_path = None
+        try:
+             pdf_path = generate_approval_pdf(db, invoice_id)
+             logger.info(f"[SagePost] Approval report path: {pdf_path}")
+        except Exception as pdf_err:
+             logger.error(f"[SagePost] Error ensuring approval PDF: {pdf_err}", exc_info=True)
+
+        # 3. Extract coding details
+        hc = {}
+        if invoice.coding and invoice.coding.header_coding:
+            try:
+                hc = json.loads(invoice.coding.header_coding)
+            except:
+                hc = {}
+        
+        line_items = []
+        if invoice.coding and invoice.coding.line_items:
+            try:
+                line_items = json.loads(invoice.coding.line_items)
+                # Robust extraction: if header fields are missing, try to get from first line item
+                if line_items and not hc.get("gl_code"):
+                    first = line_items[0]
+                    if not hc.get("gl_code"): hc["gl_code"] = first.get("gl_code")
+                    if not hc.get("department"): hc["department"] = first.get("department") or first.get("department_id")
+                    if not hc.get("item"): hc["item"] = first.get("item") or first.get("item_id")
+                    if not hc.get("lob"): hc["lob"] = first.get("lob") or first.get("class")
+            except:
+                line_items = []
+
+        # 4. Resolve Sage Location ID from EntityMaster partition mapping
+        entity_record = db.query(EntityMaster).filter(EntityMaster.entity_name == invoice.entity).first()
+        sage_location = entity_record.entity_id if entity_record else (hc.get("location") or hc.get("location_id"))
+
+        # 5. Call Sage Posting Logic
+        post_result = post_ap_bill(
+            invoice, 
+            pdf_path or "",
+            gl_account=hc.get("gl_code") or hc.get("glAccount"),
+            location=sage_location,
+            dept=hc.get("department") or hc.get("department_id"),
+            vendor_dim=invoice.vendor_id,
+            item=hc.get("item") or hc.get("item_id"),
+            class_lob=hc.get("lob") or hc.get("class") or hc.get("class_id"),
+            line_items=line_items if line_items else None
+        )
+
+        if post_result and post_result.get("success"):
+            sage_response = post_result.get("data", {})
+            intended_bill_no = f"{invoice.invoice_number}-{invoice.id}"
+            sage_bill_no = sage_response.get("billNumber") or intended_bill_no
+            return {
+                "success": True,
+                "message": "Posted to Sage successfully",
+                "sage_bill_number": sage_bill_no,
+            }
+        else:
             return {
                 "success": False,
-                "message": f"Sage returned HTTP {response.status_code}: {response.text[:200]}",
-                "sage_bill_id": None,
+                "message": post_result.get("error") if post_result else "Unknown error",
+                "sage_bill_number": None,
             }
+
     except Exception as exc:
-        logger.error("Sage posting error for invoice %s: %s", invoice_id, exc)
+        logger.error("Sage posting error for invoice %s: %s", invoice_id, exc, exc_info=True)
         return {
             "success": False,
             "message": str(exc),
-            "sage_bill_id": None,
+            "sage_bill_number": None,
         }
 
 
@@ -818,6 +869,7 @@ async def approve_invoice(
                         next_level=posting_virtual_level,
                     )
                 else:
+                    # Final Level — Fully Approved
                     _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
                     _record_step(
                         db, invoice_id,
@@ -828,11 +880,46 @@ async def approve_invoice(
                         entity=entity,
                     )
                     db.commit()
-                    return ActionResponse(
-                        success=True,
-                        message="Invoice fully approved.",
-                        new_status=InvoiceStatus.APPROVED,
-                    )
+
+                    # Trigger Sage Post
+                    sage_result = await _post_to_sage(invoice_id, entity, db)
+                    if sage_result["success"]:
+                        invoice = invoice_repo.get(db, invoice_id)
+                        _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
+                        invoice.sage_bill_number = sage_result.get("sage_bill_number")
+                        _record_step(
+                            db, invoice_id,
+                            step_name="Posted to Sage",
+                            step_type=StepType.POSTED,
+                            user_email=email,
+                            comment=f"Sage Bill Number: {sage_result.get('sage_bill_number')}",
+                            entity=entity,
+                        )
+                        db.commit()
+                        return ActionResponse(
+                            success=True,
+                            message="Invoice fully approved and posted to Sage.",
+                            new_status=InvoiceStatus.SAGE_POSTED,
+                            sage_post_result=sage_result,
+                        )
+                    else:
+                        invoice = invoice_repo.get(db, invoice_id)
+                        _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POST_FAILED)
+                        _record_step(
+                            db, invoice_id,
+                            step_name="Sage Post Failed",
+                            step_type=StepType.POST_FAILED,
+                            user_email=email,
+                            comment=sage_result.get("message"),
+                            entity=entity,
+                        )
+                        db.commit()
+                        return ActionResponse(
+                            success=False,
+                            message=f"Invoice fully approved but Sage post failed: {sage_result['message']}",
+                            new_status=InvoiceStatus.SAGE_POST_FAILED,
+                            sage_post_result=sage_result,
+                        )
         else:
             db.commit()
             return ActionResponse(
@@ -890,11 +977,46 @@ async def approve_invoice(
                 entity=entity,
             )
             db.commit()
-            return ActionResponse(
-                success=True,
-                message="Invoice fully approved after threshold.",
-                new_status=InvoiceStatus.APPROVED,
-            )
+
+            # Trigger Sage Post
+            sage_result = await _post_to_sage(invoice_id, entity, db)
+            if sage_result["success"]:
+                invoice = invoice_repo.get(db, invoice_id)
+                _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
+                invoice.sage_bill_number = sage_result.get("sage_bill_number")
+                _record_step(
+                    db, invoice_id,
+                    step_name="Posted to Sage",
+                    step_type=StepType.POSTED,
+                    user_email=email,
+                    comment=f"Sage Bill Number: {sage_result.get('sage_bill_number')}",
+                    entity=entity,
+                )
+                db.commit()
+                return ActionResponse(
+                    success=True,
+                    message="Invoice fully approved after threshold and posted to Sage.",
+                    new_status=InvoiceStatus.SAGE_POSTED,
+                    sage_post_result=sage_result,
+                )
+            else:
+                invoice = invoice_repo.get(db, invoice_id)
+                _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POST_FAILED)
+                _record_step(
+                    db, invoice_id,
+                    step_name="Sage Post Failed",
+                    step_type=StepType.POST_FAILED,
+                    user_email=email,
+                    comment=sage_result.get("message"),
+                    entity=entity,
+                )
+                db.commit()
+                return ActionResponse(
+                    success=False,
+                    message=f"Invoice fully approved after threshold but Sage post failed: {sage_result['message']}",
+                    new_status=InvoiceStatus.SAGE_POST_FAILED,
+                    sage_post_result=sage_result,
+                )
 
     # ── CASE C: Posting approver stage ──
     if has_posting and not posting_done_already:
@@ -933,18 +1055,18 @@ async def approve_invoice(
         )
         db.commit()
 
-        sage_result = await _post_to_sage(invoice_id, entity)
+        sage_result = await _post_to_sage(invoice_id, entity, db)
 
         if sage_result["success"]:
             invoice = invoice_repo.get(db, invoice_id)
             _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
-            invoice.sage_bill_id = sage_result.get("sage_bill_id")
+            invoice.sage_bill_number = sage_result.get("sage_bill_number")
             _record_step(
                 db, invoice_id,
                 step_name="Posted to Sage",
                 step_type=StepType.POSTED,
                 user_email=email,
-                comment=f"Sage Bill ID: {sage_result.get('sage_bill_id')}",
+                comment=f"Sage Bill Number: {sage_result.get('sage_bill_number')}",
                 entity=entity,
             )
             db.commit()
@@ -1275,18 +1397,19 @@ async def repost_to_sage(
             403, "Only the posting approver (or their delegate) can repost to Sage")
 
     # Attempt repost
-    sage_result = await _post_to_sage(invoice_id, entity)
+    sage_result = await _post_to_sage(invoice_id, entity, db)
 
     if sage_result["success"]:
         _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
-        invoice.sage_bill_id = sage_result.get("sage_bill_id")
+        invoice.sage_bill_number = sage_result.get("sage_bill_number")
         _record_step(
             db,
             invoice_id,
             step_name="Reposted to Sage — Success",
             step_type=StepType.POSTED,
             user_email=email,
-            comment=f"Sage Bill ID: {sage_result.get('sage_bill_id')}",
+            comment=f"Sage Bill Number: {sage_result.get('sage_bill_number')}",
+            entity=entity,
         )
         db.commit()
         return ActionResponse(
@@ -1303,6 +1426,7 @@ async def repost_to_sage(
             step_type=StepType.POST_FAILED,
             user_email=email,
             comment=sage_result.get("message"),
+            entity=entity,
         )
         db.commit()
         return ActionResponse(

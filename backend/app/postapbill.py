@@ -34,7 +34,8 @@ def post_ap_bill(
     dept: str = None,
     vendor_dim: str = None,
     item: str = None,
-    class_lob: str = None
+    class_lob: str = None,
+    line_items: list = None
 ) -> dict:
     """
     Post an AP Bill to Sage Intacct after a final invoice approval.
@@ -48,6 +49,7 @@ def post_ap_bill(
         vendor_dim: Vendor ID for dimensions.
         item: Item ID.
         class_lob: Class (LOB) ID.
+        line_items: Detailed line-item coding data (if any).
 
     Returns:
         dict with keys 'success' (bool) and 'data' (API response) or 'error'.
@@ -104,7 +106,8 @@ def post_ap_bill(
             dept=dept,
             vendor_dim=vendor_dim,
             item=item,
-            class_lob=class_lob
+            class_lob=class_lob,
+            line_items=line_items
         )
         logger.info(f"[PostAPBill] AP Bill created successfully for invoice {invoice.id}")
         return {"success": True, "data": bill_response}
@@ -172,18 +175,17 @@ def _create_ap_bill(
     dept: str,
     vendor_dim: str,
     item: str,
-    class_lob: str
+    class_lob: str,
+    line_items: list = None
 ) -> dict:
     """POST an AP Bill to Sage Intacct and return the API response JSON."""
     import json as _json
     from datetime import datetime, timedelta
 
     # --------------------------------------------------
-    # Extract total amount
+    # Extract total amount (Aggregate fallback)
     # --------------------------------------------------
     total_amount = "0"
-
-    # 1. Fetch exactly the same way as PDF generation
     try:
         from app.services.pdf_service import _extract_total
         extracted_str = invoice.extracted_data
@@ -195,10 +197,7 @@ def _create_ap_bill(
             match = re.search(r'-?\d+(\.\d+)?', clean_amt)
             if match:
                 total_float = float(match.group())
-                if total_float.is_integer():
-                    total_amount = str(int(total_float))
-                else:
-                    total_amount = str(total_float)
+                total_amount = str(int(total_float)) if total_float.is_integer() else str(total_float)
 
     except Exception as e:
         logger.warning(f"[PostAPBill] Error getting total amount from PDF service logic: {e}")
@@ -214,34 +213,25 @@ def _create_ap_bill(
     # Date calculation
     # --------------------------------------------------
     from dateutil.parser import parse
-    
     current_date = datetime.utcnow()
     posting_date_str = current_date.strftime("%Y-%m-%d")
-    
     base_date = invoice.uploaded_at if invoice.uploaded_at else current_date
     due_date = base_date + timedelta(days=30)
     
     try:
         ed = _json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else (invoice.extracted_data or {})
         inv_details = ed.get("invoice_details", {})
-        
         inv_date_str = inv_details.get("invoice_date", {}).get("value")
         due_date_str_ext = inv_details.get("due_date", {}).get("value")
         
         if inv_date_str:
-            try:
-                base_date = parse(str(inv_date_str), fuzzy=True)
-            except Exception:
-                pass
-                
+            try: base_date = parse(str(inv_date_str), fuzzy=True)
+            except: pass
         if due_date_str_ext:
-            try:
-                due_date = parse(str(due_date_str_ext), fuzzy=True)
-            except Exception:
-                due_date = base_date + timedelta(days=30)
+            try: due_date = parse(str(due_date_str_ext), fuzzy=True)
+            except: due_date = base_date + timedelta(days=30)
         else:
             due_date = base_date + timedelta(days=30)
-            
     except Exception as e:
         logger.warning(f"[PostAPBill] Error parsing dates: {e}")
 
@@ -249,74 +239,91 @@ def _create_ap_bill(
     due_date_str = due_date.strftime("%Y-%m-%d")
 
     # --------------------------------------------------
-    # Normalize GL account
+    # Dimensions Helpers
     # --------------------------------------------------
-    gl_account_clean = str(gl_account).strip() if gl_account else ""
-
-    if gl_account_clean.lower() in ["none", "null", ""]:
-        gl_account_clean = "50010"
-        
-    if " - " in gl_account_clean:
-        gl_account_clean = gl_account_clean.split(" - ", 1)[0].strip()
-
-    # --------------------------------------------------
-    # Dimensions
-    # --------------------------------------------------
-    # Helper to extract just the ID part if the string is formatted "ID - Description"
     def _extract_id(val: str) -> str:
-        if not val:
-            return ""
+        if not val: return ""
         val = str(val).strip()
-        if " - " in val:
-            return val.split(" - ", 1)[0].strip()
-        # Fallback for "ID-Description" without spaces if needed
-        return val
+        return val.split(" - ", 1)[0].strip() if " - " in val else val
 
-    dimensions = {
-        "location": {"id": _extract_id(location)} if location else {"id": LOCATION_ID},
-        "department": {"id": _extract_id(dept)} if dept else None,
-        "vendor": {"id": str(vendor_dim)} if vendor_dim else None,
-        "item": {"id": _extract_id(item)} if item else None,
-        "class": {"id": _extract_id(class_lob)} if class_lob else None
-    }
-    
-    # Remove empty dimension keys so Sage Intacct doesn't fail
-    dimensions = {k: v for k, v in dimensions.items() if v is not None}
-    
-    print("----- DIMENSIONS -----")
-    print(_json.dumps(dimensions, indent=2))
+    # --------------------------------------------------
+    # Build Lines
+    # --------------------------------------------------
+    final_lines = []
+
+    if line_items and isinstance(line_items, list) and len(line_items) > 0:
+        logger.info(f"[PostAPBill] Constructing {len(line_items)} lines for bill.")
+        for item_data in line_items:
+            # 1. Resolve GL Account for this line
+            line_gl = item_data.get("gl_code") or item_data.get("glAccount") or gl_account or "50010"
+            line_gl = _extract_id(line_gl)
+            if line_gl.lower() in ["none", "null", ""]: line_gl = "50010"
+
+            # 2. Resolve Amount for this line
+            line_amt = item_data.get("amount") or item_data.get("net_amount") or item_data.get("total_amount") or "0"
+            try:
+                amt_float = float(str(line_amt).replace(",", "").replace("$", "").strip() or 0)
+                line_amt_str = str(int(amt_float)) if amt_float.is_integer() else str(amt_float)
+            except:
+                line_amt_str = "0"
+
+            # 3. Dimensions for this line (fallback to header if missing)
+            line_loc = _extract_id(item_data.get("location") or item_data.get("location_id") or location or LOCATION_ID)
+            line_dept = _extract_id(item_data.get("department") or item_data.get("department_id") or dept)
+            line_item_dim = _extract_id(item_data.get("item") or item_data.get("item_id") or item)
+            line_class = _extract_id(item_data.get("lob") or item_data.get("class") or item_data.get("class_id") or class_lob)
+            line_memo = item_data.get("description") or description
+
+            line_dims = {
+                "location": {"id": line_loc} if line_loc else {"id": LOCATION_ID},
+                "department": {"id": line_dept} if line_dept else None,
+                "vendor": {"id": str(vendor_dim)} if vendor_dim else None,
+                "item": {"id": line_item_dim} if line_item_dim else None,
+                "class": {"id": line_class} if line_class else None
+            }
+            # Clean up empty dims 
+            line_dims = {k: v for k, v in line_dims.items() if v is not None}
+
+            final_lines.append({
+                "glAccount": {"id": line_gl},
+                "txnAmount": line_amt_str,
+                "dimensions": line_dims,
+                "memo": line_memo
+            })
+    else:
+        # Fallback to single aggregate line
+        gl_account_clean = _extract_id(gl_account)
+        if gl_account_clean.lower() in ["none", "null", ""]: gl_account_clean = "50010"
+
+        header_dims = {
+            "location": {"id": _extract_id(location)} if location else {"id": LOCATION_ID},
+            "department": {"id": _extract_id(dept)} if dept else None,
+            "vendor": {"id": str(vendor_dim)} if vendor_dim else None,
+            "item": {"id": _extract_id(item)} if item else None,
+            "class": {"id": _extract_id(class_lob)} if class_lob else None
+        }
+        header_dims = {k: v for k, v in header_dims.items() if v is not None}
+
+        final_lines.append({
+            "glAccount": {"id": gl_account_clean},
+            "txnAmount": str(total_amount),
+            "dimensions": header_dims,
+            "memo": description
+        })
 
     # --------------------------------------------------
     # Bill payload
     # --------------------------------------------------
     bill_payload = {
         "billNumber": f"{invoice_number}-{invoice.id}",
-        "vendor": {
-            "id": str(vendor_id)
-        },
+        "vendor": {"id": str(vendor_id)},
         "referenceNumber": str(invoice_number),
         "description": description,
         "createdDate": base_date_str,
         "postingDate": posting_date_str,
         "dueDate": due_date_str,
-
-        "attachment": {
-            "id": str(attachment_id)
-        },
-
-        "lines": [
-            {
-                "glAccount": {
-                    "id": gl_account_clean
-                },
-
-                "txnAmount": str(total_amount),
-
-                "dimensions": dimensions,
-
-                "memo": description
-            }
-        ]
+        "attachment": {"id": str(attachment_id)},
+        "lines": final_lines
     }
 
     # Debug log

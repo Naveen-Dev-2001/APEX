@@ -34,6 +34,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         setInvoiceActiveTab,
         activeInvoiceData,
         setActiveInvoiceData,
+        setInvoiceData,
         lineItems,
         selectedVendorId,
         navigationOrigin,
@@ -335,7 +336,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                 (userRole.includes("coder") && (currentStatus || "").toLowerCase() === "waiting_coding")) && (
                                     <>
                                         <div className="w-[100px]">
-                                            <CustomButton variant="outline">Discard</CustomButton>
+                                            <CustomButton variant="outline" onClick={handleDiscard}>Discard</CustomButton>
                                         </div>
                                         <div className="w-[100px]">
                                             <CustomButton variant="primary" onClick={handleSaveInvoice}>
