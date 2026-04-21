@@ -487,8 +487,6 @@ const Invoice = () => {
                 onConfirm={confirmDelete}
                 title="Delete Invoice?"
                 message="Are you sure you want to delete this invoice?"
-                highlightText={deleteModalState.data?.invoice_number || 'Invoice# N/A'}
-                subMessage="This action cannot be undone and will permanently remove the record."
                 confirmText="Delete Permanently"
                 cancelText="Discard"
                 type="danger"
