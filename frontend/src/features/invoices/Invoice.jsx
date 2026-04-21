@@ -144,7 +144,7 @@ const Invoice = () => {
         setInvoiceData(data);
         setViewInvoiceId(id);
         setSelectedVendorId(data.vendor_id);
-        
+
         const status = (data.status || "").toLowerCase();
         if (status === "processed") {
             setInvoiceActiveTab("Quick View");
@@ -156,7 +156,7 @@ const Invoice = () => {
     }, []);
 
 
-     useEffect(() => {
+    useEffect(() => {
         if (location.state?.viewInvoice && handleView) {
             const { setNavigationOrigin } = useInvoiceStore.getState();
             if (location.state.from) {
@@ -171,12 +171,24 @@ const Invoice = () => {
     const handleDelete = useCallback((data) => {
         console.log("handleDelete triggered for invoice:", data);
         modal.confirm({
-            title: 'Are you sure you want to delete this invoice?',
+            title: 'Delete Invoice?',
+            className: "premium-delete-modal",
             icon: <ExclamationCircleOutlined />,
-            content: `Invoice Number: ${data.invoice_number || 'N/A'}`,
-            okText: 'Yes, Delete',
+            content: (
+                <div>
+                    <p>Are you sure you want to delete this invoice?</p>
+                    <p style={{ fontWeight: 700, marginTop: '8px', color: '#1f2937' }}>
+                        {data.invoice_number || 'Invoice# N/A'}
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '16px' }}>
+                        This action cannot be undone and will permanently remove the record.
+                    </p>
+                </div>
+            ),
+            okText: 'Delete Permanently',
             okType: 'danger',
-            cancelText: 'Cancel',
+            cancelText: 'Discard',
+            centered: true,
             onOk: () => {
                 console.log("Deletion confirmed for invoice ID:", data.id);
                 return deleteInvoice(data.id).then(() => {

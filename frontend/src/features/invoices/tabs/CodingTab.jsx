@@ -185,6 +185,7 @@ const applyCalculation = (item, key, value) => {
 
 const CodingTab = () => {
     const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData, entityMaster } = useInvoiceStore();
+    const [modal, modalContextHolder] = Modal.useModal();
     const rows = lineItems;
 
     const user = useAuthStore((state) => state.user);
@@ -350,19 +351,28 @@ const CodingTab = () => {
     // ── handleDelete — original logic, zero changes ───────────────────────────
     const handleDelete = useCallback((id) => {
         console.log("CodingTab handleDelete triggered for ID:", id);
-        Modal.confirm({
-            title: 'Delete Line Item',
+        modal.confirm({
+            title: 'Delete Line Item?',
+            className: "premium-delete-modal",
             icon: <ExclamationCircleOutlined />,
-            content: 'Are you sure you want to delete this line item?',
-            okText: 'Yes, Delete',
+            content: (
+                <div>
+                    <p>Are you sure you want to delete this line item?</p>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '16px' }}>
+                        This row will be removed from the invoice coding.
+                    </p>
+                </div>
+            ),
+            okText: 'Delete Row',
             okType: 'danger',
             cancelText: 'Cancel',
+            centered: true,
             onOk: () => {
                 console.log("Line item deletion confirmed for ID:", id);
                 setLineItems(prev => prev.filter(item => item.id !== id));
             },
         });
-    }, [setLineItems]);
+    }, [modal, setLineItems]);
 
     // ── handleAdd — original logic, zero changes ──────────────────────────────
     const handleAdd = useCallback(() => {
@@ -402,6 +412,7 @@ const CodingTab = () => {
 
     return (
         <div className="flex flex-col gap-4">
+            {modalContextHolder}
             <QuickViewTab showOnlyHeader={true} />
 
             <div

@@ -277,3 +277,84 @@
 .animate-slideDown {
     animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
+/* ── Premium Delete Confirmation Modal ── */
+.premium-delete-modal {
+    width: 340px !important;
+}
+
+.premium-delete-modal .ant-modal-content {
+    border-radius: 16px !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid #fee2e2 !important;
+}
+
+.premium-delete-modal .ant-modal-confirm-body {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    padding: 24px 20px 20px !important;
+}
+
+.premium-delete-modal .ant-modal-confirm-body .anticon {
+    font-size: 36px !important;
+    margin-bottom: 12px !important;
+    margin-inline-end: 0 !important;
+    color: #ef4444 !important;
+    background: #fef2f2 !important;
+    padding: 12px !important;
+    border-radius: 50% !important;
+}
+
+.premium-delete-modal .ant-modal-confirm-title {
+    font-family: 'Jura', sans-serif !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+}
+
+.premium-delete-modal .ant-modal-confirm-content {
+    font-size: 13px !important;
+    color: #4b5563 !important;
+    margin-top: 8px !important;
+    font-family: 'Creato Display', sans-serif !important;
+}
+
+.premium-delete-modal .ant-modal-confirm-btns {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    margin-top: 24px !important;
+    float: none !important;
+}
+
+.premium-delete-modal .ant-modal-confirm-btns .ant-btn {
+    height: 36px !important;
+    padding: 0 20px !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    transition: all 0.2s ease !important;
+    font-family: 'Creato Display', sans-serif !important;
+}
+
+.premium-delete-modal .ant-modal-confirm-btns .ant-btn-dangerous {
+    background: #ef4444 !important;
+    border: none !important;
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2) !important;
+}
+
+.premium-delete-modal .ant-modal-confirm-btns .ant-btn-dangerous:hover {
+    background: #dc2626 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 8px -1px rgba(239, 68, 68, 0.3) !important;
+}
+
+.premium-delete-modal .ant-btn-default:hover {
+    background: #f9fafb !important;
+    border-color: #d1d5db !important;
+    color: #374151 !important;
+}
+

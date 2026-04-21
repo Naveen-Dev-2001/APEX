@@ -68,6 +68,7 @@ const SelectCell = ({ value, onChange, options }) => (
 );
 
 const LineItemsTable = () => {
+    const [modal, modalContextHolder] = Modal.useModal();
     const [rows, setRows] = useState([
         { id: 1, description: "Innova - 56 trip", lineType: "Expense", quantity: 0, unitPrice: 0, netAmount: 0, glCode: "", lob: "", department: "", customer: "", item: "" },
         { id: 2, description: "Small car - (11am&12", lineType: "Expense", quantity: 0, unitPrice: 0, netAmount: 0, glCode: "", lob: "", department: "", customer: "", item: "" },
@@ -119,13 +120,22 @@ const LineItemsTable = () => {
 
     const deleteRow = (id) => {
         console.log("LineItemsTable deleteRow triggered for ID:", id);
-        Modal.confirm({
-            title: 'Delete Row',
+        modal.confirm({
+            title: 'Delete Row?',
+            className: "premium-delete-modal",
             icon: <ExclamationCircleOutlined />,
-            content: 'Are you sure you want to delete this row?',
-            okText: 'Yes, Delete',
+            content: (
+                <div>
+                    <p>Are you sure you want to delete this row?</p>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '16px' }}>
+                        This row will be removed from the line items table.
+                    </p>
+                </div>
+            ),
+            okText: 'Delete Row',
             okType: 'danger',
             cancelText: 'Cancel',
+            centered: true,
             onOk: () => {
                 console.log("Row deletion confirmed for ID:", id);
                 setRows((prev) => prev.filter((r) => r.id !== id));
@@ -335,6 +345,7 @@ const LineItemsTable = () => {
 
     return (
         <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+            {modalContextHolder}
 
             {/* ── Section header ── */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
