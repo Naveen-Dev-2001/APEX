@@ -40,6 +40,8 @@ from app.repository.repositories import (
 
 from app.routes.workflow import get_invoice_total_from_invoice, get_required_approver_count
 from app.models.delegation import check_active_delegation
+from app.services.audit_service import audit_service
+from app.models.audit_log import AuditAction
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workflow/action", tags=["Workflow Actions"])
@@ -777,6 +779,15 @@ async def approve_invoice(
             entity=entity,
         )
 
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action=f"Approved (Level {current_level})",
+            user=current_user.username,
+            entity=entity,
+            details={"comment": payload.comment}
+        )
+
         updated_approved_at_level = list(
             approved_levels.get(current_level, [])) + [email]
         level_complete = _level_is_complete(
@@ -827,6 +838,14 @@ async def approve_invoice(
                         comment=payload.comment,
                         entity=entity,
                     )
+                    await audit_service.log_action(
+                        db=db,
+                        invoice_id=invoice_id,
+                        action=AuditAction.APPROVED,
+                        user=current_user.username,
+                        entity=entity,
+                        details={"comment": payload.comment}
+                    )
                     db.commit()
                     return ActionResponse(
                         success=True,
@@ -867,6 +886,15 @@ async def approve_invoice(
             user_email=email,
             comment=payload.comment,
             entity=entity,
+        )
+
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action="Threshold Approved",
+            user=current_user.username,
+            entity=entity,
+            details={"comment": payload.comment}
         )
 
         if has_posting:
@@ -931,6 +959,14 @@ async def approve_invoice(
             comment=payload.comment,
             entity=entity,
         )
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action="Posting Approved",
+            user=current_user.username,
+            entity=entity,
+            details={"comment": payload.comment}
+        )
         db.commit()
 
         sage_result = await _post_to_sage(invoice_id, entity)
@@ -946,6 +982,15 @@ async def approve_invoice(
                 user_email=email,
                 comment=f"Sage Bill ID: {sage_result.get('sage_bill_id')}",
                 entity=entity,
+            )
+            await audit_service.log_action(
+                db=db,
+                invoice_id=invoice_id,
+                action=AuditAction.SAGE_POSTED,
+                user=current_user.username,
+                entity=entity,
+                details={"sage_bill_id": sage_result.get("sage_bill_id")},
+                sage_bill_number=sage_result.get("sage_bill_id")
             )
             db.commit()
             return ActionResponse(
@@ -964,6 +1009,14 @@ async def approve_invoice(
                 user_email=email,
                 comment=sage_result.get("message"),
                 entity=entity,
+            )
+            await audit_service.log_action(
+                db=db,
+                invoice_id=invoice_id,
+                action=AuditAction.SAGE_POST_FAILED,
+                user=current_user.username,
+                entity=entity,
+                details={"error": sage_result.get("message")}
             )
             db.commit()
             return ActionResponse(
@@ -1036,12 +1089,10 @@ async def reject_invoice(
     )
 
     # ── 3. Audit Log ──────────────────────
-    from app.services.audit_service import audit_service
-    from app.models.audit_log import AuditAction
     await audit_service.log_action(
         db=db,
         invoice_id=invoice_id,
-        action=AuditAction.REJECTED.value if hasattr(AuditAction.REJECTED, 'value') else "REJECTED",
+        action=AuditAction.REJECTED,
         user=current_user.username,
         entity=entity,
         details={"comment": payload.comment}
@@ -1147,6 +1198,14 @@ async def rework_invoice(
         approver_number=prev_finance_level,
         comment=payload.comment,
         entity=entity,
+    )
+    await audit_service.log_action(
+        db=db,
+        invoice_id=invoice_id,
+        action=AuditAction.REWORKED,
+        user=current_user.username,
+        entity=entity,
+        details={"comment": payload.comment, "rework_to_level": prev_finance_level}
     )
     db.commit()
 
@@ -1288,6 +1347,15 @@ async def repost_to_sage(
             user_email=email,
             comment=f"Sage Bill ID: {sage_result.get('sage_bill_id')}",
         )
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action="Sage Reposted",
+            user=current_user.username,
+            entity=entity,
+            details={"sage_bill_id": sage_result.get("sage_bill_id")},
+            sage_bill_number=sage_result.get("sage_bill_id")
+        )
         db.commit()
         return ActionResponse(
             success=True,
@@ -1303,6 +1371,14 @@ async def repost_to_sage(
             step_type=StepType.POST_FAILED,
             user_email=email,
             comment=sage_result.get("message"),
+        )
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action="Sage Repost Failed",
+            user=current_user.username,
+            entity=entity,
+            details={"error": sage_result.get("message")}
         )
         db.commit()
         return ActionResponse(
@@ -1360,6 +1436,15 @@ async def recall_invoice(
         user_email=current_user.email,
         comment=request.comment or "Recalled by Coder",
         entity=invoice.entity
+    )
+    
+    await audit_service.log_action(
+        db=db,
+        invoice_id=invoice_id,
+        action=AuditAction.RECALLED,
+        user=current_user.username,
+        entity=invoice.entity,
+        details={"comment": request.comment or "Recalled by Coder"}
     )
 
     db.commit()
