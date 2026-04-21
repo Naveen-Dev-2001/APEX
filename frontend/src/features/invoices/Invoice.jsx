@@ -20,6 +20,7 @@ import ExportButton from "../../shared/components/ExportButton";
 import { useAuthStore } from "../../store/authStore";
 import ArchivedInvoicesTab, { ARCHIVE_COLUMNS } from "./ArchivedInvoicesTab";
 import { useLocation, useNavigate } from "react-router-dom";
+import AlertModal from "../../shared/components/AlertModal";
 
 const Invoice = () => {
     const {
@@ -116,6 +117,9 @@ const Invoice = () => {
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const { isLoadingVendorDetail, vendor } = useVendorDetailSync(selectedVendorId);
+    
+    // AlertModal state for deletion
+    const [deleteModalState, setDeleteModalState] = useState({ isOpen: false, data: null, loading: false });
 
     useEffect(() => {
         fetchEntityMaster().then((res) => {
@@ -170,37 +174,25 @@ const Invoice = () => {
 
     const handleDelete = useCallback((data) => {
         console.log("handleDelete triggered for invoice:", data);
-        modal.confirm({
-            title: 'Delete Invoice?',
-            className: "premium-delete-modal",
-            icon: <ExclamationCircleOutlined />,
-            content: (
-                <div>
-                    <p>Are you sure you want to delete this invoice?</p>
-                    <p style={{ fontWeight: 700, marginTop: '8px', color: '#1f2937' }}>
-                        {data.invoice_number || 'Invoice# N/A'}
-                    </p>
-                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '16px' }}>
-                        This action cannot be undone and will permanently remove the record.
-                    </p>
-                </div>
-            ),
-            okText: 'Delete Permanently',
-            okType: 'danger',
-            cancelText: 'Discard',
-            centered: true,
-            onOk: () => {
-                console.log("Deletion confirmed for invoice ID:", data.id);
-                return deleteInvoice(data.id).then(() => {
-                    messageApi.success("Invoice deleted successfully");
-                    refetch();
-                }).catch((err) => {
-                    console.error("Delete invoice error:", err);
-                    messageApi.error("Failed to delete invoice");
-                });
-            },
-        });
-    }, [modal, messageApi, refetch]);
+        setDeleteModalState({ isOpen: true, data, loading: false });
+    }, []);
+
+    const confirmDelete = async () => {
+        const { data } = deleteModalState;
+        if (!data?.id) return;
+        
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+            await deleteInvoice(data.id);
+            messageApi.success("Invoice deleted successfully");
+            refetch();
+            setDeleteModalState({ isOpen: false, data: null, loading: false });
+        } catch (err) {
+            console.error("Delete invoice error:", err);
+            messageApi.error("Failed to delete invoice");
+            setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
+    };
 
     const handleResetAll = useCallback(() => {
         setSearchQuery("");
@@ -488,6 +480,20 @@ const Invoice = () => {
             )}
 
             {invoiceSection === 2 && <ViewInvoicePage />}
+            
+            <AlertModal
+                isOpen={deleteModalState.isOpen}
+                onClose={() => setDeleteModalState({ isOpen: false, data: null, loading: false })}
+                onConfirm={confirmDelete}
+                title="Delete Invoice?"
+                message="Are you sure you want to delete this invoice?"
+                highlightText={deleteModalState.data?.invoice_number || 'Invoice# N/A'}
+                subMessage="This action cannot be undone and will permanently remove the record."
+                confirmText="Delete Permanently"
+                cancelText="Discard"
+                type="danger"
+                loading={deleteModalState.loading}
+            />
         </>
     );
 };
