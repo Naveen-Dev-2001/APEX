@@ -2,9 +2,9 @@ import { Collapse } from "antd";
 import { QUICK_VIEW_CONFIG } from "../Fields";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
-import { useVendersListSync, useVendorDetailSync } from "../../hooks/useInvoiceDetailSync";
+import { useVendorDetailSync } from "../../hooks/useInvoiceDetailSync";
 import { useCallback, useEffect, useMemo, useState, useRef, memo } from "react";
-import { AutoComplete } from "antd";
+import { AutoComplete, Spin } from "antd";
 import CustomInput from "../../../shared/components/CustomInput";
 import CustomDatePicker from "../../../shared/components/CustomDatePicker";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
@@ -19,7 +19,7 @@ dayjs.extend(customParseFormat);
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
-const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, isAmountMismatch, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading }) => {
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, isAmountMismatch, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading, onSearch, searchLoading }) => {
     const [localValue, setLocalValue] = useState(storeValue ?? "");
     const debounceRef = useRef(null);
 
@@ -57,8 +57,10 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
                         setLocalValue(field.key === "vendorId" ? val : name);
                         onVendorSelect(val, name);
                     }}
-                    onSearch={(val) => handleChange(val)}
-                    placeholder="Search Vendor"
+                    onSearch={onSearch}
+                    loading={searchLoading}
+                    placeholder="Type to search vendor ID or name"
+                    notFoundContent={searchLoading ? <div className="p-2 flex justify-center"><Spin size="small" /></div> : null}
                 />
             );
         }
@@ -221,20 +223,18 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             setCurrencyLoading(false);
         }
     }, []);
-    const {
-        quickViewFormData,
-        setQuickViewField,
-        activeInvoiceData,
-        selectedVendorId,
-        setQuickViewFormData,
-        setSelectedVendorId,
-        setHighlightedField,
-        entityMaster,
-        isDuplicate,
-        duplicateMessage,
-        lineItems,
-        setLineItems
-    } = useInvoiceStore();
+    const quickViewFormData = useInvoiceStore(s => s.quickViewFormData);
+    const setQuickViewField = useInvoiceStore(s => s.setQuickViewField);
+    const activeInvoiceData = useInvoiceStore(s => s.activeInvoiceData);
+    const selectedVendorId = useInvoiceStore(s => s.selectedVendorId);
+    const setQuickViewFormData = useInvoiceStore(s => s.setQuickViewFormData);
+    const setSelectedVendorId = useInvoiceStore(s => s.setSelectedVendorId);
+    const setHighlightedField = useInvoiceStore(s => s.setHighlightedField);
+    const entityMaster = useInvoiceStore(s => s.entityMaster);
+    const isDuplicate = useInvoiceStore(s => s.isDuplicate);
+    const duplicateMessage = useInvoiceStore(s => s.duplicateMessage);
+    const lineItems = useInvoiceStore(s => s.lineItems);
+    const setLineItems = useInvoiceStore(s => s.setLineItems);
 
     // ── Exchange Rate Auto-Fetch Logic ──────────────────────────────────────────
     const rateCache = useRef({}); // { 'CURRENCY_DATE': rate }
@@ -281,8 +281,94 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         return () => { isMounted = false; };
     }, [quickViewFormData?.invoiceCurrency, quickViewFormData?.invoiceDate, setQuickViewField]);
 
-    const { vendorsList } = useVendersListSync();
+    const handleCommit = useCallback((key, value) => {
+        if (key === "invoiceDate") {
+            // Get current form data and vendor info
+            const state = useInvoiceStore.getState();
+            const prev = state.quickViewFormData;
+            const vendor = state.vendor || {};
+            // Helper functions (copied from above)
+            const parseDateFlexible = (dateStr) => {
+                if (!dateStr) return null;
+                const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
+                for (const fmt of formats) {
+                    const d = dayjs(dateStr, fmt, true);
+                    if (d.isValid()) return d;
+                }
+                const d = dayjs(dateStr);
+                return d.isValid() ? d : null;
+            };
+            const extractDays = (payTerms) => {
+                if (!payTerms) return null;
+                const match = payTerms.match(/\d+/);
+                return match ? parseInt(match[0], 10) : null;
+            };
+            const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
+                // Always recalculate due date on invoiceDate change
+                const baseDate = parseDateFlexible(invoiceDate);
+                if (!baseDate) return "";
+                const invoiceDays = extractDays(prev?.paymentTerms);
+                if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
+                const vendorDays = extractDays(vendor?.pay_terms);
+                if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
+                return "";
+            };
+            const newDueDate = getDueDate(null, value, prev?.paymentTerms, vendor?.pay_terms);
+            setQuickViewField("invoiceDate", value);
+            setQuickViewField("dueDate", newDueDate);
+        } else {
+            setQuickViewField(key, value);
+        }
+    }, [setQuickViewField]);
+
+    // ── Vendor Logic (Optimized for 35k+ vendors) ──────────────────────────
     const { vendor } = useVendorDetailSync(selectedVendorId);
+    const [searchedVendors, setSearchedVendors] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const searchTimeoutRef = useRef(null);
+
+    // Populate initial vendor if available
+    useEffect(() => {
+        if (vendor) {
+            setSearchedVendors([{
+                value: vendor.vendor_id,
+                label: `${vendor.vendor_id} - ${vendor.vendor_name}`
+            }]);
+        }
+    }, [vendor]);
+
+    const handleVendorSearch = useCallback((val) => {
+        if (!val || val.length < 2) {
+            setSearchedVendors([]);
+            return;
+        }
+
+        setIsSearching(true);
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+        searchTimeoutRef.current = setTimeout(async () => {
+            try {
+                const res = await masterDataService.getVendorMasterData({ search: val, page_size: 50 });
+                const data = res.data || [];
+                const options = data.map(v => ({
+                    value: v.vendor_id,
+                    label: `${v.vendor_id} - ${v.vendor_name}`
+                }));
+                setSearchedVendors(options);
+            } catch (err) {
+                console.error("Vendor search failed:", err);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 500);
+    }, []);
+
+    // Also handle vendor name changes (which triggers manual ID update)
+    const handleVendorFieldCommit = useCallback((key, value) => {
+        handleCommit(key, value);
+        // If they manually cleared it, clear search too
+        if (!value) setSearchedVendors([]);
+    }, [handleCommit]);
     const [showCalcModal, setShowCalcModal] = useState(false);
 
     const prevVendorRef = useRef(null);
@@ -375,53 +461,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [vendor, selectedVendorId]);
 
     // ── Vendor options ─────────────────────────────────────────────────────────
-    const vendorOptions = useMemo(() => {
-        if (!vendorsList?.length) return [];
-        return vendorsList.map(v => ({
-            value: v.vendor_id,
-            label: `${v.vendor_id} - ${v.vendor_name}`,
-        }));
-    }, [vendorsList]);
+    // No longer needed: full mapping of 35k vendors
+    const vendorOptions = searchedVendors;
 
-    const handleCommit = useCallback((key, value) => {
-        if (key === "invoiceDate") {
-            // Get current form data and vendor info
-            const state = useInvoiceStore.getState();
-            const prev = state.quickViewFormData;
-            const vendor = state.vendor || {};
-            // Helper functions (copied from above)
-            const parseDateFlexible = (dateStr) => {
-                if (!dateStr) return null;
-                const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
-                for (const fmt of formats) {
-                    const d = dayjs(dateStr, fmt, true);
-                    if (d.isValid()) return d;
-                }
-                const d = dayjs(dateStr);
-                return d.isValid() ? d : null;
-            };
-            const extractDays = (payTerms) => {
-                if (!payTerms) return null;
-                const match = payTerms.match(/\d+/);
-                return match ? parseInt(match[0], 10) : null;
-            };
-            const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
-                // Always recalculate due date on invoiceDate change
-                const baseDate = parseDateFlexible(invoiceDate);
-                if (!baseDate) return "";
-                const invoiceDays = extractDays(prev?.paymentTerms);
-                if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
-                const vendorDays = extractDays(vendor?.pay_terms);
-                if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
-                return "";
-            };
-            const newDueDate = getDueDate(null, value, prev?.paymentTerms, vendor?.pay_terms);
-            setQuickViewField("invoiceDate", value);
-            setQuickViewField("dueDate", newDueDate);
-        } else {
-            setQuickViewField(key, value);
-        }
-    }, [setQuickViewField]);
 
     const filterVendors = useCallback((input, option) =>
         option?.label?.toLowerCase().includes(input.toLowerCase()), []);
@@ -603,13 +645,15 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         return VIEW_ONLY_STATUSES.includes(status);
     }, [activeInvoiceData, userRole, user?.email]);
 
+    const filteredSections = useMemo(() => {
+        return QUICK_VIEW_CONFIG.filter(section => (showOnlyHeader
+            ? section.section === "Header"
+            : (isAllFields || !section.showInAllFields)));
+    }, [isAllFields, showOnlyHeader]);
+
     return (
         <div className="p-2">
-            {QUICK_VIEW_CONFIG
-                .filter(section => (showOnlyHeader
-                    ? section.section === "Header"
-                    : (isAllFields || !section.showInAllFields)))
-                .map((section) => {
+            {filteredSections.map((section) => {
                     const content = (
                         <>
                             {/* ── FORM ── */}
@@ -629,8 +673,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                         <FieldRenderer
                                                             field={field}
                                                             storeValue={quickViewFormData?.[field.key] ?? ""}
-                                                            onCommit={handleCommit}
-                                                            vendorOptions={vendorOptions}
+                                                            onCommit={field.key === "vendorId" || field.key === "vendorName" ? handleVendorFieldCommit : handleCommit}
+                                                            vendorOptions={(field.key === "vendorId" || field.key === "vendorName") ? vendorOptions : undefined}
                                                             filterVendors={filterVendors}
                                                             onVendorSelect={handleVendorSelect}
                                                             onHover={handleHoverField}
@@ -639,9 +683,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                             duplicateMessage={duplicateMessage}
                                                             isAmountMismatch={isAmountMismatch}
                                                             forceDisabled={isViewOnly}
-                                                            currencyOptions={currencyOptions}
+                                                            currencyOptions={field.key === "invoiceCurrency" ? currencyOptions : undefined}
                                                             fetchCurrencyOptions={fetchCurrencyOptions}
                                                             currencyLoading={currencyLoading}
+                                                            onSearch={field.key === "vendorId" || field.key === "vendorName" ? handleVendorSearch : undefined}
+                                                            searchLoading={isSearching}
                                                         />
                                                     )
                                                 }
