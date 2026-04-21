@@ -1,246 +1,499 @@
+
 import { CheckOutlined, ExclamationOutlined, ClockCircleOutlined, UserOutlined, CloseOutlined, RollbackOutlined } from "@ant-design/icons";
+
 import { Tag } from "antd";
+
 import { useInvoiceStore } from "../../../store/invoice.store";
+
 import { useWorkflowDataSync } from "../../hooks/useWorkflow";
 
+
+
 const getOrdinal = (n) => {
+
     const s = ["th", "st", "nd", "rd"];
+
     const v = n % 100;
+
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
+
 };
+
+
 
 const getStatusConfig = (status) => {
+
     switch (status?.toLowerCase()) {
+
         case "completed":
+
         case "sage_posted":
+
         case "approved":
+
             return {
+
                 titleColor: "text-[#1AB394]",
+
                 subtitleColor: "text-gray-600",
+
                 timeColor: "text-gray-400",
+
                 icon: (
+
                     <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#1AB394]">
+
                         <CheckOutlined className="!text-white text-[10px] font-black" />
+
                     </div>
+
                 ),
+
                 lineColor: "bg-[#1AB394]",
+
                 lineStyle: "solid"
+
             };
+
         case "pending":
+
             return {
+
                 titleColor: "text-[#8A6D3B]",
+
                 subtitleColor: "text-gray-600",
+
                 timeColor: "text-gray-400",
+
                 icon: (
+
                     <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#F8AC59]">
+
                         <ExclamationOutlined className="!text-white text-[12px] font-black" />
+
                     </div>
+
                 ),
+
                 lineColor: "bg-gray-200",
+
                 lineStyle: "dashed",
+
                 defaultSubtitle: "Awaiting Review"
+
             };
+
         case "rejected":
+
             return {
+
                 titleColor: "text-[#ED5565]",
+
                 subtitleColor: "text-gray-600",
+
                 timeColor: "text-gray-400",
+
                 icon: (
+
                     <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#ED5565]">
+
                         <CloseOutlined className="!text-white text-[10px] font-black" />
+
                     </div>
+
                 ),
+
                 lineColor: "bg-gray-200",
+
                 lineStyle: "dashed",
+
                 defaultSubtitle: "Rejected"
+
             };
+
         case "reworked":
+
             return {
+
                 titleColor: "text-[#F8AC59]",
+
                 subtitleColor: "text-gray-600",
+
                 timeColor: "text-gray-400",
+
                 icon: (
+
                     <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#F8AC59]">
+
                         <RollbackOutlined className="!text-white text-[10px] font-black" />
+
                     </div>
+
                 ),
+
                 lineColor: "bg-gray-200",
+
                 lineStyle: "dashed",
+
                 defaultSubtitle: "Sent for Rework"
+
             };
+
         case "queued":
+
         case "upcoming":
+
         default:
+
             return {
+
                 titleColor: "text-gray-500",
+
                 subtitleColor: "text-gray-400",
+
                 timeColor: "text-gray-300",
+
                 icon: (
+
                     <div className="w-6 h-6 border-2 border-gray-200 rounded-full bg-white" />
+
                 ),
+
                 lineColor: "bg-gray-200",
+
                 lineStyle: "dashed",
+
                 defaultSubtitle: "In Queue"
+
             };
+
     }
+
 };
 
+
+
 const WorkflowTab = () => {
+
     const { viewInvoiceId, activeInvoiceData, lineItems, selectedVendorId } = useInvoiceStore();
+
     const isArchived = activeInvoiceData?.is_archived;
 
+
+
     // Pass the same preview params as InvoiceTopBar so codification workflows resolve correctly
+
     const firstLine = lineItems?.[0] || {};
+
     const {
+
         workflowData,
+
         isLoadingWorkflowData
+
     } = useWorkflowDataSync(!isArchived ? viewInvoiceId : null, {
+
         preview_vendor_id: selectedVendorId,
+
         preview_lob: firstLine.lob,
+
         preview_department_id: firstLine.department,
+
     });
 
+
+
     if (isLoadingWorkflowData) {
+
         return <div className="p-6 text-gray-400 font-normal">Loading analysis...</div>;
+
     }
 
+
+
     const currentStatus = (activeInvoiceData?.status || "processed").toLowerCase();
+
     const historySteps = workflowData?.steps || [];
+
     const assignedApprovers = workflowData?.assigned_approvers || [];
+
     const currentApproverLevel = workflowData?.current_approver_level || 1;
+
     const delegations = workflowData?.delegations || {};
+
     const userNamesMap = workflowData?.user_names || {};
+
     const getUserDisplayName = (email) => userNamesMap[email?.toLowerCase()] || email;
+
+
 
     const steps = [];
 
+
+
     // Part 1: History (Audit Trail)
+
     historySteps.forEach(s => {
+
         let title = s.step_name;
+
         let status = "completed";
+
         if (["reworked", "rejected", "post_failed"].includes(s.step_type)) {
+
             status = s.step_type === "reworked" ? "reworked" : "rejected";
+
         }
+
+
 
         // Format titles for approver stages
+
         if (s.approver_number) {
+
             const ord = getOrdinal(s.approver_number);
+
             if (s.step_type === "level_approved") title = `${ord} Approver Completed`;
+
             else if (s.step_type === "reworked") title = `${ord} Approver Reworked`;
+
             else if (s.step_type === "rejected") title = `${ord} Approver Rejected`;
+
         }
+
+
 
         steps.push({
+
             title,
+
             subtitle: getUserDisplayName(s.user),
+
             time: s.timestamp ? new Date(s.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : "",
+
             comment: s.comment,
+
             status
+
         });
+
     });
 
+
+
     // Part 2: Pending and Future Stages (if not finished)
+
     const isFinished = ["sage_posted", "rejected"].includes(currentStatus);
+
     if (!isFinished) {
+
         // 1. Coding
+
         const hasCoding = historySteps.some(s => s.step_type === "coding");
-        if (!hasCoding && currentStatus === "waiting_coding") {
-            steps.push({ title: "Pending Coding", status: "pending" });
+
+        if (!hasCoding && (currentStatus === "waiting_coding" || currentStatus === "processed")) {
+
+            steps.push({
+
+                title: currentStatus === "waiting_coding" ? "Pending Coding" : "Coding Stage",
+
+                status: currentStatus === "waiting_coding" ? "pending" : "queued"
+
+            });
+
         }
+
+
 
         // 2. Approvers
+
         const isWaitingApproval = ["waiting_approval", "reworked"].includes(currentStatus);
+
         if (isWaitingApproval || currentStatus === "waiting_coding" || currentStatus === "processed") {
+
             assignedApprovers.forEach((stage, index) => {
+
                 const level = index + 1;
+
                 const stageType = stage?.type || "mandatory";
+
                 const emails = Array.isArray(stage?.emails) ? stage.emails : (stage?.emails ? [stage.emails] : []);
-                
+
+
+
                 const isFinanceTeam = stage?.is_finance || emails.some(e => String(e).toLowerCase().includes("finance team")) || (stageType === "mandatory" && stage?.level === 2 && emails.length === 0);
+
                 const subtitle = isFinanceTeam ? "Finance Team" : emails.map(email => {
+
                     if (!email) return "";
+
                     const displayName = getUserDisplayName(email);
+
                     const substitutes = delegations[email.toLowerCase()];
+
                     if (substitutes?.length > 0) {
+
                         const subNames = substitutes.map(s => getUserDisplayName(s)).join(", ");
+
                         return `${displayName} (Delegated to ${subNames})`;
+
                     }
+
                     return displayName;
+
                 }).join(", ");
 
+
+
                 if (level === currentApproverLevel && isWaitingApproval) {
+
                     let title = `Pending ${getOrdinal(level)} Approver`;
+
                     if (stageType === "threshold") title = "Pending Threshold Approver";
+
                     if (stageType === "posting") title = "Pending Posting Approver";
 
+
+
                     steps.push({ title, subtitle, status: "pending" });
-                } else if (level > currentApproverLevel) {
+
+                } else if (level > currentApproverLevel || (level === currentApproverLevel && !isWaitingApproval)) {
+
                     let title = `${getOrdinal(level)} Approver`;
+
                     if (stageType === "threshold") title = "Threshold Approver";
+
                     if (stageType === "posting") title = "Posting Approver";
 
+
+
                     steps.push({ title, subtitle, status: "queued" });
+
                 }
+
             });
+
         }
+
+
 
         // 3. Final Posting
+
         if (currentStatus !== "sage_posted") {
+
             steps.push({
+
                 title: currentStatus === "approved" ? "Pending Final Posting" : "Final Posting",
+
                 status: currentStatus === "approved" ? "pending" : "queued"
+
             });
+
         }
+
     }
 
+
+
     return (
+
         <div className="bg-white p-10 overflow-y-auto max-h-full font-sans">
+
             {steps.map((item, index) => {
+
                 const config = getStatusConfig(item.status);
+
                 const isLast = index === steps.length - 1;
 
+
+
                 return (
+
                     <div key={index} className="flex gap-6 relative items-stretch">
+
                         <div className="flex flex-col items-center">
+
                             <div className="z-10 bg-white py-1">
+
                                 {config.icon}
+
                             </div>
+
                             {!isLast && (
+
                                 <div
+
                                     className={`w-[2px] flex-1 ${config.lineStyle === 'dashed' ? 'border-l-2 border-dashed border-gray-200' : config.lineColor}`}
+
                                     style={{ minHeight: "20px" }}
+
                                 />
+
                             )}
+
                         </div>
+
+
 
                         <div className="pb-5 flex-1 flex flex-col justify-start">
+
                             <div className={`text-[13px] font-normal tracking-wide ${config.titleColor}`}>
+
                                 {item.title}
+
                             </div>
+
+
 
                             <div className="mt-1 flex flex-col gap-1">
+
                                 <div className="flex items-baseline gap-3">
+
                                     <span className={`text-[12px] font-normal ${config.subtitleColor}`}>
+
                                         {item.subtitle || config.defaultSubtitle}
+
                                     </span>
+
                                     {item.time && (
+
                                         <span className={`text-[12px] font-normal ${config.timeColor}`}>
+
                                             {item.time}
+
                                         </span>
+
                                     )}
+
                                 </div>
+
                                 {item.comment && (
+
                                     <div className={`mt-1 text-[11px] italic text-gray-500 bg-gray-50 p-2 rounded border-l-2 ${item.status === 'rejected' ? 'border-[#ED5565]' : (item.status === 'reworked' ? 'border-[#F8AC59]' : 'border-[#1AB394]')} max-w-md shadow-sm`}>
+
                                         "{item.comment}"
+
                                     </div>
+
                                 )}
+
                             </div>
+
                         </div>
+
                     </div>
+
                 );
+
             })}
+
         </div>
+
     );
+
 };
 
+
+
 export default WorkflowTab;
+

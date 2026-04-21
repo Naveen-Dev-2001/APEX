@@ -619,7 +619,7 @@ async def get_ui_status_from_frontend(
 
     can_enable_editing = (
         is_finance
-        and is_current_level_finance
+        and (is_current_level_finance or can_act)
         and not mandatory_levels_done
         and not already_approved_this_level
     )
