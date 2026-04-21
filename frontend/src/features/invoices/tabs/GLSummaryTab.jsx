@@ -56,8 +56,8 @@ const GLSummaryTab = ({ invoice = {} }) => {
         <div className="p-2 h-full overflow-y-auto">
             {/* Total Amount Banner */}
             <div
-                className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 rounded-xl mb-5"
-                style={{ background: "#11699E" }}
+                className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 rounded-xl"
+                style={{ background: "#11699E", marginBottom: "20px" }}
             >
                 <span className="text-white text-[15px] font-normal">
                     Total Amount Payable:

@@ -786,7 +786,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                         <Collapse
                             key={section.section}
                             defaultActiveKey={[section.section]}
-                            className="mb-3 bg-white rounded-md"
+                            className="bg-white rounded-md border border-gray-200 shadow-sm"
+                            style={{ marginBottom: "16px" }}
                             items={[{ key: section.section, label: section.section, children: content }]}
                         />
                     );
