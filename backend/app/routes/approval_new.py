@@ -618,9 +618,8 @@ async def get_ui_status_from_frontend(
     )
 
     can_enable_editing = (
-        is_finance
+        (is_finance or is_threshold_approver or is_posting_approver)
         and (is_current_level_finance or can_act)
-        and not mandatory_levels_done
         and not already_approved_this_level
     )
 
@@ -1269,9 +1268,34 @@ async def enable_editing(
             delegated_finance = True
             break
 
-    if email not in [f.lower() for f in finance_users] and not delegated_finance:
+    # Check if user is a threshold or posting approver (or delegate)
+    workflow = _get_workflow_data(db, invoice, entity)
+    assigned = workflow.get("assigned_approvers", [])
+    post_emails = []
+    for a in assigned:
+        if a.get("type") in ("threshold", "posting"):
+            post_emails.extend(_parse_list(a.get("emails", [])))
+    
+    is_post_approver = email in [e.lower() for e in post_emails]
+    delegated_post = False
+    if not is_post_approver:
+        for p_email in post_emails:
+            if not p_email: continue
+            subs = check_active_delegation(db, p_email, entity)
+            if email in [s.lower() for s in subs]:
+                delegated_post = True
+                break
+
+    is_authorized = (
+        email in [f.lower() for f in finance_users]
+        or delegated_finance
+        or is_post_approver
+        or delegated_post
+    )
+
+    if not is_authorized:
         raise HTTPException(
-            403, "Only Finance Team members (or their delegates) can enable editing")
+            403, "Only Finance Team members or Post Approvers (or their delegates) can enable editing")
 
     _record_step(
         db, invoice_id,

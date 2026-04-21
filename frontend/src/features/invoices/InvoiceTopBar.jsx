@@ -62,14 +62,20 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     // so QuickViewTab's isViewOnly useMemo immediately returns false.
     const [editingEnabled, setEditingEnabled] = useState(false);
 
-    const handleEnableEditing = () => {
-        setEditingEnabled(true);
-        setActiveInvoiceData({
-            ...activeInvoiceData,
-            is_editing_enabled: true,
-            editing_enabled_by: user?.email,
-        });
-        toast.success("Editing enabled. Make your changes and save.");
+    const handleEnableEditing = async () => {
+        try {
+            await workflowActionsAPI.enableEditing(viewInvoiceId);
+            setEditingEnabled(true);
+            setActiveInvoiceData({
+                ...activeInvoiceData,
+                is_editing_enabled: true,
+                editing_enabled_by: user?.email,
+            });
+            toast.success("Editing enabled. Make your changes and save.");
+        } catch (err) {
+            console.error("Enable editing error:", err);
+            toast.error("Failed to enable editing on server. Please try again.");
+        }
     };
 
     // ── Approver UI state ──────────────────────────────────────────────────
