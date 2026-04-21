@@ -481,19 +481,20 @@ async def get_ui_status_from_frontend(
     is_finance = email in [f.lower() for f in finance_users]
 
     steps = _steps_for_invoice(db, invoice_id)
+    approval_types = [StepType.LEVEL_APPROVED, StepType.THRESHOLD_APPROVED, StepType.POSTING_APPROVED, StepType.APPROVED]
 
     mandatory = [a for a in assigned if a.get("type") == "mandatory"]
     threshold_entries = [a for a in assigned if a.get("type") == "threshold"]
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
 
-    # ── If reworked, only count level_approved steps AFTER the last rework ──
+    # ── If reworked, only count approval steps AFTER the last rework ──
     if current_status == InvoiceStatus.REWORKED:
         rework_steps = [s for s in steps if s.step_type == StepType.REWORKED]
         last_rework_ts = max((s.timestamp for s in rework_steps), default=None)
         if last_rework_ts:
             steps_for_level_check = [
                 s for s in steps
-                if s.step_type != StepType.LEVEL_APPROVED or s.timestamp > last_rework_ts
+                if s.step_type not in approval_types or s.timestamp > last_rework_ts
             ]
         else:
             steps_for_level_check = steps
@@ -549,13 +550,12 @@ async def get_ui_status_from_frontend(
                 or (email in emails_at_level)
                 or delegated_authority
             )
-            already_acted_this_level = any(
+            already_acted_in_workflow = any(
                 (s.user or "").lower() == email
-                and s.step_type == StepType.LEVEL_APPROVED
-                and s.approver_number == current_level
+                and s.step_type in approval_types
                 for s in steps_for_level_check
             )
-            can_act = user_in_level and not already_acted_this_level
+            can_act = user_in_level and not already_acted_in_workflow
 
     elif has_threshold and not threshold_done:
         delegated_threshold = False
@@ -567,13 +567,13 @@ async def get_ui_status_from_frontend(
                 delegated_threshold = True
                 break
 
-        already_threshold = any(
+        already_acted_in_workflow = any(
             (s.user or "").lower() == email
-            and s.step_type == StepType.THRESHOLD_APPROVED
+            and s.step_type in approval_types
             for s in steps_for_level_check
         )
         can_act = (
-            is_threshold_approver or delegated_threshold) and not already_threshold
+            is_threshold_approver or delegated_threshold) and not already_acted_in_workflow
 
     elif has_posting and not posting_done:
         delegated_posting = False
@@ -585,13 +585,13 @@ async def get_ui_status_from_frontend(
                 delegated_posting = True
                 break
 
-        already_posted = any(
+        already_acted_in_workflow = any(
             (s.user or "").lower() == email
-            and s.step_type == StepType.POSTING_APPROVED
+            and s.step_type in approval_types
             for s in steps_for_level_check
         )
         can_act = (
-            is_posting_approver or delegated_posting) and not already_posted
+            is_posting_approver or delegated_posting) and not already_acted_in_workflow
 
     # ── can_enable_editing logic ─────────────────────────────────────────────
     # Show "Enable Editing" if:
@@ -688,6 +688,7 @@ async def approve_invoice(
 
     workflow = _get_workflow_data(db, invoice, entity)
     steps = _steps_for_invoice(db, invoice_id)
+    approval_types = [StepType.LEVEL_APPROVED, StepType.THRESHOLD_APPROVED, StepType.POSTING_APPROVED, StepType.APPROVED]
     finance_users = _get_finance_users(db, entity)
     current_level = invoice.current_approver_level or 1
     email = current_user.email.lower()
@@ -697,14 +698,14 @@ async def approve_invoice(
     threshold_entries = [a for a in assigned if a.get("type") == "threshold"]
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
 
-    # ── If reworked, only count level_approved steps AFTER the last rework ──
+    # ── If reworked, only count approval steps AFTER the last rework ──
     if current_status == InvoiceStatus.REWORKED:
         rework_steps = [s for s in steps if s.step_type == StepType.REWORKED]
         last_rework_ts = max((s.timestamp for s in rework_steps), default=None)
         if last_rework_ts:
             steps_for_level_check = [
                 s for s in steps
-                if s.step_type != StepType.LEVEL_APPROVED or s.timestamp > last_rework_ts
+                if s.step_type not in approval_types or s.timestamp > last_rework_ts
             ]
         else:
             steps_for_level_check = steps
@@ -757,15 +758,14 @@ async def approve_invoice(
             raise HTTPException(
                 400, f"Level {current_level} has already been approved")
 
-        # Check if user already approved at this level (post-rework only)
+        # Check if user already acted in this cycle (any level)
         already = any(
             (s.user or "").lower() == email
-            and s.step_type == StepType.LEVEL_APPROVED
-            and s.approver_number == current_level
+            and s.step_type in approval_types
             for s in steps_for_level_check
         )
         if already:
-            raise HTTPException(400, "You have already approved at this level")
+            raise HTTPException(400, "You have already acted in this workflow cycle")
 
         _record_step(
             db, invoice_id,
