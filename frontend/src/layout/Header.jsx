@@ -83,8 +83,18 @@ const Header = () => {
         setActiveRole(targetRole);
         setShowChangeRoleModal(false);
         setIsDropdownOpen(false);
-        // Always navigate to dashboard to ensure the user lands on a valid page for the new role
-        navigate('/dashboard');
+        
+        let targetRoute = '/dashboard';
+        const role = targetRole.toLowerCase();
+        if (role === 'scanner') {
+            targetRoute = '/invoices';
+        } else if (role === 'coder') {
+            targetRoute = '/coding';
+        } else if (role === 'approver') {
+            targetRoute = '/approvals';
+        }
+        
+        navigate(targetRoute);
     };
 
     const { navigation, fetchSettings } = useAdminStore();

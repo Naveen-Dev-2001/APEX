@@ -12,17 +12,19 @@ import workflowActionsAPI from "../../api/workflowActionsAPI";
 import { useEffect, useState, useRef } from "react";
 import { Modal } from "antd";
 
+
 const MODAL_ACTIONS = {
     approve: { label: "Approve", okText: "Approve", danger: false },
     reject: { label: "Reject Invoice", okText: "Reject", danger: true },
     rework: { label: "Send for Rework", okText: "Send for Rework", danger: false },
     "repost-sage": { label: "Repost to Sage", okText: "Repost", danger: false },
+    recall: { label: "Recall Invoice", okText: "Recall", danger: true },
 };
 
 const InvoiceTopBar = ({ invoice = {} }) => {
     const navigate = useNavigate();
-    const user = useAuthStore((state) => state.user);
-    const userRole = user?.role?.toLowerCase();
+    const { user, activeRole } = useAuthStore();
+    const userRole = (activeRole || user?.role || "").toLowerCase();
 
     const {
         setInvoiceSection,
@@ -34,6 +36,8 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         setActiveInvoiceData,
         lineItems,
         selectedVendorId,
+        navigationOrigin,
+        setNavigationOrigin
     } = useInvoiceStore();
 
     const { handleSave } = useSaveInvoice();
@@ -139,7 +143,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
             toast.success("Invoice sent for approval successfully!");
             resetQuickView();
             setInvoiceSection(1);
-            navigate("/invoices");
+            navigate("/coding");
         } else {
             toast.error(payload?.message || "Something went wrong while sending for approval.");
         }
@@ -192,8 +196,15 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
     const Back = () => {
         resetQuickView();
-        setInvoiceSection(1);
-        setInvoiceActiveTab("Quick View");
+        
+        if (navigationOrigin) {
+            const origin = navigationOrigin;
+            setNavigationOrigin(null); // Clear origin
+            navigate(origin);
+        } else {
+            setInvoiceSection(1);
+            setInvoiceActiveTab("Quick View");
+        }
     };
 
     // ── Approver workflow actions ──────────────────────────────────────────
@@ -214,12 +225,24 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                 case "repost-sage":
                     result = await workflowActionsAPI.repostSage(viewInvoiceId, { comment: commentText });
                     break;
+                case "recall":
+                    result = await workflowActionsAPI.recall(viewInvoiceId, { comment: commentText });
+                    break;
                 default:
                     return;
             }
 
             if (result?.success) {
                 toast.success(result.message || "Action completed successfully.");
+                
+                // If it was a recall, navigate back to the coding queue
+                if (action === "recall") {
+                    resetQuickView();
+                    setInvoiceSection(1);
+                    navigate("/coding");
+                    return;
+                }
+
                 const leaveStatuses = ["rejected", "sage_posted", "reworked", "approved"];
                 if (leaveStatuses.includes(result.new_status)) {
                     resetQuickView();
@@ -272,8 +295,8 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     const busy = (key) => actionLoading === key;
 
     const isApproverView =
-        userRole === "approver" &&
-        ["waiting_approval", "reworked", "sage_post_failed"].includes(currentStatus);
+        userRole.includes("approver") &&
+        ["waiting_approval", "reworked", "sage_post_failed"].includes((currentStatus || "").toLowerCase());
 
     const btnBase =
         "px-3 py-1 rounded-lg border bg-white transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
@@ -308,8 +331,8 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                     {!activeInvoiceData?.is_archived && (
                         <>
                             {/* ── Scanner / Coder buttons ───────────────────────── */}
-                            {((userRole === "scanner" && currentStatus == "processed") ||
-                                (userRole === "coder" && currentStatus === "waiting_coding")) && (
+                            {((userRole.includes("scanner") && (currentStatus || "").toLowerCase() === "processed") ||
+                                (userRole.includes("coder") && (currentStatus || "").toLowerCase() === "waiting_coding")) && (
                                     <>
                                         <div className="w-[100px]">
                                             <CustomButton variant="outline">Discard</CustomButton>
@@ -417,6 +440,19 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                     )}
                                 </>
                             )}
+
+                             {/* Recall (Coder only, if level 1) */}
+                            {userRole.includes("coder") &&
+                                (currentStatus || "").toLowerCase().includes("waiting_approval") &&
+                                (workflowData?.current_approver_level === 1 || !workflowData) && (
+                                    <button
+                                        onClick={() => openModal("recall")}
+                                        disabled={!!actionLoading}
+                                        className={getBtnClass("red", !actionLoading)}
+                                    >
+                                        {busy("recall") ? "Recalling…" : "Recall"}
+                                    </button>
+                                )}
                         </>
                     )}
                 </div>

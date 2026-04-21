@@ -112,7 +112,7 @@ const ApprovalsPage = () => {
 
     const handleView = (invoice) => {
         // Navigate to invoices page to show the invoices screen
-        navigate('/invoices', { state: { viewInvoice: invoice } });
+        navigate('/invoices', { state: { viewInvoice: invoice, from: '/approvals' } });
     };
 
     const handleDelete = (invoice) => {
@@ -205,18 +205,18 @@ const ApprovalsPage = () => {
                 <div className="flex items-center space-x-3">
                     <button
                         onClick={() => handleView(row)}
-                        className="text-gray-400 hover:text-[#1e9bd8] transition-colors cursor-pointer"
+                        className="text-blue-500 hover:text-blue-700 transition-colors cursor-pointer"
                         title="View"
                     >
                         <EyeOutlined style={{ fontSize: 16 }} />
                     </button>
-                    <button
+                    {/* <button
                         onClick={() => handleDelete(row)}
                         className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                         title="Delete"
                     >
                         <DeleteOutlined style={{ fontSize: 16 }} />
-                    </button>
+                    </button> */}
                 </div>
             )
         }
