@@ -4,7 +4,6 @@ import {
     PlusOutlined,
     DownloadOutlined,
     UploadOutlined,
-    UploadOutlined,
     CaretUpOutlined,
     ExclamationCircleOutlined
 } from "@ant-design/icons";
