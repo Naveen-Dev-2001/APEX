@@ -312,6 +312,109 @@ def _find_previous_finance_level(
             return entry["level"]
     return None
 
+async def _finalize_and_post(db: Session, invoice: Invoice, current_user: UserResponse, email: str, entity: str, comment: str, step_name: str = "Invoice Approved", step_type: str = StepType.APPROVED):
+    """
+    Sets status to APPROVED, records approval steps, and triggers Sage posting.
+    """
+    from app.services.audit_service import audit_service
+    from app.models.audit_log import AuditAction
+    from app.models.invoice import InvoiceStatus
+    from app.repository.repositories import invoice_repo
+    
+    invoice_id = invoice.id
+    
+    # 1. Internal status: APPROVED
+    _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
+    
+    # Record the specific level/posting step first
+    _record_step(
+        db, invoice_id,
+        step_name=step_name,
+        step_type=step_type,
+        user_email=email,
+        comment=comment,
+        entity=entity,
+    )
+    
+    # Also record the final "Fully Approved" step for clarity in history if it's different
+    if step_type != StepType.APPROVED:
+        _record_step(
+            db, invoice_id,
+            step_name="Invoice Fully Approved",
+            step_type=StepType.APPROVED,
+            user_email=email,
+            comment="All approval levels completed.",
+            entity=entity,
+        )
+
+    await audit_service.log_action(
+        db=db,
+        invoice_id=invoice_id,
+        action=AuditAction.APPROVED,
+        user=current_user.username,
+        entity=entity,
+        details={"comment": comment, "final_step": step_name}
+    )
+    db.commit()
+
+    # 2. Trigger Sage Posting
+    sage_result = await _post_to_sage(invoice_id, entity)
+
+    if sage_result["success"]:
+        invoice = invoice_repo.get(db, invoice_id)
+        _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
+        invoice.sage_bill_id = sage_result.get("sage_bill_id")
+        _record_step(
+            db, invoice_id,
+            step_name="Posted to Sage",
+            step_type=StepType.POSTED,
+            user_email=email,
+            comment=f"Sage Bill ID: {sage_result.get('sage_bill_id')}",
+            entity=entity,
+        )
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action=AuditAction.SAGE_POSTED,
+            user=current_user.username,
+            entity=entity,
+            details={"sage_bill_id": sage_result.get("sage_bill_id")},
+            sage_bill_number=sage_result.get("sage_bill_id")
+        )
+        db.commit()
+        return ActionResponse(
+            success=True,
+            message="Invoice approved and successfully posted to Sage.",
+            new_status=InvoiceStatus.SAGE_POSTED,
+            sage_post_result=sage_result,
+        )
+    else:
+        invoice = invoice_repo.get(db, invoice_id)
+        _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POST_FAILED)
+        _record_step(
+            db, invoice_id,
+            step_name="Sage Post Failed",
+            step_type=StepType.POST_FAILED,
+            user_email=email,
+            comment=sage_result.get("message"),
+            entity=entity,
+        )
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action=AuditAction.SAGE_POST_FAILED,
+            user=current_user.username,
+            entity=entity,
+            details={"error": sage_result.get("message")}
+        )
+        db.commit()
+        return ActionResponse(
+            success=False,
+            message=f"Approved, but Sage posting failed: {sage_result['message']}",
+            new_status=InvoiceStatus.SAGE_POST_FAILED,
+            sage_post_result=sage_result,
+        )
+
 
 async def _post_to_sage(invoice_id: int, entity: str) -> Dict:
     """
@@ -851,28 +954,10 @@ async def approve_invoice(
                         next_level=posting_virtual_level,
                     )
                 else:
-                    _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
-                    _record_step(
-                        db, invoice_id,
-                        step_name="Invoice Approved",
-                        step_type=StepType.APPROVED,
-                        user_email=email,
-                        comment=payload.comment,
-                        entity=entity,
-                    )
-                    await audit_service.log_action(
-                        db=db,
-                        invoice_id=invoice_id,
-                        action=AuditAction.APPROVED,
-                        user=current_user.username,
-                        entity=entity,
-                        details={"comment": payload.comment}
-                    )
-                    db.commit()
-                    return ActionResponse(
-                        success=True,
-                        message="Invoice fully approved.",
-                        new_status=InvoiceStatus.APPROVED,
+                    return await _finalize_and_post(
+                        db, invoice, current_user, email, entity, payload.comment,
+                        step_name=f"Level {current_level} Approved (Final)",
+                        step_type=StepType.LEVEL_APPROVED
                     )
         else:
             db.commit()
@@ -932,20 +1017,10 @@ async def approve_invoice(
                 next_level=posting_virtual_level,
             )
         else:
-            _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
-            _record_step(
-                db, invoice_id,
-                step_name="Invoice Approved",
-                step_type=StepType.APPROVED,
-                user_email=email,
-                comment=payload.comment,
-                entity=entity,
-            )
-            db.commit()
-            return ActionResponse(
-                success=True,
-                message="Invoice fully approved after threshold.",
-                new_status=InvoiceStatus.APPROVED,
+            return await _finalize_and_post(
+                db, invoice, current_user, email, entity, payload.comment,
+                step_name="Threshold Approved (Final)",
+                step_type=StepType.THRESHOLD_APPROVED
             )
 
     # ── CASE C: Posting approver stage ──
@@ -966,89 +1041,11 @@ async def approve_invoice(
         if email not in [e.lower() for e in posting_emails] and not delegated_posting:
             raise HTTPException(403, "You are not the posting approver")
 
-        _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
-        _record_step(
-            db, invoice_id,
+        return await _finalize_and_post(
+            db, invoice, current_user, email, entity, payload.comment,
             step_name="Posting Approver Approved",
-            step_type=StepType.POSTING_APPROVED,
-            user_email=email,
-            comment=payload.comment,
-            entity=entity,
+            step_type=StepType.POSTING_APPROVED
         )
-        _record_step(
-            db, invoice_id,
-            step_name="Invoice Approved",
-            step_type=StepType.APPROVED,
-            user_email=email,
-            comment=payload.comment,
-            entity=entity,
-        )
-        await audit_service.log_action(
-            db=db,
-            invoice_id=invoice_id,
-            action="Posting Approved",
-            user=current_user.username,
-            entity=entity,
-            details={"comment": payload.comment}
-        )
-        db.commit()
-
-        sage_result = await _post_to_sage(invoice_id, entity)
-
-        if sage_result["success"]:
-            invoice = invoice_repo.get(db, invoice_id)
-            _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
-            invoice.sage_bill_id = sage_result.get("sage_bill_id")
-            _record_step(
-                db, invoice_id,
-                step_name="Posted to Sage",
-                step_type=StepType.POSTED,
-                user_email=email,
-                comment=f"Sage Bill ID: {sage_result.get('sage_bill_id')}",
-                entity=entity,
-            )
-            await audit_service.log_action(
-                db=db,
-                invoice_id=invoice_id,
-                action=AuditAction.SAGE_POSTED,
-                user=current_user.username,
-                entity=entity,
-                details={"sage_bill_id": sage_result.get("sage_bill_id")},
-                sage_bill_number=sage_result.get("sage_bill_id")
-            )
-            db.commit()
-            return ActionResponse(
-                success=True,
-                message="Invoice approved and successfully posted to Sage.",
-                new_status=InvoiceStatus.SAGE_POSTED,
-                sage_post_result=sage_result,
-            )
-        else:
-            invoice = invoice_repo.get(db, invoice_id)
-            _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POST_FAILED)
-            _record_step(
-                db, invoice_id,
-                step_name="Sage Post Failed",
-                step_type=StepType.POST_FAILED,
-                user_email=email,
-                comment=sage_result.get("message"),
-                entity=entity,
-            )
-            await audit_service.log_action(
-                db=db,
-                invoice_id=invoice_id,
-                action=AuditAction.SAGE_POST_FAILED,
-                user=current_user.username,
-                entity=entity,
-                details={"error": sage_result.get("message")}
-            )
-            db.commit()
-            return ActionResponse(
-                success=False,
-                message=f"Invoice approved but Sage posting failed: {sage_result['message']}",
-                new_status=InvoiceStatus.SAGE_POST_FAILED,
-                sage_post_result=sage_result,
-            )
 
     raise HTTPException(
         400, "No pending approval stage found for this invoice")
