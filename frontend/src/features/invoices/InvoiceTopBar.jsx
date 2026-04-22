@@ -178,47 +178,7 @@ const InvoiceTopBar = ({ invoice = {} }) => {
         }
     };
 
-    const handleApprove = async () => {
-        const response = await handleSave()
-        if (response) {
-            const payload = await saveInvoice(viewInvoiceId, { status: 'approved' })
-            if (payload.status == "approved") {
-                toast.success("Invoice Approved successfully!")
-                queryClient.invalidateQueries(["invoices"]);
-                navigate('/invoices')
-            } else {
-                toast.error(payload?.message || "Something went wrong while approving.");
-            }
-        }
-    }
 
-    const handleReject = async () => {
-        const response = await handleSave()
-        if (response) {
-            const payload = await saveInvoice(viewInvoiceId, { status: 'rejected' })
-            if (payload.status == "rejected") {
-                toast.success("Invoice Rejected successfully!")
-                queryClient.invalidateQueries(["invoices"]);
-                navigate('/invoices')
-            } else {
-                toast.error(payload?.message || "Something went wrong while rejecting.");
-            }
-        }
-    }
-
-    const handleRework = async () => {
-        const response = await handleSave()
-        if (response) {
-            const payload = await saveInvoice(viewInvoiceId, { status: 'rework' })
-            if (payload.status == "rework") {
-                toast.success("Invoice sent for Rework successfully!")
-                queryClient.invalidateQueries(["invoices"]);
-                navigate('/invoices')
-            } else {
-                toast.error(payload?.message || "Something went wrong while sending for rework.");
-            }
-        }
-    }
 
     const handleSaveInvoice = async () => {
         const extraFields = {};
@@ -303,18 +263,15 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                     return;
                 }
 
-                const leaveStatuses = ["rejected", "sage_posted", "reworked", "approved"];
-                if (leaveStatuses.includes(result.new_status)) {
-                    resetQuickView();
-                    setInvoiceSection(1);
-                    navigate("/invoices");
-                } else {
-                    await fetchUIStatus();
-                }
+                // For any other successful approver action, go to approvals page
+                resetQuickView();
+                setInvoiceSection(1);
+                navigate("/approvals");
             } else {
                 toast.error(result?.message || "Action failed. Please try again.");
                 await fetchUIStatus();
             }
+
         } catch (err) {
             const errorData = err?.response?.data;
             let detail = errorData?.detail;
