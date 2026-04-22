@@ -14,7 +14,7 @@ export const useInvoicePreviewData = ({ invoiceId, vendorId, workflowParams = {}
     const queryClient = useQueryClient();
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: ["invoice-preview", invoiceId, vendorId],
+        queryKey: ["invoice-preview", invoiceId, vendorId, workflowParams],
         queryFn: () =>
             fetchInvoicePreviewData({ invoiceId, vendorId, workflowParams }),
         enabled: !!invoiceId,
@@ -52,14 +52,14 @@ export const useInvoicePreviewData = ({ invoiceId, vendorId, workflowParams = {}
                 data.codingSuggestions
             );
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data, invoiceId, vendorId, queryClient]);
 
     return {
-        vendor:            data?.vendor            ?? null,
-        workflowData:      data?.workflowData      ?? null,
+        vendor: data?.vendor ?? null,
+        workflowData: data?.workflowData ?? null,
         codingSuggestions: data?.codingSuggestions ?? [],
-        isLoadingPreview:  isLoading,
-        isPreviewError:    isError,
+        isLoadingPreview: isLoading,
+        isPreviewError: isError,
     };
 };
