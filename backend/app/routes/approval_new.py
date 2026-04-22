@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.auth.jwt import get_current_user
 from app.database.database import get_db
 from app.dependencies import get_current_entity
-from app.models.db_models import Invoice, User, WorkflowStep, EntityMaster
+from app.models.db_models import Invoice, User, WorkflowStep, EntityMaster, InvoiceApprovedBy
 from app.models.user import UserResponse
 from app.repository.repositories import (
     coding_repo,
@@ -828,6 +828,10 @@ async def approve_invoice(
             entity=entity,
         )
 
+        # Record approver email in invoice.approved_by_list
+        if email not in [a.approver_email.lower() for a in (invoice.approved_by_list or [])]:
+            invoice.approved_by_list.append(InvoiceApprovedBy(approver_email=email))
+
         updated_approved_at_level = list(
             approved_levels.get(current_level, [])) + [email]
         level_complete = _level_is_complete(
@@ -956,6 +960,10 @@ async def approve_invoice(
             entity=entity,
         )
 
+        # Record approver email in invoice.approved_by_list
+        if email not in [a.approver_email.lower() for a in (invoice.approved_by_list or [])]:
+            invoice.approved_by_list.append(InvoiceApprovedBy(approver_email=email))
+
         if has_posting:
             posting_virtual_level = len(mandatory) + 2
             _advance_level(db, invoice, posting_virtual_level)
@@ -1045,6 +1053,10 @@ async def approve_invoice(
             comment=payload.comment,
             entity=entity,
         )
+
+        # Record approver email in invoice.approved_by_list
+        if email not in [a.approver_email.lower() for a in (invoice.approved_by_list or [])]:
+            invoice.approved_by_list.append(InvoiceApprovedBy(approver_email=email))
         _record_step(
             db, invoice_id,
             step_name="Invoice Approved",
