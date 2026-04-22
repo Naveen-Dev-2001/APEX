@@ -298,12 +298,10 @@ const CodingTab = ({ isActive = false }) => {
     const [itemToDelete, setItemToDelete] = useState(null);
 
     useEffect(() => {
-        if (!isActive || hasBeenActive.current) return;
-        hasBeenActive.current = true;
-        // Short settle delay so the tab paint finishes before network hits
-        const timer = setTimeout(() => setLoadMasterData(true), 200);
-        return () => clearTimeout(timer);
-    }, [isActive]);
+        if (isActive && !loadMasterData) {
+            setLoadMasterData(true);
+        }
+    }, [isActive, loadMasterData]);
 
     // ── Suggestions Logic ────────────────────────────────────────────────────
     // Check cache first (pre-seeded by useInvoicePreviewData parallel fetch).
