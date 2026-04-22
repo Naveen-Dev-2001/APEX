@@ -42,6 +42,8 @@ class InvoiceBase(BaseModel):
     due_date: Optional[date] = None
     total_amount: Optional[float] = None
     amount_due: Optional[float] = None
+    last_modified_by: Optional[str] = None
+    approver: Optional[str] = None
 
 class InvoiceCreate(InvoiceBase):
     pass

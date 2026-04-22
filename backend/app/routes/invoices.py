@@ -672,6 +672,23 @@ async def get_invoices(
         try:
             extra_filters = json.loads(filters)
             if isinstance(extra_filters, dict):
+                # Handle virtual 'last_modified_by' filter
+                if "last_modified_by" in extra_filters:
+                    user_vals = extra_filters.pop("last_modified_by")
+                    if not isinstance(user_vals, list):
+                        user_vals = [user_vals]
+                    
+                    if user_vals:
+                        # Search in workflow steps OR uploaded_by
+                        step_exists = exists().where(
+                            and_(
+                                WorkflowStep.invoice_id == Invoice.id,
+                                WorkflowStep.user.in_(user_vals)
+                            )
+                        )
+                        uploader_match = Invoice.uploaded_by.in_(user_vals)
+                        expressions.append(or_(step_exists, uploader_match))
+
                 # Apply special coding_view logic if requested
                 if extra_filters.get("coding_view"):
                     from sqlalchemy import or_, and_
@@ -808,6 +825,28 @@ async def get_invoice_filter_options(
     Returns all unique values for a specific column in the invoices table, 
     filtered by the active entity and optionally by other active filters.
     """
+    # Special handling for virtual 'last_modified_by' column
+    if column == "last_modified_by":
+        # Get unique users from workflow steps
+        step_users = db.query(WorkflowStep.user).filter(
+            WorkflowStep.user != None,
+            WorkflowStep.invoice_id == Invoice.id,
+            Invoice.entity == entity
+        ).join(Invoice).distinct().all()
+        
+        options = set()
+        for u in step_users:
+            if u[0]: options.add(u[0])
+            
+        # Also add uploader names
+        uploaders = db.query(Invoice.uploaded_by).filter(
+            Invoice.entity == entity
+        ).distinct().all()
+        for u in uploaders:
+            if u[0]: options.add(u[0])
+        
+        return sorted([o for o in options if o], key=lambda x: str(x))
+
     if not hasattr(Invoice, column):
         raise HTTPException(status_code=400, detail=f"Column '{column}' does not exist on Invoice model")
 
@@ -2457,7 +2496,7 @@ async def list_deleted_invoices(
     is_finance = "finance" in user_dept and "non-finance" not in user_dept
 
     if is_approver and not is_admin and not is_finance:
-        from app.models.delegation import Delegation
+        from app.models.db_models import Delegation
         curr_time = datetime.utcnow()
         active_delegations = db.query(Delegation.delegator_email).filter(
             Delegation.substitute_email.ilike(current_user.email),
