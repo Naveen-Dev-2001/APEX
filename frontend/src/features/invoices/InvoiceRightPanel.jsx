@@ -23,9 +23,9 @@ const TAB_COMPONENTS = {
 const TabContent = React.memo(({ tabName, isActive }) => {
     const Component = TAB_COMPONENTS[tabName];
     if (!Component) return null;
-    
+
     return (
-        <div 
+        <div
             className="h-full overflow-y-auto"
             style={{ display: isActive ? 'block' : 'none' }}
         >
@@ -40,14 +40,14 @@ const TabContent = React.memo(({ tabName, isActive }) => {
 const InvoiceRightPanel = ({ invoice = {} }) => {
 
     const { invoiceActiveTab, setInvoiceActiveTab, tabList, activeInvoiceData } = useInvoiceStore();
-    
+
     // Determine status and explicitly filter out Coding tab if processed
     const status = (activeInvoiceData?.status || "").toLowerCase();
     const visibleTabs = status === "processed" ? tabList.filter(t => t !== "Coding") : tabList;
-    
+
     // Safety check just in case state gets out of sync with the visible tabs
     const validActiveTab = visibleTabs.includes(invoiceActiveTab) ? invoiceActiveTab : (visibleTabs[0] || "Quick View");
-    
+
     // Keep track of which tabs have been rendered to avoid mounting them until needed
     const [renderedTabs, setRenderedTabs] = useState(() => new Set([validActiveTab]));
 
@@ -77,12 +77,12 @@ const InvoiceRightPanel = ({ invoice = {} }) => {
                 {visibleTabs.map(tabName => {
                     // Only render tabs that have been visited
                     if (!renderedTabs.has(tabName)) return null;
-                    
+
                     return (
-                        <TabContent 
-                            key={tabName} 
-                            tabName={tabName} 
-                            isActive={validActiveTab === tabName} 
+                        <TabContent
+                            key={tabName}
+                            tabName={tabName}
+                            isActive={validActiveTab === tabName}
                         />
                     );
                 })}

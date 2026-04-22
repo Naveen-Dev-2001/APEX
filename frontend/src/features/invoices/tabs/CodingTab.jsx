@@ -13,6 +13,7 @@ import { useAuthStore } from "../../../store/authStore";
 import QuickViewTab from "./QuickViewTab";
 import CustomInput from "../../../shared/components/CustomInput";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
+import AlertModal from "../../../shared/components/AlertModal";
 import {
     useBulkCodingDataSync,
 } from "../../hooks/useMasterDataSync";
@@ -225,6 +226,8 @@ const CodingTab = ({ isActive = false }) => {
     // Using a ref to ensure we latch it on — never turns back off.
     const hasBeenActive = useRef(false);
     const [loadMasterData, setLoadMasterData] = useState(false);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState(null);
 
     useEffect(() => {
         if (!isActive || hasBeenActive.current) return;
@@ -365,31 +368,19 @@ const CodingTab = ({ isActive = false }) => {
         );
     }, [setLineItems]);
 
-    // ── handleDelete — original logic, zero changes ───────────────────────────
+    // ── handleDelete ──────────────────────────────────────────────────────────
     const handleDelete = useCallback((id) => {
-        console.log("CodingTab handleDelete triggered for ID:", id);
-        modal.confirm({
-            title: 'Delete Line Item?',
-            className: "premium-delete-modal",
-            icon: <ExclamationCircleOutlined />,
-            content: (
-                <div>
-                    <p>Are you sure you want to delete this line item?</p>
-                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '16px' }}>
-                        This row will be removed from the invoice coding.
-                    </p>
-                </div>
-            ),
-            okText: 'Delete Row',
-            okType: 'danger',
-            cancelText: 'Cancel',
-            centered: true,
-            onOk: () => {
-                console.log("Line item deletion confirmed for ID:", id);
-                setLineItems(prev => prev.filter(item => item.id !== id));
-            },
-        });
-    }, [modal, setLineItems]);
+        setItemToDelete(id);
+        setDeleteModalVisible(true);
+    }, []);
+
+    const confirmDelete = useCallback(() => {
+        if (itemToDelete) {
+            setLineItems(prev => prev.filter(item => item.id !== itemToDelete));
+            setDeleteModalVisible(false);
+            setItemToDelete(null);
+        }
+    }, [itemToDelete, setLineItems]);
 
     // ── handleAdd — original logic, zero changes ──────────────────────────────
     const handleAdd = useCallback(() => {
@@ -430,6 +421,17 @@ const CodingTab = ({ isActive = false }) => {
     return (
         <div className="flex flex-col gap-4">
             {modalContextHolder}
+            <AlertModal
+                isOpen={deleteModalVisible}
+                onClose={() => setDeleteModalVisible(false)}
+                onConfirm={confirmDelete}
+                title="Delete Line Item?"
+                message="Are you sure you want to delete this line item?"
+                subMessage="This row will be removed from the invoice coding."
+                confirmText="Delete Row"
+                confirmBtnVariant="primary"
+                type="info"
+            />
             <QuickViewTab showOnlyHeader={true} />
 
             <div
