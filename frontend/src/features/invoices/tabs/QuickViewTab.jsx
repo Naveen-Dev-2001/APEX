@@ -477,7 +477,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const handleUpdateLineItem = useCallback((id, key, value) => {
         setLineItems(prev =>
             prev.map(item => {
-                debugger
                 if (item.id !== id) return item;
 
                 // Keep value as-is (string) — don't cast to Number here.

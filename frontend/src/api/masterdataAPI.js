@@ -442,3 +442,15 @@ export const masterDataService = {
         return res.data;
     },
 };
+
+/**
+ * Fetches GL, LOB, Department, Customer, and Item master data in ONE request.
+ * Used by CodingTab to eliminate 5 separate API round-trips on mount.
+ */
+export const fetchBulkCodingData = async (pageSize = 2000) => {
+    const res = await API.get(`/master/bulk-coding-data`, {
+        params: { page_size: pageSize }
+    });
+    return res.data;
+};
+

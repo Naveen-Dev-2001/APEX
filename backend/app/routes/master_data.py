@@ -500,6 +500,42 @@ async def get_sheet_data(
     }
 
 
+@router.get("/bulk-coding-data")
+async def get_bulk_coding_data(
+    page_size: int = 2000,
+    db: Session = Depends(get_db)
+):
+    """
+    Returns GL, LOB, Department, Customer, and Item master data in a single
+    request so the CodingTab doesn't have to fire 5 separate round-trips.
+    Each dataset is fetched independently and returned together.
+    """
+    def fetch_rows(model, page_size: int):
+        rows = db.query(model).order_by(model.id).limit(page_size).all()
+        result = []
+        for row in rows:
+            row_dict = {}
+            for column in row.__table__.columns:
+                val = getattr(row, column.name)
+                if isinstance(val, datetime):
+                    val = val.isoformat()
+                elif isinstance(val, float) and np.isnan(val):
+                    val = None
+                row_dict[column.name] = val
+            result.append(row_dict)
+        return result
+
+    return {
+        "gl":         fetch_rows(GLMaster, page_size),
+        "lob":        fetch_rows(LOBMaster, page_size),
+        "department": fetch_rows(DepartmentMaster, page_size),
+        "customer":   fetch_rows(CustomerMaster, page_size),
+        "item":       fetch_rows(ItemMaster, page_size),
+    }
+
+
+
+
 @router.get("/getvendors")
 def get_all_vendors(db: Session = Depends(get_db)):
     """

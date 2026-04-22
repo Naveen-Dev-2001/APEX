@@ -14,14 +14,11 @@ import QuickViewTab from "./QuickViewTab";
 import CustomInput from "../../../shared/components/CustomInput";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
 import {
-    useGLMasterSync,
-    useLOBMasterSync,
-    useDepartmentMasterSync,
-    useCustomerMasterSync,
-    useItemMasterSync
+    useBulkCodingDataSync,
 } from "../../hooks/useMasterDataSync";
 import { fetchCodingSuggestions } from "../../../api/invoiceApi";
 import { useWorkflowDataSync } from "../../hooks/useWorkflow";
+import { useQueryClient } from "@tanstack/react-query";
 
 const LINE_TYPE_OPTIONS = [
     { label: "Expense", value: "Expense" },
@@ -182,10 +179,11 @@ const applyCalculation = (item, key, value) => {
     return updated;
 };
 
-const CodingTab = () => {
+const CodingTab = ({ isActive = false }) => {
     const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData, entityMaster } = useInvoiceStore();
     const [modal, modalContextHolder] = Modal.useModal();
     const rows = lineItems;
+    const queryClient = useQueryClient();
 
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
@@ -223,14 +221,30 @@ const CodingTab = () => {
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);
+    // Only load heavy master data once this tab has been activated.
+    // Using a ref to ensure we latch it on — never turns back off.
+    const hasBeenActive = useRef(false);
+    const [loadMasterData, setLoadMasterData] = useState(false);
 
-    // ── Sugggestions Logic ───────────────────────────────────────────────────
+    useEffect(() => {
+        if (!isActive || hasBeenActive.current) return;
+        hasBeenActive.current = true;
+        // Short settle delay so the tab paint finishes before network hits
+        const timer = setTimeout(() => setLoadMasterData(true), 200);
+        return () => clearTimeout(timer);
+    }, [isActive]);
+
+    // ── Suggestions Logic ────────────────────────────────────────────────────
+    // Check cache first (pre-seeded by useInvoicePreviewData parallel fetch).
+    // Only fall back to a direct API call if cache is empty to avoid duplicate requests.
     useEffect(() => {
         if (!viewInvoiceId) return;
 
         const applySuggestions = async () => {
             try {
-                const suggestions = await fetchCodingSuggestions(viewInvoiceId, selectedVendorId);
+                // Try cache first — useInvoicePreviewData may have already fetched this
+                const cached = queryClient.getQueryData(["coding-suggestions", viewInvoiceId, selectedVendorId]);
+                const suggestions = cached ?? await fetchCodingSuggestions(viewInvoiceId, selectedVendorId);
                 if (!suggestions?.length) return;
 
                 // Build a map: normalised description → suggestion
@@ -242,7 +256,7 @@ const CodingTab = () => {
                 });
 
                 setLineItems(prev => prev.map((row, rowIndex) => {
-                    if (row.glCode) return row; // skip system or already filled
+                    if (row.glCode) return row; // skip already filled
 
                     const key = (row.description || "").trim().toLowerCase();
 
@@ -273,7 +287,7 @@ const CodingTab = () => {
         };
 
         applySuggestions();
-    }, [viewInvoiceId, selectedVendorId, setLineItems]);
+    }, [viewInvoiceId, selectedVendorId, setLineItems, queryClient]);
 
     // FIX: only count non-system rows so GST/TDS rows don't break allSelected
     const selectableRows = useMemo(() => rows, [rows]);
@@ -307,22 +321,26 @@ const CodingTab = () => {
         });
     }, [rows]);
 
-    const { data: glData, isLoading: glLoading } = useGLMasterSync();
-    const { data: lobData, isLoading: lobLoading } = useLOBMasterSync();
-    const { data: deptData, isLoading: deptLoading } = useDepartmentMasterSync();
-    const { data: customerData, isLoading: customerLoading } = useCustomerMasterSync();
-    const { data: itemData, isLoading: itemLoading } = useItemMasterSync();
+    // Single bulk fetch replaces 5 individual round-trips (GL + LOB + Dept + Customer + Item)
+    const {
+        glData,
+        lobData,
+        deptData,
+        customerData,
+        itemData,
+        isLoading: masterDataLoading,
+    } = useBulkCodingDataSync(loadMasterData);
 
     const glOptions = useMemo(() =>
-        (glData?.data || glData || []).map(i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number })), [glData]);
+        (glData || []).map(i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number })), [glData]);
     const lobOptions = useMemo(() =>
-        (lobData?.data || lobData || []).map(i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id })), [lobData]);
+        (lobData || []).map(i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id })), [lobData]);
     const deptOptions = useMemo(() =>
-        (deptData?.data || deptData || []).map(i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id })), [deptData]);
+        (deptData || []).map(i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id })), [deptData]);
     const customerOptions = useMemo(() =>
-        (customerData?.data || customerData || []).map(i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id })), [customerData]);
+        (customerData || []).map(i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id })), [customerData]);
     const itemOptions = useMemo(() =>
-        (itemData?.data || itemData || []).map(i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })), [itemData]);
+        (itemData || []).map(i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })), [itemData]);
 
     // selectedIds ref — avoids stale closure in handleUpdate
     const selectedIdsRef = useRef(selectedIds);
@@ -560,19 +578,19 @@ const CodingTab = () => {
                                                     <EditableCell disabled={isViewOnly} value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="number" />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.glCode} onChange={(v) => handleUpdate(row.id, "glCode", v)} options={glOptions} isLoading={glLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.glCode} onChange={(v) => handleUpdate(row.id, "glCode", v)} options={glOptions} isLoading={masterDataLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.lob} onChange={(v) => handleUpdate(row.id, "lob", v)} options={lobOptions} isLoading={lobLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.lob} onChange={(v) => handleUpdate(row.id, "lob", v)} options={lobOptions} isLoading={masterDataLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.department} onChange={(v) => handleUpdate(row.id, "department", v)} options={deptOptions} isLoading={deptLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.department} onChange={(v) => handleUpdate(row.id, "department", v)} options={deptOptions} isLoading={masterDataLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.customer} onChange={(v) => handleUpdate(row.id, "customer", v)} options={customerOptions} isLoading={customerLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.customer} onChange={(v) => handleUpdate(row.id, "customer", v)} options={customerOptions} isLoading={masterDataLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.item} onChange={(v) => handleUpdate(row.id, "item", v)} options={itemOptions} isLoading={itemLoading} filterOption={filterOption} />
+                                                    <DropdownCell disabled={isViewOnly} value={row.item} onChange={(v) => handleUpdate(row.id, "item", v)} options={itemOptions} isLoading={masterDataLoading} filterOption={filterOption} />
                                                 </td>
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (

@@ -3,15 +3,16 @@ import { icons } from "../../file";
 import { useInvoiceStore } from "../../store/invoice.store";
 import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 import { useSaveInvoice } from "../hooks/useSaveInvoice";
-import { useWorkflowDataSync } from "../hooks/useWorkflow";
+import { useInvoicePreviewData } from "../hooks/useInvoicePreviewData";
 import toast from "../../utils/toast";
 import { saveInvoice } from "../../api/invoiceApi";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import workflowActionsAPI from "../../api/workflowActionsAPI";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { Modal } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
+
 
 
 const MODAL_ACTIONS = {
@@ -46,11 +47,25 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     useDuplicateCheck();
 
     const firstLine = lineItems?.[0] || {};
-    const { workflowData } = useWorkflowDataSync(viewInvoiceId, {
+
+    // Memoize workflowParams so the React Query key stays stable between renders
+    // (inline object literals always get a new reference → triggers unnecessary re-fetches)
+    const workflowParams = useMemo(() => ({
         preview_vendor_id: selectedVendorId,
         preview_lob: firstLine.lob,
         preview_department_id: firstLine.department,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [selectedVendorId, firstLine.lob, firstLine.department]);
+
+    // ── Parallel fetch: vendor + workflow + coding suggestions fire together ──
+    // This warms the React Query cache so downstream hooks (useWorkflowDataSync,
+    // useVendorDetailSync in QuickViewTab) return data instantly.
+    const { workflowData } = useInvoicePreviewData({
+        invoiceId: viewInvoiceId,
+        vendorId: selectedVendorId,
+        workflowParams,
     });
+
 
     const currentStatus = activeInvoiceData?.status || invoice?.status;
     const isWaitingCoding = currentStatus === "waiting_coding";
@@ -83,13 +98,16 @@ const InvoiceTopBar = ({ invoice = {} }) => {
     const [actionLoading, setActionLoading] = useState(null);
     const [modal, setModal] = useState(null);
     const [comment, setComment] = useState("");
-    const prevWorkflowRef = useRef(null);
+    // Track workflow revision with a lightweight counter rather than JSON.stringify
+    // which is O(n) on every render and causes micro-lag on large payloads.
+    const prevWorkflowIdRef = useRef(null);
 
     useEffect(() => {
         if (!workflowData) return;
-        const key = JSON.stringify(workflowData);
-        if (key === prevWorkflowRef.current) return;
-        prevWorkflowRef.current = key;
+        // Use current_approver_level + current_status as a cheap change signal
+        const key = `${workflowData.current_approver_level}_${workflowData.current_status}`;
+        if (key === prevWorkflowIdRef.current) return;
+        prevWorkflowIdRef.current = key;
         fetchUIStatus();
     }, [workflowData]);
 

@@ -92,6 +92,31 @@ export const fetchCodingSuggestions = async (invoiceId, vendorId = null) => {
     return res.data;
 };
 
+/**
+ * Parallel batch fetcher for all critical invoice preview data.
+ * Fires vendor detail, workflow, and coding suggestions simultaneously
+ * using Promise.allSettled so a single failure doesn't block the rest.
+ *
+ * @param {object} opts
+ * @param {number} opts.invoiceId
+ * @param {string} opts.vendorId
+ * @param {object} [opts.workflowParams]  - preview_vendor_id, preview_lob, preview_department_id
+ * @returns {{ vendor, workflowData, codingSuggestions }}
+ */
+export const fetchInvoicePreviewData = async ({ invoiceId, vendorId, workflowParams = {} }) => {
+    const [vendorRes, workflowRes, suggestionsRes] = await Promise.allSettled([
+        vendorId ? API.get(`/master/vendor/${vendorId}`).then(r => r.data) : Promise.resolve(null),
+        invoiceId ? API.get(`/workflow/${invoiceId}`, { params: workflowParams }).then(r => r.data) : Promise.resolve(null),
+        invoiceId ? API.get(`/coding/${invoiceId}/suggestions`, { params: vendorId ? { vendor_id: vendorId } : {} }).then(r => r.data) : Promise.resolve([]),
+    ]);
+
+    return {
+        vendor:            vendorRes.status === 'fulfilled'      ? vendorRes.value      : null,
+        workflowData:      workflowRes.status === 'fulfilled'    ? workflowRes.value    : null,
+        codingSuggestions: suggestionsRes.status === 'fulfilled' ? suggestionsRes.value : [],
+    };
+};
+
 export const fetchDeletedInvoices = (params = {}) =>
     API.get(`/invoices/deleted`, {
         params: {
