@@ -638,11 +638,34 @@ async def get_invoices(
     db: Session = Depends(get_db)
 ):
     repo_filters = {"entity": entity}
+    
+    from sqlalchemy import or_, and_, exists, func
+    user_email = current_user.email.lower()
+    user_dept = (current_user.department or "").lower()
+    user_roles = [r.strip().lower() for r in (current_user.role or "user").split(",")]
+    is_finance_user = "finance" in user_dept and "non" not in user_dept
+    is_admin = "admin" in user_roles
+    is_coder = "coder" in user_roles
+    is_scanner = "scanner" in user_roles
+
+    if is_finance_user or is_admin or is_coder or is_scanner:
+        show_all = True  # Finance, Admin, Coders, and Scanners see all records
+
     if not show_all:
         repo_filters["uploaded_by"] = current_user.username
 
     expressions = []
     extra_filters = {}
+
+    # Get active delegations for the current user
+    curr_time = datetime.utcnow()
+    active_delegations = db.query(Delegation.delegator_email).filter(
+        Delegation.substitute_email.ilike(current_user.email),
+        Delegation.entity == entity,
+        Delegation.start_date <= curr_time,
+        Delegation.end_date >= curr_time
+    ).all()
+    target_emails = [user_email] + [d[0].lower() for d in active_delegations]
 
     # Parse JSON filters if provided
     if filters:
@@ -666,24 +689,11 @@ async def get_invoices(
 
                 # Apply special approvals_view logic
                 if extra_filters.get("approvals_view"):
-                    from sqlalchemy import or_, and_, exists, func
-                    
-                    user_email = current_user.email.lower()
-                    user_dept = (getattr(current_user, "department", "finance") or "finance").lower()
-                    is_finance_user = "finance" in user_dept and "non-finance" not in user_dept
-                    
                     # 1. Base eligibility: Current level match
                     # User is assigned to current level OR current level is a Finance level
                     
                     # Get active delegations for current level
-                    curr_time = datetime.utcnow()
-                    active_delegations = db.query(Delegation.delegator_email).filter(
-                        Delegation.substitute_email.ilike(current_user.email),
-                        Delegation.entity == entity,
-                        Delegation.start_date <= curr_time,
-                        Delegation.end_date >= curr_time
-                    ).all()
-                    target_emails = [user_email] + [d[0].lower() for d in active_delegations]
+                    # (Already calculated at top)
 
                     approver_subquery = exists().where(
                         and_(
@@ -743,7 +753,24 @@ async def get_invoices(
         except Exception as e:
             print(f"Error parsing filters: {e}")
     
-    # (Removed restrictive filtering so all invoices show in the Invoices tab)
+    # 3. Base Visibility Restriction for Non-Finance Approvers
+    # (Applied if not already handled by approvals_view or coding_view)
+    # We exempt Admins, Coders, and Scanners from this 'assigned-only' restriction.
+    is_restricted_approver = not is_finance_user and not is_admin and not is_coder and not is_scanner
+    
+    if is_restricted_approver and not extra_filters.get("approvals_view") and not extra_filters.get("coding_view"):
+        assigned_at_any_level_subquery = exists().where(
+            and_(
+                InvoiceAssignedApprover.invoice_id == Invoice.id,
+                InvoiceAssignedApprover.approver_email.in_(target_emails)
+            )
+        )
+        expressions.append(
+            or_(
+                Invoice.uploaded_by_id == current_user.id,
+                assigned_at_any_level_subquery
+            )
+        )
 
     search_fields = ["invoice_number", "vendor_name", "vendor_id", "status", "filename"]
     
@@ -2423,7 +2450,7 @@ async def list_deleted_invoices(
 
     # Extra role filtering for non-finance approvers in archived invoices
     user_roles = [r.strip().lower() for r in current_user.role.split(",")]
-    user_dept = (getattr(current_user, "department", "finance") or "finance").lower()
+    user_dept = (current_user.department or "").lower()
     
     is_approver = "approver" in user_roles
     is_admin = "admin" in user_roles
