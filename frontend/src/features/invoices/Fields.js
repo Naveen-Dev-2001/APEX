@@ -20,6 +20,11 @@ export const QUICK_VIEW_CONFIG = [
             { key: "totalAmount", label: "Total Amount", type: "input", editable: true },
             { key: "totalPayable", label: "Total Payable", type: "input", editable: true },
             { key: "memo", label: "Memo", type: "input", editable: true },
+            { key: "gstEligibility", label: "GST Eligibility", type: "input", editable: true },
+            { key: "tdsApplicability", label: "TDS Applicability", type: "input", editable: true },
+            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true },
+            { key: "tdsSection", label: "TDS Section", type: "input", editable: true },
+            { key: "lineGrouping", label: "Line Grouping", type: "input", editable: true },
             // AllFields only ↓
             { key: "amountPaid", label: "Amount Paid", type: "input", editable: true, showInAllFields: true },
             { key: "invoiceType", label: "Invoice Type", type: "input", editable: true, showInAllFields: true },
@@ -28,17 +33,6 @@ export const QUICK_VIEW_CONFIG = [
             { key: "costCenter", label: "Cost Center", type: "input", editable: true, showInAllFields: true },
             { key: "serviceStartDate", label: "Service Period Start", type: "date", editable: true, showInAllFields: true },
             { key: "serviceEndDate", label: "Service Period End", type: "date", editable: true, showInAllFields: true },
-        ],
-    },
-    {
-        section: "Vendor Master Details",
-        type: "form",
-        fields: [
-            { key: "gstEligibility", label: "GST Eligibility", type: "input", editable: true },
-            { key: "tdsApplicability", label: "TDS Applicability", type: "input", editable: true },
-            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true },
-            { key: "tdsSection", label: "TDS Section", type: "input", editable: true },
-            { key: "lineGrouping", label: "Line Grouping", type: "input", editable: true },
         ],
     },
     // AllFields only sections ↓
