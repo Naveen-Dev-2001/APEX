@@ -381,8 +381,8 @@ const Header = () => {
                                     </span>
                                 </button>
                                
-                                {/* Change Role Action (only if user has multiple roles) */}
-                                {Array.isArray(allRoles) && allRoles.length >= 2 && (
+                                {/* Change Role Action (only if user has multiple roles and not on select-entity route) */}
+                                {Array.isArray(allRoles) && allRoles.length >= 2 && location.pathname !== '/select-entity' && (
                                     <button
                                         onClick={() => {
                                             setShowChangeRoleModal(true);
