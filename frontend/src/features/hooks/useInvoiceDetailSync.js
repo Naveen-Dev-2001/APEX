@@ -7,6 +7,8 @@ export const useVendorDetailSync = (vendorId) => {
         queryKey: ["vendor", vendorId],
         queryFn: () => getVendorById(vendorId),
         enabled: !!vendorId,
+        staleTime: 5 * 60 * 1000,   // 5 min — pre-seeded by useInvoicePreviewData
+        gcTime: 10 * 60 * 1000,
     });
 
     // Normalize data here

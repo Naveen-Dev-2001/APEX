@@ -2,9 +2,10 @@ import { useMemo } from "react";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useGLMasterSync } from "../../hooks/useMasterDataSync";
 
-const GLSummaryTab = ({ invoice = {} }) => {
+const GLSummaryTab = ({ isActive = false }) => {
     const { lineItems } = useInvoiceStore();
-    const { data: glData } = useGLMasterSync();
+    // Only load GL master data when this tab is actually visible
+    const { data: glData } = useGLMasterSync(isActive);
 
     // ── Optimized GL Lookup Map ──────────────────────────────────────────────
     const glMap = useMemo(() => {

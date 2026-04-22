@@ -7,7 +7,7 @@ import { useInvoiceStore } from "../../../store/invoice.store";
 
 import { useWorkflowDataSync } from "../../hooks/useWorkflow";
 
-
+import { useMemo } from "react";
 
 const getOrdinal = (n) => {
 
@@ -182,8 +182,15 @@ const WorkflowTab = () => {
 
 
     // Pass the same preview params as InvoiceTopBar so codification workflows resolve correctly
-
+    // Memoize so React Query doesn't see a new key object on every render → prevents re-fetches
     const firstLine = lineItems?.[0] || {};
+
+    const workflowParams = useMemo(() => ({
+        preview_vendor_id: selectedVendorId,
+        preview_lob: firstLine.lob,
+        preview_department_id: firstLine.department,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [selectedVendorId, firstLine.lob, firstLine.department]);
 
     const {
 
@@ -191,15 +198,7 @@ const WorkflowTab = () => {
 
         isLoadingWorkflowData
 
-    } = useWorkflowDataSync(!isArchived ? viewInvoiceId : null, {
-
-        preview_vendor_id: selectedVendorId,
-
-        preview_lob: firstLine.lob,
-
-        preview_department_id: firstLine.department,
-
-    });
+    } = useWorkflowDataSync(!isArchived ? viewInvoiceId : null, workflowParams);
 
 
 

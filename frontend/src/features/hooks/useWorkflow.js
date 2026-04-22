@@ -7,6 +7,8 @@ export const useWorkflowDataSync = (invoiceId, params = {}) => {
         queryKey: ["workflow", invoiceId, params],
         queryFn: () => getWorkflowData(invoiceId, params),
         enabled: !!invoiceId,
+        staleTime: 2 * 60 * 1000,   // 2 min — avoids re-fetch on tab switch
+        gcTime: 5 * 60 * 1000,       // 5 min — keeps in cache after unmount
     });
 
     return {
@@ -21,6 +23,8 @@ export const getWorkflowApproversSync = (invoiceId) => {
         queryKey: ["workflowApprovers", invoiceId],
         queryFn: () => getworkflowApprovers(invoiceId),
         enabled: !!invoiceId,
+        staleTime: 2 * 60 * 1000,
+        gcTime: 5 * 60 * 1000,
     })
 
     return {
@@ -36,6 +40,8 @@ export const getAuditflowSync = (invoiceId) => {
         queryKey: ["auditFlow", invoiceId],
         queryFn: () => getAudit(invoiceId),
         enabled: !!invoiceId,
+        staleTime: 2 * 60 * 1000,
+        gcTime: 5 * 60 * 1000,
     })
 
     return {
