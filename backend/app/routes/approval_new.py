@@ -1377,18 +1377,36 @@ async def rework_invoice(
             403, "You are not authorized to send this invoice for rework"
         )
 
-    # ── Early check: level 1 can never have a previous finance approver ──
     if current_level == 1:
-        raise HTTPException(
-            400,
-            detail={
-                "code": "NO_FINANCE_APPROVER",
-                "message": (
-                    "You are the first approver. There is no previous Finance Team approver "
-                    "to send this invoice for rework. "
-                    "Please use 'Enable Editing' to edit the invoice directly."
-                ),
-            },
+        # Approver 1 reworks -> send back to coder
+        _update_invoice_status(db, invoice, InvoiceStatus.WAITING_CODING)
+        invoice.current_approver_level = 1
+        
+        _record_step(
+            db,
+            invoice_id,
+            step_name="Sent for Rework to Coding",
+            step_type=StepType.REWORKED,
+            user_email=email,
+            approver_number=current_level,
+            comment=payload.comment,
+            entity=entity,
+        )
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action=AuditAction.REWORKED,
+            user=current_user.username,
+            entity=entity,
+            details={"comment": payload.comment, "rework_to": "coder"}
+        )
+        db.commit()
+
+        return ActionResponse(
+            success=True,
+            message="Invoice returned to coders for rework.",
+            new_status=InvoiceStatus.WAITING_CODING,
+            next_level=1,
         )
 
     assigned: List[Dict] = workflow.get("assigned_approvers", [])
