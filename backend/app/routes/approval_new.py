@@ -604,10 +604,6 @@ def _resolve_user_role_in_workflow(
             break
 
     # ── Determine if user can act RIGHT NOW ──
-    # Logic:
-    #   mandatory levels not yet complete → user must be at current_level and level not done
-    #   all mandatory done + threshold exists + threshold not done → threshold approver acts
-    #   all mandatory (+ threshold) done → posting approver acts
     mandatory_levels_done = all(
         bool(approved_levels.get(e.get("level")))
         for e in mandatory
@@ -616,33 +612,45 @@ def _resolve_user_role_in_workflow(
     has_threshold = bool(threshold_entries)
     has_posting = bool(posting_entries)
 
-    if not mandatory_levels_done:
-        # Must be the user whose level == current_level and level not yet complete
-        user_lvl = result["user_level"]
-        if user_lvl is not None and user_lvl == current_level:
+    # Check for direct eligibility at the current level
+    # This covers mandatory levels AND reconstructed threshold/posting levels
+    current_entry = next((e for e in mandatory if e.get("level") == current_level), None)
+    if current_entry:
+        is_fin_lvl = current_entry.get("is_finance", False)
+        emails_at_lvl = [e.lower() for e in _parse_list(current_entry.get("emails", []))]
+        
+        # Check eligibility for THIS specific level
+        is_eligible = (
+            (is_fin_lvl and result["is_finance_team"])
+            or (email in emails_at_lvl)
+            or any(email in [s.lower() for s in check_active_delegation(db, e, entity)] for e in emails_at_lvl)
+        )
+        if is_eligible:
             result["can_act"] = not result["level_already_approved"]
-    elif has_threshold and not threshold_done:
-        delegated_threshold = False
-        for o_email in [e.lower() for te in threshold_entries for e in _parse_list(te.get("emails", []))]:
-            if not o_email:
-                continue
-            subs = check_active_delegation(db, o_email, entity)
-            if email in [s.lower() for s in subs]:
-                delegated_threshold = True
-                break
-        result["can_act"] = (result["is_threshold_approver"]
-                             or delegated_threshold) and not result["already_acted"]
-    elif has_posting and not posting_done:
-        delegated_posting = False
-        for o_email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]:
-            if not o_email:
-                continue
-            subs = check_active_delegation(db, o_email, entity)
-            if email in [s.lower() for s in subs]:
-                delegated_posting = True
-                break
-        result["can_act"] = (result["is_posting_approver"]
-                             or delegated_posting) and not result["already_acted"]
+            result["user_level"] = current_level
+
+    # Explicit stage-based eligibility for virtual Posting/Threshold levels
+    if not result["can_act"]:
+        if has_threshold and not threshold_done:
+            delegated_threshold = False
+            for o_email in [e.lower() for te in threshold_entries for e in _parse_list(te.get("emails", []))]:
+                if not o_email: continue
+                subs = check_active_delegation(db, o_email, entity)
+                if email in [s.lower() for s in subs]:
+                    delegated_threshold = True
+                    break
+            if result["is_threshold_approver"] or delegated_threshold:
+                result["can_act"] = not result["already_acted"]
+        elif has_posting and not posting_done:
+            delegated_posting = False
+            for o_email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]:
+                if not o_email: continue
+                subs = check_active_delegation(db, o_email, entity)
+                if email in [s.lower() for s in subs]:
+                    delegated_posting = True
+                    break
+            if result["is_posting_approver"] or delegated_posting:
+                result["can_act"] = not result["already_acted"]
     # else: all done — no one can act
 
     return result
@@ -776,6 +784,17 @@ async def get_ui_status_from_frontend(
         )
         can_act = (
             is_posting_approver or delegated_posting) and not already_acted_in_workflow
+
+    # Explicit authorization check for Posting/Threshold stages
+    if not can_act:
+        if (is_posting_approver or is_threshold_approver) and not already_acted:
+             # Check if we are at a level beyond mandatory approvals
+             if current_level > len(mandatory):
+                 can_act = True
+             # Or if this level matches the user's role specifically
+             current_lvl_entry = next((e for e in assigned if e.get("level") == current_level), None)
+             if current_lvl_entry and (is_posting_approver and current_lvl_entry.get("type") == "posting" or is_threshold_approver and current_lvl_entry.get("type") == "threshold"):
+                 can_act = True
 
     # ── can_enable_editing logic ─────────────────────────────────────────────
     # Show "Enable Editing" if:
@@ -1286,7 +1305,15 @@ async def reject_invoice(
     role = _resolve_user_role_in_workflow(
         db, email, workflow, steps, finance_users, current_level, entity
     )
-    if not role["can_act"]:
+    
+    # Explicitly allow Posting/Threshold approvers to reject
+    is_authorized = (
+        role["can_act"] 
+        or (role["is_posting_approver"] and not role["already_acted"])
+        or (role["is_threshold_approver"] and not role["already_acted"])
+    )
+
+    if not is_authorized:
         raise HTTPException(
             403, "You are not authorized to reject this invoice at its current stage")
 
@@ -1369,13 +1396,19 @@ async def rework_invoice(
     role = _resolve_user_role_in_workflow(
         db, email, workflow, steps, finance_users, current_level, entity
     )
-    is_current_level_user = role["user_level"] == current_level
-    is_finance_user = role["is_finance_team"]
 
-    if not (role["can_act"] or is_current_level_user or is_finance_user):
+    # Explicitly allow Posting/Threshold approvers to rework
+    is_authorized = (
+        role["can_act"] 
+        or role["is_finance_team"]
+        or (role["is_posting_approver"] and not role["already_acted"])
+        or (role["is_threshold_approver"] and not role["already_acted"])
+        or (role["user_level"] == current_level)
+    )
+
+    if not is_authorized:
         raise HTTPException(
-            403, "You are not authorized to send this invoice for rework"
-        )
+            403, "You are not authorized to send this invoice for rework")
 
     # ── Early check: level 1 can never have a previous finance approver ──
     if current_level == 1:

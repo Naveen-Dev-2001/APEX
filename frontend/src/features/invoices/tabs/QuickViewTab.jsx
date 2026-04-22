@@ -13,6 +13,8 @@ import InvoiceCalculationModal from "./InvoiceCalculationModal";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import loadLineItemTable from "../../../utils/lineItemLogic";
+import * as XLSX from "xlsx";
+import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 
 dayjs.extend(customParseFormat);
 
@@ -209,6 +211,7 @@ LineItemCell.displayName = "LineItemCell";
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
+    const fileInputRef = useRef(null);
     const [currencyOptions, setCurrencyOptions] = useState([]);
     const [currencyLoading, setCurrencyLoading] = useState(false);
     const fetchCurrencyOptions = useCallback(async () => {
@@ -626,7 +629,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
 
         if (isMyEditingSession) return false;
 
-       
+
         if (userRole === 'scanner') {
             return status !== 'processed';
         }
@@ -650,193 +653,298 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             : (isAllFields || !section.showInAllFields)));
     }, [isAllFields, showOnlyHeader]);
 
+    const handleExportExcel = useCallback(() => {
+        const dataToExport = (lineItems || [])
+            .filter(item => !item.isSystemRow)
+            .map((item, index) => ({
+                "S.No": index + 1,
+                "Description": item.description || "",
+                "Qty": item.qty || 0,
+                "Unit Price": item.unitPrice || 0,
+                "Discount": item.discount || 0,
+                "Net Amount": item.netAmount || 0,
+                "Tax Amt": item.taxAmt || 0,
+                "Line Type": item.lineType || "",
+                "GL Code": item.glCode || "",
+                "LOB": item.lob || "",
+                "Department": item.department || "",
+                "Customer": item.customer || "",
+                "Item": item.item || "",
+            }));
+
+        if (dataToExport.length === 0) {
+            return;
+        }
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Line Items");
+        XLSX.writeFile(workbook, `Invoice_${activeInvoiceData?.invoice_number || "LineItems"}_${dayjs().format("YYYYMMDD")}.xlsx`);
+    }, [lineItems, activeInvoiceData]);
+
+    const handleImportExcel = useCallback((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet);
+
+            const newItems = json.map(row => ({
+                id: Date.now() + Math.random(),
+                description: row["Description"] || "",
+                qty: parseFloat(row["Qty"]) || 0,
+                unitPrice: parseFloat(row["Unit Price"]) || 0,
+                discount: parseFloat(row["Discount"]) || 0,
+                netAmount: parseFloat(row["Net Amount"]) || 0,
+                taxAmt: parseFloat(row["Tax Amt"]) || 0,
+                lineType: row["Line Type"] || "",
+                glCode: row["GL Code"] || "",
+                lob: row["LOB"] || "",
+                department: row["Department"] || "",
+                customer: row["Customer"] || "",
+                item: row["Item"] || "",
+                isSystemRow: false,
+                isNetAmountOverridden: true
+            }));
+
+            setLineItems(prev => {
+                const systemRows = prev.filter(r => r.isSystemRow);
+                const regularRows = prev.filter(r => !r.isSystemRow);
+                return [...regularRows, ...newItems, ...systemRows];
+            });
+        };
+        reader.readAsArrayBuffer(file);
+    }, [setLineItems]);
+
+
+    const headerButtons = (
+        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+            <button
+                onClick={(e) => { e.stopPropagation(); handleExportExcel(); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
+            >
+                <DownloadOutlined style={{ fontSize: 12 }} /> Export to Excel
+            </button>
+            {activeInvoiceData?.status?.toLowerCase() === "waiting_coding" && (
+                <>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); fileInputRef.current.click(); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
+                    >
+                        <UploadOutlined style={{ fontSize: 12 }} /> Import from Excel
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept=".xlsx, .xls"
+                        onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                                handleImportExcel(e.target.files[0]);
+                                e.target.value = null;
+                            }
+                        }}
+                    />
+                </>
+            )}
+        </div>
+    );
+
     return (
         <div className="p-2">
+
             {filteredSections.map((section) => {
-                    const content = (
-                        <>
-                            {/* ── FORM ── */}
-                            {section.type === "form" && (
-                                <div className="grid grid-cols-2 gap-4">
-                                    {section.fields
-                                        .filter(field => {
-                                            if (!isAllFields && field.showInAllFields) return false;
-                                            if (!field.visible) return true;
-                                            return field.visible(quickViewFormData);
-                                        })
-                                        .map(field => (
-                                            <div key={field.key} className="flex flex-col justify-start">
-                                                {field.key === "exchangeRate" && (quickViewFormData?.invoiceCurrency ?? "USD") === "USD"
-                                                    ? null
-                                                    : (
-                                                        <FieldRenderer
-                                                            field={field}
-                                                            storeValue={quickViewFormData?.[field.key] ?? ""}
-                                                            onCommit={field.key === "vendorId" || field.key === "vendorName" ? handleVendorFieldCommit : handleCommit}
-                                                            vendorOptions={(field.key === "vendorId" || field.key === "vendorName") ? vendorOptions : undefined}
-                                                            filterVendors={filterVendors}
-                                                            onVendorSelect={handleVendorSelect}
-                                                            onHover={handleHoverField}
-                                                            onLeave={handleLeaveField}
-                                                            isDuplicate={isDuplicate}
-                                                            duplicateMessage={duplicateMessage}
-                                                            isAmountMismatch={isAmountMismatch}
-                                                            forceDisabled={isViewOnly}
-                                                            currencyOptions={field.key === "invoiceCurrency" ? currencyOptions : undefined}
-                                                            fetchCurrencyOptions={fetchCurrencyOptions}
-                                                            currencyLoading={currencyLoading}
-                                                            onSearch={field.key === "vendorId" || field.key === "vendorName" ? handleVendorSearch : undefined}
-                                                            searchLoading={isSearching}
-                                                        />
-                                                    )
-                                                }
-                                            </div>
-                                        ))}
-                                </div>
-                            )}
+                const content = (
+                    <>
+                        {/* ── FORM ── */}
+                        {section.type === "form" && (
+                            <div className="grid grid-cols-2 gap-4">
+                                {section.fields
+                                    .filter(field => {
+                                        if (!isAllFields && field.showInAllFields) return false;
+                                        if (!field.visible) return true;
+                                        return field.visible(quickViewFormData);
+                                    })
+                                    .map(field => (
+                                        <div key={field.key} className="flex flex-col justify-start">
+                                            {field.key === "exchangeRate" && (quickViewFormData?.invoiceCurrency ?? "USD") === "USD"
+                                                ? null
+                                                : (
+                                                    <FieldRenderer
+                                                        field={field}
+                                                        storeValue={quickViewFormData?.[field.key] ?? ""}
+                                                        onCommit={field.key === "vendorId" || field.key === "vendorName" ? handleVendorFieldCommit : handleCommit}
+                                                        vendorOptions={(field.key === "vendorId" || field.key === "vendorName") ? vendorOptions : undefined}
+                                                        filterVendors={filterVendors}
+                                                        onVendorSelect={handleVendorSelect}
+                                                        onHover={handleHoverField}
+                                                        onLeave={handleLeaveField}
+                                                        isDuplicate={isDuplicate}
+                                                        duplicateMessage={duplicateMessage}
+                                                        isAmountMismatch={isAmountMismatch}
+                                                        forceDisabled={isViewOnly}
+                                                        currencyOptions={field.key === "invoiceCurrency" ? currencyOptions : undefined}
+                                                        fetchCurrencyOptions={fetchCurrencyOptions}
+                                                        currencyLoading={currencyLoading}
+                                                        onSearch={field.key === "vendorId" || field.key === "vendorName" ? handleVendorSearch : undefined}
+                                                        searchLoading={isSearching}
+                                                    />
+                                                )
+                                            }
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
 
-                            {/* ── TABLE ── */}
-                            {section.type === "table" && (
-                                <div className="w-full">
-                                    <div className="overflow-x-auto">
-                                        <div className="overflow-y-auto max-h-[300px]">
-                                            <table className="w-full border-separate border-spacing-y-2" style={{ minWidth: "800px" }}>
-                                                <thead className="bg-[#2F5D7C] text-white sticky top-0 z-10">
-                                                    <tr>
-                                                        <th className="p-2 w-[60px]">S.No</th>
-                                                        {section.columns.map(col => (
-                                                            <th key={col.key} className="p-2 text-left min-w-[150px]">{col.label}</th>
-                                                        ))}
-                                                        <th className="p-2 w-[60px]">Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {/* ── Render quickViewLineItems directly — no derived processedItems ── */}
-                                                    {lineItems?.map((row, index) => {
-                                                        const isSystem = !!row.isSystemRow;
-                                                        const rowLabel = row.type === "GST" ? gstTaxLabel : row.description;
+                        {/* ── TABLE ── */}
+                        {section.type === "table" && (
+                            <div className="w-full">
+                                <div className="overflow-x-auto">
+                                    <div className="overflow-y-auto max-h-[300px]">
+                                        <table className="w-full border-separate border-spacing-y-2" style={{ minWidth: "800px" }}>
+                                            <thead className="bg-[#2F5D7C] text-white sticky top-0 z-10">
+                                                <tr>
+                                                    <th className="p-2 w-[60px]">S.No</th>
+                                                    {section.columns.map(col => (
+                                                        <th key={col.key} className="p-2 text-left min-w-[150px]">{col.label}</th>
+                                                    ))}
+                                                    <th className="p-2 w-[60px]">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {/* ── Render quickViewLineItems directly — no derived processedItems ── */}
+                                                {lineItems?.map((row, index) => {
+                                                    const isSystem = !!row.isSystemRow;
+                                                    const rowLabel = row.type === "GST" ? gstTaxLabel : row.description;
 
-                                                        return (
-                                                            <tr
-                                                                key={row.id || index}
-                                                                className={`shadow-sm ${isSystem ? "bg-gray-50" : "bg-white"}`}
-                                                            >
-                                                                <td className="p-2 text-center w-[60px]">{index + 1}</td>
-                                                                {section.columns.map((col, colIndex) => (
-                                                                    <td key={col.key} className="p-2 min-w-[150px]">
-                                                                        {isSystem ? (
-                                                                            // System rows: read-only display
-                                                                            <LineItemCell
-                                                                                value={
-                                                                                    colIndex === 0
-                                                                                        ? rowLabel
-                                                                                        : col.key === "qty"
-                                                                                            ? "1"
-                                                                                            : col.key === "unitPrice"
-                                                                                                ? Number((row.unitPrice || 0).toString().replace(/,/g, ""))
-                                                                                                    .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                                                                                : col.key === "discount"
-                                                                                                    ? "0"
-                                                                                                    : col.key === "netAmount"
-                                                                                                        ? Number((row.netAmount || 0).toString().replace(/,/g, ""))
-                                                                                                            .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                                                                                        : col.key === "taxAmt"
-                                                                                                            ? "0"
-                                                                                                            : ""
-                                                                                }
-                                                                                disabled={isViewOnly}
-                                                                                rowId={row.id ?? index}
-                                                                                colKey={col.key}
-                                                                                onUpdate={handleUpdateLineItem}
-                                                                                onHover={handleHoverLineItem}
-                                                                                onLeave={handleLeaveField}
-                                                                            />
-                                                                        ) : (
-                                                                            // Regular / grouped rows: fully editable
-                                                                            <LineItemCell
-                                                                                value={row[col.key]}
-                                                                                disabled={!col.editable || isViewOnly}
-                                                                                rowId={row.id}
-                                                                                colKey={col.key}
-                                                                                onUpdate={handleUpdateLineItem}
-                                                                                onHover={handleHoverLineItem}
-                                                                                onLeave={handleLeaveField}
+                                                    return (
+                                                        <tr
+                                                            key={row.id || index}
+                                                            className={`shadow-sm ${isSystem ? "bg-gray-50" : "bg-white"}`}
+                                                        >
+                                                            <td className="p-2 text-center w-[60px]">{index + 1}</td>
+                                                            {section.columns.map((col, colIndex) => (
+                                                                <td key={col.key} className="p-2 min-w-[150px]">
+                                                                    {isSystem ? (
+                                                                        // System rows: read-only display
+                                                                        <LineItemCell
+                                                                            value={
+                                                                                colIndex === 0
+                                                                                    ? rowLabel
+                                                                                    : col.key === "qty"
+                                                                                        ? "1"
+                                                                                        : col.key === "unitPrice"
+                                                                                            ? Number((row.unitPrice || 0).toString().replace(/,/g, ""))
+                                                                                                .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                            : col.key === "discount"
+                                                                                                ? "0"
+                                                                                                : col.key === "netAmount"
+                                                                                                    ? Number((row.netAmount || 0).toString().replace(/,/g, ""))
+                                                                                                        .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                                    : col.key === "taxAmt"
+                                                                                                        ? "0"
+                                                                                                        : ""
+                                                                            }
+                                                                            disabled={isViewOnly}
+                                                                            rowId={row.id ?? index}
+                                                                            colKey={col.key}
+                                                                            onUpdate={handleUpdateLineItem}
+                                                                            onHover={handleHoverLineItem}
+                                                                            onLeave={handleLeaveField}
+                                                                        />
+                                                                    ) : (
+                                                                        // Regular / grouped rows: fully editable
+                                                                        <LineItemCell
+                                                                            value={row[col.key]}
+                                                                            disabled={!col.editable || isViewOnly}
+                                                                            rowId={row.id}
+                                                                            colKey={col.key}
+                                                                            onUpdate={handleUpdateLineItem}
+                                                                            onHover={handleHoverLineItem}
+                                                                            onLeave={handleLeaveField}
 
-                                                                            />
-                                                                        )}
-                                                                    </td>
-                                                                ))}
-                                                                <td className="p-2 w-[60px]">
-                                                                    {!isSystem && !isViewOnly && (
-                                                                        <span
-                                                                            className="text-red-500 cursor-pointer flex justify-center"
-                                                                            onClick={() => handleDeleteLineItem(row.id)}
-                                                                        >
-                                                                            🗑
-                                                                        </span>
+                                                                        />
                                                                     )}
                                                                 </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    {!isViewOnly && (
-                                        <button
-                                            onClick={handleAddLineItem}
-                                            className="w-full flex items-center justify-center gap-2 py-2 mt-1 mb-4 border border-dashed border-[#2F5D7C] rounded-md text-[#2F5D7C] hover:bg-[#eaf2f8] transition-colors font-medium text-sm"
-                                        >
-                                            <span className="text-lg leading-none">+</span>
-                                            Add Line Item
-                                        </button>
-                                    )}
-
-                                    <div className="border-t border-gray-200 pt-3 space-y-2">
-                                        <div className="flex justify-end items-center gap-4 pr-2">
-                                            <span className="text-sm text-gray-500">
-                                                Total Sum of Line Items <span className="text-xs">(Excl GST)</span> :
-                                            </span>
-                                            <span className="text-sm font-semibold text-gray-800 min-w-[120px] text-right">
-                                                $ {regularItemsSum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-end items-center gap-4 pr-2 pb-2">
-                                            <span className="text-sm text-gray-500">Total Amount Payable :</span>
-                                            <span className="text-base font-bold text-[#2F5D7C] min-w-[120px] text-right">
-                                                $ {totalAmountPayable.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
-                                            <button
-                                                className="text-[#2F5D7C] hover:text-[#1e4560] transition-colors"
-                                                title="View breakdown"
-                                                onClick={() => setShowCalcModal(true)}
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                                    <circle cx="12" cy="12" r="3" />
-                                                </svg>
-                                            </button>
-                                        </div>
+                                                            ))}
+                                                            <td className="p-2 w-[60px]">
+                                                                {!isSystem && !isViewOnly && (
+                                                                    <span
+                                                                        className="text-red-500 cursor-pointer flex justify-center"
+                                                                        onClick={() => handleDeleteLineItem(row.id)}
+                                                                    >
+                                                                        🗑
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
-                            )}
-                        </>
-                    );
 
-                    return (
-                        <Collapse
-                            key={section.section}
-                            defaultActiveKey={[section.section]}
-                            className="bg-white rounded-md border border-gray-200 shadow-sm"
-                            style={{ marginBottom: "16px" }}
-                            items={[{ key: section.section, label: section.section, children: content }]}
-                        />
-                    );
-                })}
+                                {!isViewOnly && (
+                                    <button
+                                        onClick={handleAddLineItem}
+                                        className="w-full flex items-center justify-center gap-2 py-2 mt-1 mb-4 border border-dashed border-[#2F5D7C] rounded-md text-[#2F5D7C] hover:bg-[#eaf2f8] transition-colors font-medium text-sm"
+                                    >
+                                        <span className="text-lg leading-none">+</span>
+                                        Add Line Item
+                                    </button>
+                                )}
+
+                                <div className="border-t border-gray-200 pt-3 space-y-2">
+                                    <div className="flex justify-end items-center gap-4 pr-2">
+                                        <span className="text-sm text-gray-500">
+                                            Total Sum of Line Items <span className="text-xs">(Excl GST)</span> :
+                                        </span>
+                                        <span className="text-sm font-semibold text-gray-800 min-w-[120px] text-right">
+                                            $ {regularItemsSum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-end items-center gap-4 pr-2 pb-2">
+                                        <span className="text-sm text-gray-500">Total Amount Payable :</span>
+                                        <span className="text-base font-bold text-[#2F5D7C] min-w-[120px] text-right">
+                                            $ {totalAmountPayable.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                        <button
+                                            className="text-[#2F5D7C] hover:text-[#1e4560] transition-colors"
+                                            title="View breakdown"
+                                            onClick={() => setShowCalcModal(true)}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                                <circle cx="12" cy="12" r="3" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                );
+
+                return (
+                    <Collapse
+                        key={section.section}
+                        defaultActiveKey={[section.section]}
+                        className="bg-white rounded-md border border-gray-200 shadow-sm"
+                        style={{ marginBottom: "16px" }}
+                        items={[{ 
+                            key: section.section, 
+                            label: section.section, 
+                            children: content,
+                            extra: section.section === "Line Items" ? headerButtons : null
+                        }]}
+                    />
+                );
+            })}
 
             <InvoiceCalculationModal open={showCalcModal} onClose={() => setShowCalcModal(false)} />
         </div>

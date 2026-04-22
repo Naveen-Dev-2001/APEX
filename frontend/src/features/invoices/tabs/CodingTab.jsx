@@ -10,7 +10,10 @@ import {
 import { Modal } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
+import * as XLSX from "xlsx";
+import dayjs from "dayjs";
 import QuickViewTab from "./QuickViewTab";
+
 import CustomInput from "../../../shared/components/CustomInput";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
 import AlertModal from "../../../shared/components/AlertModal";
@@ -183,6 +186,71 @@ const applyCalculation = (item, key, value) => {
 const CodingTab = ({ isActive = false }) => {
     const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData, entityMaster } = useInvoiceStore();
     const [modal, modalContextHolder] = Modal.useModal();
+    const fileInputRef = useRef(null);
+
+    const handleExportExcel = useCallback(() => {
+        const dataToExport = (lineItems || [])
+            .filter(item => !item.isSystemRow)
+            .map((item, index) => ({
+                "S.No": index + 1,
+                "Description": item.description || "",
+                "Qty": item.qty || 0,
+                "Unit Price": item.unitPrice || 0,
+                "Discount": item.discount || 0,
+                "Net Amount": item.netAmount || 0,
+                "Tax Amt": item.taxAmt || 0,
+                "Line Type": item.lineType || "",
+                "GL Code": item.glCode || "",
+                "LOB": item.lob || "",
+                "Department": item.department || "",
+                "Customer": item.customer || "",
+                "Item": item.item || "",
+            }));
+
+        if (dataToExport.length === 0) return;
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Line Items");
+        XLSX.writeFile(workbook, `Invoice_Coding_${activeInvoiceData?.invoice_number || "LineItems"}_${dayjs().format("YYYYMMDD")}.xlsx`);
+    }, [lineItems, activeInvoiceData]);
+
+    const handleImportExcel = useCallback((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet);
+
+            const newItems = json.map(row => ({
+                id: Date.now() + Math.random(),
+                description: row["Description"] || "",
+                qty: parseFloat(row["Qty"]) || 0,
+                unitPrice: parseFloat(row["Unit Price"]) || 0,
+                discount: parseFloat(row["Discount"]) || 0,
+                netAmount: parseFloat(row["Net Amount"]) || 0,
+                taxAmt: parseFloat(row["Tax Amt"]) || 0,
+                lineType: row["Line Type"] || "",
+                glCode: row["GL Code"] || "",
+                lob: row["LOB"] || "",
+                department: row["Department"] || "",
+                customer: row["Customer"] || "",
+                item: row["Item"] || "",
+                isSystemRow: false,
+                isNetAmountOverridden: true
+            }));
+
+            setLineItems(prev => {
+                const systemRows = prev.filter(r => r.isSystemRow);
+                const regularRows = prev.filter(r => !r.isSystemRow);
+                return [...regularRows, ...newItems, ...systemRows];
+            });
+        };
+        reader.readAsArrayBuffer(file);
+    }, [setLineItems]);
+
     const rows = lineItems;
     const queryClient = useQueryClient();
 
@@ -461,13 +529,36 @@ const CodingTab = ({ isActive = false }) => {
                         )}
                     </div>
                     <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors font-medium">
-                            <DownloadOutlined style={{ fontSize: 12 }} /> Export
+                        <button 
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
+                        >
+                            <DownloadOutlined style={{ fontSize: 12 }} /> Export to Excel
                         </button>
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors font-medium">
-                            <UploadOutlined style={{ fontSize: 12 }} /> Import
-                        </button>
+                        {activeInvoiceData?.status?.toLowerCase() === "waiting_coding" && (
+                            <>
+                                <button
+                                    onClick={() => fileInputRef.current.click()}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
+                                >
+                                    <UploadOutlined style={{ fontSize: 12 }} /> Import from Excel
+                                </button>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    accept=".xlsx, .xls"
+                                    onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                            handleImportExcel(e.target.files[0]);
+                                            e.target.value = null;
+                                        }
+                                    }}
+                                />
+                            </>
+                        )}
                     </div>
+
                 </div>
 
                 {/* ── Collapsible body: table + add button ────────────────── */}
