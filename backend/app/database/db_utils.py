@@ -6,10 +6,10 @@ Provides compatibility layer between MongoDB and SQLAlchemy.
 import json
 from typing import Any, Dict, List, Optional
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 from app.models.db_models import (
     Invoice, InvoiceStatusHistory, InvoiceApprovedBy, 
-    InvoiceAssignedApprover, User
+    InvoiceAssignedApprover, User, InvoiceStatusEnum
 )
 from app.repository.repositories import user_repo
 
@@ -75,6 +75,37 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True) -> Dic
         "approver_breakdown": deserialize_json_field(invoice.approver_breakdown),
         "gl_summary": deserialize_json_field(invoice.gl_summary),
     }
+    
+    # ─── Calculate Last Modified By (from workflow_steps) ───
+    last_modified_by = "-"
+    if invoice.workflow_steps:
+        # Sort by timestamp desc to find the most recent non-pending action
+        sorted_steps = sorted(invoice.workflow_steps, key=lambda x: x.timestamp, reverse=True)
+        for step in sorted_steps:
+            if step.status in ["completed", "approved", "rejected", "reworked"]:
+                # If it's a multi-step workflow, we want the most recent 'human' action
+                # But 'Processed' (by scanner) is also a valid 'modified by'
+                last_modified_by = step.user
+                break
+                
+    # If no one has acted yet, fallback to uploader
+    if last_modified_by == "-":
+        last_modified_by = invoice.uploaded_by
+        
+    # 3. Format the display name (resolve email to username if possible)
+    if last_modified_by and "@" in last_modified_by:
+        db = object_session(invoice)
+        if db:
+            user_obj = db.query(User).filter(User.email == last_modified_by).first()
+            if user_obj:
+                last_modified_by = user_obj.username or user_obj.full_name or last_modified_by.split("@")[0]
+            else:
+                last_modified_by = last_modified_by.split("@")[0]
+        else:
+            last_modified_by = last_modified_by.split("@")[0]
+            
+    result["last_modified_by"] = last_modified_by
+    result["approver"] = last_modified_by 
     
     if include_relationships:
         # Status history

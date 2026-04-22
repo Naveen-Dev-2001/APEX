@@ -116,11 +116,10 @@ export const getCondensedColumns = (onView, onDelete) => [
         render:         (val) => <StatusBadge value={val} />,
     },
     {
-        header:         "Approver",
-        accessor:       "approver",
+        header:         "Last Modified By",
+        accessor:       "last_modified_by",
         filterable:     true,
-        getFilterValue: (row) => row?.assigned_approvers?.join(", ") || "",
-        render:         (_, row) => row?.assigned_approvers?.join(", ") || "-",
+        render:         (val) => val || "-",
     },
     {
         header:     "Action Time",
@@ -297,11 +296,10 @@ export const getFullColumns = (onView, onDelete) => [
         render:     (val) => <StatusBadge value={val} />,
     },
     {
-        header:         "Approver",
-        accessor:       "approver",
+        header:         "Last Modified By",
+        accessor:       "last_modified_by",
         filterable:     true,
-        getFilterValue: (row) => row?.assigned_approvers?.join(", ") || "",
-        render:         (_, row) => row?.assigned_approvers?.join(", ") || "-",
+        render:         (val) => val || "-",
     },
     {
         header:         "Approval Time",
