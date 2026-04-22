@@ -13,7 +13,7 @@ export const useSaveInvoice = () => {
     } = useInvoiceStore();
 
     const buildPayload = useCallback(() => {
-        debugger
+
         const f = quickViewFormData;
 
         // ── Save exactly what is on screen ────────────────────────────────────
@@ -25,38 +25,38 @@ export const useSaveInvoice = () => {
         // ── Map to the server Items shape ─────────────────────────────────────
         const mappedItems = lineItemsToSave.map((item, index) => {
             const original = originalItems[index] || {};
-            
+
             return {
                 item_number: { value: index + 1, source: "system" },
-                description: { 
+                description: {
                     ...(original.description || {}),
-                    value: item.description ?? "", 
-                    source: "user" 
+                    value: item.description ?? "",
+                    source: "user"
                 },
-                amount: { 
+                amount: {
                     ...(original.amount || {}),
-                    value: Number(item.netAmount) || 0, 
-                    source: "user" 
+                    value: Number(item.netAmount) || 0,
+                    source: "user"
                 },
-                qty: { 
+                qty: {
                     ...(original.qty || original.quantity || {}),
-                    value: Number(item.qty) || 1, 
-                    source: "user" 
+                    value: Number(item.qty) || 1,
+                    source: "user"
                 },
-                unit_price: { 
+                unit_price: {
                     ...(original.unit_price || {}),
-                    value: Number(item.unitPrice) || 0, 
-                    source: "user" 
+                    value: Number(item.unitPrice) || 0,
+                    source: "user"
                 },
-                discount: { 
+                discount: {
                     ...(original.discount || {}),
-                    value: Number(item.discount) || 0, 
-                    source: "user" 
+                    value: Number(item.discount) || 0,
+                    source: "user"
                 },
-                tax_amount: { 
+                tax_amount: {
                     ...(original.tax_amount || {}),
-                    value: Number(item.taxAmt) || 0, 
-                    source: "user" 
+                    value: Number(item.taxAmt) || 0,
+                    source: "user"
                 },
                 gl_code: { value: item.glCode || "", source: "user" },
                 lob: { value: item.lob || "", source: "user" },
@@ -79,35 +79,35 @@ export const useSaveInvoice = () => {
 
             return {
                 item_number: { value: index + 1, source: "system" },
-                description: { 
+                description: {
                     ...(original.description || {}),
-                    value: item.description ?? "", 
-                    source: "user" 
+                    value: item.description ?? "",
+                    source: "user"
                 },
-                amount: { 
+                amount: {
                     ...(original.amount || {}),
-                    value: Number(item.netAmount) || 0, 
-                    source: "user" 
+                    value: Number(item.netAmount) || 0,
+                    source: "user"
                 },
-                qty: { 
+                qty: {
                     ...(original.qty || original.quantity || {}),
-                    value: Number(item.qty) || 1, 
-                    source: "user" 
+                    value: Number(item.qty) || 1,
+                    source: "user"
                 },
-                unit_price: { 
+                unit_price: {
                     ...(original.unit_price || {}),
-                    value: Number(item.unitPrice) || 0, 
-                    source: "user" 
+                    value: Number(item.unitPrice) || 0,
+                    source: "user"
                 },
-                discount: { 
+                discount: {
                     ...(original.discount || {}),
-                    value: Number(item.discount) || 0, 
-                    source: "user" 
+                    value: Number(item.discount) || 0,
+                    source: "user"
                 },
-                tax_amount: { 
+                tax_amount: {
                     ...(original.tax_amount || {}),
-                    value: Number(item.taxAmt) || 0, 
-                    source: "user" 
+                    value: Number(item.taxAmt) || 0,
+                    source: "user"
                 },
             };
         });
@@ -219,9 +219,9 @@ export const useSaveInvoice = () => {
     }, [quickViewFormData, lineItems, activeInvoiceData]);
 
     const handleSave = useCallback(async (extraFields = {}) => {
-        debugger
+
         const payload = buildPayload();
-        
+
         // Apply any extra field overrides (e.g. status)
         const finalPayload = {
             ...payload,
