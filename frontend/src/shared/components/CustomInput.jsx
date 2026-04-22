@@ -15,6 +15,7 @@ const CustomInput = memo(({
     onRightIconClick,
     className = "mb-4 w-full",
     height = "",
+    allowClear = true,
     ...props
 }) => {
     const InputComponent = type === "password" ? Input.Password : Input;
@@ -45,6 +46,7 @@ const CustomInput = memo(({
                 status={error ? "error" : ""}
                 size="large"
                 style={{ borderRadius: '8px', height, fontSize: '16px' }}
+                allowClear={allowClear}
                 {...props}
             />
             {error && (

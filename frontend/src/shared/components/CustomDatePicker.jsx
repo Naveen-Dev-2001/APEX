@@ -9,6 +9,7 @@ const CustomDatePicker = ({
     error,
     required = false,
     className = "mb-4 w-full",
+    allowClear = true,
     ...props
 }) => {
 
@@ -29,6 +30,7 @@ const CustomDatePicker = ({
                 }}
                 style={{ width: "100%", borderRadius: "8px", height: "40px" }}
                 status={error ? "error" : ""}
+                allowClear={allowClear}
                 placement="bottomLeft"
                 getPopupContainer={() => document.body}
                 styles={{

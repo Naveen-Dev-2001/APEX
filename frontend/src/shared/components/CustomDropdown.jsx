@@ -14,6 +14,7 @@ const CustomDropdown = ({
     className = "mb-4 w-full",
     showSearch = false,
     filterOption,
+    allowClear = true,
     ...props
 }) => {
     return (
@@ -35,6 +36,7 @@ const CustomDropdown = ({
                 style={{ width: "100%" }}
                 size="large"
                 status={error ? "error" : ""}
+                allowClear={allowClear}
                 {...props}
             />
 

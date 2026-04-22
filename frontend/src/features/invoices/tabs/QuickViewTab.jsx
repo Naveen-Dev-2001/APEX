@@ -47,19 +47,27 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
 
     const fieldContent = (() => {
         if (field.key === "vendorId" || field.key === "vendorName") {
+            const adaptedOptions = (vendorOptions || []).map(opt => ({
+                ...opt,
+                value: field.key === "vendorId" ? opt.vendorId : opt.vendorName
+            }));
+
             return (
                 <AutoComplete
                     value={localValue}
-                    options={vendorOptions}
+                    options={adaptedOptions}
                     style={{ width: "100%", height: "40px" }}
                     disabled={commonProps.disabled}
                     filterOption={filterVendors}
                     onSelect={(val, option) => {
-                        const name = option.label.split(" - ")[1];
-                        setLocalValue(field.key === "vendorId" ? val : name);
-                        onVendorSelect(val, name);
+                        const id = option.vendorId;
+                        const name = option.vendorName;
+                        setLocalValue(field.key === "vendorId" ? id : name);
+                        onVendorSelect(id, name);
                     }}
+                    onChange={(val) => handleChange(val)}
                     onSearch={onSearch}
+                    allowClear
                     loading={searchLoading}
                     placeholder="Type to search vendor ID or name"
                     notFoundContent={searchLoading ? <div className="p-2 flex justify-center"><Spin size="small" /></div> : null}
@@ -335,7 +343,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         if (vendor) {
             setSearchedVendors([{
                 value: vendor.vendor_id,
-                label: `${vendor.vendor_id} - ${vendor.vendor_name}`
+                label: `${vendor.vendor_id} - ${vendor.vendor_name}`,
+                vendorId: vendor.vendor_id,
+                vendorName: vendor.vendor_name
             }]);
         }
     }, [vendor]);
@@ -355,7 +365,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 const data = res.data || [];
                 const options = data.map(v => ({
                     value: v.vendor_id,
-                    label: `${v.vendor_id} - ${v.vendor_name}`
+                    label: `${v.vendor_id} - ${v.vendor_name}`,
+                    vendorId: v.vendor_id,
+                    vendorName: v.vendor_name
                 }));
                 setSearchedVendors(options);
             } catch (err) {
@@ -370,8 +382,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const handleVendorFieldCommit = useCallback((key, value) => {
         handleCommit(key, value);
         // If they manually cleared it, clear search too
-        if (!value) setSearchedVendors([]);
-    }, [handleCommit]);
+        if (!value) {
+            setSearchedVendors([]);
+            setSelectedVendorId(null);
+        }
+    }, [handleCommit, setSelectedVendorId]);
     const [showCalcModal, setShowCalcModal] = useState(false);
 
     const prevVendorRef = useRef(null);
