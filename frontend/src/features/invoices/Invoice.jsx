@@ -206,8 +206,8 @@ const Invoice = () => {
 
     const columnDefs = useMemo(() => {
         const cols = view === "condensed"
-            ? getCondensedColumns(handleView, handleDelete)
-            : getFullColumns(handleView, handleDelete);
+            ? getCondensedColumns(handleView, handleDelete, userRole)
+            : getFullColumns(handleView, handleDelete, userRole);
 
         return cols.map(col => ({
             ...col,

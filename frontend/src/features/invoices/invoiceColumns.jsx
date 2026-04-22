@@ -19,32 +19,38 @@ const StatusBadge = ({ value }) => {
 };
 
 // ─── Actions cell helper ──────────────────────────────────────────────────────
-const actionsCol = (onView, onDelete) => ({
+const actionsCol = (onView, onDelete, userRole) => ({
     header: "Actions",
     accessor: "actions",
     sortable: false,
-    render: (_, row) => (
-        <div className="flex items-center justify-center gap-3">
-            <button
-                onClick={() => onView(row)}
-                className="text-blue-500 hover:text-blue-700 transition-colors cursor-pointer"
-                title="View"
-            >
-                <EyeOutlined style={{ fontSize: 16 }} />
-            </button>
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    console.log("Delete button clicked for row:", row);
-                    onDelete(row);
-                }}
-                className="text-red-400 hover:text-red-600 transition-colors cursor-pointer"
-                title="Delete"
-            >
-                <DeleteOutlined style={{ fontSize: 16 }} />
-            </button>
-        </div>
-    ),
+    render: (_, row) => {
+        const canDelete = ["scanner", "coder"].includes(userRole?.toLowerCase());
+        
+        return (
+            <div className="flex items-center justify-center gap-3">
+                <button
+                    onClick={() => onView(row)}
+                    className="text-blue-500 hover:text-blue-700 transition-colors cursor-pointer"
+                    title="View"
+                >
+                    <EyeOutlined style={{ fontSize: 16 }} />
+                </button>
+                {canDelete && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            console.log("Delete button clicked for row:", row);
+                            onDelete(row);
+                        }}
+                        className="text-red-400 hover:text-red-600 transition-colors cursor-pointer"
+                        title="Delete"
+                    >
+                        <DeleteOutlined style={{ fontSize: 16 }} />
+                    </button>
+                )}
+            </div>
+        );
+    },
 });
 
 export const VIEW_OPTIONS = [
@@ -53,7 +59,7 @@ export const VIEW_OPTIONS = [
 ];
 
 // ─── Condensed columns ────────────────────────────────────────────────────────
-export const getCondensedColumns = (onView, onDelete) => [
+export const getCondensedColumns = (onView, onDelete, userRole) => [
     {
         header:         "Vendor Name",
         accessor:       "vendor_name",
@@ -128,11 +134,11 @@ export const getCondensedColumns = (onView, onDelete) => [
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render:     (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
     },
-    actionsCol(onView, onDelete),
+    actionsCol(onView, onDelete, userRole),
 ];
 
 // ─── Full columns ─────────────────────────────────────────────────────────────
-export const getFullColumns = (onView, onDelete) => [
+export const getFullColumns = (onView, onDelete, userRole) => [
     {
         header:         "Vendor Name",
         accessor:       "vendor_name",
@@ -308,5 +314,5 @@ export const getFullColumns = (onView, onDelete) => [
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render:         (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
     },
-    actionsCol(onView, onDelete),
+    actionsCol(onView, onDelete, userRole),
 ];
