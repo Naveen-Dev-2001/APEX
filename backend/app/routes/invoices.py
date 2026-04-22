@@ -23,8 +23,9 @@ from app.models.db_models import (
     Invoice, WorkflowStep, WorkflowStepTypeEnum, 
     WorkflowStepStatusEnum, InvoiceStatusEnum, InvoiceStatusHistory,
     VendorMetadata, RawExtractionData, User, EntityMaster, InvoiceAssignedApprover,
-    DeletedInvoice
+    DeletedInvoice, Delegation
 )
+from app.routes.approval_new import StepType
 
 from app.repository.repositories import (
     invoice_repo, workflow_step_repo, invoice_status_history_repo,
@@ -641,6 +642,7 @@ async def get_invoices(
         repo_filters["uploaded_by"] = current_user.username
 
     expressions = []
+    extra_filters = {}
 
     # Parse JSON filters if provided
     if filters:
@@ -662,6 +664,76 @@ async def get_invoices(
                     )
                     del extra_filters["coding_view"]
 
+                # Apply special approvals_view logic
+                if extra_filters.get("approvals_view"):
+                    from sqlalchemy import or_, and_, exists, func
+                    
+                    user_email = current_user.email.lower()
+                    user_dept = (getattr(current_user, "department", "finance") or "finance").lower()
+                    is_finance_user = "finance" in user_dept and "non-finance" not in user_dept
+                    
+                    # 1. Base eligibility: Current level match
+                    # User is assigned to current level OR current level is a Finance level
+                    
+                    # Get active delegations for current level
+                    curr_time = datetime.utcnow()
+                    active_delegations = db.query(Delegation.delegator_email).filter(
+                        Delegation.substitute_email.ilike(current_user.email),
+                        Delegation.entity == entity,
+                        Delegation.start_date <= curr_time,
+                        Delegation.end_date >= curr_time
+                    ).all()
+                    target_emails = [user_email] + [d[0].lower() for d in active_delegations]
+
+                    approver_subquery = exists().where(
+                        and_(
+                            InvoiceAssignedApprover.invoice_id == Invoice.id,
+                            InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
+                            or_(
+                                InvoiceAssignedApprover.approver_email.in_(target_emails),
+                                and_(InvoiceAssignedApprover.is_finance == True, is_finance_user == True)
+                            )
+                        )
+                    )
+                    
+                    # 2. Exclude if already acted in current cycle
+                    # Find the timestamp of the most recent 'reset' event (rework or recall)
+                    last_reset_subquery = db.query(func.max(WorkflowStep.timestamp)).filter(
+                        WorkflowStep.invoice_id == Invoice.id,
+                        WorkflowStep.step_type.in_([StepType.REWORKED, StepType.RECALLED])
+                    ).correlate(Invoice).scalar_subquery()
+
+                    # Check if user has an approval-related action after the last reset
+                    user_acted_subquery = exists().where(
+                        and_(
+                            WorkflowStep.invoice_id == Invoice.id,
+                            func.lower(WorkflowStep.user) == user_email,
+                            WorkflowStep.step_type.in_([
+                                StepType.LEVEL_APPROVED,
+                                StepType.APPROVED,
+                                StepType.REJECTED,
+                                StepType.THRESHOLD_APPROVED,
+                                StepType.POSTING_APPROVED
+                            ]),
+                            or_(
+                                last_reset_subquery == None,
+                                WorkflowStep.timestamp > last_reset_subquery
+                            )
+                        )
+                    )
+
+                    expressions.append(
+                        and_(
+                            or_(
+                                Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                Invoice.status == InvoiceStatusEnum.REWORKED
+                            ),
+                            approver_subquery,
+                            ~user_acted_subquery  # Hide if already acted
+                        )
+                    )
+                    del extra_filters["approvals_view"]
+
                 # Convert list of values to list if they're not already
                 for k, v in extra_filters.items():
                     if isinstance(v, list):
@@ -671,32 +743,7 @@ async def get_invoices(
         except Exception as e:
             print(f"Error parsing filters: {e}")
     
-    # Extra role filtering for non-finance approvers
-    user_roles = [r.strip().lower() for r in current_user.role.split(",")]
-    user_dept = (getattr(current_user, "department", "finance") or "finance").lower()
-    
-    # Non-finance approvers (who are NOT admins) only see invoices where they are assigned
-    is_approver = "approver" in user_roles
-    is_admin = "admin" in user_roles
-    is_finance = "finance" in user_dept and "non-finance" not in user_dept
-    
-    if is_approver and not is_admin and not is_finance:
-        from app.models.delegation import Delegation
-        curr_time = datetime.utcnow()
-        # Find delegators who have assigned this user as substitute
-        active_delegations = db.query(Delegation.delegator_email).filter(
-            Delegation.substitute_email.ilike(current_user.email),
-            Delegation.entity == entity,
-            Delegation.start_date <= curr_time,
-            Delegation.end_date >= curr_time
-        ).all()
-        target_emails = [current_user.email.lower()] + [d[0].lower() for d in active_delegations]
-        
-        expressions.append(
-            Invoice.assigned_approvers_list.any(
-                InvoiceAssignedApprover.approver_email.in_(target_emails)
-            )
-        )
+    # (Removed restrictive filtering so all invoices show in the Invoices tab)
 
     search_fields = ["invoice_number", "vendor_name", "vendor_id", "status", "filename"]
     
@@ -1811,16 +1858,65 @@ async def update_invoice(
 
     # Status transition logic
     if "status" in update_data and update_data["status"] == InvoiceStatusEnum.WAITING_APPROVAL:
-        if invoice.required_approvers is None:
-             from app.routes.workflow import get_vendor_data_from_invoice, get_required_approver_count, get_invoice_total_from_invoice
+         from app.routes.workflow import get_vendor_data_from_invoice, get_required_approver_count, get_invoice_total_from_invoice
+         from app.models.db_models import User
+         from app.repository.repositories import invoice_assigned_approver_repo
+         
+         vendor_name, vendor_id = get_vendor_data_from_invoice(db, invoice_id)
+         total_amount = get_invoice_total_from_invoice(db, invoice_id)
+         currency = (deserialize_json_field(invoice.extracted_data) or {}).get("invoice_details", {}).get("currency", {}).get("value", "USD")
+         
+         # Always recalculate requirements on transition
+         requirement_data = get_required_approver_count(
+             db, vendor_name, total_amount, invoice_id,
+             currency=currency, entity=invoice.entity,
+             force_vendor_id=vendor_id, force_vendor_name=vendor_name
+         )
+         
+         invoice.required_approvers = requirement_data["required"]
+         invoice.approver_breakdown = serialize_json_field(requirement_data.get("breakdown", {}))
+         
+         # Clear existing assigned approvers
+         invoice_assigned_approver_repo.delete_all(db, filters={"invoice_id": invoice_id})
+         
+         # Fetch all finance-department users once (used for finance-level expansion)
+         finance_users = (
+             db.query(User)
+             .filter(
+                 User.department != None,
+                 User.department.ilike("%finance%"),
+                 ~User.department.ilike("%non-finance%"),
+                 User.status == "active"
+             )
+             .all()
+         )
+         finance_emails = [u.email.lower() for u in finance_users if u.email]
+         
+         # Store assigned approvers
+         assigned_approvers = requirement_data.get("assigned_approvers", [])
+         for idx, level_data in enumerate(assigned_approvers):
+             is_finance_level = False
+             emails = []
              
-             vendor_name, vendor_id = get_vendor_data_from_invoice(db, invoice_id)
-             total_amount = get_invoice_total_from_invoice(db, invoice_id)
-             currency = (deserialize_json_field(invoice.extracted_data) or {}).get("invoice_details", {}).get("currency", {}).get("value", "USD")
-             requirement_data = get_required_approver_count(db, vendor_name, total_amount, invoice_id, currency=currency, entity=invoice.entity)
-             
-             invoice.required_approvers = requirement_data["required"]
-             invoice.approver_breakdown = serialize_json_field(requirement_data["breakdown"])
+             if isinstance(level_data, dict):
+                 emails = level_data.get("emails", [])
+                 is_finance_level = level_data.get("is_finance", False)
+             else:
+                 emails = [level_data] if isinstance(level_data, str) else level_data
+                 
+             if is_finance_level and finance_emails:
+                 combined = set(e.lower() for e in emails if e) | set(finance_emails)
+             else:
+                 combined = set(e.lower() for e in emails if e)
+                 
+             for email in combined:
+                 if email:
+                     invoice_assigned_approver_repo.create(db, obj_in={
+                         "invoice_id": invoice_id,
+                         "approver_email": email,
+                         "sequence_order": idx + 1,
+                         "is_finance": is_finance_level
+                     })
 
     # Update attributes
     update_fields = [

@@ -226,6 +226,7 @@ class InvoiceAssignedApprover(Base):
     approver_email = Column(String(255), nullable=False)
     sequence_order = Column(Integer, nullable=False,
                             default=0)  # For maintaining order
+    is_finance = Column(Boolean, nullable=False, default=False)
 
     # Relationships
     invoice = relationship("Invoice", back_populates="assigned_approvers_list")

@@ -56,35 +56,37 @@ const ApprovalsPage = () => {
             setActiveDelegations(active);
             setApprovers(approverData);
 
-            // Helper to get emails from a stage (handles string OR object formats)
+            // Helper to get emails from a stage (handles string OR object formats OR plain array)
             const getStageEmails = (stage) => {
                 if (!stage) return [];
+                // New format: { emails: [...], is_finance: bool }
+                if (stage?.emails != null) {
+                    if (Array.isArray(stage.emails)) return stage.emails.map(e => String(e).toLowerCase());
+                    if (typeof stage.emails === 'string') return [stage.emails.toLowerCase()];
+                }
+                // Plain array of email strings (legacy)
+                if (Array.isArray(stage)) return stage.map(e => String(e).toLowerCase());
+                // Single email string
                 if (typeof stage === 'string') return [stage.toLowerCase()];
-                if (Array.isArray(stage?.emails)) return stage.emails.map(e => String(e).toLowerCase());
-                if (typeof stage?.emails === 'string') return [stage.emails.toLowerCase()];
                 return [];
             };
 
-            // Transform and filter invoices
-            const filtered = invoiceData.filter(inv => {
-                const currentLevel = inv.current_approver_level || 1;
-                const assignedApprovers = inv.assigned_approvers || [];
-                const stage = assignedApprovers[currentLevel - 1];
-                const stageEmails = getStageEmails(stage);
-
-                const userEmail = (user?.email || '').toLowerCase();
-                const isDesignatedApprover = stageEmails.includes(userEmail);
-                const isActiveDelegate = stageEmails.some(email => active.includes(email));
-
-                // User can see the invoice if they are the designated approver or an active delegate
-                // Note: User manually set this to 'true' in a recent edit, preserving that behavior while fixing types
-                return true; 
-            }).map(inv => {
+            // Transform invoices
+            const transformed = invoiceData.map(inv => {
                 const currentLevel = inv.current_approver_level || 1;
                 const stage = inv.assigned_approvers?.[currentLevel - 1];
+                const isFinanceLevel = stage?.is_finance === true;
                 const stageEmails = getStageEmails(stage);
-                const approverLabel = stageEmails.length > 0 ? stageEmails.join(", ") : 'Pending';
-                const isDelegated = stageEmails.some(e => active.includes(e));
+
+                // For finance-team levels show "Finance Team" instead of individual emails
+                const approverLabel = isFinanceLevel
+                    ? 'Finance Team'
+                    : stageEmails.length > 0
+                        ? stageEmails.join(", ")
+                        : 'Pending';
+                
+                // Active delegation check for the label
+                const isDelegated = !isFinanceLevel && stageEmails.some(e => active.includes(e));
 
                 return {
                     ...inv,
@@ -95,7 +97,7 @@ const ApprovalsPage = () => {
                 };
             });
 
-            setInvoices(filtered);
+            setInvoices(transformed);
         } catch (error) {
             console.error('Error fetching approval data:', error);
             toast.error('Failed to load approvals');

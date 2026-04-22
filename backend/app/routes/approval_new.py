@@ -249,6 +249,30 @@ def _threshold_approved(steps: List[WorkflowStep]) -> bool:
     return any(s.step_type == StepType.THRESHOLD_APPROVED for s in steps)
 
 
+def _get_current_cycle_steps(steps: List[WorkflowStep]) -> List[WorkflowStep]:
+    """
+    Returns only the steps that occurred after the most recent 'reset' event
+    (REWORKED or RECALLED). If no reset occurred, returns all steps.
+    """
+    if not steps:
+        return []
+    
+    # Reset types
+    resets = {StepType.REWORKED, StepType.RECALLED}
+    
+    # Find the index of the latest reset
+    latest_reset_idx = -1
+    for i in range(len(steps) - 1, -1, -1):
+        if steps[i].step_type in resets:
+            latest_reset_idx = i
+            break
+            
+    if latest_reset_idx == -1:
+        return steps
+    
+    return steps[latest_reset_idx + 1:]
+
+
 def _posting_approved(steps: List[WorkflowStep]) -> bool:
     return any(s.step_type == StepType.POSTING_APPROVED for s in steps)
 
@@ -350,9 +374,13 @@ def _resolve_user_role_in_workflow(
     """
     email = current_user_email.lower()
     assigned: List[Dict] = workflow.get("assigned_approvers", [])
-    approved_levels = _get_approved_levels(steps)
-    threshold_done = _threshold_approved(steps)
-    posting_done = _posting_approved(steps)
+    
+    # Filter steps to the current cycle (post-rework/recall)
+    current_cycle_steps = _get_current_cycle_steps(steps)
+    
+    approved_levels = _get_approved_levels(current_cycle_steps)
+    threshold_done = _threshold_approved(current_cycle_steps)
+    posting_done = _posting_approved(current_cycle_steps)
 
     result = {
         "user_level": None,
@@ -374,7 +402,7 @@ def _resolve_user_role_in_workflow(
     }
     result["already_acted"] = any(
         (s.user or "").lower() == email and s.step_type in acted_types
-        for s in steps
+        for s in current_cycle_steps
     )
 
     # Walk assigned_approvers
@@ -699,23 +727,12 @@ async def approve_invoice(
     threshold_entries = [a for a in assigned if a.get("type") == "threshold"]
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
 
-    # ── If reworked, only count approval steps AFTER the last rework ──
-    if current_status == InvoiceStatus.REWORKED:
-        rework_steps = [s for s in steps if s.step_type == StepType.REWORKED]
-        last_rework_ts = max((s.timestamp for s in rework_steps), default=None)
-        if last_rework_ts:
-            steps_for_level_check = [
-                s for s in steps
-                if s.step_type not in approval_types or s.timestamp > last_rework_ts
-            ]
-        else:
-            steps_for_level_check = steps
-    else:
-        steps_for_level_check = steps
+    # ── Filter steps to the current cycle (post-rework/recall) ──
+    current_cycle_steps = _get_current_cycle_steps(steps)
 
-    approved_levels = _get_approved_levels(steps_for_level_check)
-    threshold_done = _threshold_approved(steps_for_level_check)
-    posting_done_already = _posting_approved(steps_for_level_check)
+    approved_levels = _get_approved_levels(current_cycle_steps)
+    threshold_done = _threshold_approved(current_cycle_steps)
+    posting_done_already = _posting_approved(current_cycle_steps)
 
     mandatory_levels_done = all(
         bool(approved_levels.get(e.get("level"))) for e in mandatory
@@ -763,7 +780,7 @@ async def approve_invoice(
         already = any(
             (s.user or "").lower() == email
             and s.step_type in approval_types
-            for s in steps_for_level_check
+            for s in current_cycle_steps
         )
         if already:
             raise HTTPException(400, "You have already acted in this workflow cycle")

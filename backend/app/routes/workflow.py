@@ -149,16 +149,31 @@ def get_required_approver_count(
     if not force_vendor_name and not force_vendor_id and invoice_data:
         if hasattr(invoice_data, "required_approvers") and invoice_data.required_approvers is not None:
             # We need to map relationship models to strings for the response
-            assigned_approvers = []
-            if hasattr(invoice_data, "assigned_approvers_list"):
-                assigned_approvers = [a.approver_email for a in sorted(invoice_data.assigned_approvers_list, key=lambda x: x.sequence_order)]
+            if hasattr(invoice_data, "assigned_approvers_list") and invoice_data.assigned_approvers_list:
+                # Group by sequence_order to recreate the levels
+                levels = {}
+                for a in invoice_data.assigned_approvers_list:
+                    seq = a.sequence_order
+                    if seq not in levels:
+                        # Reconstruct the level dict
+                        # Note: We assume 'mandatory' as default type for now
+                        levels[seq] = {
+                            "emails": [], 
+                            "is_finance": getattr(a, "is_finance", False), 
+                            "level": seq,
+                            "type": "mandatory" 
+                        }
+                    levels[seq]["emails"].append(a.approver_email)
+                
+                # Sort levels and format as list of dicts
+                assigned_approvers = [levels[s] for s in sorted(levels.keys())]
                 
             if assigned_approvers:
                 return {
                     "required": invoice_data.required_approvers,
                     "assigned_approvers": assigned_approvers,
                     "workflow_type": getattr(invoice_data, "workflow_type", "persisted"),
-                    "breakdown": {} # Breakdown is usually not persisted in a structured way elsewhere
+                    "breakdown": {} 
                 }
 
     assigned_approvers = []

@@ -64,7 +64,17 @@ async def send_to_approval(
         except: pass
     currency = extracted.get("invoice_details", {}).get("currency", {}).get("value", "USD")
     
-    requirement_data = get_required_approver_count(db, vendor_name, total_amount, invoice_id, currency=currency, entity=entity, force_vendor_id=vendor_id)
+    requirement_data = get_required_approver_count(
+        db, vendor_name, total_amount, invoice_id,
+        currency=currency, entity=entity,
+        force_vendor_id=vendor_id,
+        force_vendor_name=vendor_name   # ← ensure vendor name is passed for lookup
+    )
+    
+    # DEBUG: log what the workflow resolver returned
+    print(f"[APPROVAL] invoice_id={invoice_id} vendor='{vendor_name}' entity='{entity}'")
+    print(f"[APPROVAL] requirement_data required={requirement_data.get('required')} type={requirement_data.get('workflow_type')}")
+    print(f"[APPROVAL] assigned_approvers={requirement_data.get('assigned_approvers', [])}")
     
     # 4. Update Invoice Status
     invoice.status = InvoiceStatus.WAITING_APPROVAL
@@ -76,18 +86,51 @@ async def send_to_approval(
     # Clear existing assigned approvers
     invoice_assigned_approver_repo.delete_all(db, filters={"invoice_id": invoice_id})
     
+    # Fetch all finance-department users once (used for finance-level expansion)
+    finance_users = (
+        db.query(User)
+        .filter(
+            User.department != None,
+            User.department.ilike("%finance%"),
+            ~User.department.ilike("%non-finance%"),
+            User.status == "active"
+        )
+        .all()
+    )
+    finance_emails = [u.email.lower() for u in finance_users if u.email]
+
     # Store assigned approvers
     assigned_approvers = requirement_data.get("assigned_approvers", [])
-    for idx, email_item in enumerate(assigned_approvers):
-        # email_item could be a string or a list of strings
-        emails = [email_item] if isinstance(email_item, str) else email_item
-        for email in emails:
+    print(f"[APPROVAL] Total levels to store: {len(assigned_approvers)}")
+    for idx, level_data in enumerate(assigned_approvers):
+        # level_data is a dict: {"emails": [...], "is_finance": bool, "type": "mandatory", "level": X}
+        # OR it could be a list of emails (fallback for older workflows)
+        
+        is_finance_level = False
+        emails = []
+        
+        if isinstance(level_data, dict):
+            emails = level_data.get("emails", [])
+            is_finance_level = level_data.get("is_finance", False)
+        else:
+            emails = [level_data] if isinstance(level_data, str) else level_data
+
+        # For finance-team levels: merge explicit emails with all finance users
+        if is_finance_level and finance_emails:
+            combined = set(e.lower() for e in emails if e) | set(finance_emails)
+        else:
+            combined = set(e.lower() for e in emails if e)
+
+        print(f"[APPROVAL]   Level {idx+1}: is_finance={is_finance_level}, emails={combined}")
+        for email in combined:
             if email:
                 invoice_assigned_approver_repo.create(db, obj_in={
                     "invoice_id": invoice_id,
                     "approver_email": email,
-                    "sequence_order": idx + 1
+                    "sequence_order": idx + 1,
+                    "is_finance": is_finance_level
                 })
+    print(f"[APPROVAL] Done writing assigned approvers for invoice {invoice_id}")
     import json
     
     # Update requirement breakdown if we want to persist it (using JSON field)
@@ -160,9 +203,12 @@ async def send_to_approval(
 
     # 7. TRIGGER FIRST APPROVAL EMAIL
     if assigned_approvers:
-        first_level_approvers = assigned_approvers[0]
-        # emails could be a string or a list of strings
-        emails = [first_level_approvers] if isinstance(first_level_approvers, str) else first_level_approvers
+        first_level_data = assigned_approvers[0]
+        emails = []
+        if isinstance(first_level_data, dict):
+            emails = first_level_data.get("emails", [])
+        else:
+            emails = [first_level_data] if isinstance(first_level_data, str) else first_level_data
         
         for approver_email in emails:
             if not approver_email: continue

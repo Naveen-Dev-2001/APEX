@@ -102,15 +102,15 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True) -> Dic
         if invoice.assigned_approvers_list:
             # Sort by sequence_order first
             sorted_approvers = sorted(invoice.assigned_approvers_list, key=lambda x: x.sequence_order)
-            grouped = {}
+            grouped = {}        # { seq_order: {"emails": [...], "is_finance": bool} }
             for a in sorted_approvers:
-                if a.sequence_order not in grouped:
-                    grouped[a.sequence_order] = []
-                grouped[a.sequence_order].append(a.approver_email)
+                seq = a.sequence_order
+                if seq not in grouped:
+                    grouped[seq] = {"emails": [], "is_finance": bool(a.is_finance)}
+                grouped[seq]["emails"].append(a.approver_email)
             
-            # Return as a list of levels (each level is a list of emails)
-            # The indices will correspond to current_approver_level - 1
-            # We use the sequence of sorted keys to ensure correct ordering even if there are gaps
+            # Return as a list of level dicts ordered by sequence_order
+            # Each dict: { "emails": [...], "is_finance": bool }
             result["assigned_approvers"] = [grouped[seq] for seq in sorted(grouped.keys())]
         else:
             result["assigned_approvers"] = []

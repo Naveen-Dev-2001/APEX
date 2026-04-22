@@ -5,11 +5,17 @@ import API from "./api";
  * Note: Currently filtering on the frontend based on the status 'waiting_approval'
  */
 export const getUnapprovedInvoices = (skip = 0, limit = 1000) =>
-    API.get(`/invoices/`, { params: { skip, limit } }).then(res => {
+    API.get(`/invoices/`, { 
+        params: { 
+            skip, 
+            limit, 
+            filters: JSON.stringify({ approvals_view: true }) 
+        } 
+    }).then(res => {
         // The backend returns { data: [...], total: ... }
         const invoices = Array.isArray(res.data?.data) ? res.data.data : 
                          (Array.isArray(res.data) ? res.data : []);
-        return invoices.filter(inv => inv.status === 'waiting_approval');
+        return invoices; // Filtering now handled by backend
     });
 
 /**
