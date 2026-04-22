@@ -667,18 +667,19 @@ async def get_ui_status_from_frontend(
     assigned = payload.get("assigned_approvers", [])
     current_level = payload.get("current_approver_level", 1)
     current_status = payload.get("current_status")
-
+ 
     email = current_user.email.lower()
     finance_users = _get_finance_users(db, entity)
     is_finance = email in [f.lower() for f in finance_users]
-
+ 
     steps = _steps_for_invoice(db, invoice_id)
-    approval_types = [StepType.LEVEL_APPROVED, StepType.THRESHOLD_APPROVED, StepType.POSTING_APPROVED, StepType.APPROVED]
-
+    approval_types = [StepType.LEVEL_APPROVED, StepType.THRESHOLD_APPROVED,
+                      StepType.POSTING_APPROVED, StepType.APPROVED]
+ 
     mandatory = [a for a in assigned if a.get("type") == "mandatory"]
     threshold_entries = [a for a in assigned if a.get("type") == "threshold"]
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
-
+ 
     # ── If reworked, only count approval steps AFTER the last rework ──
     if current_status == InvoiceStatus.REWORKED:
         rework_steps = [s for s in steps if s.step_type == StepType.REWORKED]
@@ -692,32 +693,37 @@ async def get_ui_status_from_frontend(
             steps_for_level_check = steps
     else:
         steps_for_level_check = steps
-
+ 
     approved_levels = _get_approved_levels(steps_for_level_check)
     threshold_done = _threshold_approved(steps_for_level_check)
     posting_done = _posting_approved(steps_for_level_check)
-
+ 
     mandatory_levels_done = all(
         bool(approved_levels.get(e.get("level"))) for e in mandatory
     )
     has_threshold = bool(threshold_entries)
     has_posting = bool(posting_entries)
-
+ 
     # ── Posting approver check ──
     posting_emails = []
     for pe in posting_entries:
         posting_emails.extend(_parse_list(pe.get("emails", [])))
     is_posting_approver = email in [e.lower() for e in posting_emails]
-
+ 
     # ── Threshold approver check ──
     threshold_emails = []
     for te in threshold_entries:
         threshold_emails.extend(_parse_list(te.get("emails", [])))
     is_threshold_approver = email in [e.lower() for e in threshold_emails]
-
+ 
+    # ── already_acted defined HERE so all branches below can safely use it ──
+    # FIX: was defined after the explicit check block, causing NameError when
+    # can_act was False and the block tried to evaluate `not already_acted`.
+    already_acted = any((s.user or "").lower() == email for s in steps)
+ 
     # ── can_act logic ────────────────────────────────────────────────────────
     can_act = False
-
+ 
     if not mandatory_levels_done:
         current_entry = next(
             (a for a in mandatory if a.get("level") == current_level), None
@@ -726,8 +732,7 @@ async def get_ui_status_from_frontend(
             is_finance_level = current_entry.get("is_finance", False)
             emails_at_level = [e.lower() for e in _parse_list(
                 current_entry.get("emails", []))]
-
-            # Delegation check
+ 
             delegated_authority = False
             for orig_email in emails_at_level:
                 if not orig_email:
@@ -736,7 +741,7 @@ async def get_ui_status_from_frontend(
                 if email in [s.lower() for s in substitutes]:
                     delegated_authority = True
                     break
-
+ 
             user_in_level = (
                 (is_finance_level and is_finance)
                 or (email in emails_at_level)
@@ -748,7 +753,7 @@ async def get_ui_status_from_frontend(
                 for s in steps_for_level_check
             )
             can_act = user_in_level and not already_acted_in_workflow
-
+ 
     elif has_threshold and not threshold_done:
         delegated_threshold = False
         for orig_email in threshold_emails:
@@ -758,7 +763,7 @@ async def get_ui_status_from_frontend(
             if email in [s.lower() for s in substitutes]:
                 delegated_threshold = True
                 break
-
+ 
         already_acted_in_workflow = any(
             (s.user or "").lower() == email
             and s.step_type in approval_types
@@ -766,7 +771,7 @@ async def get_ui_status_from_frontend(
         )
         can_act = (
             is_threshold_approver or delegated_threshold) and not already_acted_in_workflow
-
+ 
     elif has_posting and not posting_done:
         delegated_posting = False
         for orig_email in posting_emails:
@@ -776,32 +781,50 @@ async def get_ui_status_from_frontend(
             if email in [s.lower() for s in substitutes]:
                 delegated_posting = True
                 break
-
-        already_acted_in_workflow = any(
+ 
+        # FIX: only block if they already did POSTING_APPROVED specifically.
+        # A posting approver who approved at a mandatory level must NOT be blocked here.
+        already_posting_approved = any(
             (s.user or "").lower() == email
-            and s.step_type in approval_types
+            and s.step_type == StepType.POSTING_APPROVED
             for s in steps_for_level_check
         )
         can_act = (
-            is_posting_approver or delegated_posting) and not already_acted_in_workflow
-
-    # Explicit authorization check for Posting/Threshold stages
+            is_posting_approver or delegated_posting) and not already_posting_approved
+ 
+    # ── Explicit fallback for virtual Posting/Threshold levels ───────────────
+    # FIX: replaced `not already_acted` with stage-specific checks so a posting
+    # approver who acted at a mandatory level is not incorrectly blocked here.
     if not can_act:
-        if (is_posting_approver or is_threshold_approver) and not already_acted:
-             # Check if we are at a level beyond mandatory approvals
-             if current_level > len(mandatory):
-                 can_act = True
-             # Or if this level matches the user's role specifically
-             current_lvl_entry = next((e for e in assigned if e.get("level") == current_level), None)
-             if current_lvl_entry and (is_posting_approver and current_lvl_entry.get("type") == "posting" or is_threshold_approver and current_lvl_entry.get("type") == "threshold"):
-                 can_act = True
-
+        if is_posting_approver:
+            already_posting_approved = any(
+                (s.user or "").lower() == email
+                and s.step_type == StepType.POSTING_APPROVED
+                for s in steps_for_level_check
+            )
+            if current_level > len(mandatory) and not already_posting_approved:
+                can_act = True
+            else:
+                current_lvl_entry = next(
+                    (e for e in assigned if e.get("level") == current_level), None)
+                if current_lvl_entry and current_lvl_entry.get("type") == "posting" and not already_posting_approved:
+                    can_act = True
+ 
+        elif is_threshold_approver:
+            already_threshold_approved = any(
+                (s.user or "").lower() == email
+                and s.step_type == StepType.THRESHOLD_APPROVED
+                for s in steps_for_level_check
+            )
+            if current_level > len(mandatory) and not already_threshold_approved:
+                can_act = True
+            else:
+                current_lvl_entry = next(
+                    (e for e in assigned if e.get("level") == current_level), None)
+                if current_lvl_entry and current_lvl_entry.get("type") == "threshold" and not already_threshold_approved:
+                    can_act = True
+ 
     # ── can_enable_editing logic ─────────────────────────────────────────────
-    # Show "Enable Editing" if:
-    # 1. User is finance team
-    # 2. Current level is a finance-team level
-    # 3. User has NOT yet approved at this level
-    # 4. Mandatory levels not all done yet
     current_level_entry = next(
         (a for a in mandatory if a.get("level") == current_level), None
     )
@@ -809,32 +832,28 @@ async def get_ui_status_from_frontend(
         current_level_entry.get("is_finance", False)
         if current_level_entry else False
     )
-
-    # Has this finance user already approved at current level?
+ 
     already_approved_this_level = any(
         (s.user or "").lower() == email
         and s.step_type == StepType.LEVEL_APPROVED
         and s.approver_number == current_level
-        for s in steps_for_level_check  # respects rework timestamp filter
+        for s in steps_for_level_check
     )
-
+ 
     can_enable_editing = (
         (is_finance or is_threshold_approver or is_posting_approver)
         and (is_current_level_finance or can_act)
         and not already_approved_this_level
     )
-
-    # ── already_acted for display only ───────────────────────────────────────
-    already_acted = any((s.user or "").lower() == email for s in steps)
-
-    # Pre-calculate flags for the response
+ 
+    # Pre-calculate delegated flags for the response
     delegated_finance = False
     for f_user in finance_users:
         subs = check_active_delegation(db, f_user, entity)
         if email in [s.lower() for s in subs]:
             delegated_finance = True
             break
-
+ 
     delegated_posting = False
     for p_email in posting_emails:
         if not p_email:
@@ -843,7 +862,7 @@ async def get_ui_status_from_frontend(
         if email in [s.lower() for s in subs]:
             delegated_posting = True
             break
-
+ 
     return ApproverUIStatus(
         invoice_id=str(invoice_id),
         current_status=current_status,
@@ -863,7 +882,6 @@ async def get_ui_status_from_frontend(
         assigned_approvers=assigned,
         sage_post_error=None,
     )
-
 
 @router.post("/approve/{invoice_id}", response_model=ActionResponse)
 async def approve_invoice(
@@ -952,7 +970,8 @@ async def approve_invoice(
         # Check if user already acted in this cycle (any level)
         already = any(
             (s.user or "").lower() == email
-            and s.step_type in approval_types
+            and s.step_type == StepType.LEVEL_APPROVED
+            and s.approver_number == current_level   # ← scoped to current level only
             for s in current_cycle_steps
         )
         if already:

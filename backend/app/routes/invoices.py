@@ -730,8 +730,13 @@ async def get_invoices(
                         WorkflowStep.step_type.in_([StepType.REWORKED, StepType.RECALLED])
                     ).correlate(Invoice).scalar_subquery()
 
-                    # Check if user has an approval-related action after the last reset
-                    user_acted_subquery = exists().where(
+                    # Identify if we are at the final stage (typically the Posting stage)
+                    is_last_stage_subquery = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                        InvoiceAssignedApprover.invoice_id == Invoice.id
+                    ).correlate(Invoice).scalar_subquery()
+
+                    # Strict check: User acted at ANY level (for mandatory/threshold)
+                    user_acted_any_subquery = exists().where(
                         and_(
                             WorkflowStep.invoice_id == Invoice.id,
                             func.lower(WorkflowStep.user) == user_email,
@@ -749,6 +754,33 @@ async def get_invoices(
                         )
                     )
 
+                    # Stage-specific check: User acted specifically at the Posting stage
+                    user_acted_posting_subquery = exists().where(
+                        and_(
+                            WorkflowStep.invoice_id == Invoice.id,
+                            func.lower(WorkflowStep.user) == user_email,
+                            WorkflowStep.step_type == StepType.POSTING_APPROVED,
+                            or_(
+                                last_reset_subquery == None,
+                                WorkflowStep.timestamp > last_reset_subquery
+                            )
+                        )
+                    )
+
+                    # Combine: Hide if...
+                    # - We are NOT at the last stage AND user has acted at any level
+                    # - OR we ARE at the last stage AND user has already done a Posting Approval
+                    hide_condition = or_(
+                        and_(
+                            Invoice.current_approver_level != is_last_stage_subquery,
+                            user_acted_any_subquery
+                        ),
+                        and_(
+                            Invoice.current_approver_level == is_last_stage_subquery,
+                            user_acted_posting_subquery
+                        )
+                    )
+
                     expressions.append(
                         and_(
                             or_(
@@ -756,7 +788,7 @@ async def get_invoices(
                                 Invoice.status == InvoiceStatusEnum.REWORKED
                             ),
                             approver_subquery,
-                            ~user_acted_subquery  # Hide if already acted
+                            ~hide_condition
                         )
                     )
                     del extra_filters["approvals_view"]
