@@ -250,11 +250,13 @@ const CodingPage = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <ExportButton
-                        data={invoices}
-                        columns={columns}
-                        fileName="CodingQueue.xlsx"
-                    />
+                    <div className="w-[120px]">
+                        <ExportButton
+                            data={invoices}
+                            columns={columns}
+                            fileName="CodingQueue.xlsx"
+                        />
+                    </div>
                 </div>
             </div>
 

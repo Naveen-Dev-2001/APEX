@@ -738,9 +738,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
             <button
                 onClick={(e) => { e.stopPropagation(); handleExportExcel(); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
+                className="flex items-center justify-center gap-1.5 w-[120px] py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
             >
-                <DownloadOutlined style={{ fontSize: 12 }} /> Export to Excel
+                <DownloadOutlined style={{ fontSize: 12 }} /> Export
             </button>
             {activeInvoiceData?.status?.toLowerCase() === "waiting_coding" && (
                 <>

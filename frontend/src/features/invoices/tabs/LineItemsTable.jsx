@@ -354,9 +354,9 @@ const LineItemsTable = () => {
                     Line Items
                 </div>
                 <div className="flex items-center gap-2">
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors">
+                    <button className="flex items-center justify-center gap-1.5 w-[120px] py-1.5 text-[13px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors">
                         <DownloadOutlined style={{ fontSize: 13 }} />
-                        Export to Excel
+                        Export
                     </button>
                     <button className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors">
                         <UploadOutlined style={{ fontSize: 13 }} />
