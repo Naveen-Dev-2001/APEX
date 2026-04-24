@@ -78,7 +78,7 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabl
         prev.onChange === next.onChange
 );
 
-const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, onSearch, disabled = false }) => (
+const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, onSearch, onOpen, disabled = false }) => (
     <div style={{ width: "100%" }}>
         <CustomDropdown
             value={value}
@@ -89,6 +89,7 @@ const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, 
             className="mb-0"
             showSearch
             onSearch={onSearch}
+            onDropdownVisibleChange={onOpen}
             filterOption={onSearch ? false : filterOption} // Disable local filter if remote searching
             placeholder="Select"
             size="small"
@@ -101,6 +102,7 @@ const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, 
         prev.isLoading === next.isLoading &&
         prev.options === next.options &&
         prev.onSearch === next.onSearch &&
+        prev.onOpen === next.onOpen &&
         prev.onChange === next.onChange
 );
 
@@ -392,19 +394,24 @@ const CodingTab = ({ isActive = false }) => {
 
     // Remote Master Data Hooks
     const gl = useRemoteMasterData("GL", {
-        mapOption: i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number })
+        mapOption: i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number }),
+        enabled: loadMasterData
     });
     const lob = useRemoteMasterData("LOB", {
-        mapOption: i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id })
+        mapOption: i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id }),
+        enabled: loadMasterData
     });
     const dept = useRemoteMasterData("Department", {
-        mapOption: i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id })
+        mapOption: i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id }),
+        enabled: loadMasterData
     });
     const customer = useRemoteMasterData("Customer", {
-        mapOption: i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id })
+        mapOption: i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id }),
+        enabled: loadMasterData
     });
     const item = useRemoteMasterData("Item", {
-        mapOption: i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })
+        mapOption: i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id }),
+        enabled: loadMasterData
     });
 
     // selectedIds ref — avoids stale closure in handleUpdate
@@ -671,6 +678,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         options={gl.options} 
                                                         isLoading={gl.loading} 
                                                         onSearch={gl.handleSearch} 
+                                                        onOpen={gl.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
@@ -681,6 +689,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         options={lob.options} 
                                                         isLoading={lob.loading} 
                                                         onSearch={lob.handleSearch} 
+                                                        onOpen={lob.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
@@ -691,6 +700,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         options={dept.options} 
                                                         isLoading={dept.loading} 
                                                         onSearch={dept.handleSearch} 
+                                                        onOpen={dept.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
@@ -701,6 +711,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         options={customer.options} 
                                                         isLoading={customer.loading} 
                                                         onSearch={customer.handleSearch} 
+                                                        onOpen={customer.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
@@ -711,6 +722,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         options={item.options} 
                                                         isLoading={item.loading} 
                                                         onSearch={item.handleSearch} 
+                                                        onOpen={item.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>

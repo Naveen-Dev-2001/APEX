@@ -354,7 +354,7 @@ const Header = () => {
                                             {user?.username || 'admin'}
                                         </span>
                                         <span className="text-[13px] text-gray-400 font-medium truncate capitalize">
-                                            {activeRole || 'User'}
+                                            {activeRole || 'User'} - {user?.department?.toLowerCase() === 'finance' ? 'Finance' : 'Non-Finance'}
                                         </span>
                                     </div>
                                 </div>
