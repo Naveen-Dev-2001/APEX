@@ -519,8 +519,9 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                         )}
                         {modal.action === "rework" && (
                             <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-700">
-                                The invoice will be sent back to the previous Finance Team
-                                approver for corrections.
+                                {uiStatus?.current_level === 1 
+                                    ? "The invoice will be sent back to the coder for coding."
+                                    : "The invoice will be sent back to the previous Finance Team approver for corrections."}
                             </div>
                         )}
 
