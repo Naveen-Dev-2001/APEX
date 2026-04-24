@@ -15,20 +15,28 @@ export const useInvoiceStore = create((set, get) => ({
     setSelectedEntity: (entity) => set({ selectedEntity: entity }),
 
     view: "condensed",
-    setView: (view) => set({ view }),
+    setView: (view) => set((state) => (state.view === view ? state : { view })),
 
     searchQuery: "",
-    setSearchQuery: (query) => set({ searchQuery: query, skip: 0 }),
+    setSearchQuery: (query) =>
+        set((state) => {
+            if (state.searchQuery === query && state.skip === 0) return state;
+            return { searchQuery: query, skip: 0 };
+        }),
 
     sortColumn: "uploaded_at",
     sortDirection: "desc",
-    setSort: (column, direction) => set({ sortColumn: column, sortDirection: direction }),
+    setSort: (column, direction) =>
+        set((state) => {
+            if (state.sortColumn === column && state.sortDirection === direction) return state;
+            return { sortColumn: column, sortDirection: direction };
+        }),
 
     skip: 0,
-    setSkip: (skip) => set({ skip }),
+    setSkip: (skip) => set((state) => (state.skip === skip ? state : { skip })),
 
     limit: 10,
-    setLimit: (limit) => set({ limit }),
+    setLimit: (limit) => set((state) => (state.limit === limit ? state : { limit })),
 
     viewInvoiceId: null,
     setViewInvoiceId: (id) => set({ viewInvoiceId: id }),

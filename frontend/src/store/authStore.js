@@ -21,7 +21,7 @@ export const useAuthStore = create((set) => ({
       sessionStorage.setItem('active_role', currentActive);
     }
 
-    set({ token, user, activeRole: currentActive });
+    set({ token, user, refreshToken: refreshToken || null, activeRole: currentActive });
   },
 
   setActiveRole: (role) => {

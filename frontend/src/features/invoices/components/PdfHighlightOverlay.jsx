@@ -1,5 +1,3 @@
-import { useRef } from "react";
-
 const PdfHighlightOverlay = ({ 
     activeHighlights, 
     highlightRef, 

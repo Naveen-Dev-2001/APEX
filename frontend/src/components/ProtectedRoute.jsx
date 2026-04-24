@@ -7,17 +7,23 @@ const ProtectedRoute = () => {
     const token = useAuthStore((state) => state.token);
     const user = useAuthStore((state) => state.user);
     const activeRole = useAuthStore((state) => state.activeRole);
-    const { navigation, fetchSettings } = useAdminStore();
+    const navigation = useAdminStore((state) => state.navigation);
+    const fetchSettings = useAdminStore((state) => state.fetchSettings);
+    const loading = useAdminStore((state) => state.loading);
     const location = useLocation();
 
     useEffect(() => {
-        if (token && navigation.length === 0) {
+        if (token && navigation.length === 0 && !loading) {
             fetchSettings();
         }
-    }, [token, navigation.length, fetchSettings]);
+    }, [token, navigation.length, loading, fetchSettings]);
 
     if (!token) {
         return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    if (loading && navigation.length === 0) {
+        return null;
     }
 
     // Role-based route protection

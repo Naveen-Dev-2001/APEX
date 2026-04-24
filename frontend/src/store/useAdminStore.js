@@ -5,6 +5,7 @@ import toast from '../utils/toast';
 const useAdminStore = create((set, get) => ({
     users: [],
     roles: [],
+    statuses: [],
     navigation: [],
     loading: false,
     error: null,
@@ -190,7 +191,7 @@ const useAdminStore = create((set, get) => ({
 
     deleteUser: async (userId) => {
         try {
-            await API.delete(`/users/${userId}/`);
+            await adminService.deleteUser(userId);
             get().fetchUsers();
             return true;
         } catch (error) {

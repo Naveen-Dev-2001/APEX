@@ -36,6 +36,7 @@ const InvoicePdfViewer = () => {
         resetView,
         getViewport,
         renderPage,
+        getPageCached,
         scale
     } = usePdfRenderer(pdfBlob);
 
@@ -55,7 +56,8 @@ const InvoicePdfViewer = () => {
         setPage,
         autoFit,
         autoFitWidth,
-        renderPage
+        renderPage,
+        getPageCached
     });
 
     return (
@@ -100,8 +102,6 @@ const InvoicePdfViewer = () => {
                         <PdfHighlightOverlay 
                             activeHighlights={activeHighlights}
                             highlightRef={highlightRef}
-                            canvasWidth={canvasRef.current?.style?.width}
-                            canvasHeight={canvasRef.current?.style?.height}
                             highlightedField={highlightedField}
                         />
                     </div>

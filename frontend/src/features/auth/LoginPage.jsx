@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../../layout/AuthLayout';
 import CustomInput from '../../shared/components/CustomInput';
 import CustomButton from '../../shared/components/CustomButton';
@@ -13,18 +13,18 @@ const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+    const [error, setError] = useState('');
 
     const handleLogin = async (e) => {
         e.preventDefault();
         if (!email || !password) {
-            setError("Email and password are required");
+            setError('Email and password are required');
             return;
         }
 
         try {
             setLoading(true);
-            setError("");
+            setError('');
 
             // Backend login route expects { email, password }
             const response = await API.post('/auth/login', { email, password });
@@ -45,11 +45,10 @@ const LoginPage = () => {
                     toast.info('Please change your password to continue');
                     navigate('/change-password-first-time', { state: { email: response.data.email || email } });
                 } else {
-                    // Navigate to dashboard upon successful login
                     navigate('/select-entity');
                 }
             } else {
-                setError("Invalid response from server");
+                setError('Invalid response from server');
             }
         } catch (err) {
             const errMsg = err.response?.data?.detail || err.message || 'Login failed';
@@ -60,18 +59,18 @@ const LoginPage = () => {
         }
     };
 
-
     return (
         <AuthLayout title="Welcome Back">
-
-
             <form onSubmit={handleLogin} className="w-full">
                 <CustomInput
                     label="Email Address"
                     type="email"
                     placeholder="you@domain.com"
                     value={email}
-                    onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                    onChange={(e) => {
+                        setEmail(e.target.value);
+                        setError('');
+                    }}
                     required
                     icon={
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
@@ -83,7 +82,10 @@ const LoginPage = () => {
                     type="password"
                     placeholder="Enter password"
                     value={password}
-                    onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                    onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError('');
+                    }}
                     error={error}
                     required
                     icon={
@@ -92,7 +94,7 @@ const LoginPage = () => {
                 />
 
                 <div className="flex justify-end mb-6">
-                    <a href="/forgot-password" className="text-sm text-blue-500 hover:underline">Forgot password?</a>
+                    <Link to="/forgot-password" className="text-sm text-blue-500 hover:underline">Forgot password?</Link>
                 </div>
 
                 <div className="mt-4">
@@ -102,12 +104,12 @@ const LoginPage = () => {
                         disabled={loading}
                         className="bg-blue-500 !text-white !h-11 !rounded font-medium w-full"
                     >
-                        {loading ? "Signing in..." : "Login →"}
+                        {loading ? 'Signing in...' : 'Login ->'}
                     </CustomButton>
                 </div>
 
                 <div className="mt-6 text-center text-sm text-gray-500">
-                    Don't have an account? <a href="/register" className="text-blue-500 hover:underline">Register</a>
+                    Don't have an account? <Link to="/register" className="text-blue-500 hover:underline">Register</Link>
                 </div>
             </form>
         </AuthLayout>

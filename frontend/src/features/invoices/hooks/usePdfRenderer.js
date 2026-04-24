@@ -9,6 +9,11 @@ export const usePdfRenderer = (pdfBlob) => {
     const viewerRef = useRef(null);
     const canvasRef = useRef(null);
     const renderTaskRef = useRef(null);
+    const renderSeqRef = useRef(0);
+    const pageCacheRef = useRef(new Map());
+    const objectUrlRef = useRef(null);
+    const resizeTimerRef = useRef(null);
+    const rafMeasureRef = useRef(null);
     const initializedRef = useRef(false);
     const firstAutoFitDoneRef = useRef(false);
 
@@ -31,13 +36,26 @@ export const usePdfRenderer = (pdfBlob) => {
             rotation: getEffectiveRotation(pageObj, rot)
         }), [getEffectiveRotation, rotation]);
 
+    const getPageCached = useCallback(async (pdf, pageNum) => {
+        if (!pdf || !pageNum) return null;
+        const cacheKey = `${pageNum}`;
+        if (pageCacheRef.current.has(cacheKey)) {
+            return pageCacheRef.current.get(cacheKey);
+        }
+        const pageObj = await pdf.getPage(pageNum);
+        pageCacheRef.current.set(cacheKey, pageObj);
+        return pageObj;
+    }, []);
+
     /* ---------------- CORE: Render Page to Canvas ---------------- */
     const renderPage = useCallback(async (pdf, pageNum, scaleVal, rotationVal = rotation, onRenderComplete) => {
         if (!pdf || !canvasRef.current) return;
+        const renderSeq = ++renderSeqRef.current;
 
         try {
             setIsRendering(true);
-            const pageObj = await pdf.getPage(pageNum);
+            const pageObj = await getPageCached(pdf, pageNum);
+            if (!pageObj) return;
             const viewport = getViewport(pageObj, scaleVal, rotationVal);
 
             const canvas = canvasRef.current;
@@ -62,6 +80,7 @@ export const usePdfRenderer = (pdfBlob) => {
             });
 
             await renderTaskRef.current.promise;
+            if (renderSeq !== renderSeqRef.current) return;
             
             if (onRenderComplete) {
                 onRenderComplete(pageObj, viewport);
@@ -71,16 +90,19 @@ export const usePdfRenderer = (pdfBlob) => {
                 console.error("PDF Rendering Error:", err);
             }
         } finally {
-            setIsRendering(false);
+            if (renderSeq === renderSeqRef.current) {
+                setIsRendering(false);
+            }
         }
-    }, [getViewport, rotation]);
+    }, [getPageCached, getViewport, rotation]);
 
     /* ---------------- Logic: Auto-Fit Width ---------------- */
     const autoFitWidth = useCallback(async (pdf, pageNum, rotationVal = rotation) => {
         if (!pdf || !viewerRef.current) return;
 
         try {
-            const pageObj = await pdf.getPage(pageNum);
+            const pageObj = await getPageCached(pdf, pageNum);
+            if (!pageObj) return;
             const viewport = getViewport(pageObj, 1, rotationVal);
 
             const width = viewerRef.current.clientWidth - 32;
@@ -96,23 +118,41 @@ export const usePdfRenderer = (pdfBlob) => {
         } catch (err) {
             console.error("AutoFit Error:", err);
         }
-    }, [rotation, getViewport, renderPage]);
+    }, [rotation, getPageCached, getViewport, renderPage]);
 
     /* ---------------- Measure Container (ResizeObserver) ---------------- */
     useEffect(() => {
         if (!viewerRef.current) return;
 
-        const measure = () => {
+        const measureNow = () => {
             if (!viewerRef.current) return;
             const w = viewerRef.current.clientWidth;
-            if (w > 0) setContainerWidth(w);
+            if (w > 0) {
+                setContainerWidth((prev) => (Math.abs(prev - w) < 2 ? prev : w));
+            }
         };
 
-        measure();
+        const measure = () => {
+            if (rafMeasureRef.current) {
+                cancelAnimationFrame(rafMeasureRef.current);
+            }
+            rafMeasureRef.current = requestAnimationFrame(() => {
+                clearTimeout(resizeTimerRef.current);
+                resizeTimerRef.current = setTimeout(measureNow, 100);
+            });
+        };
+
+        measureNow();
         const ro = new ResizeObserver(measure);
         ro.observe(viewerRef.current);
 
-        return () => ro.disconnect();
+        return () => {
+            ro.disconnect();
+            clearTimeout(resizeTimerRef.current);
+            if (rafMeasureRef.current) {
+                cancelAnimationFrame(rafMeasureRef.current);
+            }
+        };
     }, []);
 
     /* ---------------- Lifecycle: Initial Load ---------------- */
@@ -121,18 +161,29 @@ export const usePdfRenderer = (pdfBlob) => {
             if (!pdfBlob) {
                 setPdfObj(null);
                 initializedRef.current = false;
+                pageCacheRef.current.clear();
             }
             return;
         }
 
+        let cancelled = false;
         (async () => {
             try {
                 if (!pdfBlob) return;
                 initializedRef.current = true;
                 firstAutoFitDoneRef.current = false;
+                pageCacheRef.current.clear();
+                renderSeqRef.current += 1;
+
+                if (objectUrlRef.current) {
+                    URL.revokeObjectURL(objectUrlRef.current);
+                    objectUrlRef.current = null;
+                }
 
                 const url = URL.createObjectURL(pdfBlob);
+                objectUrlRef.current = url;
                 const pdf = await pdfjs.getDocument(url).promise;
+                if (cancelled) return;
 
                 setPdfObj(pdf);
                 setPage(1);
@@ -145,7 +196,26 @@ export const usePdfRenderer = (pdfBlob) => {
                 initializedRef.current = false;
             }
         })();
+
+        return () => {
+            cancelled = true;
+        };
     }, [pdfBlob, containerWidth, autoFitWidth]);
+
+    useEffect(() => {
+        const cachedPages = pageCacheRef.current;
+        return () => {
+            renderSeqRef.current += 1;
+            if (renderTaskRef.current) {
+                renderTaskRef.current.cancel();
+            }
+            if (objectUrlRef.current) {
+                URL.revokeObjectURL(objectUrlRef.current);
+                objectUrlRef.current = null;
+            }
+            cachedPages.clear();
+        };
+    }, []);
 
     /* ---------------- Lifecycle: Refit on Resize ---------------- */
     useEffect(() => {
@@ -218,6 +288,7 @@ export const usePdfRenderer = (pdfBlob) => {
         rotate,
         fitToPage,
         resetView,
-        getViewport
+        getViewport,
+        getPageCached
     };
 };

@@ -23,6 +23,16 @@ import ArchivedInvoicesTab, { ARCHIVE_COLUMNS } from "./ArchivedInvoicesTab";
 import { useLocation, useNavigate } from "react-router-dom";
 import AlertModal from "../../shared/components/AlertModal";
 
+const ACCESSOR_TO_DB_FIELD = {
+    vendor_name: "vendor_name",
+    vendor_id: "vendor_id",
+    invoice_number: "invoice_number",
+    uploaded_by: "uploaded_by",
+    status: "status",
+    total_amount: "total_amount",
+    amount_due: "amount_due",
+};
+
 const Invoice = () => {
     const {
         invoiceSection, skip, limit, view, setView, setInvoiceSection,
@@ -50,21 +60,11 @@ const Invoice = () => {
     const user = useAuthStore((state) => state.user);
     const userRole = user?.role?.toLowerCase();
 
-    const accessorToDbField = {
-        vendor_name: "vendor_name",
-        vendor_id: "vendor_id",
-        invoice_number: "invoice_number",
-        uploaded_by: "uploaded_by",
-        status: "status",
-        total_amount: "total_amount",
-        amount_due: "amount_due",
-    };
-
     const backendFilters = useMemo(() => {
         const filters = {};
         Object.entries(columnFilters).forEach(([accessor, value]) => {
             if (!value) return;
-            const dbField = accessorToDbField[accessor] || accessor;
+            const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
 
             if (value instanceof Set) {
                 if (value.size > 0) {
@@ -102,16 +102,20 @@ const Invoice = () => {
 
     // Reset pagination when search or filters change
     useEffect(() => {
-        setSkip(0);
-    }, [searchQuery, columnFilters, sortColumn, sortDirection, setSkip]);
+        if (skip !== 0) {
+            setSkip(0);
+        }
+    }, [searchQuery, columnFilters, sortColumn, sortDirection, skip, setSkip]);
 
     // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => {
-            setSearchQuery(localSearch);
+            if (localSearch !== searchQuery) {
+                setSearchQuery(localSearch);
+            }
         }, 500);
         return () => clearTimeout(timer);
-    }, [localSearch, setSearchQuery]);
+    }, [localSearch, searchQuery, setSearchQuery]);
 
     const [modal, modalContextHolder] = Modal.useModal();
     const [uploadLoading, setUploadLoading] = useState(false);
@@ -212,7 +216,7 @@ const Invoice = () => {
         return cols.map(col => ({
             ...col,
             onGetOptions: col.filterable ? async (accessor) => {
-                const dbField = accessorToDbField[accessor] || accessor;
+                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
 
                 // For hierarchical filtering: 
                 // Exclude the current column's filter so the user can still see other options in that column
@@ -222,7 +226,7 @@ const Invoice = () => {
                 return await getInvoiceFilterOptions(dbField, otherFilters);
             } : undefined
         }));
-    }, [view, handleView, handleDelete, backendFilters, accessorToDbField]);
+    }, [view, handleView, handleDelete, backendFilters, userRole]);
 
     const handleCreateInvoice = () => {
         setIsModalOpen(true);

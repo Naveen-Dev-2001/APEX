@@ -9,6 +9,7 @@ export const usePdfHighlights = ({
     pdfObj, 
     viewerRef, 
     getViewport,
+    getPageCached,
     setPage,
     autoFit,
     autoFitWidth,
@@ -200,7 +201,8 @@ export const usePdfHighlights = ({
 
         (async () => {
             try {
-                const pageObj = await pdfObj.getPage(page);
+                const pageObj = await getPageCached(pdfObj, page);
+                if (!pageObj) return;
                 const viewport = getViewport(pageObj, scale);
                 updateHighlights(pageObj, viewport);
                 if (highlightedRegions.length > 0) {
@@ -210,7 +212,7 @@ export const usePdfHighlights = ({
                 console.error("Highlighting Effect Error:", err);
             }
         })();
-    }, [highlightedRegions, page, scale, rotation, pdfObj, updateHighlights, scrollToFirstHighlight, getViewport]);
+    }, [highlightedRegions, page, scale, rotation, pdfObj, updateHighlights, scrollToFirstHighlight, getViewport, getPageCached]);
 
     return {
         activeHighlights,

@@ -17,6 +17,11 @@ export const adminService = {
     return response.data;
   },
 
+  async deleteUser(userId) {
+    const response = await API.delete(`/users/${userId}/`);
+    return response.data;
+  },
+
   async getSettings() {
     const response = await API.get('/settings/');
     return response.data;

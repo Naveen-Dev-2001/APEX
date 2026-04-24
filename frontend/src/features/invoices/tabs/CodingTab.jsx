@@ -392,18 +392,37 @@ const CodingTab = ({ isActive = false }) => {
         });
     }, [rows]);
 
+    const initialGlValues = useMemo(
+        () => Array.from(new Set((rows || []).map((r) => r.glCode).filter(Boolean))),
+        [rows]
+    );
+    const initialLobValues = useMemo(
+        () => Array.from(new Set((rows || []).map((r) => r.lob).filter(Boolean))),
+        [rows]
+    );
+    const initialDepartmentValues = useMemo(
+        () => Array.from(new Set((rows || []).map((r) => r.department).filter(Boolean))),
+        [rows]
+    );
+
     // Remote Master Data Hooks
     const gl = useRemoteMasterData("GL", {
         mapOption: i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number }),
-        enabled: loadMasterData
+        enabled: loadMasterData,
+        preload: true,
+        initialValues: initialGlValues
     });
     const lob = useRemoteMasterData("LOB", {
         mapOption: i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id }),
-        enabled: loadMasterData
+        enabled: loadMasterData,
+        preload: true,
+        initialValues: initialLobValues
     });
     const dept = useRemoteMasterData("Department", {
         mapOption: i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id }),
-        enabled: loadMasterData
+        enabled: loadMasterData,
+        preload: true,
+        initialValues: initialDepartmentValues
     });
     const customer = useRemoteMasterData("Customer", {
         mapOption: i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id }),

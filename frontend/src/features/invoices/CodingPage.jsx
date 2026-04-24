@@ -1,10 +1,20 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EyeOutlined } from '@ant-design/icons';
 import DataTable from '../../components/ui/DataTable';
 import { getInvoices, getInvoiceFilterOptions } from '../../api/invoiceApi';
 import toast from '../../utils/toast';
 import ExportButton from '../../shared/components/ExportButton';
+
+const ACCESSOR_TO_DB_FIELD = {
+    vendor_name: "vendor_name",
+    vendor_id: "vendor_id",
+    invoice_number: "invoice_number",
+    uploaded_by: "uploaded_by",
+    status: "status",
+    total_amount: "total_amount",
+    processed_at: "processed_at"
+};
 
 const CodingPage = () => {
     const navigate = useNavigate();
@@ -19,15 +29,8 @@ const CodingPage = () => {
     const [sortDirection, setSortDirection] = useState("desc");
     const [columnFilters, setColumnFilters] = useState({});
 
-    const accessorToDbField = {
-        vendor_name: "vendor_name",
-        vendor_id: "vendor_id",
-        invoice_number: "invoice_number",
-        uploaded_by: "uploaded_by",
-        status: "status",
-        total_amount: "total_amount",
-        processed_at: "processed_at"
-    };
+    const abortRef = useRef(null);
+    const requestIdRef = useRef(0);
 
     const backendFilters = useMemo(() => {
         const filters = {
@@ -36,7 +39,7 @@ const CodingPage = () => {
 
         Object.entries(columnFilters).forEach(([accessor, value]) => {
             if (!value) return;
-            const dbField = accessorToDbField[accessor] || accessor;
+            const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
 
             if (dbField === 'status') {
                 if (value instanceof Set && value.size > 0) {
@@ -57,35 +60,49 @@ const CodingPage = () => {
         return filters;
     }, [columnFilters]);
 
-    const fetchInvoices = async () => {
+    const fetchInvoices = useCallback(async () => {
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+        const requestId = ++requestIdRef.current;
+
         setLoading(true);
         try {
             const skip = (currentPage - 1) * itemsPerPage;
             const response = await getInvoices({
                 skip,
                 limit: itemsPerPage,
-                sort_by: accessorToDbField[sortColumn] || sortColumn,
+                sort_by: ACCESSOR_TO_DB_FIELD[sortColumn] || sortColumn,
                 sort_dir: sortDirection,
-                filters: backendFilters
-            });
+                filters: backendFilters,
+                show_all: false
+            }, { signal: controller.signal });
+
+            if (requestId !== requestIdRef.current) return;
 
             setInvoices(response.data || []);
             setTotal(response.total || 0);
         } catch (error) {
+            if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED' || controller.signal.aborted) {
+                return;
+            }
             console.error('Error fetching invoices:', error);
             toast.error('Failed to load coding queue');
         } finally {
-            setLoading(false);
+            if (requestId === requestIdRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, [currentPage, itemsPerPage, sortColumn, sortDirection, backendFilters]);
 
     useEffect(() => {
         fetchInvoices();
-    }, [currentPage, itemsPerPage, sortColumn, sortDirection, backendFilters]);
+        return () => abortRef.current?.abort();
+    }, [fetchInvoices]);
 
-    const handleView = (invoice) => {
+    const handleView = useCallback((invoice) => {
         navigate('/invoices', { state: { viewInvoice: invoice, from: '/coding' } });
-    };
+    }, [navigate]);
 
     const columns = useMemo(() => [
         {
@@ -103,7 +120,7 @@ const CodingPage = () => {
             render: (val, row) => row.vendor_name || row.extracted_data?.vendor_info?.name?.value || "N/A",
             valueGetter: (p) => p.data?.vendor_name || p.data?.extracted_data?.vendor_info?.name?.value || "N/A",
             onGetOptions: async (accessor) => {
-                const dbField = accessorToDbField[accessor] || accessor;
+                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[dbField];
                 return await getInvoiceFilterOptions(dbField, otherFilters);
@@ -116,7 +133,7 @@ const CodingPage = () => {
             sortable: true,
             filterable: true,
             onGetOptions: async (accessor) => {
-                const dbField = accessorToDbField[accessor] || accessor;
+                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[dbField];
                 return await getInvoiceFilterOptions(dbField, otherFilters);
@@ -129,7 +146,7 @@ const CodingPage = () => {
             sortable: true,
             filterable: true,
             onGetOptions: async (accessor) => {
-                const dbField = accessorToDbField[accessor] || accessor;
+                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[dbField];
                 return await getInvoiceFilterOptions(dbField, otherFilters);
@@ -173,7 +190,7 @@ const CodingPage = () => {
             sortable: true,
             filterable: true,
             onGetOptions: async (accessor) => {
-                const dbField = accessorToDbField[accessor] || accessor;
+                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[dbField];
                 return await getInvoiceFilterOptions(dbField, otherFilters);

@@ -1,6 +1,6 @@
 import API from "./api";
 
-export const getInvoices = (params = {}) =>
+export const getInvoices = (params = {}, options = {}) =>
     API.get(`/invoices/`, {
         params: {
             skip: params.skip || 0,
@@ -9,8 +9,10 @@ export const getInvoices = (params = {}) =>
             filters: params.filters ? JSON.stringify(params.filters) : undefined,
             sort_by: params.sort_by || "uploaded_at",
             sort_dir: params.sort_dir || "desc",
-            show_all: params.show_all ?? true
-        }
+            // Server-side pagination must stay enabled for large datasets.
+            show_all: params.show_all ?? false
+        },
+        signal: options.signal
     }).then(res => res.data);
 
 export const getInvoiceFilterOptions = (column, filters = {}) =>
