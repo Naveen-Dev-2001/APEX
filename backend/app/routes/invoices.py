@@ -1992,6 +1992,7 @@ async def update_invoice(
          
          # Store assigned approvers
          assigned_approvers = requirement_data.get("assigned_approvers", [])
+         level_1_emails = []
          for idx, level_data in enumerate(assigned_approvers):
              is_finance_level = False
              emails = []
@@ -2007,6 +2008,9 @@ async def update_invoice(
              else:
                  combined = set(e.lower() for e in emails if e)
                  
+             if idx == 0:
+                 level_1_emails = list(combined)
+
              for email in combined:
                  if email:
                      invoice_assigned_approver_repo.create(db, obj_in={
@@ -2073,6 +2077,25 @@ async def update_invoice(
             ))
             db.commit()
             logger.info(f"[Workflow] Recorded coding completion for invoice {invoice_id} by {current_user.username}")
+
+        # --- TRIGGER LEVEL 1 EMAIL NOTIFICATION ---
+        if 'level_1_emails' in locals() and level_1_emails:
+            for next_email in level_1_emails:
+                if not next_email: continue
+                
+                # Fetch username for personal touch if possible
+                approver_user = db.query(User).filter(User.email == next_email).first()
+                approver_name = approver_user.username if approver_user else "Approver"
+                
+                background_tasks.add_task(
+                    email_service.send_approval_request_email,
+                    email=next_email,
+                    username=approver_name,
+                    vendor_name=invoice.vendor_name or "Unknown",
+                    invoice_number=invoice.invoice_number or "N/A",
+                    amount=str(invoice.total_amount),
+                    currency=currency if 'currency' in locals() else "USD"
+                )
 
     # --- Auto-Coding Suggestions on transition to waiting_coding ---
     # When an invoice is sent to coding, automatically apply AI-based GL suggestions

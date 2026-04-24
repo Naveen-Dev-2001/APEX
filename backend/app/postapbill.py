@@ -206,7 +206,7 @@ def _create_ap_bill(
     # Vendor and invoice details
     # --------------------------------------------------
     vendor_id = invoice.vendor_id or ""
-    invoice_number = invoice.invoice_number or f"INV_{invoice.id}"
+    invoice_number = invoice.invoice_number
     description = f"Invoice Id: {invoice.id} - {invoice.vendor_name or vendor_id}"
 
     # --------------------------------------------------
