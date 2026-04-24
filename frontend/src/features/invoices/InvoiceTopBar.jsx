@@ -316,7 +316,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         ["waiting_approval", "reworked", "sage_post_failed"].includes((currentStatus || "").toLowerCase());
 
     const btnBase =
-        "px-3 py-1 rounded-lg border bg-white transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
+        "w-[130px] h-[34px] flex items-center justify-center rounded-lg border bg-white transition text-[13px] font-medium custom-font-creato disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
 
     const getBtnClass = (type, enabled) => {
         if (!enabled) return `${btnBase} border-gray-300 text-gray-400`;
@@ -351,17 +351,18 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                             {((userRole.includes("scanner") && (currentStatus || "").toLowerCase() === "processed") ||
                                 (userRole.includes("coder") && (currentStatus || "").toLowerCase() === "waiting_coding")) && (
                                     <>
-                                        <div className="w-[100px]">
-                                            <CustomButton variant="outline" onClick={handleDiscard}>Discard</CustomButton>
+                                        <div className="w-[130px]">
+                                            <CustomButton variant="outline" height="h-[34px]" onClick={handleDiscard}>Discard</CustomButton>
                                         </div>
-                                        <div className="w-[100px]">
-                                            <CustomButton variant="primary" onClick={handleSaveInvoice}>
+                                        <div className="w-[130px]">
+                                            <CustomButton variant="primary" height="h-[34px]" onClick={handleSaveInvoice}>
                                                 Save
                                             </CustomButton>
                                         </div>
-                                        <div className="w-[220px]">
+                                        <div className="w-[130px]">
                                             <CustomButton
                                                 variant="success"
+                                                height="h-[34px]"
                                                 disabled={isDuplicate}
                                                 onClick={
                                                     currentStatus === "waiting_coding"
@@ -405,8 +406,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
                                             {/* Save — appears once editing is unlocked */}
                                             {editingEnabled &&(currentStatus === "waiting_approval" || currentStatus === "reworked") && (
-                                                <div className="w-[100px]">
-                                                    <CustomButton variant="primary" onClick={handleSaveInvoice}>
+                                                <div className="w-[130px]">
+                                                    <CustomButton variant="primary" height="h-[34px]" onClick={handleSaveInvoice}>
                                                         Save
                                                     </CustomButton>
                                                 </div>
@@ -472,9 +473,10 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                 )}
                         </>
                     )}
-                    <div className="w-[120px]">
+                    <div className="w-[130px]">
                         <CustomButton 
                             variant="outline" 
+                            height="h-[34px]"
                             onClick={onTogglePdf}
                         >
                             {isPdfVisible ? "Hide PDF" : "Show PDF"}

@@ -7,11 +7,12 @@ export default function CustomButton({
     className = "",
     onClick,
     disabled = false,
+    height = "h-10",
     ...props
 }) {
 
     const baseClasses = `
-    w-full h-10 
+    w-full ${height}
     inline-flex items-center justify-center
     rounded-lg
     !font-creato custom-font-creato text-base leading-4
