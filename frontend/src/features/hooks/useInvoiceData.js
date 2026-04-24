@@ -10,7 +10,7 @@ export const useInvoiceData = ({ skip = 0, limit = 10, search = "", filters = {}
         queryFn: async ({ signal }) => {
             const start = performance.now();
 
-            const res = await getInvoices({ skip, limit, search, filters, sort_by, sort_dir, show_all: false }, { signal });
+            const res = await getInvoices({ skip, limit, search, filters, sort_by, sort_dir, show_all: true }, { signal });
 
             const end = performance.now();
             const duration = (end - start).toFixed(2);

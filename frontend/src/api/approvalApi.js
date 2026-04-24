@@ -11,7 +11,7 @@ export const getUnapprovedInvoices = ({ skip = 0, limit = 15, sort_by = "uploade
             limit, 
             sort_by,
             sort_dir,
-            show_all: false,
+            show_all: true,
             filters: JSON.stringify({ approvals_view: true }) 
         } 
     }).then(res => res.data);
