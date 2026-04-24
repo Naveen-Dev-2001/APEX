@@ -24,18 +24,29 @@ const ApprovalsPage = () => {
     // Pagination and Sorting State
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(15);
-    const [sortColumn, setSortColumn] = useState(null);
-    const [sortDirection, setSortDirection] = useState('asc');
+    const [totalItems, setTotalItems] = useState(0);
+    const [sortColumn, setSortColumn] = useState('uploaded_at');
+    const [sortDirection, setSortDirection] = useState('desc');
 
     const fetchData = async () => {
         setLoading(true);
         try {
+            const skip = (currentPage - 1) * itemsPerPage;
+            
             // Fetch invoices, delegations, and approvers in parallel
-            const [invoiceData, delegationData, approverData] = await Promise.all([
-                getUnapprovedInvoices(),
+            const [invoiceRes, delegationData, approverData] = await Promise.all([
+                getUnapprovedInvoices({
+                    skip,
+                    limit: itemsPerPage,
+                    sort_by: sortColumn,
+                    sort_dir: sortDirection
+                }),
                 getDelegations(),
                 getApprovers()
             ]);
+
+            const invoiceData = invoiceRes?.data || [];
+            setTotalItems(invoiceRes?.total || 0);
 
             const now = new Date();
             now.setHours(0, 0, 0, 0);
@@ -110,7 +121,7 @@ const ApprovalsPage = () => {
         if (user) {
             fetchData();
         }
-    }, [user]);
+    }, [user, currentPage, itemsPerPage, sortColumn, sortDirection]);
 
     const handleView = (invoice) => {
         // Navigate to invoices page to show the invoices screen
@@ -137,13 +148,10 @@ const ApprovalsPage = () => {
         });
     };
 
-    const handleSort = (column) => {
-        if (sortColumn === column) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortColumn(column);
-            setSortDirection('asc');
-        }
+    const handleSort = (column, direction) => {
+        setSortColumn(column);
+        setSortDirection(direction);
+        setCurrentPage(1); // Reset to first page on sort
     };
 
     const columnDefs = useMemo(() => [
@@ -224,27 +232,10 @@ const ApprovalsPage = () => {
         }
     ], [currentPage, itemsPerPage, sortColumn, sortDirection]);
 
-    const sortedAndPaginatedInvoices = useMemo(() => {
-        let result = [...invoices];
-
-        // Sort
-        if (sortColumn) {
-            result.sort((a, b) => {
-                const valA = a[sortColumn] || '';
-                const valB = b[sortColumn] || '';
-                if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-                if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
-        }
-
-        // Map with original index for S.no
-        const withIndex = result.map((item, index) => ({ ...item, index }));
-
-        // Paginate
-        const start = (currentPage - 1) * itemsPerPage;
-        return withIndex.slice(start, start + itemsPerPage);
-    }, [invoices, currentPage, itemsPerPage, sortColumn, sortDirection]);
+    // Handled by backend now
+    const displayInvoices = useMemo(() => {
+        return invoices.map((item, index) => ({ ...item, index }));
+    }, [invoices]);
 
     const items = [
         {
@@ -254,13 +245,17 @@ const ApprovalsPage = () => {
                 <div className="pt-4">
                     <DataTable
                         columns={columnDefs}
-                        data={sortedAndPaginatedInvoices}
+                        data={displayInvoices}
                         loading={loading}
-                        totalItems={invoices.length}
+                        totalItems={totalItems}
                         currentPage={currentPage}
                         itemsPerPage={itemsPerPage}
                         onPageChange={setCurrentPage}
-                        onItemsPerPageChange={setItemsPerPage}
+                        onItemsPerPageChange={(val) => {
+                            setItemsPerPage(val);
+                            setCurrentPage(1);
+                        }}
+                        onSort={handleSort}
                         sortColumn={sortColumn}
                         sortDirection={sortDirection}
                         maxHeight="calc(100vh - 320px)"

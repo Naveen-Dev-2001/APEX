@@ -15,6 +15,8 @@ const CustomDropdown = ({
     showSearch = false,
     filterOption,
     allowClear = true,
+    loading = false,
+    onSearch,
     ...props
 }) => {
     return (
@@ -37,6 +39,8 @@ const CustomDropdown = ({
                 size="large"
                 status={error ? "error" : ""}
                 allowClear={allowClear}
+                loading={loading}
+                onSearch={onSearch}
                 {...props}
             />
 

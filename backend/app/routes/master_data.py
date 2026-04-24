@@ -72,7 +72,11 @@ TAB_SEARCH_FIELDS = {
     "LOB": ["lob_id", "name"],
     "Department": ["department_id", "department_name"],
     "Customer": ["customer_id", "customer_name"],
-    "Exchange_Rate": ["code", "name"]
+    "Exchange_Rate": ["code", "name"],
+    "Currency": ["code", "name"],
+    "Entity": ["entity_id", "entity_name"],
+    "Vendor": ["vendor_id", "vendor_name"],
+    "Item": ["item_id", "name"]
 }
 
 TAB_REPO_MAP = {

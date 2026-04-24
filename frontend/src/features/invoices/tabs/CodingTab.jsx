@@ -18,8 +18,8 @@ import CustomInput from "../../../shared/components/CustomInput";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
 import AlertModal from "../../../shared/components/AlertModal";
 import {
-    useBulkCodingDataSync,
-} from "../../hooks/useMasterDataSync";
+    useRemoteMasterData
+} from "../../hooks/useRemoteMasterData";
 import { fetchCodingSuggestions } from "../../../api/invoiceApi";
 import { useWorkflowDataSync } from "../../hooks/useWorkflow";
 import { useQueryClient } from "@tanstack/react-query";
@@ -78,7 +78,7 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabl
         prev.onChange === next.onChange
 );
 
-const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, disabled = false }) => (
+const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, onSearch, disabled = false }) => (
     <div style={{ width: "100%" }}>
         <CustomDropdown
             value={value}
@@ -88,7 +88,8 @@ const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, 
             disabled={disabled}
             className="mb-0"
             showSearch
-            filterOption={filterOption}
+            onSearch={onSearch}
+            filterOption={onSearch ? false : filterOption} // Disable local filter if remote searching
             placeholder="Select"
             size="small"
             style={{ width: "100%", height: "32px", fontSize: "13px", display: "block" }}
@@ -99,6 +100,7 @@ const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, 
         prev.value === next.value &&
         prev.isLoading === next.isLoading &&
         prev.options === next.options &&
+        prev.onSearch === next.onSearch &&
         prev.onChange === next.onChange
 );
 
@@ -290,9 +292,7 @@ const CodingTab = ({ isActive = false }) => {
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);
-    // Only load heavy master data once this tab has been activated.
-    // Using a ref to ensure we latch it on — never turns back off.
-    const hasBeenActive = useRef(false);
+    
     const [loadMasterData, setLoadMasterData] = useState(false);
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
@@ -390,26 +390,22 @@ const CodingTab = ({ isActive = false }) => {
         });
     }, [rows]);
 
-    // Single bulk fetch replaces 5 individual round-trips (GL + LOB + Dept + Customer + Item)
-    const {
-        glData,
-        lobData,
-        deptData,
-        customerData,
-        itemData,
-        isLoading: masterDataLoading,
-    } = useBulkCodingDataSync(loadMasterData);
-
-    const glOptions = useMemo(() =>
-        (glData || []).map(i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number })), [glData]);
-    const lobOptions = useMemo(() =>
-        (lobData || []).map(i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id })), [lobData]);
-    const deptOptions = useMemo(() =>
-        (deptData || []).map(i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id })), [deptData]);
-    const customerOptions = useMemo(() =>
-        (customerData || []).map(i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id })), [customerData]);
-    const itemOptions = useMemo(() =>
-        (itemData || []).map(i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })), [itemData]);
+    // Remote Master Data Hooks
+    const gl = useRemoteMasterData("GL", {
+        mapOption: i => ({ label: `${i.account_number} - ${i.title}`, value: i.account_number })
+    });
+    const lob = useRemoteMasterData("LOB", {
+        mapOption: i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id })
+    });
+    const dept = useRemoteMasterData("Department", {
+        mapOption: i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id })
+    });
+    const customer = useRemoteMasterData("Customer", {
+        mapOption: i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id })
+    });
+    const item = useRemoteMasterData("Item", {
+        mapOption: i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id })
+    });
 
     // selectedIds ref — avoids stale closure in handleUpdate
     const selectedIdsRef = useRef(selectedIds);
@@ -647,7 +643,6 @@ const CodingTab = ({ isActive = false }) => {
                                                     {index + 1}
                                                 </td>
 
-                                                {/* All cells below are IDENTICAL to original — no isSystem branching */}
                                                 <td className="p-2 border-r border-gray-100">
                                                     <EditableCell
                                                         disabled={isViewOnly || isSystem}
@@ -669,26 +664,60 @@ const CodingTab = ({ isActive = false }) => {
                                                     <EditableCell disabled={isViewOnly} value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="number" />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.glCode} onChange={(v) => handleUpdate(row.id, "glCode", v)} options={glOptions} isLoading={masterDataLoading} filterOption={filterOption} />
+                                                    <DropdownCell 
+                                                        disabled={isViewOnly} 
+                                                        value={row.glCode} 
+                                                        onChange={(v) => handleUpdate(row.id, "glCode", v)} 
+                                                        options={gl.options} 
+                                                        isLoading={gl.loading} 
+                                                        onSearch={gl.handleSearch} 
+                                                    />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.lob} onChange={(v) => handleUpdate(row.id, "lob", v)} options={lobOptions} isLoading={masterDataLoading} filterOption={filterOption} />
+                                                    <DropdownCell 
+                                                        disabled={isViewOnly} 
+                                                        value={row.lob} 
+                                                        onChange={(v) => handleUpdate(row.id, "lob", v)} 
+                                                        options={lob.options} 
+                                                        isLoading={lob.loading} 
+                                                        onSearch={lob.handleSearch} 
+                                                    />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.department} onChange={(v) => handleUpdate(row.id, "department", v)} options={deptOptions} isLoading={masterDataLoading} filterOption={filterOption} />
+                                                    <DropdownCell 
+                                                        disabled={isViewOnly} 
+                                                        value={row.department} 
+                                                        onChange={(v) => handleUpdate(row.id, "department", v)} 
+                                                        options={dept.options} 
+                                                        isLoading={dept.loading} 
+                                                        onSearch={dept.handleSearch} 
+                                                    />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.customer} onChange={(v) => handleUpdate(row.id, "customer", v)} options={customerOptions} isLoading={masterDataLoading} filterOption={filterOption} />
+                                                    <DropdownCell 
+                                                        disabled={isViewOnly} 
+                                                        value={row.customer} 
+                                                        onChange={(v) => handleUpdate(row.id, "customer", v)} 
+                                                        options={customer.options} 
+                                                        isLoading={customer.loading} 
+                                                        onSearch={customer.handleSearch} 
+                                                    />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell disabled={isViewOnly} value={row.item} onChange={(v) => handleUpdate(row.id, "item", v)} options={itemOptions} isLoading={masterDataLoading} filterOption={filterOption} />
+                                                    <DropdownCell 
+                                                        disabled={isViewOnly} 
+                                                        value={row.item} 
+                                                        onChange={(v) => handleUpdate(row.id, "item", v)} 
+                                                        options={item.options} 
+                                                        isLoading={item.loading} 
+                                                        onSearch={item.handleSearch} 
+                                                    />
                                                 </td>
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                console.log("CodingTab Delete icon clicked for ID:", row.id);
                                                                 handleDelete(row.id);
                                                             }}
                                                             className="text-gray-400 hover:text-red-500 transition-colors"
@@ -704,8 +733,6 @@ const CodingTab = ({ isActive = false }) => {
                                                                 cursor: "pointer",
                                                                 flexShrink: 0,
                                                             }}
-                                                            onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.borderColor = "#fca5a5"; }}
-                                                            onMouseLeave={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.borderColor = "#e5e7eb"; }}
                                                         >
                                                             <DeleteOutlined style={{ fontSize: 12, color: "inherit" }} />
                                                         </button>
