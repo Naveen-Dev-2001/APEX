@@ -249,27 +249,32 @@ const InvoiceTopBar = ({ invoice = {} }) => {
 
             if (result?.success) {
                 toast.success(result.message || "Action completed successfully.");
-                
-                // Invalidate cache to ensure fresh data on next view
-                queryClient.invalidateQueries(["workflow", viewInvoiceId]);
-                queryClient.invalidateQueries(["auditFlow", viewInvoiceId]);
-                queryClient.invalidateQueries(["invoices"]);
-                
-                // If it was a recall, navigate back to the coding queue
-                if (action === "recall") {
-                    resetQuickView();
-                    setInvoiceSection(1);
-                    navigate("/coding");
-                    return;
-                }
-
-                // For any other successful approver action, go to approvals page
-                resetQuickView();
-                setInvoiceSection(1);
-                navigate("/approvals");
             } else {
                 toast.error(result?.message || "Action failed. Please try again.");
-                await fetchUIStatus();
+            }
+
+            // Invalidate cache to ensure fresh data on next view
+            queryClient.invalidateQueries(["workflow", viewInvoiceId]);
+            queryClient.invalidateQueries(["auditFlow", viewInvoiceId]);
+            queryClient.invalidateQueries(["invoices"]);
+            
+            resetQuickView();
+
+            // If it was a recall, navigate back to the coding queue
+            if (action === "recall") {
+                setInvoiceSection(1);
+                navigate("/coding");
+                return;
+            }
+
+            // Return to origin or default to approvals
+            if (navigationOrigin) {
+                const origin = navigationOrigin;
+                setNavigationOrigin(null); // Clear origin
+                navigate(origin);
+            } else {
+                setInvoiceSection(1);
+                navigate("/approvals");
             }
 
         } catch (err) {
