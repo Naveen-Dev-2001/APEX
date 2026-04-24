@@ -866,25 +866,9 @@ async def get_ui_status_from_frontend(
                     can_act = True
  
     # ── can_enable_editing logic ─────────────────────────────────────────────
-    current_level_entry = next(
-        (a for a in mandatory if a.get("level") == current_level), None
-    )
-    is_current_level_finance = (
-        current_level_entry.get("is_finance", False)
-        if current_level_entry else False
-    )
- 
-    already_approved_this_level = any(
-        (s.user or "").lower() == email
-        and s.step_type == StepType.LEVEL_APPROVED
-        and s.approver_number == current_level
-        for s in steps_for_level_check
-    )
- 
     can_enable_editing = (
         (is_finance or is_threshold_approver or is_posting_approver)
-        and (is_current_level_finance or can_act)
-        and not already_approved_this_level
+        and can_act
     )
  
     # Pre-calculate delegated flags for the response
