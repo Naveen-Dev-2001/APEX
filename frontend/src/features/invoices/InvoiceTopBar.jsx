@@ -23,7 +23,7 @@ const MODAL_ACTIONS = {
     recall: { label: "Recall Invoice", okText: "Recall", danger: true },
 };
 
-const InvoiceTopBar = ({ invoice = {} }) => {
+const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { user, activeRole } = useAuthStore();
@@ -472,6 +472,14 @@ const InvoiceTopBar = ({ invoice = {} }) => {
                                 )}
                         </>
                     )}
+                    <div className="w-[120px]">
+                        <CustomButton 
+                            variant="outline" 
+                            onClick={onTogglePdf}
+                        >
+                            {isPdfVisible ? "Hide PDF" : "Show PDF"}
+                        </CustomButton>
+                    </div>
                 </div>
             </div>
 
