@@ -9,7 +9,7 @@ import { saveInvoice } from "../../api/invoiceApi";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import workflowActionsAPI from "../../api/workflowActionsAPI";
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Modal } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -55,7 +55,6 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         preview_vendor_id: selectedVendorId,
         preview_lob: firstLine.lob,
         preview_department_id: firstLine.department,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [selectedVendorId, firstLine.lob, firstLine.department]);
 
     // ── Parallel fetch: vendor + workflow + coding suggestions fire together ──
@@ -96,6 +95,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     // ── Approver UI state ──────────────────────────────────────────────────
     const [uiStatus, setUiStatus] = useState(null);
+    const [uiStatusLoading, setUiStatusLoading] = useState(false);
+    const [uiStatusReady, setUiStatusReady] = useState(false);
     const [actionLoading, setActionLoading] = useState(null);
     const [modal, setModal] = useState(null);
     const [comment, setComment] = useState("");
@@ -103,17 +104,9 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     // which is O(n) on every render and causes micro-lag on large payloads.
     const prevWorkflowIdRef = useRef(null);
 
-    useEffect(() => {
-        if (!workflowData) return;
-        // Use current_approver_level + current_status as a cheap change signal
-        const key = `${workflowData.current_approver_level}_${workflowData.current_status}`;
-        if (key === prevWorkflowIdRef.current) return;
-        prevWorkflowIdRef.current = key;
-        fetchUIStatus();
-    }, [workflowData]);
-
-    const fetchUIStatus = async () => {
+    const fetchUIStatus = useCallback(async () => {
         if (!viewInvoiceId || !workflowData) return;
+        setUiStatusLoading(true);
         try {
             const payload = {
                 invoice_id: viewInvoiceId,
@@ -127,8 +120,21 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         } catch (err) {
             console.error("fetchUIStatus error:", err);
             setUiStatus(null);
+        } finally {
+            setUiStatusLoading(false);
+            setUiStatusReady(true);
         }
-    };
+    }, [viewInvoiceId, workflowData]);
+
+    useEffect(() => {
+        if (!workflowData) return;
+        // Use current_approver_level + current_status as a cheap change signal
+        const key = `${workflowData.current_approver_level}_${workflowData.current_status}`;
+        if (key === prevWorkflowIdRef.current) return;
+        prevWorkflowIdRef.current = key;
+        setUiStatusReady(false);
+        fetchUIStatus();
+    }, [workflowData, fetchUIStatus]);
 
     // ── Scanner / Coder actions ────────────────────────────────────────────
     const handleSendToCoding = async () => {
@@ -319,6 +325,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     const isApproverView =
         userRole.includes("approver") &&
         ["waiting_approval", "reworked", "sage_post_failed"].includes((currentStatus || "").toLowerCase());
+    const canAction = (key) => uiStatusReady && !!uiStatus?.[key] && !actionLoading;
 
     const btnBase =
         "w-[130px] h-[34px] flex items-center justify-center rounded-lg border bg-white transition text-[13px] font-medium custom-font-creato disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
@@ -387,11 +394,11 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                             {isApproverView && (
                                 <>
                                     {/* Repost to Sage */}
-                                    {currentStatus === "sage_post_failed" && uiStatus?.can_repost_sage && (
+                                    {currentStatus === "sage_post_failed" && (
                                         <button
                                             onClick={() => openModal("repost-sage")}
-                                            disabled={busy("repost-sage")}
-                                            className={getBtnClass("orange", true)}
+                                            disabled={!canAction("can_repost_sage")}
+                                            className={getBtnClass("orange", canAction("can_repost_sage"))}
                                         >
                                             {busy("repost-sage") ? "Reposting…" : "Repost"}
                                         </button>
@@ -400,10 +407,11 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                     {["waiting_approval", "reworked"].includes(currentStatus) && (
                                         <>
                                             {/* Enable Editing — no API, flips local state only */}
-                                            {uiStatus?.can_enable_editing && !editingEnabled && (
+                                            {!editingEnabled && (
                                                 <button
                                                     onClick={handleEnableEditing}
-                                                    className={getBtnClass("blue", true)}
+                                                    disabled={!canAction("can_enable_editing")}
+                                                    className={getBtnClass("blue", canAction("can_enable_editing"))}
                                                 >
                                                     Enable Editing
                                                 </button>
@@ -421,8 +429,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                             {/* Rework */}
                                             <button
                                                 onClick={() => openModal("rework")}
-                                                disabled={!uiStatus?.can_rework || !!actionLoading}
-                                                className={getBtnClass("yellow", uiStatus?.can_rework && !actionLoading)}
+                                                disabled={!canAction("can_rework")}
+                                                className={getBtnClass("yellow", canAction("can_rework"))}
                                             >
                                                 {busy("rework") ? "Sending…" : "Rework"}
                                             </button>
@@ -430,8 +438,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                             {/* Reject */}
                                             <button
                                                 onClick={() => openModal("reject")}
-                                                disabled={!uiStatus?.can_reject || !!actionLoading}
-                                                className={getBtnClass("red", uiStatus?.can_reject && !actionLoading)}
+                                                disabled={!canAction("can_reject")}
+                                                className={getBtnClass("red", canAction("can_reject"))}
                                             >
                                                 {busy("reject") ? "Rejecting…" : "Reject"}
                                             </button>
@@ -439,14 +447,19 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                             {/* Approve */}
                                             <button
                                                 onClick={() => openModal("approve")}
-                                                disabled={!uiStatus?.can_approve || !!actionLoading}
-                                                className={getBtnClass("green", uiStatus?.can_approve && !actionLoading)}
+                                                disabled={!canAction("can_approve")}
+                                                className={getBtnClass("green", canAction("can_approve"))}
                                             >
                                                 {busy("approve") ? "Approving…" : "Approve"}
                                             </button>
 
                                             {/* Info label */}
-                                            {uiStatus &&
+                                            {(uiStatusLoading || !uiStatusReady) && (
+                                                <span className="text-xs text-gray-400 italic select-none">
+                                                    Checking permissions...
+                                                </span>
+                                            )}
+                                            {uiStatusReady && uiStatus &&
                                                 !uiStatus.can_approve &&
                                                 !uiStatus.can_reject &&
                                                 !uiStatus.can_rework &&
