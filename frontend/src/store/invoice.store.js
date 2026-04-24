@@ -41,6 +41,9 @@ export const useInvoiceStore = create((set, get) => ({
     viewInvoiceId: null,
     setViewInvoiceId: (id) => set({ viewInvoiceId: id }),
 
+    isPreviewLoading: false,
+    setIsPreviewLoading: (loading) => set((state) => (state.isPreviewLoading === loading ? state : { isPreviewLoading: loading })),
+
     fileName: "",
     setFileName: (name) => set({ fileName: name }),
 
@@ -408,6 +411,7 @@ export const useInvoiceStore = create((set, get) => ({
         originalLineItems: [],
         selectedVendorId: null,
         activeInvoiceData: null,
+        isPreviewLoading: false,
     }),
 
     // =============================

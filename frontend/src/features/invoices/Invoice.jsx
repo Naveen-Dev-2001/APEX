@@ -53,6 +53,8 @@ const Invoice = () => {
     const [columnFilters, setColumnFilters] = useState({});
     const [pageTab, setPageTab] = useState("invoices"); // "invoices" | "archive"
     const [archivedRecords, setArchivedRecords] = useState([]);
+    const [openingInvoiceId, setOpeningInvoiceId] = useState(null);
+    const openPreviewTimerRef = useRef(null);
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -146,21 +148,41 @@ const Invoice = () => {
         const id = Number(data.id);
         if (!id) return;
 
-        const { setInvoiceData, setFileName, setViewInvoiceId, setSelectedVendorId, setInvoiceSection, setInvoiceActiveTab } = useInvoiceStore.getState();
+        setOpeningInvoiceId(id);
+        const { setInvoiceData, setFileName, setViewInvoiceId, setInvoiceSection, setInvoiceActiveTab, setIsPreviewLoading } = useInvoiceStore.getState();
 
-        setFileName(data.original_filename ?? "");
-        setInvoiceData(data);
-        setViewInvoiceId(id);
-        setSelectedVendorId(data.vendor_id);
-
-        const status = (data.status || "").toLowerCase();
-        if (status === "processed") {
-            setInvoiceActiveTab("Quick View");
-        } else {
-            setInvoiceActiveTab("Coding");
-        }
-
+        setIsPreviewLoading(true);
         setInvoiceSection(2);
+        setViewInvoiceId(id);
+
+        // Defer heavy state mapping by a tick so UI can switch immediately with loader.
+        if (openPreviewTimerRef.current) {
+            clearTimeout(openPreviewTimerRef.current);
+        }
+        openPreviewTimerRef.current = setTimeout(() => {
+            try {
+                setFileName(data.original_filename ?? "");
+                setInvoiceData(data);
+
+                const status = (data.status || "").toLowerCase();
+                if (status === "processed") {
+                    setInvoiceActiveTab("Quick View");
+                } else {
+                    setInvoiceActiveTab("Coding");
+                }
+            } finally {
+                setIsPreviewLoading(false);
+                setOpeningInvoiceId(null);
+            }
+        }, 0);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (openPreviewTimerRef.current) {
+                clearTimeout(openPreviewTimerRef.current);
+            }
+        };
     }, []);
 
 
@@ -210,8 +232,8 @@ const Invoice = () => {
 
     const columnDefs = useMemo(() => {
         const cols = view === "condensed"
-            ? getCondensedColumns(handleView, handleDelete, userRole)
-            : getFullColumns(handleView, handleDelete, userRole);
+            ? getCondensedColumns(handleView, handleDelete, userRole, openingInvoiceId)
+            : getFullColumns(handleView, handleDelete, userRole, openingInvoiceId);
 
         return cols.map(col => ({
             ...col,
@@ -226,7 +248,7 @@ const Invoice = () => {
                 return await getInvoiceFilterOptions(dbField, otherFilters);
             } : undefined
         }));
-    }, [view, handleView, handleDelete, backendFilters, userRole]);
+    }, [view, handleView, handleDelete, backendFilters, userRole, openingInvoiceId]);
 
     const handleCreateInvoice = () => {
         setIsModalOpen(true);

@@ -1,4 +1,4 @@
-import { EyeOutlined, DeleteOutlined } from "@ant-design/icons";
+import { EyeOutlined, DeleteOutlined, LoadingOutlined } from "@ant-design/icons";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
 const StatusBadge = ({ value }) => {
@@ -19,21 +19,23 @@ const StatusBadge = ({ value }) => {
 };
 
 // ─── Actions cell helper ──────────────────────────────────────────────────────
-const actionsCol = (onView, onDelete, userRole) => ({
+const actionsCol = (onView, onDelete, userRole, openingInvoiceId) => ({
     header: "Actions",
     accessor: "actions",
     sortable: false,
     render: (_, row) => {
         const canDelete = ["scanner", "coder"].includes(userRole?.toLowerCase());
+        const isOpening = openingInvoiceId != null && String(openingInvoiceId) === String(row?.id);
         
         return (
             <div className="flex items-center justify-center gap-3">
                 <button
                     onClick={() => onView(row)}
-                    className="text-blue-500 hover:text-blue-700 transition-colors cursor-pointer"
+                    disabled={isOpening}
+                    className="text-blue-500 hover:text-blue-700 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     title="View"
                 >
-                    <EyeOutlined style={{ fontSize: 16 }} />
+                    {isOpening ? <LoadingOutlined style={{ fontSize: 16 }} spin /> : <EyeOutlined style={{ fontSize: 16 }} />}
                 </button>
                 {canDelete && (
                     <button
@@ -59,7 +61,7 @@ export const VIEW_OPTIONS = [
 ];
 
 // ─── Condensed columns ────────────────────────────────────────────────────────
-export const getCondensedColumns = (onView, onDelete, userRole) => [
+export const getCondensedColumns = (onView, onDelete, userRole, openingInvoiceId = null) => [
     {
         header:         "Vendor Name",
         accessor:       "vendor_name",
@@ -134,11 +136,11 @@ export const getCondensedColumns = (onView, onDelete, userRole) => [
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render:     (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
     },
-    actionsCol(onView, onDelete, userRole),
+    actionsCol(onView, onDelete, userRole, openingInvoiceId),
 ];
 
 // ─── Full columns ─────────────────────────────────────────────────────────────
-export const getFullColumns = (onView, onDelete, userRole) => [
+export const getFullColumns = (onView, onDelete, userRole, openingInvoiceId = null) => [
     {
         header:         "Vendor Name",
         accessor:       "vendor_name",
@@ -314,5 +316,5 @@ export const getFullColumns = (onView, onDelete, userRole) => [
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render:         (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
     },
-    actionsCol(onView, onDelete, userRole),
+    actionsCol(onView, onDelete, userRole, openingInvoiceId),
 ];
