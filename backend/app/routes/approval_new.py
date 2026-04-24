@@ -42,6 +42,7 @@ from app.routes.workflow import get_invoice_total_from_invoice, get_required_app
 from app.models.delegation import check_active_delegation
 from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
+from app.services.email_service import email_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workflow/action", tags=["Workflow Actions"])
@@ -229,6 +230,46 @@ def _update_invoice_status(db: Session, invoice: Invoice, new_status: str):
 def _advance_level(db: Session, invoice: Invoice, new_level: int):
     invoice.current_approver_level = new_level
     db.add(invoice)
+
+
+def notify_next_approvers(db: Session, invoice: Invoice, next_level_data: Dict, background_tasks: BackgroundTasks):
+    """
+    Sends email notifications to the next set of approvers in the background.
+    """
+    emails = _parse_list(next_level_data.get("emails", []))
+    is_finance = next_level_data.get("is_finance", False)
+    
+    # Expand finance emails if needed
+    if is_finance:
+        finance_emails = _get_finance_users(db, invoice.entity)
+        emails = list(set(emails) | set(finance_emails))
+        
+    for next_email in emails:
+        if not next_email: continue
+        
+        # Fetch username for personal touch if possible
+        approver_user = db.query(User).filter(User.email == next_email).first()
+        approver_name = approver_user.username if approver_user else "Approver"
+        
+        total_amount = get_invoice_total_from_invoice(db, invoice.id)
+        
+        # Extract currency
+        extracted_data = {}
+        if invoice.extracted_data:
+            try:
+                extracted_data = json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else invoice.extracted_data
+            except: pass
+        currency = extracted_data.get("invoice_details", {}).get("currency", {}).get("value", "USD")
+
+        background_tasks.add_task(
+            email_service.send_approval_request_email,
+            email=next_email,
+            username=approver_name,
+            vendor_name=invoice.vendor_name or "Unknown",
+            invoice_number=invoice.invoice_number or "N/A",
+            amount=str(total_amount),
+            currency=currency
+        )
 
 
 def _get_approved_levels(steps: List[WorkflowStep]) -> Dict[int, List[str]]:
@@ -1012,6 +1053,10 @@ async def approve_invoice(
                 _advance_level(db, invoice, next_mandatory["level"])
                 if invoice.status == InvoiceStatus.REWORKED:
                     _update_invoice_status(db, invoice, InvoiceStatus.WAITING_APPROVAL)
+                
+                # Notify next mandatory level
+                notify_next_approvers(db, invoice, next_mandatory, background_tasks)
+                
                 db.commit()
                 return ActionResponse(
                     success=True,
@@ -1025,6 +1070,11 @@ async def approve_invoice(
                     _advance_level(db, invoice, threshold_virtual_level)
                     if invoice.status == InvoiceStatus.REWORKED:
                         _update_invoice_status(db, invoice, InvoiceStatus.WAITING_APPROVAL)
+                    
+                    # Notify threshold approvers
+                    for te in threshold_entries:
+                        notify_next_approvers(db, invoice, te, background_tasks)
+                        
                     db.commit()
                     return ActionResponse(
                         success=True,
@@ -1038,6 +1088,11 @@ async def approve_invoice(
                     _advance_level(db, invoice, posting_virtual_level)
                     if invoice.status == InvoiceStatus.REWORKED:
                         _update_invoice_status(db, invoice, InvoiceStatus.WAITING_APPROVAL)
+                    
+                    # Notify posting approvers
+                    for pe in posting_entries:
+                        notify_next_approvers(db, invoice, pe, background_tasks)
+                        
                     db.commit()
                     return ActionResponse(
                         success=True,
@@ -1150,6 +1205,11 @@ async def approve_invoice(
             _advance_level(db, invoice, posting_virtual_level)
             if invoice.status == InvoiceStatus.REWORKED:
                 _update_invoice_status(db, invoice, InvoiceStatus.WAITING_APPROVAL)
+            
+            # Notify posting approvers
+            for pe in posting_entries:
+                notify_next_approvers(db, invoice, pe, background_tasks)
+                
             db.commit()
             return ActionResponse(
                 success=True,
@@ -1298,6 +1358,7 @@ async def approve_invoice(
 async def reject_invoice(
     invoice_id: int,
     payload: ActionRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity),
@@ -1368,6 +1429,37 @@ async def reject_invoice(
 
     db.commit()
 
+    # --- NOTIFY CODER OF REJECTION ---
+    # Find the user who did the coding step
+    coding_step = db.query(WorkflowStep).filter(
+        WorkflowStep.invoice_id == invoice_id,
+        WorkflowStep.step_type == StepType.EDITING_ENABLED  # Often coding is done here or initial upload
+    ).order_by(WorkflowStep.timestamp.desc()).first()
+    
+    # Fallback to uploader if no coding step found
+    coder_email = None
+    coder_name = "Coder"
+    
+    if coding_step:
+        coder_user = db.query(User).filter(User.username == coding_step.user).first()
+        if coder_user:
+            coder_email = coder_user.email
+            coder_name = coder_user.username
+            
+    if not coder_email:
+        coder_email = invoice.uploaded_by
+        
+    if coder_email:
+        background_tasks.add_task(
+            email_service.send_rejection_notification,
+            email=coder_email,
+            username=coder_name,
+            vendor_name=invoice.vendor_name or "Unknown",
+            invoice_number=invoice.invoice_number or "N/A",
+            status=InvoiceStatus.REJECTED,
+            comment=payload.comment
+        )
+
     return ActionResponse(
         success=True,
         message="Invoice has been rejected. It remains in the system with status REJECTED.",
@@ -1383,6 +1475,7 @@ async def reject_invoice(
 async def rework_invoice(
     invoice_id: int,
     payload: ActionRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity),
@@ -1500,6 +1593,32 @@ async def rework_invoice(
         details={"comment": payload.comment, "rework_to_level": prev_finance_level}
     )
     db.commit()
+
+    # --- NOTIFY PREVIOUS FINANCE TEAM OF REWORK ---
+    prev_finance_emails = []
+    level_entry = next((e for e in assigned if e.get("level") == prev_finance_level), None)
+    if level_entry:
+        emails = _parse_list(level_entry.get("emails", []))
+        if level_entry.get("is_finance"):
+            f_users = _get_finance_users(db, entity)
+            prev_finance_emails = list(set(emails) | set(f_users))
+        else:
+            prev_finance_emails = emails
+            
+    for f_email in prev_finance_emails:
+        if not f_email: continue
+        f_user = db.query(User).filter(User.email == f_email).first()
+        f_name = f_user.username if f_user else "Approver"
+        
+        background_tasks.add_task(
+            email_service.send_rejection_notification,
+            email=f_email,
+            username=f_name,
+            vendor_name=invoice.vendor_name or "Unknown",
+            invoice_number=invoice.invoice_number or "N/A",
+            status=InvoiceStatus.REWORKED,
+            comment=payload.comment
+        )
 
     return ActionResponse(
         success=True,
