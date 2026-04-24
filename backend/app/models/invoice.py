@@ -61,6 +61,7 @@ class InvoiceUpdate(BaseModel):
     vendor_id: Optional[str] = None
     vendor_name: Optional[str] = None
     invoice_number: Optional[str] = None
+    last_updated_at: Optional[datetime] = None
 
 class Invoice(InvoiceBase):
     model_config = ConfigDict(from_attributes=True)
@@ -74,6 +75,7 @@ class Invoice(InvoiceBase):
     processed_at: Optional[datetime] = None
     duplicate_info: Optional[Dict[str, Any]] = None
     original_items: Optional[List[Dict[str, Any]]] = None
+    updated_at: Optional[datetime] = None
 
 class InvoiceResponse(Invoice):
     pass

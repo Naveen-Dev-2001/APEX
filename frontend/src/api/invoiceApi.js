@@ -81,6 +81,7 @@ export const getAudit = async (invoice_id) => {
 }
 
 export const saveInvoice = async (invoice_id, payload) => {
+    // Ensure last_updated_at is included for concurrency control
     const res = await API.put(`/invoices/${invoice_id}`, payload)
     return res.data
 }

@@ -80,7 +80,9 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     const handleEnableEditing = async () => {
         try {
-            await workflowActionsAPI.enableEditing(viewInvoiceId);
+            await workflowActionsAPI.enableEditing(viewInvoiceId, { 
+                last_updated_at: activeInvoiceData?.updated_at 
+            });
             setEditingEnabled(true);
             setActiveInvoiceData({
                 ...activeInvoiceData,
@@ -132,8 +134,11 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     // ── Scanner / Coder actions ────────────────────────────────────────────
     const handleSendToCoding = async () => {
-        await handleSave();
-        const payload = await saveInvoice(viewInvoiceId, { status: "waiting_coding" });
+        const saveRes = await handleSave();
+        const payload = await saveInvoice(viewInvoiceId, { 
+            status: "waiting_coding",
+            last_updated_at: saveRes?.updated_at || activeInvoiceData?.updated_at
+        });
         if (payload?.status === "waiting_coding") {
             toast.success("Invoice sent for coding successfully!");
             queryClient.invalidateQueries(["invoices"]);
@@ -165,8 +170,11 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             toast.error("No workflow defined for this invoice. Please configure a vendor or codification workflow.");
             return;
         }
-        await handleSave();
-        const payload = await saveInvoice(viewInvoiceId, { status: "waiting_approval" });
+        const saveRes = await handleSave();
+        const payload = await saveInvoice(viewInvoiceId, { 
+            status: "waiting_approval",
+            last_updated_at: saveRes?.updated_at || activeInvoiceData?.updated_at
+        });
         if (payload?.status === "waiting_approval") {
             toast.success("Invoice sent for approval successfully!");
             queryClient.invalidateQueries(["invoices"]);
@@ -226,22 +234,26 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
         setActionLoading(action);
         try {
+            const actionPayload = { 
+                comment: commentText,
+                last_updated_at: activeInvoiceData?.updated_at 
+            };
             let result;
             switch (action) {
                 case "approve":
-                    result = await workflowActionsAPI.approve(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.approve(viewInvoiceId, actionPayload);
                     break;
                 case "reject":
-                    result = await workflowActionsAPI.reject(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.reject(viewInvoiceId, actionPayload);
                     break;
                 case "rework":
-                    result = await workflowActionsAPI.rework(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.rework(viewInvoiceId, actionPayload);
                     break;
                 case "repost-sage":
-                    result = await workflowActionsAPI.repostSage(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.repostSage(viewInvoiceId, actionPayload);
                     break;
                 case "recall":
-                    result = await workflowActionsAPI.recall(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.recall(viewInvoiceId, actionPayload);
                     break;
                 default:
                     return;

@@ -142,6 +142,7 @@ class Invoice(Base):
     uploaded_at = Column(DateTime, nullable=False,
                          default=datetime.utcnow, index=True)
     processed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Approval tracking
     required_approvers = Column(Integer, nullable=True)

@@ -2,6 +2,7 @@
 import { saveInvoice } from "../../api/invoiceApi";
 import { useInvoiceStore } from "../../store/invoice.store";
 import { useCallback } from "react";
+import toast from '../../utils/toast';
 
 export const useSaveInvoice = () => {
     const {
@@ -213,41 +214,49 @@ export const useSaveInvoice = () => {
             invoice_number: f.invoiceNumber,
             exchange_rate: f.exchangeRate || activeInvoiceData.exchange_rate,
             extracted_data: updatedExtractedData,
+            last_updated_at: activeInvoiceData.updated_at
         };
 
         return payload;
     }, [quickViewFormData, lineItems, activeInvoiceData]);
 
     const handleSave = useCallback(async (extraFields = {}) => {
+        try {
+            const payload = buildPayload();
 
-        const payload = buildPayload();
+            // Apply any extra field overrides (e.g. status)
+            const finalPayload = {
+                ...payload,
+                ...extraFields
+            };
 
-        // Apply any extra field overrides (e.g. status)
-        const finalPayload = {
-            ...payload,
-            ...extraFields
-        };
+            // Optimistically update the store so UI stays in sync
+            setActiveInvoiceData(finalPayload);
 
-        // Optimistically update the store so UI stays in sync
-        setActiveInvoiceData(finalPayload);
+            const object = {
+                extracted_data: finalPayload.extracted_data,   // already has isModified: true
+                exchange_rate: finalPayload.exchange_rate,
+                vendor_id: finalPayload.vendor_id,
+                vendor_name: finalPayload.vendor_name,
+                invoice_number: finalPayload.invoice_number,
+                total_amount: finalPayload.extracted_data?.amounts?.total_invoice_amount?.value,
+                amount_due: finalPayload.extracted_data?.amounts?.amount_due?.value,
+                invoice_date: finalPayload.extracted_data?.invoice_details?.invoice_date?.value,
+                due_date: finalPayload.extracted_data?.invoice_details?.due_date?.value,
+                last_updated_at: finalPayload.last_updated_at,
+                ...extraFields // Merge extra fields (like status) into the final object
+            };
 
-        const object = {
-            extracted_data: finalPayload.extracted_data,   // already has isModified: true
-            exchange_rate: finalPayload.exchange_rate,
-            vendor_id: finalPayload.vendor_id,
-            vendor_name: finalPayload.vendor_name,
-            invoice_number: finalPayload.invoice_number,
-            total_amount: finalPayload.extracted_data?.amounts?.total_invoice_amount?.value,
-            amount_due: finalPayload.extracted_data?.amounts?.amount_due?.value,
-            invoice_date: finalPayload.extracted_data?.invoice_details?.invoice_date?.value,
-            due_date: finalPayload.extracted_data?.invoice_details?.due_date?.value,
-            ...extraFields // Merge extra fields (like status) into the final object
-        };
+            const response = await saveInvoice(viewInvoiceId, object);
+            console.log("Save response →", response);
 
-        const response = await saveInvoice(viewInvoiceId, object);
-        console.log("Save response →", response);
-
-        return response;
+            return response;
+        } catch (err) {
+            const errorData = err?.response?.data;
+            const detail = errorData?.detail || "Failed to save invoice";
+            toast.error(typeof detail === "string" ? detail : (detail.message || "Something went wrong"));
+            return null;
+        }
     }, [buildPayload, setActiveInvoiceData, viewInvoiceId]);
 
     return { handleSave, buildPayload };
