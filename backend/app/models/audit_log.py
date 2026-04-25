@@ -19,6 +19,7 @@ class AuditAction(str, Enum):
     SAGE_POST_FAILED = "Sage Post Failed"
     SAGE_REPOSTED = "Sage Reposted"
     SAGE_REPOST_FAILED = "Sage Repost Failed"
+    ARCHIVED = "Archived"
 
 class AuditLogCreate(BaseModel):
     invoice_id: str

@@ -60,6 +60,7 @@ class InvoiceStatus:
     REWORKED = "reworked"
     SAGE_POSTED = "sage_posted"
     SAGE_POST_FAILED = "sage_post_failed"
+    ARCHIVED = "archived"
 
 
 class StepType:
