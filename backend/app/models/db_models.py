@@ -108,11 +108,11 @@ class Invoice(Base):
     status = Column(SQLEnum(InvoiceStatusEnum), nullable=False,
                     default=InvoiceStatusEnum.WAITING_APPROVAL, index=True)
     entity = Column(String(100), ForeignKey(
-        "entity_master.entity_id"), nullable=True, index=True)
+        "entity_master.entity_id", onupdate="CASCADE"), nullable=True, index=True)
 
     # Vendor information
     vendor_id = Column(String(100), ForeignKey(
-        "vendor_master.vendor_id"), nullable=True, index=True)
+        "vendor_master.vendor_id", onupdate="CASCADE"), nullable=True, index=True)
     vendor_name = Column(String(500), nullable=True, index=True)
     invoice_number = Column(String(200), nullable=True, index=True)
     azure_vendor_name = Column(String(500), nullable=True)
@@ -249,7 +249,7 @@ class Coding(Base):
     header_coding = Column(Text, nullable=True)  # Store as JSON string
     line_items = Column(Text, nullable=True)    # Store as JSON string
     entity = Column(String(100), ForeignKey(
-        "entity_master.entity_id"), nullable=False, index=True)
+        "entity_master.entity_id", onupdate="CASCADE"), nullable=False, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
 
@@ -268,7 +268,7 @@ class AuditLog(Base):
     action = Column(String(100), nullable=False, index=True)
     user = Column(String(100), nullable=False, index=True)
     entity = Column(String(100), ForeignKey(
-        "entity_master.entity_id"), nullable=False, index=True)
+        "entity_master.entity_id", onupdate="CASCADE"), nullable=False, index=True)
     details = Column(Text, nullable=True)  # JSON stored as text
     sage_bill_number = Column(String(200), nullable=True)
     timestamp = Column(DateTime, nullable=False,
@@ -300,7 +300,7 @@ class WorkflowStep(Base):
     approver_number = Column(Integer, nullable=True, index=True)
     comment = Column(Text, nullable=True)
     entity = Column(String(100), ForeignKey(
-        "entity_master.entity_id"), nullable=False, index=True)
+        "entity_master.entity_id", onupdate="CASCADE"), nullable=False, index=True)
 
     # Relationships
     invoice = relationship("Invoice", back_populates="workflow_steps")
@@ -332,7 +332,7 @@ class Delegation(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     entity = Column(String(100), ForeignKey(
-        "entity_master.entity_id"), nullable=False, index=True)
+        "entity_master.entity_id", onupdate="CASCADE"), nullable=False, index=True)
     # Copied from original_approver usually
     delegator_email = Column(String(200), nullable=False, index=True)
     substitute_email = Column(String(200), nullable=False)
@@ -463,7 +463,7 @@ class VendorMaster(Base):
 
     # Suggested Foreign Key to Entity
     entity_id = Column(String(100), ForeignKey(
-        "entity_master.entity_id"), nullable=True, index=True)
+        "entity_master.entity_id", onupdate="CASCADE"), nullable=True, index=True)
 
     # Sage Intacct Sync Fields
     vendor_key = Column(String(100), index=True, nullable=True)
@@ -652,9 +652,9 @@ class VendorWorkflow(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     entity = Column(String(100), ForeignKey(
-        "entity_master.entity_id"), nullable=False, index=True)
+        "entity_master.entity_id", onupdate="CASCADE"), nullable=False, index=True)
     vendor_id = Column(String(100), ForeignKey(
-        "vendor_master.vendor_id"), nullable=True, index=True)
+        "vendor_master.vendor_id", onupdate="CASCADE"), nullable=True, index=True)
     vendor_name = Column(String(500), nullable=True)
     approver_count = Column(Integer, default=3)
     mandatory_approver_1 = Column(Text, nullable=True)
@@ -677,7 +677,7 @@ class CodificationWorkflow(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     entity = Column(String(100), ForeignKey(
-        "entity_master.entity_id"), nullable=False, index=True)
+        "entity_master.entity_id", onupdate="CASCADE"), nullable=False, index=True)
     lob = Column(String(200), nullable=False, index=True)
     department_id = Column(String(200), nullable=False, index=True)
     approver_count = Column(Integer, default=3)
