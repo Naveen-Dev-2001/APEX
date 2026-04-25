@@ -16,11 +16,12 @@ export const getInvoices = (params = {}, options = {}) =>
         signal: options.signal
     }).then(res => res.data);
 
-export const getInvoiceFilterOptions = (column, filters = {}) =>
+export const getInvoiceFilterOptions = (column, filters = {}, tab = undefined) =>
     API.get(`/invoices/filter-options`, {
         params: { 
             column,
-            filters: Object.keys(filters).length > 0 ? JSON.stringify(filters) : undefined
+            filters: Object.keys(filters).length > 0 ? JSON.stringify(filters) : undefined,
+            tab
         }
     }).then(res => res.data);
 

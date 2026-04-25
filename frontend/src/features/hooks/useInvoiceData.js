@@ -2,15 +2,15 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getInvoices } from "../../api/invoiceApi";
 
-export const useInvoiceData = ({ skip = 0, limit = 10, search = "", filters = {}, sort_by = "uploaded_at", sort_dir = "desc" } = {}) => {
+export const useInvoiceData = ({ skip = 0, limit = 10, search = "", filters = {}, sort_by = "uploaded_at", sort_dir = "desc", tab = undefined } = {}) => {
     const filtersKey = useMemo(() => JSON.stringify(filters || {}), [filters]);
 
     const { data, isLoading, isError, refetch } = useQuery({
-        queryKey: ["invoices", skip, limit, search, filtersKey, sort_by, sort_dir],
+        queryKey: ["invoices", skip, limit, search, filtersKey, sort_by, sort_dir, tab],
         queryFn: async ({ signal }) => {
             const start = performance.now();
 
-            const res = await getInvoices({ skip, limit, search, filters, sort_by, sort_dir, show_all: true }, { signal });
+            const res = await getInvoices({ skip, limit, search, filters, sort_by, sort_dir, show_all: true, tab }, { signal });
 
             const end = performance.now();
             const duration = (end - start).toFixed(2);

@@ -191,10 +191,10 @@ const Invoice = () => {
                 const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[dbField];
-                return await getInvoiceFilterOptions(dbField, otherFilters);
+                return await getInvoiceFilterOptions(dbField, otherFilters, pageTab === "delete" ? undefined : pageTab);
             } : undefined
         }));
-    }, [view, handleView, handleDelete, handleArchive, backendFilters, userRole, openingInvoiceId]);
+    }, [view, handleView, handleDelete, handleArchive, backendFilters, userRole, openingInvoiceId, pageTab]);
 
     const handleUpload = async (files) => {
         if (!files || files.length === 0) {
@@ -255,7 +255,7 @@ const Invoice = () => {
                             {[
                                 { key: "in_progress", label: "In Progress" },
                                 { key: "delete", label: "Delete" },
-                                { key: "posted_stage", label: "Posted To Stage" },
+                                { key: "posted_stage", label: "Posted To Sage" },
                                 { key: "archive", label: "Archive" },
                             ].map(({ key, label }, index, arr) => {
                                 const isActive = pageTab === key;

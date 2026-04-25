@@ -10,12 +10,30 @@ const StatusBadge = ({ value }) => {
         waiting_approval:"bg-orange-100 text-orange-700",
         waiting_coding:  "bg-purple-100 text-purple-700",
         sage_posted:     "bg-emerald-100 text-emerald-700",
+        sage_post_failed: "bg-red-100 text-red-700",
+        reworked:        "bg-rose-100 text-rose-700",
         archived:        "bg-indigo-100 text-indigo-700",
     };
+
+    const labelMap = {
+        approved:        "Approved",
+        pending:         "Pending",
+        rejected:        "Rejected",
+        processed:       "Processed",
+        waiting_approval:"Waiting Approval",
+        waiting_coding:  "Waiting Coding",
+        sage_posted:     "Posted to Sage",
+        sage_post_failed: "Sage Post Failed",
+        reworked:        "Reworked",
+        archived:        "Archived",
+    };
+
     const cls = colorMap[value] ?? "bg-gray-100 text-gray-600";
+    const label = labelMap[value] ?? value;
+
     return (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${cls}`}>
-            {value ?? "-"}
+            {label ?? "-"}
         </span>
     );
 };

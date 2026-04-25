@@ -865,6 +865,7 @@ async def get_invoices(
 async def get_invoice_filter_options(
     column: str,
     filters: Optional[str] = Query(None),
+    tab: Optional[str] = Query(None),
     entity: str = Depends(get_current_entity),
     db: Session = Depends(get_db)
 ):
@@ -872,23 +873,42 @@ async def get_invoice_filter_options(
     Returns all unique values for a specific column in the invoices table, 
     filtered by the active entity and optionally by other active filters.
     """
-    # Special handling for virtual 'last_modified_by' column
+    repo_filters = {"entity": entity}
+    expressions = []
+
+    # Apply Tab-based filtering (same logic as get_invoices)
+    if tab == "posted_stage":
+        expressions.append(Invoice.status == InvoiceStatusEnum.SAGE_POSTED)
+    elif tab == "archive":
+        expressions.append(Invoice.status == InvoiceStatusEnum.ARCHIVED)
+    elif tab == "in_progress":
+        expressions.append(and_(
+            Invoice.status != InvoiceStatusEnum.SAGE_POSTED,
+            Invoice.status != InvoiceStatusEnum.ARCHIVED
+        ))
     if column == "last_modified_by":
         # Get unique users from workflow steps
-        step_users = db.query(WorkflowStep.user).filter(
+        query = db.query(WorkflowStep.user).join(Invoice).filter(
             WorkflowStep.user != None,
-            WorkflowStep.invoice_id == Invoice.id,
             Invoice.entity == entity
-        ).join(Invoice).distinct().all()
+        )
+        for expr in expressions:
+            query = query.filter(expr)
+        
+        step_users = query.distinct().all()
         
         options = set()
         for u in step_users:
             if u[0]: options.add(u[0])
             
         # Also add uploader names
-        uploaders = db.query(Invoice.uploaded_by).filter(
+        query_uploaders = db.query(Invoice.uploaded_by).filter(
             Invoice.entity == entity
-        ).distinct().all()
+        )
+        for expr in expressions:
+            query_uploaders = query_uploaders.filter(expr)
+            
+        uploaders = query_uploaders.distinct().all()
         for u in uploaders:
             if u[0]: options.add(u[0])
         
@@ -899,7 +919,6 @@ async def get_invoice_filter_options(
 
     col_attr = getattr(Invoice, column)
     
-    repo_filters = {"entity": entity}
     if filters:
         try:
             extra_filters = json.loads(filters)
@@ -911,6 +930,9 @@ async def get_invoice_filter_options(
     # Query unique non-null values for the column with applied filters
     query = db.query(col_attr)
     query = invoice_repo._apply_filters(query, repo_filters)
+    for expr in expressions:
+        query = query.filter(expr)
+        
     results = query.filter(col_attr != None).distinct().all()
     
     # Flatten result list (SQLAlchemy returns tuples)
