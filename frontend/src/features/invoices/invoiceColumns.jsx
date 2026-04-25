@@ -44,7 +44,7 @@ const actionsCol = (onView, onDelete, onArchive, userRole, openingInvoiceId) => 
     accessor: "actions",
     sortable: false,
     render: (_, row) => {
-        const canDelete = ["scanner", "coder"].includes(userRole?.toLowerCase());
+        const canDelete = ["scanner", "coder"].includes(userRole?.toLowerCase()) && row.status !== 'sage_posted';
         const isOpening = openingInvoiceId != null && String(openingInvoiceId) === String(row?.id);
         const canArchive = row.status === 'sage_posted';
         
