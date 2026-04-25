@@ -1,4 +1,4 @@
-import { EyeOutlined, DeleteOutlined, LoadingOutlined } from "@ant-design/icons";
+import { EyeOutlined, DeleteOutlined, LoadingOutlined, InboxOutlined } from "@ant-design/icons";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
 const StatusBadge = ({ value }) => {
@@ -9,6 +9,8 @@ const StatusBadge = ({ value }) => {
         processed:       "bg-blue-100 text-blue-700",
         waiting_approval:"bg-orange-100 text-orange-700",
         waiting_coding:  "bg-purple-100 text-purple-700",
+        sage_posted:     "bg-emerald-100 text-emerald-700",
+        archived:        "bg-indigo-100 text-indigo-700",
     };
     const cls = colorMap[value] ?? "bg-gray-100 text-gray-600";
     return (
@@ -19,13 +21,14 @@ const StatusBadge = ({ value }) => {
 };
 
 // ─── Actions cell helper ──────────────────────────────────────────────────────
-const actionsCol = (onView, onDelete, userRole, openingInvoiceId) => ({
+const actionsCol = (onView, onDelete, onArchive, userRole, openingInvoiceId) => ({
     header: "Actions",
     accessor: "actions",
     sortable: false,
     render: (_, row) => {
         const canDelete = ["scanner", "coder"].includes(userRole?.toLowerCase());
         const isOpening = openingInvoiceId != null && String(openingInvoiceId) === String(row?.id);
+        const canArchive = row.status === 'sage_posted';
         
         return (
             <div className="flex items-center justify-center gap-3">
@@ -41,13 +44,24 @@ const actionsCol = (onView, onDelete, userRole, openingInvoiceId) => ({
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            console.log("Delete button clicked for row:", row);
                             onDelete(row);
                         }}
                         className="text-red-400 hover:text-red-600 transition-colors cursor-pointer"
                         title="Delete"
                     >
                         <DeleteOutlined style={{ fontSize: 16 }} />
+                    </button>
+                )}
+                {canArchive && onArchive && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onArchive(row);
+                        }}
+                        className="text-emerald-500 hover:text-emerald-700 transition-colors cursor-pointer"
+                        title="Archive"
+                    >
+                        <InboxOutlined style={{ fontSize: 16 }} />
                     </button>
                 )}
             </div>
@@ -61,7 +75,7 @@ export const VIEW_OPTIONS = [
 ];
 
 // ─── Condensed columns ────────────────────────────────────────────────────────
-export const getCondensedColumns = (onView, onDelete, userRole, openingInvoiceId = null) => [
+export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null) => [
     {
         header:         "Vendor Name",
         accessor:       "vendor_name",
@@ -75,14 +89,12 @@ export const getCondensedColumns = (onView, onDelete, userRole, openingInvoiceId
         accessor:       "vendor_id",
         sortable:       true,
         filterable:     true,
-        // vendor_id is a direct field on row — no getFilterValue needed
     },
     {
         header:         "Invoice ID",
         accessor:       "invoice_number",
         sortable:       true,
         filterable:     true,
-        // invoice_number is a direct field on row — no getFilterValue needed
     },
     {
         header:     "Total Amount",
@@ -113,14 +125,12 @@ export const getCondensedColumns = (onView, onDelete, userRole, openingInvoiceId
         accessor:   "uploaded_by",
         sortable:   true,
         filterable: true,
-        // uploaded_by is a direct field on row — no getFilterValue needed
     },
     {
         header:         "Status",
         accessor:       "status",
         sortable:       true,
         filterable:     true,
-        // status is a direct field on row, getFilterValue falls back to row[accessor]
         render:         (val) => <StatusBadge value={val} />,
     },
     {
@@ -136,11 +146,11 @@ export const getCondensedColumns = (onView, onDelete, userRole, openingInvoiceId
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render:     (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
     },
-    actionsCol(onView, onDelete, userRole, openingInvoiceId),
+    actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId),
 ];
 
 // ─── Full columns ─────────────────────────────────────────────────────────────
-export const getFullColumns = (onView, onDelete, userRole, openingInvoiceId = null) => [
+export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null) => [
     {
         header:         "Vendor Name",
         accessor:       "vendor_name",
@@ -210,7 +220,6 @@ export const getFullColumns = (onView, onDelete, userRole, openingInvoiceId = nu
         accessor:   "invoice_number",
         sortable:   true,
         filterable: true,
-        // invoice_number is a direct field — no getFilterValue needed
     },
     {
         header:         "Invoice Date",
@@ -299,8 +308,7 @@ export const getFullColumns = (onView, onDelete, userRole, openingInvoiceId = nu
         header:     "Approval Status",
         accessor:   "status",
         sortable:   true,
-        filterable: true,
-        // status is a direct field on row
+        filterable:     true,
         render:     (val) => <StatusBadge value={val} />,
     },
     {
@@ -314,7 +322,7 @@ export const getFullColumns = (onView, onDelete, userRole, openingInvoiceId = nu
         accessor:       "approval_time",
         filterable:     true,
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
-        render:         (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
+        render:     (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
     },
-    actionsCol(onView, onDelete, userRole, openingInvoiceId),
+    actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId),
 ];

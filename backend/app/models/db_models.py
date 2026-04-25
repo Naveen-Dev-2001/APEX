@@ -26,6 +26,7 @@ class InvoiceStatusEnum(str, enum.Enum):
     REWORKED = "reworked"
     SAGE_POSTED = "sage_posted"
     SAGE_POST_FAILED = "sage_post_failed"
+    ARCHIVED = "archived"
 
 
 class WorkflowStepTypeEnum(str, enum.Enum):

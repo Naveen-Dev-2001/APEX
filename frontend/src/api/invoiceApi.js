@@ -10,7 +10,8 @@ export const getInvoices = (params = {}, options = {}) =>
             sort_by: params.sort_by || "uploaded_at",
             sort_dir: params.sort_dir || "desc",
             // Server-side pagination must stay enabled for large datasets.
-            show_all: params.show_all ?? false
+            show_all: params.show_all ?? false,
+            tab: params.tab || undefined
         },
         signal: options.signal
     }).then(res => res.data);
@@ -135,3 +136,5 @@ export const fetchDeletedInvoices = (params = {}) =>
 export const fetchDeletedInvoiceById = (archiveId) =>
     API.get(`/invoices/deleted/${archiveId}`).then(res => res.data);
 
+export const archiveInvoice = (invoiceId) =>
+    API.post(`/invoices/${invoiceId}/archive`).then(res => res.data);

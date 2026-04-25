@@ -25,6 +25,8 @@ from app.models.db_models import (
     VendorMetadata, RawExtractionData, User, EntityMaster, InvoiceAssignedApprover,
     DeletedInvoice, Delegation
 )
+from app.services.file_manager import init_upload_folders, move_invoice_file, find_file_in_any_folder, get_folder_path
+init_upload_folders()
 from app.routes.approval_new import StepType
 
 from app.repository.repositories import (
@@ -178,7 +180,7 @@ async def upload_invoices(
         get_vendor_id_from_master
     )
     from app.utils.invoice_registry import check_registry_duplicate, register_invoice
-    upload_dir = "uploads"
+    upload_dir = get_folder_path("in_progress")
     os.makedirs(upload_dir, exist_ok=True)
     
     # ⚡️ Concurrency Control: limit to 3 concurrent extractions
@@ -635,6 +637,7 @@ async def get_invoices(
     sort_by: str = "uploaded_at",
     sort_dir: str = "desc",
     show_all: bool = True,
+    tab: Optional[str] = Query(None), # in_progress, posted_stage, archive
     db: Session = Depends(get_db)
 ):
     repo_filters = {"entity": entity}
@@ -666,6 +669,18 @@ async def get_invoices(
         Delegation.end_date >= curr_time
     ).all()
     target_emails = [user_email] + [d[0].lower() for d in active_delegations]
+
+    # Apply Tab-based filtering
+    if tab == "posted_stage":
+        expressions.append(Invoice.status == InvoiceStatusEnum.SAGE_POSTED)
+    elif tab == "archive":
+        expressions.append(Invoice.status == InvoiceStatusEnum.ARCHIVED)
+    elif tab == "in_progress" or not tab:
+        # Default view: Exclude Posted and Archived
+        expressions.append(and_(
+            Invoice.status != InvoiceStatusEnum.SAGE_POSTED,
+            Invoice.status != InvoiceStatusEnum.ARCHIVED
+        ))
 
     # Parse JSON filters if provided
     if filters:
@@ -954,14 +969,14 @@ async def get_invoice_pdf(
             file_path = full_path
 
     if not file_path or not os.path.exists(file_path):
-        # Fallback: try to find it in uploads folder if path looks like just a filename
-        if file_path and "/" not in file_path and "\\" not in file_path:
-             alt_path = os.path.join("uploads", file_path)
-             if os.path.exists(alt_path):
-                 file_path = alt_path
+        # Fallback: try to find it in any subfolder
+        filename = os.path.basename(file_path) if file_path else (invoice.filename)
+        found_path = find_file_in_any_folder(filename)
+        if found_path:
+            file_path = found_path
 
     if not file_path or not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"PDF file not found at {file_path}")
+        raise HTTPException(status_code=404, detail=f"PDF file not found")
 
     return FileResponse(
         path=file_path,
@@ -1506,6 +1521,12 @@ async def update_invoice_status(
                     timestamp=datetime.utcnow(),
                     entity=invoice.entity
                 ))
+                
+                # Move file to posted_stage_files
+                new_path = move_invoice_file(invoice.file_path, "posted_stage")
+                if new_path:
+                    invoice.file_path = new_path
+                    db.commit()
             else:
                 sage_status = "failure"
                 invoice.status = InvoiceStatusEnum.SAGE_POST_FAILED
@@ -2489,6 +2510,13 @@ async def delete_invoice(
         # ------------------------------------------------------------------
         # 4. Delete from invoices table (cascade removes all child rows)
         # ------------------------------------------------------------------
+        # Move file to deleted_files
+        new_path = move_invoice_file(invoice.file_path, "deleted")
+        if new_path:
+            # We update the archived record's file path to reflect the move
+            deleted_record.file_path = new_path
+            db.commit()
+
         db.delete(invoice)
         db.commit()
 
@@ -2502,6 +2530,62 @@ async def delete_invoice(
         db.rollback()
         logger.error(f"[DeleteInvoice] Failed to soft-delete invoice {invoice_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to delete invoice: {str(e)}")
+
+
+@router.post("/{invoice_id}/archive")
+async def archive_invoice(
+    invoice_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Archive an invoice: change status to ARCHIVED and move file to archive_files.
+    """
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if invoice.status != InvoiceStatusEnum.SAGE_POSTED:
+        raise HTTPException(
+            status_code=400, 
+            detail="Only invoices with 'Posted To Stage' status can be archived."
+        )
+
+    try:
+        # Move file to archive_files
+        new_path = move_invoice_file(invoice.file_path, "archive")
+        if new_path:
+            invoice.file_path = new_path
+        
+        invoice.status = InvoiceStatusEnum.ARCHIVED
+        
+        # Add to history
+        history_item = InvoiceStatusHistory(
+            invoice_id=invoice_id,
+            status=InvoiceStatusEnum.ARCHIVED,
+            user=current_user.username,
+            timestamp=datetime.utcnow(),
+            comment="Invoiced archived by user"
+        )
+        db.add(history_item)
+        
+        # [AUDIT] Log Archive
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id, 
+            action=AuditAction.ARCHIVED.value if hasattr(AuditAction, 'ARCHIVED') else "Archived", 
+            user=current_user.username,
+            entity=invoice.entity,
+            details={"action": "archived"}
+        )
+        
+        db.commit()
+        logger.info(f"[ArchiveInvoice] Invoice {invoice_id} archived by {current_user.username}")
+        return {"message": "Invoice archived successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[ArchiveInvoice] Failed to archive invoice {invoice_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to archive invoice: {str(e)}")
 
 
 @router.get("/deleted", summary="List deleted (archived) invoices")
