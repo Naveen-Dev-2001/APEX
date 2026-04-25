@@ -138,16 +138,24 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     // ── Scanner / Coder actions ────────────────────────────────────────────
     const handleSendToCoding = async () => {
-        await handleSave();
-        const payload = await saveInvoice(viewInvoiceId, { status: "waiting_coding" });
-        if (payload?.status === "waiting_coding") {
-            toast.success("Invoice sent for coding successfully!");
-            queryClient.invalidateQueries(["invoices"]);
-            resetQuickView();
-            setInvoiceSection(1);
-            navigate("/invoices");
-        } else {
-            toast.error(payload?.message || "Something went wrong while sending for coding.");
+        setActionLoading("sendToCoding");
+        try {
+            await handleSave();
+            const payload = await saveInvoice(viewInvoiceId, { status: "waiting_coding" });
+            if (payload?.status === "waiting_coding") {
+                toast.success("Invoice sent for coding successfully!");
+                await queryClient.invalidateQueries(["invoices"]);
+                resetQuickView();
+                setInvoiceSection(1);
+                navigate("/invoices");
+            } else {
+                toast.error(payload?.message || "Something went wrong while sending for coding.");
+            }
+        } catch (err) {
+            console.error("Send to coding error:", err);
+            toast.error("Failed to send invoice for coding.");
+        } finally {
+            setActionLoading(null);
         }
     };
 
@@ -171,16 +179,25 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             toast.error("No workflow defined for this invoice. Please configure a vendor or codification workflow.");
             return;
         }
-        await handleSave();
-        const payload = await saveInvoice(viewInvoiceId, { status: "waiting_approval" });
-        if (payload?.status === "waiting_approval") {
-            toast.success("Invoice sent for approval successfully!");
-            queryClient.invalidateQueries(["invoices"]);
-            resetQuickView();
-            setInvoiceSection(1);
-            navigate("/coding");
-        } else {
-            toast.error(payload?.message || "Something went wrong while sending for approval.");
+
+        setActionLoading("sendToApproval");
+        try {
+            await handleSave();
+            const payload = await saveInvoice(viewInvoiceId, { status: "waiting_approval" });
+            if (payload?.status === "waiting_approval") {
+                toast.success("Invoice sent for approval successfully!");
+                await queryClient.invalidateQueries(["invoices"]);
+                resetQuickView();
+                setInvoiceSection(1);
+                navigate("/coding");
+            } else {
+                toast.error(payload?.message || "Something went wrong while sending for approval.");
+            }
+        } catch (err) {
+            console.error("Send to approval error:", err);
+            toast.error("Failed to send invoice for approval.");
+        } finally {
+            setActionLoading(null);
         }
     };
 
@@ -192,12 +209,20 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             extraFields.status = "waiting_approval";
         }
         
-        const response = await handleSave(extraFields);
-        if (response) {
-            toast.success("Invoice Saved Successfully!");
-            if (currentStatus === "reworked") {
-                await fetchUIStatus();
+        setActionLoading("saving");
+        try {
+            const response = await handleSave(extraFields);
+            if (response) {
+                toast.success("Invoice Saved Successfully!");
+                if (currentStatus === "reworked") {
+                    await fetchUIStatus();
+                }
             }
+        } catch (err) {
+            console.error("Save invoice error:", err);
+            toast.error("Failed to save invoice.");
+        } finally {
+            setActionLoading(null);
         }
     };
 
@@ -367,15 +392,20 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                             <CustomButton variant="outline" height="h-[34px]" onClick={handleDiscard}>Discard</CustomButton>
                                         </div>
                                         <div className="w-[130px]">
-                                            <CustomButton variant="primary" height="h-[34px]" onClick={handleSaveInvoice}>
-                                                Save
+                                            <CustomButton 
+                                                variant="primary" 
+                                                height="h-[34px]" 
+                                                disabled={!!actionLoading}
+                                                onClick={handleSaveInvoice}
+                                            >
+                                                {busy("saving") ? "Saving..." : "Save"}
                                             </CustomButton>
                                         </div>
                                         <div className="w-[130px]">
                                             <CustomButton
                                                 variant="success"
                                                 height="h-[34px]"
-                                                disabled={isDuplicate}
+                                                disabled={isDuplicate || !!actionLoading}
                                                 onClick={
                                                     currentStatus === "waiting_coding"
                                                         ? handleSendToApproval
@@ -383,8 +413,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                                 }
                                             >
                                                 {currentStatus === "waiting_coding"
-                                                    ? "Send to Approval"
-                                                    : "Send to Coding"}
+                                                    ? (busy("sendToApproval") ? "Sending..." : "Send to Approval")
+                                                    : (busy("sendToCoding") ? "Sending..." : "Send to Coding")}
                                             </CustomButton>
                                         </div>
                                     </>
@@ -420,8 +450,13 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                             {/* Save — appears once editing is unlocked */}
                                             {editingEnabled &&(currentStatus === "waiting_approval" || currentStatus === "reworked") && (
                                                 <div className="w-[130px]">
-                                                    <CustomButton variant="primary" height="h-[34px]" onClick={handleSaveInvoice}>
-                                                        Save
+                                                    <CustomButton 
+                                                        variant="primary" 
+                                                        height="h-[34px]" 
+                                                        disabled={!!actionLoading}
+                                                        onClick={handleSaveInvoice}
+                                                    >
+                                                        {busy("saving") ? "Saving..." : "Save"}
                                                     </CustomButton>
                                                 </div>
                                             )}
