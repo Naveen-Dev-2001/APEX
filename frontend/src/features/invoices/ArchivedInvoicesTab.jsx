@@ -1,140 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
-import { SearchOutlined, CloseCircleOutlined, EyeOutlined } from "@ant-design/icons";
-import { Skeleton, Tag, Tooltip, Button } from "antd";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { EyeOutlined } from "@ant-design/icons";
+import { Skeleton, Tooltip, Button } from "antd";
 import { fetchDeletedInvoices, fetchDeletedInvoiceById } from "../../api/invoiceApi";
-import CustomInput from "../../shared/components/CustomInput";
 import DataTable from "../../components/ui/DataTable";
+import { getCondensedColumns, getFullColumns } from "./invoiceColumns";
 
-const STATUS_COLORS = {
-    waiting_coding:   { bg: "#FFF8E1", text: "#F59E0B", label: "Waiting Coding" },
-    waiting_approval: { bg: "#E3F2FD", text: "#1976D2", label: "Waiting Approval" },
-    approved:         { bg: "#E8F5E9", text: "#2E7D32", label: "Approved" },
-    rejected:         { bg: "#FFEBEE", text: "#C62828", label: "Rejected" },
-    processed:        { bg: "#EDE7F6", text: "#6A1B9A", label: "Processed" },
-    reworked:         { bg: "#FFF3E0", text: "#E65100", label: "Reworked" },
-    sage_posted:      { bg: "#E0F2F1", text: "#00695C", label: "Sage Posted" },
-    sage_post_failed: { bg: "#FCE4EC", text: "#AD1457", label: "Sage Post Failed" },
-};
-
-const StatusBadge = ({ status }) => {
-    const s = STATUS_COLORS[status] || { bg: "#F5F5F5", text: "#616161", label: status };
-    return (
-        <Tag
-            style={{
-                background: s.bg,
-                color: s.text,
-                border: "none",
-                borderRadius: "999px",
-                fontWeight: 600,
-                fontSize: "11px",
-                padding: "2px 10px",
-            }}
-        >
-            {s.label}
-        </Tag>
-    );
-};
-
-const formatDate = (iso) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) +
-        " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-};
-
-export const ARCHIVE_COLUMNS = [
-    {
-        header: "Invoice #",
-        accessor: "invoice_number",
-        sortable: true,
-        filterable: true,
-        render: (value) => (
-            <span style={{ fontWeight: 600, color: "#1A1A2E" }}>{value || "—"}</span>
-        ),
-    },
-    {
-        header: "Vendor",
-        accessor: "vendor_name",
-        sortable: true,
-        filterable: true,
-        render: (value, row) => (
-            <Tooltip title={row.vendor_id}>
-                <span>{value || "—"}</span>
-            </Tooltip>
-        ),
-    },
-    {
-        header: "Entity",
-        accessor: "entity",
-        sortable: true,
-        filterable: true,
-    },
-    {
-        header: "Status at Deletion",
-        accessor: "status",
-        sortable: true,
-        filterable: true,
-        render: (value) => <StatusBadge status={value} />,
-    },
-    {
-        header: "Uploaded By",
-        accessor: "uploaded_by",
-        sortable: true,
-        filterable: true,
-    },
-    {
-        header: "Uploaded At",
-        accessor: "uploaded_at",
-        sortable: true,
-        render: (value) => (
-            <span style={{ color: "#555", fontSize: "12px" }}>{formatDate(value)}</span>
-        ),
-    },
-    {
-        header: "Deleted By",
-        accessor: "deleted_by",
-        sortable: true,
-        render: (value) => (
-            <span style={{ color: "#C62828", fontWeight: 500 }}>{value || "—"}</span>
-        ),
-    },
-    {
-        header: "Deleted At",
-        accessor: "deleted_at",
-        sortable: true,
-        render: (value) => (
-            <span style={{ color: "#AD1457", fontSize: "12px" }}>{formatDate(value)}</span>
-        ),
-    },
-    {
-        header: "Sage Bill #",
-        accessor: "sage_bill_number",
-        sortable: true,
-        render: (value) => (
-            <span style={{ color: "#00695C" }}>{value || "—"}</span>
-        ),
-    },
-    {
-        header: "Action",
-        accessor: "actions",
-        width: 100,
-        render: (value, row, index, onView) => (
-            <div style={{ display: "flex", justifyContent: "center" }}>
-                <Tooltip title="View Snapshot">
-                    <Button
-                        type="text"
-                        icon={<EyeOutlined style={{ color: "#4F46E5", fontSize: "16px" }} />}
-                        onClick={() => onView(row)}
-                    />
-                </Tooltip>
-            </div>
-        ),
-    },
-];
-
-const PAGE_SIZE = 50;
-
-const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch }) => {
+const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch, userRole, view = "condensed" }) => {
     const [records, setRecords]       = useState([]);
     const [total, setTotal]           = useState(0);
     const [isLoading, setIsLoading]   = useState(false);
@@ -207,6 +78,12 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch }) => {
         }
     };
 
+    const columnDefs = useMemo(() => {
+        return view === "condensed"
+            ? getCondensedColumns(handleView, null, null, userRole, null, true)
+            : getFullColumns(handleView, null, null, userRole, null, true);
+    }, [view, handleView, userRole]);
+
     return (
         <div style={{ padding: "0 16px 24px" }}>
 
@@ -229,11 +106,7 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch }) => {
 
             {/* ── Table ── */}
             <DataTable
-                columns={ARCHIVE_COLUMNS.map(col => 
-                    col.accessor === "actions" 
-                    ? { ...col, render: (v, r, i) => col.render(v, r, i, handleView) } 
-                    : col
-                )}
+                columns={columnDefs}
                 data={records}
                 loading={isLoading}
                 totalItems={total}
@@ -249,6 +122,7 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch }) => {
                 onSort={handleSort}
                 maxHeight="calc(100vh - 250px)"
                 stickyHeader={true}
+                enableColumnFilters={true}
             />
         </div>
     );

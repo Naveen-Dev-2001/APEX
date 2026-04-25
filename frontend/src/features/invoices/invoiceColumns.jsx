@@ -39,12 +39,12 @@ const StatusBadge = ({ value }) => {
 };
 
 // ─── Actions cell helper ──────────────────────────────────────────────────────
-const actionsCol = (onView, onDelete, onArchive, userRole, openingInvoiceId) => ({
+const actionsCol = (onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete = false) => ({
     header: "Actions",
     accessor: "actions",
     sortable: false,
     render: (_, row) => {
-        const canDelete = ["scanner", "coder"].includes(userRole?.toLowerCase()) && row.status !== 'sage_posted';
+        const canDelete = ["scanner", "coder"].includes(userRole?.toLowerCase()) && row.status !== 'sage_posted' && !hideDelete;
         const isOpening = openingInvoiceId != null && String(openingInvoiceId) === String(row?.id);
         const canArchive = row.status === 'sage_posted';
         
@@ -93,7 +93,7 @@ export const VIEW_OPTIONS = [
 ];
 
 // ─── Condensed columns ────────────────────────────────────────────────────────
-export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null) => [
+export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null, hideDelete = false) => [
     {
         header:         "Vendor Name",
         accessor:       "vendor_name",
@@ -164,11 +164,11 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render:     (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
     },
-    actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId),
+    actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete),
 ];
 
 // ─── Full columns ─────────────────────────────────────────────────────────────
-export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null) => [
+export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null, hideDelete = false) => [
     {
         header:         "Vendor Name",
         accessor:       "vendor_name",
@@ -342,5 +342,5 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render:     (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
     },
-    actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId),
+    actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete),
 ];

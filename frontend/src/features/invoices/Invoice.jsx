@@ -18,7 +18,7 @@ import ViewInvoicePage from "./ViewInvoicePage";
 import { useVendorDetailSync } from "../hooks/useInvoiceDetailSync";
 import ExportButton from "../../shared/components/ExportButton";
 import { useAuthStore } from "../../store/authStore";
-import ArchivedInvoicesTab, { ARCHIVE_COLUMNS } from "./ArchivedInvoicesTab";
+import ArchivedInvoicesTab from "./ArchivedInvoicesTab";
 import { useLocation, useNavigate } from "react-router-dom";
 import AlertModal from "../../shared/components/AlertModal";
 
@@ -182,8 +182,8 @@ const Invoice = () => {
 
     const columnDefs = useMemo(() => {
         const cols = view === "condensed"
-            ? getCondensedColumns(handleView, handleDelete, handleArchive, userRole, openingInvoiceId)
-            : getFullColumns(handleView, handleDelete, handleArchive, userRole, openingInvoiceId);
+            ? getCondensedColumns(handleView, handleDelete, handleArchive, userRole, openingInvoiceId, pageTab === "delete")
+            : getFullColumns(handleView, handleDelete, handleArchive, userRole, openingInvoiceId, pageTab === "delete");
 
         return cols.map(col => ({
             ...col,
@@ -270,13 +270,11 @@ const Invoice = () => {
                             <div style={{ width: 280 }}>
                                 <CustomInput placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."} value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} icon={<SearchOutlined />} rightIcon={localSearch && <CloseCircleOutlined />} onRightIconClick={() => setLocalSearch("")} className="mb-0" />
                             </div>
-                            {pageTab !== 'delete' && (
-                                <div style={{ width: 200 }}>
-                                    <Dropdown options={VIEW_OPTIONS} placeholder="Select View" value={view} onChange={(val) => setView(val)} />
-                                </div>
-                            )}
+                            <div style={{ width: 200 }}>
+                                <Dropdown options={VIEW_OPTIONS} placeholder="Select View" value={view} onChange={(val) => setView(val)} />
+                            </div>
                             <div style={{ minWidth: 120 }}>
-                                <ExportButton data={pageTab === 'delete' ? archivedRecords : invoices} columns={pageTab === 'delete' ? ARCHIVE_COLUMNS : columnDefs} fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`} />
+                                <ExportButton data={pageTab === 'delete' ? archivedRecords : invoices} columns={columnDefs} fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`} />
                             </div>
                             {userRole === 'scanner' && pageTab === 'in_progress' && (
                                 <div style={{ minWidth: 160 }}>
@@ -293,7 +291,7 @@ const Invoice = () => {
                             )}
                         </div>
                     ) : (
-                        <ArchivedInvoicesTab key={entityMaster?.entity_id} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} />
+                        <ArchivedInvoicesTab key={entityMaster?.entity_id} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} userRole={userRole} view={view} />
                     )}
 
                     {(invoiceSection === 1 || isModalOpen) && pageTab === "in_progress" && (

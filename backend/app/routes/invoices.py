@@ -2681,6 +2681,36 @@ async def list_deleted_invoices(
     records = query.offset(skip).limit(limit).all()
 
     def _serialize(r: DeletedInvoice):
+        # Parse JSON fields safely
+        try:
+            extracted_data = json.loads(r.extracted_data) if r.extracted_data else {}
+        except:
+            extracted_data = {}
+
+        # Calculate last_modified_by from workflow_steps_json snapshot
+        last_modified_by = r.uploaded_by
+        try:
+            if r.workflow_steps_json:
+                steps = json.loads(r.workflow_steps_json)
+                if isinstance(steps, list) and steps:
+                    # Sort by timestamp desc to find the most recent non-pending action
+                    # Steps in JSON usually have ISO format timestamps
+                    sorted_steps = sorted(steps, key=lambda x: x.get("timestamp", ""), reverse=True)
+                    for step in sorted_steps:
+                        if step.get("status") in ["completed", "approved", "rejected", "reworked"]:
+                            last_modified_by = step.get("user")
+                            break
+        except Exception as e:
+            print(f"Error parsing workflow steps for deleted invoice {r.id}: {e}")
+
+        # Resolve email to username for last_modified_by if possible
+        if last_modified_by and "@" in last_modified_by:
+            user_obj = db.query(User).filter(User.email == last_modified_by).first()
+            if user_obj:
+                last_modified_by = user_obj.username or last_modified_by.split("@")[0]
+            else:
+                last_modified_by = last_modified_by.split("@")[0]
+
         return {
             "id": r.id,
             "original_invoice_id": r.original_invoice_id,
@@ -2695,6 +2725,15 @@ async def list_deleted_invoices(
             "deleted_by": r.deleted_by,
             "deleted_at": r.deleted_at.isoformat() if r.deleted_at else None,
             "sage_bill_number": r.sage_bill_number,
+            "extracted_data": extracted_data,
+            "total_amount": float(r.total_amount) if r.total_amount else None,
+            "amount_due": float(r.amount_due) if r.amount_due else None,
+            "invoice_date": r.invoice_date.isoformat() if r.invoice_date else None,
+            "due_date": r.due_date.isoformat() if r.due_date else None,
+            "confidence_score": r.confidence_score,
+            "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+            "last_modified_by": last_modified_by,
+            "action_time": r.processed_at.isoformat() if r.processed_at else None,
         }
 
     return {
