@@ -37,7 +37,7 @@ const Invoice = () => {
         invoiceSection, skip, limit, view, setView, setInvoiceSection,
         setIsModalOpen, isModalOpen, setFileName, setViewInvoiceId,
         selectedVendorId, setEntityMaster, setSearchQuery, searchQuery,
-        sortColumn, sortDirection, setSort, setSkip, setLimit
+        sortColumn, sortDirection, setSort, setSkip, setLimit, entityMaster
     } = useInvoiceStore();
 
     const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -293,7 +293,7 @@ const Invoice = () => {
                             )}
                         </div>
                     ) : (
-                        <ArchivedInvoicesTab onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} />
+                        <ArchivedInvoicesTab key={entityMaster?.entity_id} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} />
                     )}
 
                     {(invoiceSection === 1 || isModalOpen) && pageTab === "in_progress" && (

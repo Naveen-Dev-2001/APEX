@@ -2612,7 +2612,7 @@ async def archive_invoice(
 
 @router.get("/deleted", summary="List deleted (archived) invoices")
 async def list_deleted_invoices(
-    entity: Optional[str] = Query(None, description="Filter by entity"),
+    entity: str = Depends(get_current_entity),
     vendor_id: Optional[str] = Query(None, description="Filter by vendor ID"),
     invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
     skip: int = Query(0, ge=0),
