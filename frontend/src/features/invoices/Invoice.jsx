@@ -268,6 +268,15 @@ const Invoice = () => {
                             })}
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
+                            <div style={{ width: 280 }}>
+                                <CustomInput placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."} value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} icon={<SearchOutlined />} rightIcon={localSearch && <CloseCircleOutlined />} onRightIconClick={() => setLocalSearch("")} className="mb-0" />
+                            </div>
+                            <div style={{ width: 200 }}>
+                                <Dropdown options={VIEW_OPTIONS} placeholder="Select View" value={view} onChange={(val) => setView(val)} />
+                            </div>
+                            <div style={{ minWidth: 120 }}>
+                                <ExportButton data={pageTab === 'delete' ? archivedRecords : invoices} columns={columnDefs} fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`} />
+                            </div>
                             <div style={{ minWidth: 120 }}>
                                 <CustomButton 
                                     variant="outline" 
@@ -282,15 +291,6 @@ const Invoice = () => {
                                 >
                                     <ReloadOutlined /> Refresh
                                 </CustomButton>
-                            </div>
-                            <div style={{ width: 280 }}>
-                                <CustomInput placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."} value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} icon={<SearchOutlined />} rightIcon={localSearch && <CloseCircleOutlined />} onRightIconClick={() => setLocalSearch("")} className="mb-0" />
-                            </div>
-                            <div style={{ width: 200 }}>
-                                <Dropdown options={VIEW_OPTIONS} placeholder="Select View" value={view} onChange={(val) => setView(val)} />
-                            </div>
-                            <div style={{ minWidth: 120 }}>
-                                <ExportButton data={pageTab === 'delete' ? archivedRecords : invoices} columns={columnDefs} fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`} />
                             </div>
                             {userRole === 'scanner' && pageTab === 'in_progress' && (
                                 <div style={{ minWidth: 160 }}>

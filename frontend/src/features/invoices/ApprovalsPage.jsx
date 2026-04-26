@@ -10,6 +10,7 @@ import { getApprovers } from '../../api/workflowConfigApi';
 import { useAuthStore } from '../../store/authStore';
 import toast from '../../utils/toast';
 import ExportButton from '../../shared/components/ExportButton';
+import CustomButton from '../../shared/components/CustomButton';
 
 const { confirm } = Modal;
 
@@ -286,15 +287,15 @@ const ApprovalsPage = () => {
             <div className="flex items-center justify-between mb-4">
                 <h1 className="text-3xl font-bold custom-font-jura">Approvals</h1>
                 <div className="flex items-center gap-3">
-                    <div className="w-[120px]">
-                        <Button 
-                            icon={<ReloadOutlined />} 
+                    <div className="w-[150px]">
+                        <CustomButton 
+                            variant="outline"
                             onClick={fetchData}
                             loading={loading}
-                            className="h-[42px] flex items-center justify-center"
+                            className="!h-[42px] border-[#D9D9D9] !text-[#595959]"
                         >
-                            Refresh
-                        </Button>
+                            <ReloadOutlined /> Refresh
+                        </CustomButton>
                     </div>
                     <div className="w-[150px]">
                         <ExportButton 

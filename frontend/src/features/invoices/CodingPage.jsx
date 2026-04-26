@@ -6,6 +6,7 @@ import DataTable from '../../components/ui/DataTable';
 import { getInvoices, getInvoiceFilterOptions } from '../../api/invoiceApi';
 import toast from '../../utils/toast';
 import ExportButton from '../../shared/components/ExportButton';
+import CustomButton from '../../shared/components/CustomButton';
 
 const ACCESSOR_TO_DB_FIELD = {
     vendor_name: "vendor_name",
@@ -268,17 +269,17 @@ const CodingPage = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="w-[120px]">
-                        <Button 
-                            icon={<ReloadOutlined />} 
+                    <div className="w-[150px]">
+                        <CustomButton 
+                            variant="outline"
                             onClick={fetchInvoices}
                             loading={loading}
-                            className="h-[42px] flex items-center justify-center"
+                            className="!h-[42px] border-[#D9D9D9] !text-[#595959]"
                         >
-                            Refresh
-                        </Button>
+                            <ReloadOutlined /> Refresh
+                        </CustomButton>
                     </div>
-                    <div className="w-[120px]">
+                    <div className="w-[150px]">
                         <ExportButton
                             data={invoices}
                             columns={columns}
