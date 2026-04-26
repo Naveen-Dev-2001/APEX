@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CustomInput from "../../shared/components/CustomInput";
-import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
 import DataTable from "../../components/ui/DataTable";
@@ -45,6 +45,7 @@ const Invoice = () => {
     const [pageTab, setPageTab] = useState("in_progress"); // in_progress | delete | posted_stage | archive
     const [archivedRecords, setArchivedRecords] = useState([]);
     const [openingInvoiceId, setOpeningInvoiceId] = useState(null);
+    const [refreshKey, setRefreshKey] = useState(0);
     const openPreviewTimerRef = useRef(null);
 
     const location = useLocation();
@@ -267,6 +268,21 @@ const Invoice = () => {
                             })}
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
+                            <div style={{ minWidth: 120 }}>
+                                <CustomButton 
+                                    variant="outline" 
+                                    onClick={() => {
+                                        if (pageTab === 'delete') {
+                                            setRefreshKey(prev => prev + 1);
+                                        } else {
+                                            refetch();
+                                        }
+                                    }}
+                                    className="!h-[42px] border-[#D9D9D9] !text-[#595959]"
+                                >
+                                    <ReloadOutlined /> Refresh
+                                </CustomButton>
+                            </div>
                             <div style={{ width: 280 }}>
                                 <CustomInput placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."} value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} icon={<SearchOutlined />} rightIcon={localSearch && <CloseCircleOutlined />} onRightIconClick={() => setLocalSearch("")} className="mb-0" />
                             </div>
@@ -291,7 +307,7 @@ const Invoice = () => {
                             )}
                         </div>
                     ) : (
-                        <ArchivedInvoicesTab key={entityMaster?.entity_id} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} userRole={userRole} view={view} />
+                        <ArchivedInvoicesTab key={`${entityMaster?.entity_id}-${refreshKey}`} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} userRole={userRole} view={view} />
                     )}
 
                     {(invoiceSection === 1 || isModalOpen) && pageTab === "in_progress" && (

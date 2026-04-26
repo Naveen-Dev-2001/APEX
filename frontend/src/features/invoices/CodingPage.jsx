@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EyeOutlined } from '@ant-design/icons';
+import { EyeOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
 import DataTable from '../../components/ui/DataTable';
 import { getInvoices, getInvoiceFilterOptions } from '../../api/invoiceApi';
 import toast from '../../utils/toast';
@@ -267,6 +268,16 @@ const CodingPage = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <div className="w-[120px]">
+                        <Button 
+                            icon={<ReloadOutlined />} 
+                            onClick={fetchInvoices}
+                            loading={loading}
+                            className="h-[42px] flex items-center justify-center"
+                        >
+                            Refresh
+                        </Button>
+                    </div>
                     <div className="w-[120px]">
                         <ExportButton
                             data={invoices}

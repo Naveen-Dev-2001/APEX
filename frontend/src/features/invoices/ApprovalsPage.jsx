@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, Tag, Space, Button, Modal } from 'antd';
-import { EyeOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { EyeOutlined, DeleteOutlined, ExclamationCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import DataTable from '../../components/ui/DataTable';
 import DelegationManager from './components/DelegationManager';
 import { getUnapprovedInvoices, updateApprovalStatus } from '../../api/approvalApi';
@@ -285,12 +285,24 @@ const ApprovalsPage = () => {
         <div className="p-6 bg-[#f8fafc] min-h-screen pt-[10px]">
             <div className="flex items-center justify-between mb-4">
                 <h1 className="text-3xl font-bold custom-font-jura">Approvals</h1>
-                <div className="w-[150px]">
-                    <ExportButton 
-                        data={invoices} 
-                        columns={columnDefs} 
-                        fileName="Approvals.xlsx" 
-                    />
+                <div className="flex items-center gap-3">
+                    <div className="w-[120px]">
+                        <Button 
+                            icon={<ReloadOutlined />} 
+                            onClick={fetchData}
+                            loading={loading}
+                            className="h-[42px] flex items-center justify-center"
+                        >
+                            Refresh
+                        </Button>
+                    </div>
+                    <div className="w-[150px]">
+                        <ExportButton 
+                            data={invoices} 
+                            columns={columnDefs} 
+                            fileName="Approvals.xlsx" 
+                        />
+                    </div>
                 </div>
             </div>
             <div className="bg-white rounded-xl shadow-sm p-2">
