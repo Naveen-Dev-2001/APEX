@@ -35,7 +35,7 @@ def deserialize_json_field(json_str: Optional[str]) -> Any:
         return json_str
 
 
-def invoice_to_dict(invoice: Invoice, include_relationships: bool = True) -> Dict[str, Any]:
+def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minimal: bool = False) -> Dict[str, Any]:
     """
     Convert SQLAlchemy Invoice model to dictionary (MongoDB-like format).
     This provides backward compatibility with existing frontend code.
@@ -64,17 +64,31 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True) -> Dic
         "due_date": invoice.due_date,
         "required_approvers": invoice.required_approvers,
         "current_approver_level": invoice.current_approver_level,
-        
-        # Deserialize JSON fields
-        "extracted_data": deserialize_json_field(invoice.extracted_data),
-        "vendor_details": deserialize_json_field(invoice.vendor_details),
-        "processing_steps": deserialize_json_field(invoice.processing_steps),
-        "validation_results": deserialize_json_field(invoice.validation_results),
-        "duplicate_info": deserialize_json_field(invoice.duplicate_info),
-        "original_items": deserialize_json_field(invoice.original_items),
-        "approver_breakdown": deserialize_json_field(invoice.approver_breakdown),
-        "gl_summary": deserialize_json_field(invoice.gl_summary),
     }
+    
+    # Conditionally include JSON fields (avoid heavy parsing in list views)
+    json_fields = {
+        "extracted_data": invoice.extracted_data,
+        "vendor_details": invoice.vendor_details,
+        "processing_steps": invoice.processing_steps,
+        "validation_results": invoice.validation_results,
+        "duplicate_info": invoice.duplicate_info,
+        "original_items": invoice.original_items,
+        "approver_breakdown": invoice.approver_breakdown,
+        "gl_summary": invoice.gl_summary,
+    }
+
+    for field, value in json_fields.items():
+        if minimal:
+            # In minimal mode, only include basic info if it's already a dict or just skip
+            # For backward compatibility, we might need some fields even in minimal mode
+            if field in ["extracted_data"]:
+                 result[field] = deserialize_json_field(value)
+            else:
+                 result[field] = None
+        else:
+            result[field] = deserialize_json_field(value)
+
     
     # ─── Calculate Last Modified By (from workflow_steps) ───
     last_modified_by = "-"
@@ -94,21 +108,25 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True) -> Dic
         
     # 3. Format the display name (resolve email to username if possible)
     if last_modified_by and "@" in last_modified_by:
-        db = object_session(invoice)
-        if db:
-            user_obj = db.query(User).filter(User.email == last_modified_by).first()
-            if user_obj:
-                last_modified_by = user_obj.username or user_obj.full_name or last_modified_by.split("@")[0]
+        # If we are in minimal mode, just use the prefix to avoid N+1 queries
+        if minimal:
+             last_modified_by = last_modified_by.split("@")[0]
+        else:
+            db = object_session(invoice)
+            if db:
+                user_obj = db.query(User).filter(User.email == last_modified_by).first()
+                if user_obj:
+                    last_modified_by = user_obj.username or user_obj.full_name or last_modified_by.split("@")[0]
+                else:
+                    last_modified_by = last_modified_by.split("@")[0]
             else:
                 last_modified_by = last_modified_by.split("@")[0]
-        else:
-            last_modified_by = last_modified_by.split("@")[0]
             
     result["last_modified_by"] = last_modified_by
     result["approver"] = last_modified_by 
     
-    if include_relationships:
-        # Status history
+    if include_relationships and not minimal:
+        # Status history (Heavy relationship, skip in minimal/list mode)
         if invoice.status_history:
             result["status_history"] = [
                 {
@@ -128,6 +146,10 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True) -> Dic
             result["approved_by"] = [a.approver_email for a in invoice.approved_by_list]
         else:
             result["approved_by"] = []
+    elif include_relationships and minimal:
+        # In minimal mode, we still provide empty lists for compatibility
+        result["status_history"] = []
+        result["approved_by"] = []
         
         # Assigned approvers (Grouped by sequence_order/level)
         if invoice.assigned_approvers_list:

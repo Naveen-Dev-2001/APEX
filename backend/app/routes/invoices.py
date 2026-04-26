@@ -643,6 +643,7 @@ async def get_invoices(
     repo_filters = {"entity": entity}
     
     from sqlalchemy import or_, and_, exists, func
+    from sqlalchemy.orm import joinedload
     user_email = current_user.email.lower()
     user_dept = (current_user.department or "").lower()
     user_roles = [r.strip().lower() for r in (current_user.role or "user").split(",")]
@@ -846,12 +847,15 @@ async def get_invoices(
         search=search,
         search_fields=search_fields,
         order_by=sort_by,
-        descending=(sort_dir.lower() == 'desc'),
-        expressions=expressions
+        expressions=expressions,
+        options=[
+            joinedload(Invoice.workflow_steps),
+            joinedload(Invoice.assigned_approvers_list)
+        ]
     )
     
-    # Convert models to dicts
-    data = [invoice_to_dict(inv) for inv in paginated_res["data"]]
+    # Convert models to dicts (Minimal mode for list performance)
+    data = [invoice_to_dict(inv, minimal=True) for inv in paginated_res["data"]]
     
     return {
         "data": data,

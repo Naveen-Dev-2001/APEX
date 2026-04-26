@@ -68,13 +68,18 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         search: str = None,
         search_fields: List[str] = None,
         order_by: str = None,
-        descending: bool = False
+        descending: bool = False,
+        options: List[Any] = None
     ) -> Dict[str, Any]:
         """
         Generic paginated query with search and filtering.
         """
 
         query = self._apply_filters(db.query(self.model), filters)
+        
+        if options:
+            for opt in options:
+                query = query.options(opt)
 
         # Complex expressions
         if expressions:

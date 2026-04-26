@@ -61,7 +61,7 @@ class User(Base):
     # pending, active, rejected
     status = Column(String(50), nullable=False, default="pending")
     department = Column(String(100), nullable=False,
-                        default="non-finance")  # finance, non-finance
+                        default="non-finance", index=True)  # finance, non-finance
     isCreatedByUser = Column(Boolean, nullable=False, default=True)
     createdby = Column(String(100), nullable=False, default="self")
     ispasswordchange = Column(Boolean, nullable=False, default=True)
@@ -102,9 +102,9 @@ class Invoice(Base):
     original_filename = Column(String(500), nullable=False)
     file_path = Column(String(1000), nullable=False)
     # Username for backward compatibility
-    uploaded_by = Column(String(100), nullable=False)
+    uploaded_by = Column(String(100), nullable=False, index=True)
     uploaded_by_id = Column(Integer, ForeignKey(
-        "users.id"), nullable=True)  # FK to users
+        "users.id"), nullable=True, index=True)  # FK to users
     status = Column(SQLEnum(InvoiceStatusEnum), nullable=False,
                     default=InvoiceStatusEnum.WAITING_APPROVAL, index=True)
     entity = Column(String(100), ForeignKey(
@@ -136,7 +136,7 @@ class Invoice(Base):
     approver_breakdown = Column(Text, nullable=True)  # JSON
     gl_summary = Column(Text, nullable=True)  # JSON (array)
     # Bill number returned by Sage Intacct
-    sage_bill_number = Column(String(200), nullable=True)
+    sage_bill_number = Column(String(200), nullable=True, index=True)
 
     # Metadata
     confidence_score = Column(String(50), nullable=True)
@@ -146,7 +146,7 @@ class Invoice(Base):
 
     # Approval tracking
     required_approvers = Column(Integer, nullable=True)
-    current_approver_level = Column(Integer, nullable=True, default=1)
+    current_approver_level = Column(Integer, nullable=True, default=1, index=True)
 
     # Relationships
     uploader = relationship(
@@ -224,10 +224,10 @@ class InvoiceAssignedApprover(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     invoice_id = Column(Integer, ForeignKey(
         "invoices.id", ondelete="CASCADE"), nullable=False, index=True)
-    approver_email = Column(String(255), nullable=False)
+    approver_email = Column(String(255), nullable=False, index=True)
     sequence_order = Column(Integer, nullable=False,
                             default=0)  # For maintaining order
-    is_finance = Column(Boolean, nullable=False, default=False)
+    is_finance = Column(Boolean, nullable=False, default=False, index=True)
 
     # Relationships
     invoice = relationship("Invoice", back_populates="assigned_approvers_list")
@@ -294,9 +294,9 @@ class WorkflowStep(Base):
     step_name = Column(String(200), nullable=False)
     # Changed to String for flexibility with approver_N
     step_type = Column(String(100), nullable=False)
-    user = Column(String(100), nullable=False)
+    user = Column(String(100), nullable=False, index=True)
     status = Column(String(100), nullable=False)
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     approver_number = Column(Integer, nullable=True, index=True)
     comment = Column(Text, nullable=True)
     entity = Column(String(100), ForeignKey(
@@ -318,7 +318,7 @@ class Currency(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     code = Column(String(10), unique=True, nullable=False, index=True)
-    name = Column(String(100), nullable=False)
+    name = Column(String(100), nullable=False, index=True)
     symbol = Column(String(10), nullable=True)
     exchange_rate = Column(Float, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -335,10 +335,10 @@ class Delegation(Base):
         "entity_master.entity_id", onupdate="CASCADE"), nullable=False, index=True)
     # Copied from original_approver usually
     delegator_email = Column(String(200), nullable=False, index=True)
-    substitute_email = Column(String(200), nullable=False)
+    substitute_email = Column(String(200), nullable=False, index=True)
     is_active = Column(Boolean, nullable=False, default=True)
     original_approver = Column(String(200), nullable=False, index=True)
-    substitute_approver = Column(String(200), nullable=False)
+    substitute_approver = Column(String(200), nullable=False, index=True)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -412,7 +412,7 @@ class EntityMaster(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     entity_id = Column(String(100), unique=True, nullable=False, index=True)
-    entity_name = Column(String(200), nullable=False)
+    entity_name = Column(String(200), nullable=False, index=True)
     registered_address = Column(Text, nullable=True)
     address_line1 = Column(String(255), nullable=True)
     address_line2 = Column(String(255), nullable=True)
@@ -498,7 +498,7 @@ class GLMaster(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     account_number = Column(String(100), unique=True,
                             nullable=False, index=True)
-    title = Column(String(200), nullable=False)
+    title = Column(String(200), nullable=False, index=True)
     normal_balance = Column(String(20), nullable=True)  # Debit/Credit
     require_department = Column(Boolean, default=False)
     require_location = Column(Boolean, default=False)
@@ -527,7 +527,7 @@ class LOBMaster(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     lob_id = Column(String(100), unique=True, nullable=False, index=True)
-    name = Column(String(200), nullable=False)
+    name = Column(String(200), nullable=False, index=True)
     parent_id = Column(String(50), nullable=True)
 
     # Sage Intacct Sync Fields
@@ -549,7 +549,7 @@ class DepartmentMaster(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     department_id = Column(String(100), unique=True,
                            nullable=False, index=True)
-    department_name = Column(String(200), nullable=False)
+    department_name = Column(String(200), nullable=False, index=True)
 
     # Sage Intacct Sync Fields
     dept_key = Column(String(100), index=True, nullable=True)
@@ -569,7 +569,7 @@ class CustomerMaster(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     customer_id = Column(String(100), unique=True, nullable=False, index=True)
-    customer_name = Column(String(200), nullable=False)
+    customer_name = Column(String(200), nullable=False, index=True)
 
     # Sage Intacct Sync Fields
     customer_key = Column(String(100), index=True, nullable=True)
@@ -589,7 +589,7 @@ class ItemMaster(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     item_id = Column(String(100), unique=True, nullable=False, index=True)
-    name = Column(String(200), nullable=False)
+    name = Column(String(200), nullable=False, index=True)
     product_line_id = Column(String(50), nullable=True)
     gl_group = Column(String(50), nullable=True)
 
