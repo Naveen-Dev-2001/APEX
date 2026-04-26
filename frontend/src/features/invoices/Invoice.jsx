@@ -110,6 +110,7 @@ const Invoice = () => {
     const [uploadProgress, setUploadProgress] = useState(0);
     
     const [deleteModalState, setDeleteModalState] = useState({ isOpen: false, data: null, loading: false });
+    const [archiveModalState, setArchiveModalState] = useState({ isOpen: false, data: null, loading: false });
 
     useEffect(() => {
         fetchEntityMaster().then((res) => {
@@ -176,17 +177,25 @@ const Invoice = () => {
         }
     };
 
-    const handleArchive = useCallback(async (data) => {
+    const handleArchive = useCallback((data) => {
+        setArchiveModalState({ isOpen: true, data, loading: false });
+    }, []);
+
+    const confirmArchive = async () => {
+        const { data } = archiveModalState;
         if (!data?.id) return;
+        setArchiveModalState(prev => ({ ...prev, loading: true }));
         try {
             await archiveInvoice(data.id);
             toast.success("Invoice archived successfully");
             refetch();
+            setArchiveModalState({ isOpen: false, data: null, loading: false });
         } catch (err) {
             console.error("Archive invoice error:", err);
             toast.error(err?.response?.data?.detail || "Failed to archive invoice");
+            setArchiveModalState(prev => ({ ...prev, loading: false }));
         }
-    }, [refetch]);
+    };
 
     const handleBulkDelete = async () => {
         if (selectedInvoiceIds.length === 0) return;
@@ -499,6 +508,7 @@ const Invoice = () => {
             )}
             {invoiceSection === 2 && <ViewInvoicePage />}
             <AlertModal isOpen={deleteModalState.isOpen} onClose={() => setDeleteModalState({ isOpen: false, data: null, loading: false })} onConfirm={confirmDelete} title="Delete Invoice?" message="Are you sure you want to delete this invoice?" confirmText="Delete Permanently" cancelText="Discard" type="danger" loading={deleteModalState.loading} confirmBtnVariant="primary" />
+            <AlertModal isOpen={archiveModalState.isOpen} onClose={() => setArchiveModalState({ isOpen: false, data: null, loading: false })} onConfirm={confirmArchive} title="Archive Invoice?" message="Are you sure you want to archive this invoice?" confirmText="Archive" cancelText="Cancel" type="info" loading={archiveModalState.loading} confirmBtnVariant="primary" />
         </>
     );
 };
