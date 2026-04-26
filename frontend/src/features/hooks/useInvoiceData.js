@@ -19,7 +19,12 @@ export const useInvoiceData = ({ skip = 0, limit = 10, search = "", filters = {}
 
             return res;
         },
-        placeholderData: (previousData) => previousData,
+        placeholderData: (previousData, previousQuery) => {
+            // Only preserve data if we are staying on the same tab
+            const prevTab = previousQuery?.queryKey?.[7]; // tab is at index 7 in queryKey
+            if (prevTab !== tab) return undefined;
+            return previousData;
+        },
         staleTime: 30 * 1000,
         gcTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,

@@ -881,7 +881,7 @@ async def get_invoice_filter_options(
         expressions.append(Invoice.status == InvoiceStatusEnum.SAGE_POSTED)
     elif tab == "archive":
         expressions.append(Invoice.status == InvoiceStatusEnum.ARCHIVED)
-    elif tab == "in_progress":
+    elif tab == "in_progress" or not tab:
         expressions.append(and_(
             Invoice.status != InvoiceStatusEnum.SAGE_POSTED,
             Invoice.status != InvoiceStatusEnum.ARCHIVED

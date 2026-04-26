@@ -83,7 +83,7 @@ const Invoice = () => {
         filters: backendFilters,
         sort_by: sortColumn,
         sort_dir: sortDirection,
-        tab: pageTab === "delete" ? undefined : pageTab
+        tab: (pageTab === "delete" || pageTab === "in_progress") ? undefined : pageTab
     });
 
     useEffect(() => {
@@ -113,7 +113,7 @@ const Invoice = () => {
     }, []);
 
     useEffect(() => {
-        if (invoiceSection === 1) refetch();
+        // Redundant refetch removed as useInvoiceData already watches pageTab
     }, [invoiceSection, pageTab]);
 
     const handleView = useCallback((data) => {
