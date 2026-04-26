@@ -408,6 +408,9 @@ const DataTable = ({
   expandable = true,
   renderExpandedRow,
   isClientSide = false,
+  selectable = false,
+  selectedRows = [],
+  onSelectionChange,
 }) => {
     // ── Row Expansion state ──────────────────────────────────────────────────
     const [expandedRow, setExpandedRow] = useState(null);
@@ -614,6 +617,28 @@ const DataTable = ({
                 <table className="w-full text-left text-[13px] text-gray-700 border-separate border-spacing-0">
                     <thead className={`${stickyHeader ? 'sticky top-0 z-20' : ''} bg-[#1D71AB] text-white`}>
                         <tr>
+                            {selectable && (
+                                <th className="px-4 py-3 w-10">
+                                    <div className="flex items-center justify-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={displayData.length > 0 && displayData.every(row => selectedRows.includes(row.id))}
+                                            onChange={(e) => {
+                                                if (onSelectionChange) {
+                                                    if (e.target.checked) {
+                                                        const newIds = displayData.map(row => row.id).filter(id => !selectedRows.includes(id));
+                                                        onSelectionChange([...selectedRows, ...newIds]);
+                                                    } else {
+                                                        const pageIds = displayData.map(row => row.id);
+                                                        onSelectionChange(selectedRows.filter(id => !pageIds.includes(id)));
+                                                    }
+                                                }
+                                            }}
+                                            className="w-4 h-4 cursor-pointer"
+                                        />
+                                    </div>
+                                </th>
+                            )}
                             {columns.map((col, idx) => {
                                 const isSortedColumn = sortColumn === col.accessor;
                                 const isLastColumn = idx === columns.length - 1;
@@ -700,6 +725,25 @@ const DataTable = ({
                                             if (expandable) toggleRow(rowIdx);
                                         }}
                                     >
+                                        {selectable && (
+                                            <td className="px-4 py-3.5 w-10" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedRows.includes(row.id)}
+                                                        onChange={(e) => {
+                                                            if (onSelectionChange) {
+                                                                const newSelected = e.target.checked
+                                                                    ? [...selectedRows, row.id]
+                                                                    : selectedRows.filter(id => id !== row.id);
+                                                                onSelectionChange(newSelected);
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 cursor-pointer"
+                                                    />
+                                                </div>
+                                            </td>
+                                        )}
                                         {columns.map((col, colIdx) => {
                                             const isLastColumn = colIdx === columns.length - 1;
                                             const isSticky = isLastColumn && col.accessor === 'actions';
@@ -717,7 +761,7 @@ const DataTable = ({
                                     </tr>
                                     {isExpanded && (
                                         <tr>
-                                            <td colSpan={columns.length} className="p-0 bg-white border-none">
+                                            <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0 bg-white border-none">
                                                 <div className="px-4 py-4 sm:px-8 sm:py-5 bg-[#fbfcfd] border-y border-gray-100 animate-slideDown overflow-hidden">
                                                     <div className="sticky left-0 w-fit max-w-[calc(100vw-100px)] px-4">
                                                         <div className="flex items-center gap-2 mb-4">
@@ -755,7 +799,7 @@ const DataTable = ({
                         })}
                         {filteredData.length === 0 && (
                             <tr>
-                                <td colSpan={columns.length} className="px-5 py-8 text-center text-gray-500">
+                                <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-5 py-8 text-center text-gray-500">
                                     {hasActiveFilters
                                         ? 'No records match the current filters.'
                                         : 'No data available'}

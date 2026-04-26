@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CustomInput from "../../shared/components/CustomInput";
-import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined, ReloadOutlined } from "@ant-design/icons";
+import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined, ReloadOutlined, DeleteOutlined, InboxOutlined, CloseOutlined } from "@ant-design/icons";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
 import DataTable from "../../components/ui/DataTable";
@@ -10,8 +10,8 @@ import { getCondensedColumns, getFullColumns, VIEW_OPTIONS } from "./invoiceColu
 import { useInvoiceStore } from "../../store/invoice.store";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
-import { deleteInvoice, uploadInvoices, fetchEntityMaster, getInvoiceFilterOptions, archiveInvoice } from "../../api/invoiceApi";
-import { Modal } from "antd";
+import { deleteInvoice, uploadInvoices, fetchEntityMaster, getInvoiceFilterOptions, archiveInvoice, bulkDeleteInvoices, bulkArchiveInvoices } from "../../api/invoiceApi";
+import { Modal, Popconfirm } from "antd";
 import toast from "../../utils/toast";
 import API from "../../api/api";
 import ViewInvoicePage from "./ViewInvoicePage";
@@ -46,6 +46,8 @@ const Invoice = () => {
     const [archivedRecords, setArchivedRecords] = useState([]);
     const [openingInvoiceId, setOpeningInvoiceId] = useState(null);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+    const [bulkActionLoading, setBulkActionLoading] = useState(false);
     const openPreviewTimerRef = useRef(null);
 
     const location = useLocation();
@@ -89,7 +91,12 @@ const Invoice = () => {
 
     useEffect(() => {
         if (skip !== 0) setSkip(0);
-    }, [searchQuery, columnFilters, sortColumn, sortDirection, pageTab]);
+        setSelectedInvoiceIds([]);
+    }, [searchQuery, columnFilters, sortColumn, sortDirection, pageTab, limit]);
+
+    useEffect(() => {
+        setSelectedInvoiceIds([]);
+    }, [skip]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -180,6 +187,44 @@ const Invoice = () => {
             toast.error(err?.response?.data?.detail || "Failed to archive invoice");
         }
     }, [refetch]);
+
+    const handleBulkDelete = async () => {
+        if (selectedInvoiceIds.length === 0) return;
+        setBulkActionLoading(true);
+        try {
+            const res = await bulkDeleteInvoices(selectedInvoiceIds);
+            const successCount = res.success?.length || 0;
+            const failedCount = res.failed?.length || 0;
+            if (successCount > 0) toast.success(`Successfully deleted ${successCount} invoices`);
+            if (failedCount > 0) toast.error(`Failed to delete ${failedCount} invoices`);
+            setSelectedInvoiceIds([]);
+            refetch();
+        } catch (err) {
+            console.error("Bulk delete error:", err);
+            toast.error("Failed to perform bulk delete");
+        } finally {
+            setBulkActionLoading(false);
+        }
+    };
+
+    const handleBulkArchive = async () => {
+        if (selectedInvoiceIds.length === 0) return;
+        setBulkActionLoading(true);
+        try {
+            const res = await bulkArchiveInvoices(selectedInvoiceIds);
+            const successCount = res.success?.length || 0;
+            const failedCount = res.failed?.length || 0;
+            if (successCount > 0) toast.success(`Successfully archived ${successCount} invoices`);
+            if (failedCount > 0) toast.error(`Failed to archive ${failedCount} invoices`);
+            setSelectedInvoiceIds([]);
+            refetch();
+        } catch (err) {
+            console.error("Bulk archive error:", err);
+            toast.error("Failed to perform bulk archive");
+        } finally {
+            setBulkActionLoading(false);
+        }
+    };
 
     const columnDefs = useMemo(() => {
         const cols = view === "condensed"
@@ -301,11 +346,148 @@ const Invoice = () => {
                     </div>
 
                     {pageTab !== "delete" ? (
-                        <div className="overflow-x-auto w-full">
-                            {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
-                                <DataTable columns={columnDefs} data={invoices ?? []} loading={isLoading} totalItems={total} currentPage={(skip / limit) + 1} itemsPerPage={limit} onPageChange={(page) => setSkip((page - 1) * limit)} onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} sortColumn={sortColumn} sortDirection={sortDirection} onSort={(col, dir) => setSort(col, dir)} maxHeight="calc(100vh - 250px)" stickyHeader={true} enableColumnFilters={true} columnFilters={columnFilters} onColumnFiltersChange={setColumnFilters} />
+                        <>
+                            {selectedInvoiceIds.length > 0 && (
+                                <div style={{ 
+                                    position: "fixed",
+                                    bottom: "40px",
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                    zIndex: 1000,
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    gap: "24px", 
+                                    padding: "12px 28px", 
+                                    background: "rgba(29, 113, 171, 0.95)", 
+                                    backdropFilter: "blur(10px)",
+                                    borderRadius: "100px",
+                                    boxShadow: "0 12px 32px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1)",
+                                    animation: "slideUp 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)",
+                                    color: "white"
+                                }}>
+                                    <style>
+                                        {`
+                                            @keyframes slideUp {
+                                                from { transform: translate(-50%, 100px); opacity: 0; }
+                                                to { transform: translate(-50%, 0); opacity: 1; }
+                                            }
+                                        `}
+                                    </style>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                        <div style={{ 
+                                            background: "white", 
+                                            color: "#1D71AB", 
+                                            borderRadius: "50%", 
+                                            width: "28px",
+                                            height: "28px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: "14px", 
+                                            fontWeight: "bold",
+                                        }}>
+                                            {selectedInvoiceIds.length}
+                                        </div>
+                                        <span style={{ fontSize: "15px", fontWeight: 500, letterSpacing: "0.3px" }}>
+                                            {selectedInvoiceIds.length === 1 ? "Invoice" : "Invoices"} Selected
+                                        </span>
+                                    </div>
+                                    
+                                    <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.2)" }} />
+
+                                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                        {pageTab === 'in_progress' && (
+                                            <Popconfirm
+                                                title="Delete Invoices"
+                                                description={`Are you sure you want to delete ${selectedInvoiceIds.length} invoices?`}
+                                                onConfirm={handleBulkDelete}
+                                                okText="Delete"
+                                                cancelText="Cancel"
+                                                okButtonProps={{ danger: true, loading: bulkActionLoading }}
+                                            >
+                                                <button style={{ 
+                                                    background: "#FF4D4F",
+                                                    border: "none",
+                                                    color: "white",
+                                                    padding: "8px 20px",
+                                                    borderRadius: "50px",
+                                                    fontSize: "14px",
+                                                    fontWeight: 600,
+                                                    cursor: "pointer",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "8px",
+                                                    transition: "all 0.2s"
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+                                                onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                                                >
+                                                    <DeleteOutlined /> Bulk Delete
+                                                </button>
+                                            </Popconfirm>
+                                        )}
+                                        {pageTab === 'posted_stage' && (
+                                            <Popconfirm
+                                                title="Archive Invoices"
+                                                description={`Are you sure you want to archive ${selectedInvoiceIds.length} invoices?`}
+                                                onConfirm={handleBulkArchive}
+                                                okText="Archive"
+                                                cancelText="Cancel"
+                                                okButtonProps={{ loading: bulkActionLoading }}
+                                            >
+                                                <button style={{ 
+                                                    background: "#52C41A",
+                                                    border: "none",
+                                                    color: "white",
+                                                    padding: "8px 20px",
+                                                    borderRadius: "50px",
+                                                    fontSize: "14px",
+                                                    fontWeight: 600,
+                                                    cursor: "pointer",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "8px",
+                                                    transition: "all 0.2s"
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+                                                onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                                                >
+                                                    <InboxOutlined /> Bulk Archive
+                                                </button>
+                                            </Popconfirm>
+                                        )}
+                                        
+                                        <button 
+                                            onClick={() => setSelectedInvoiceIds([])}
+                                            style={{ 
+                                                background: "rgba(255,255,255,0.1)", 
+                                                border: "1px solid rgba(255,255,255,0.2)", 
+                                                color: "white", 
+                                                cursor: "pointer", 
+                                                padding: "8px 16px",
+                                                borderRadius: "50px",
+                                                fontSize: "14px",
+                                                fontWeight: 500,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "6px",
+                                                transition: "all 0.2s"
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+                                        >
+                                            <CloseOutlined style={{ fontSize: "12px" }} /> Cancel
+                                        </button>
+                                    </div>
+                                </div>
                             )}
-                        </div>
+
+                            <div className="overflow-x-auto w-full">
+                                {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
+                                    <DataTable columns={columnDefs} data={invoices ?? []} loading={isLoading} totalItems={total} currentPage={(skip / limit) + 1} itemsPerPage={limit} onPageChange={(page) => setSkip((page - 1) * limit)} onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} sortColumn={sortColumn} sortDirection={sortDirection} onSort={(col, dir) => setSort(col, dir)} maxHeight="calc(100vh - 250px)" stickyHeader={true} enableColumnFilters={true} columnFilters={columnFilters} onColumnFiltersChange={setColumnFilters} selectable={pageTab === 'in_progress' || pageTab === 'posted_stage'} selectedRows={selectedInvoiceIds} onSelectionChange={setSelectedInvoiceIds} />
+                                )}
+                            </div>
+                        </>
                     ) : (
                         <ArchivedInvoicesTab key={`${entityMaster?.entity_id}-${refreshKey}`} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} userRole={userRole} view={view} />
                     )}

@@ -2610,6 +2610,173 @@ async def archive_invoice(
         raise HTTPException(status_code=500, detail=f"Failed to archive invoice: {str(e)}")
 
 
+@router.post("/bulk-delete")
+async def bulk_delete_invoices(
+    payload: dict,
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk soft-delete invoices.
+    """
+    invoice_ids = payload.get("invoice_ids", [])
+    if not invoice_ids:
+        raise HTTPException(status_code=400, detail="No invoice IDs provided")
+    
+    results = {"success": [], "failed": []}
+    
+    for inv_id in invoice_ids:
+        try:
+            # We call the logic for individual delete but within this loop
+            # To avoid large complex transactions, we commit each one or handle carefully
+            # For simplicity, let's just use the logic from delete_invoice
+            invoice = db.query(Invoice).filter(Invoice.id == inv_id).first()
+            if not invoice:
+                results["failed"].append({"id": inv_id, "reason": "Invoice not found"})
+                continue
+            
+            # (Reusing logic from delete_invoice)
+            def _row_to_dict(row):
+                result = {}
+                for col in row.__table__.columns:
+                    val = getattr(row, col.name)
+                    if isinstance(val, datetime):
+                        val = val.isoformat()
+                    elif hasattr(val, 'value'):
+                        val = val.value
+                    result[col.name] = val
+                return result
+
+            status_history_snapshot = json.dumps([_row_to_dict(h) for h in (invoice.status_history or [])])
+            workflow_steps_snapshot = json.dumps([_row_to_dict(s) for s in (invoice.workflow_steps or [])])
+            approved_by_snapshot = json.dumps([_row_to_dict(a) for a in (invoice.approved_by_list or [])])
+            assigned_approvers_snapshot = json.dumps([_row_to_dict(a) for a in (invoice.assigned_approvers_list or [])])
+            coding_snapshot = json.dumps(_row_to_dict(invoice.coding) if invoice.coding else None)
+            audit_logs_snapshot = json.dumps([_row_to_dict(al) for al in (invoice.audit_logs or [])])
+
+            deleted_record = DeletedInvoice(
+                original_invoice_id=invoice.id,
+                filename=invoice.filename,
+                original_filename=invoice.original_filename,
+                file_path=invoice.file_path,
+                uploaded_by=invoice.uploaded_by,
+                uploaded_by_id=invoice.uploaded_by_id,
+                status=invoice.status.value if hasattr(invoice.status, 'value') else invoice.status,
+                entity=invoice.entity,
+                vendor_id=invoice.vendor_id,
+                vendor_name=invoice.vendor_name,
+                invoice_number=invoice.invoice_number,
+                azure_vendor_name=invoice.azure_vendor_name,
+                azure_vendor_address=invoice.azure_vendor_address,
+                line_grouping=invoice.line_grouping,
+                exchange_rate=invoice.exchange_rate,
+                sage_bill_number=invoice.sage_bill_number,
+                extracted_data=invoice.extracted_data,
+                vendor_details=invoice.vendor_details,
+                processing_steps=invoice.processing_steps,
+                validation_results=invoice.validation_results,
+                duplicate_info=invoice.duplicate_info,
+                original_items=invoice.original_items,
+                approver_breakdown=invoice.approver_breakdown,
+                gl_summary=invoice.gl_summary,
+                confidence_score=invoice.confidence_score,
+                uploaded_at=invoice.uploaded_at,
+                processed_at=invoice.processed_at,
+                required_approvers=invoice.required_approvers,
+                current_approver_level=invoice.current_approver_level,
+                status_history_json=status_history_snapshot,
+                workflow_steps_json=workflow_steps_snapshot,
+                approved_by_json=approved_by_snapshot,
+                assigned_approvers_json=assigned_approvers_snapshot,
+                coding_json=coding_snapshot,
+                audit_logs_json=audit_logs_snapshot,
+                deleted_at=datetime.utcnow(),
+                deleted_by=current_user.username,
+            )
+            db.add(deleted_record)
+            db.flush()
+
+            from app.utils.invoice_registry import remove_from_registry
+            remove_from_registry(db, inv_id)
+
+            new_path = move_invoice_file(invoice.file_path, "deleted")
+            if new_path:
+                deleted_record.file_path = new_path
+            
+            db.delete(invoice)
+            db.commit()
+            results["success"].append(inv_id)
+        except Exception as e:
+            db.rollback()
+            logger.error(f"[BulkDelete] Failed to delete invoice {inv_id}: {e}")
+            results["failed"].append({"id": inv_id, "reason": str(e)})
+
+    return results
+
+
+@router.post("/bulk-archive")
+async def bulk_archive_invoices(
+    payload: dict,
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk archive invoices.
+    """
+    invoice_ids = payload.get("invoice_ids", [])
+    if not invoice_ids:
+        raise HTTPException(status_code=400, detail="No invoice IDs provided")
+    
+    results = {"success": [], "failed": []}
+    
+    for inv_id in invoice_ids:
+        try:
+            invoice = db.query(Invoice).filter(Invoice.id == inv_id).first()
+            if not invoice:
+                results["failed"].append({"id": inv_id, "reason": "Invoice not found"})
+                continue
+
+            if invoice.status != InvoiceStatusEnum.SAGE_POSTED:
+                results["failed"].append({"id": inv_id, "reason": "Only invoices with 'Posted To Stage' status can be archived."})
+                continue
+
+            # Move file to archive_files
+            new_path = move_invoice_file(invoice.file_path, "archive")
+            if new_path:
+                invoice.file_path = new_path
+            
+            invoice.status = InvoiceStatusEnum.ARCHIVED
+            
+            # Add to history
+            history_item = InvoiceStatusHistory(
+                invoice_id=inv_id,
+                status=InvoiceStatusEnum.ARCHIVED,
+                user=current_user.username,
+                timestamp=datetime.utcnow(),
+                comment="Invoiced archived by user (Bulk)"
+            )
+            db.add(history_item)
+            
+            # [AUDIT] Log Archive
+            await audit_service.log_action(
+                db=db,
+                invoice_id=inv_id, 
+                action=AuditAction.ARCHIVED.value if hasattr(AuditAction, 'ARCHIVED') else "Archived", 
+                user=current_user.username,
+                entity=invoice.entity,
+                details={"action": "archived", "bulk": True}
+            )
+            
+            db.commit()
+            results["success"].append(inv_id)
+        except Exception as e:
+            db.rollback()
+            logger.error(f"[BulkArchive] Failed to archive invoice {inv_id}: {e}")
+            results["failed"].append({"id": inv_id, "reason": str(e)})
+
+    return results
+
+
 @router.get("/deleted", summary="List deleted (archived) invoices")
 async def list_deleted_invoices(
     entity: str = Depends(get_current_entity),

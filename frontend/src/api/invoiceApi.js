@@ -139,3 +139,9 @@ export const fetchDeletedInvoiceById = (archiveId) =>
 
 export const archiveInvoice = (invoiceId) =>
     API.post(`/invoices/${invoiceId}/archive`).then(res => res.data);
+
+export const bulkDeleteInvoices = (invoiceIds) =>
+    API.post(`/invoices/bulk-delete`, { invoice_ids: invoiceIds }).then(res => res.data);
+
+export const bulkArchiveInvoices = (invoiceIds) =>
+    API.post(`/invoices/bulk-archive`, { invoice_ids: invoiceIds }).then(res => res.data);
