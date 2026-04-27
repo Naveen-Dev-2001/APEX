@@ -29,7 +29,7 @@ const AdminPage = () => {
 
     const handleRoleLogic = (newSelectedRoles, previousRoles) => {
         const multiRoles = ['admin', 'approver'];
-        
+
         // If a role was removed, just return the new list
         if (newSelectedRoles.length < previousRoles.length) {
             return newSelectedRoles;
@@ -80,9 +80,9 @@ const AdminPage = () => {
 
     return (
         <div className="p-2 sm:p-4 flex flex-col gap-4 sm:gap-5 w-full bg-gray-50 min-h-0">
-            <h1 className="text-2xl font-extrabold mb-2 text-[#333333] text-left">
+            {/* <h1 className="text-2xl font-extrabold mb-2 text-[#333333] text-left">
                 Admin Dashboard
-            </h1>
+            </h1> */}
 
             <div className="bg-white rounded-[4px] shadow-sm w-full p-5 border border-gray-200 min-h-[200px] flex flex-col relative text-left">
 
@@ -142,7 +142,7 @@ const AdminPage = () => {
                 )}
 
                 {/* Add User Modal Component */}
-                <AddUserModal 
+                <AddUserModal
                     isOpen={isAddModalOpen}
                     onClose={() => setIsAddModalOpen(false)}
                     onAdd={handleAddUser}

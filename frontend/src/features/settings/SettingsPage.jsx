@@ -415,9 +415,9 @@ const SettingsPage = () => {
     return (
         <div className="p-4 flex flex-col gap-4 w-full bg-gray-50 min-h-0 h-full">
             {/* Header Area */}
-            <div className="flex flex-col gap-1">
+            {/* <div className="flex flex-col gap-1">
                 <h1 className="text-[28px] font-extrabold text-[#333333]">Approval Workflow Settings</h1>
-            </div>
+            </div> */}
 
             {/* Controls Row */}
             <div className="flex items-center gap-3">
