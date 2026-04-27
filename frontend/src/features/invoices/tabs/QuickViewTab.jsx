@@ -18,6 +18,8 @@ import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 
 dayjs.extend(customParseFormat);
 
+const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -506,6 +508,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                         // User manually typed netAmount — mark as overridden,
                         // do NOT recalculate from qty/unitPrice/discount.
                         updated.isNetAmountOverridden = true;
+                        updated.netAmount = roundTo2(parseFloat(value) || 0);
                     } else if (["qty", "unitPrice", "discount"].includes(key)) {
                         // These fields drive the auto-calculation.
                         updated.isNetAmountOverridden = false;
@@ -516,13 +519,13 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                         const price = parseFloat(updated.unitPrice) || 0;
                         const discount = parseFloat(updated.discount) || 0;
 
-                        updated.netAmount = qty * price - discount;
+                        updated.netAmount = roundTo2(qty * price - discount);
                     }
                     // "description" and other string fields: no calculation needed.
                 } else {
                     // System rows (GST / TDS): keep unitPrice and netAmount in sync.
                     if (key === "unitPrice" || key === "netAmount") {
-                        const numVal = parseFloat(value) || 0;
+                        const numVal = roundTo2(parseFloat(value) || 0);
                         updated.unitPrice = numVal;
                         updated.netAmount = numVal;
                     }

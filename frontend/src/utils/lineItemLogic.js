@@ -1,3 +1,4 @@
+const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
 const normalizeItems = (items) => {
     return items.map((item, index) => ({
@@ -35,7 +36,7 @@ const calculateNetAmount = (row) => {
 
     //  Case 1: Only when both exist → calculate
     if (qty > 0 && unitPrice > 0) {
-        return (qty * unitPrice) - discount;
+        return roundTo2((qty * unitPrice) - discount);
     }
 
     //  Case 2: Everything missing → trust invoice value
@@ -109,7 +110,7 @@ const addSystemRows = (rows, formData, entityMaster) => {
     );
 
     if (isTdsApplicable) {
-        const tdsValue = -Math.abs((tdsRate / 100) * totalInvoiceAmount);
+        const tdsValue = roundTo2(-Math.abs((tdsRate / 100) * totalInvoiceAmount));
 
         const tdsRow = {
             id: "tds-row",
