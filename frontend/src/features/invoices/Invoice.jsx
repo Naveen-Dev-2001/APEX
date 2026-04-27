@@ -108,7 +108,7 @@ const Invoice = () => {
     const [modal, modalContextHolder] = Modal.useModal();
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    
+
     const [deleteModalState, setDeleteModalState] = useState({ isOpen: false, data: null, loading: false });
     const [archiveModalState, setArchiveModalState] = useState({ isOpen: false, data: null, loading: false });
 
@@ -308,17 +308,17 @@ const Invoice = () => {
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px", background: "#F7F7F7", borderBottom: "1px solid #E5E7EB", flexWrap: "wrap", gap: "12px" }}>
                         <div style={{ display: "flex", border: "1px solid #D9D9D9", borderRadius: "4px", overflow: "hidden", background: "#FFFFFF", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
                             {[
-                                { key: "in_progress", label: "In Progress" },
-                                { key: "delete", label: "Delete" },
-                                { key: "posted_stage", label: "Posted To Sage" },
-                                { key: "archive", label: "Archive" },
+                                { key: "in_progress", label: "In Progress Invoices" },
+                                { key: "posted_stage", label: "Posted To Sage Invoices" },
+                                { key: "delete", label: "Deleted Invoices" },
+                                { key: "archive", label: "Archived Invoices" },
                             ].map(({ key, label }, index, arr) => {
                                 const isActive = pageTab === key;
-                                return (
-                                    <button key={key} onClick={() => setPageTab(key)} style={{ padding: "8px 24px", fontSize: 13, fontWeight: 500, color: isActive ? "#003A8C" : "#595959", background: isActive ? "#BAE7FF" : "#FFFFFF", border: "none", borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none", cursor: "pointer", transition: "all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1)", outline: "none", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "120px" }} onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }} onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}>
-                                        {label}
-                                    </button>
-                                );
+                                    return (
+                                        <button key={key} onClick={() => setPageTab(key)} style={{ padding: "8px 24px", fontSize: 14, fontWeight: isActive ? 700 : 500, color: "black", background: isActive ? "#BAE7FF" : "#FFFFFF", border: "none", borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none", cursor: "pointer", transition: "background-color 0.2s, color 0.2s", outline: "none", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "120px" }} onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }} onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}>
+                                            {label}
+                                        </button>
+                                    );
                             })}
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
@@ -332,8 +332,8 @@ const Invoice = () => {
                                 <ExportButton data={pageTab === 'delete' ? archivedRecords : invoices} columns={columnDefs} fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`} />
                             </div>
                             <div style={{ minWidth: 120 }}>
-                                <CustomButton 
-                                    variant="outline" 
+                                <CustomButton
+                                    variant="outline"
                                     onClick={() => {
                                         if (pageTab === 'delete') {
                                             setRefreshKey(prev => prev + 1);
@@ -357,17 +357,17 @@ const Invoice = () => {
                     {pageTab !== "delete" ? (
                         <>
                             {selectedInvoiceIds.length > 0 && (
-                                <div style={{ 
+                                <div style={{
                                     position: "fixed",
                                     bottom: "40px",
                                     left: "50%",
                                     transform: "translateX(-50%)",
                                     zIndex: 1000,
-                                    display: "flex", 
-                                    alignItems: "center", 
-                                    gap: "24px", 
-                                    padding: "12px 28px", 
-                                    background: "rgba(29, 113, 171, 0.95)", 
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "24px",
+                                    padding: "12px 28px",
+                                    background: "rgba(29, 113, 171, 0.95)",
                                     backdropFilter: "blur(10px)",
                                     borderRadius: "100px",
                                     boxShadow: "0 12px 32px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1)",
@@ -383,16 +383,16 @@ const Invoice = () => {
                                         `}
                                     </style>
                                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                        <div style={{ 
-                                            background: "white", 
-                                            color: "#1D71AB", 
-                                            borderRadius: "50%", 
+                                        <div style={{
+                                            background: "white",
+                                            color: "#1D71AB",
+                                            borderRadius: "50%",
                                             width: "28px",
                                             height: "28px",
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
-                                            fontSize: "14px", 
+                                            fontSize: "14px",
                                             fontWeight: "bold",
                                         }}>
                                             {selectedInvoiceIds.length}
@@ -401,11 +401,11 @@ const Invoice = () => {
                                             {selectedInvoiceIds.length === 1 ? "Invoice" : "Invoices"} Selected
                                         </span>
                                     </div>
-                                    
+
                                     <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.2)" }} />
 
                                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                        {pageTab === 'in_progress' && (
+                                        {pageTab === 'in_progress' && ["scanner", "coder"].includes(userRole) && (
                                             <Popconfirm
                                                 title="Delete Invoices"
                                                 description={`Are you sure you want to delete ${selectedInvoiceIds.length} invoices?`}
@@ -414,7 +414,7 @@ const Invoice = () => {
                                                 cancelText="Cancel"
                                                 okButtonProps={{ danger: true, loading: bulkActionLoading }}
                                             >
-                                                <button style={{ 
+                                                <button style={{
                                                     background: "#FF4D4F",
                                                     border: "none",
                                                     color: "white",
@@ -428,14 +428,14 @@ const Invoice = () => {
                                                     gap: "8px",
                                                     transition: "all 0.2s"
                                                 }}
-                                                onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-                                                onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+                                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                                                 >
                                                     <DeleteOutlined /> Bulk Delete
                                                 </button>
                                             </Popconfirm>
                                         )}
-                                        {pageTab === 'posted_stage' && (
+                                        {pageTab === 'posted_stage' && ["scanner", "coder"].includes(userRole) && (
                                             <Popconfirm
                                                 title="Archive Invoices"
                                                 description={`Are you sure you want to archive ${selectedInvoiceIds.length} invoices?`}
@@ -444,7 +444,7 @@ const Invoice = () => {
                                                 cancelText="Cancel"
                                                 okButtonProps={{ loading: bulkActionLoading }}
                                             >
-                                                <button style={{ 
+                                                <button style={{
                                                     background: "#52C41A",
                                                     border: "none",
                                                     color: "white",
@@ -458,21 +458,21 @@ const Invoice = () => {
                                                     gap: "8px",
                                                     transition: "all 0.2s"
                                                 }}
-                                                onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-                                                onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+                                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                                                 >
                                                     <InboxOutlined /> Bulk Archive
                                                 </button>
                                             </Popconfirm>
                                         )}
-                                        
-                                        <button 
+
+                                        <button
                                             onClick={() => setSelectedInvoiceIds([])}
-                                            style={{ 
-                                                background: "rgba(255,255,255,0.1)", 
-                                                border: "1px solid rgba(255,255,255,0.2)", 
-                                                color: "white", 
-                                                cursor: "pointer", 
+                                            style={{
+                                                background: "rgba(255,255,255,0.1)",
+                                                border: "1px solid rgba(255,255,255,0.2)",
+                                                color: "white",
+                                                cursor: "pointer",
                                                 padding: "8px 16px",
                                                 borderRadius: "50px",
                                                 fontSize: "14px",
@@ -493,7 +493,7 @@ const Invoice = () => {
 
                             <div className="overflow-x-auto w-full">
                                 {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
-                                    <DataTable columns={columnDefs} data={invoices ?? []} loading={isLoading} totalItems={total} currentPage={(skip / limit) + 1} itemsPerPage={limit} onPageChange={(page) => setSkip((page - 1) * limit)} onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} sortColumn={sortColumn} sortDirection={sortDirection} onSort={(col, dir) => setSort(col, dir)} maxHeight="calc(100vh - 250px)" stickyHeader={true} enableColumnFilters={true} columnFilters={columnFilters} onColumnFiltersChange={setColumnFilters} selectable={pageTab === 'in_progress' || pageTab === 'posted_stage'} selectedRows={selectedInvoiceIds} onSelectionChange={setSelectedInvoiceIds} />
+                                    <DataTable columns={columnDefs} data={invoices ?? []} loading={isLoading} totalItems={total} currentPage={(skip / limit) + 1} itemsPerPage={limit} onPageChange={(page) => setSkip((page - 1) * limit)} onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} sortColumn={sortColumn} sortDirection={sortDirection} onSort={(col, dir) => setSort(col, dir)} maxHeight="calc(100vh - 250px)" stickyHeader={true} enableColumnFilters={true} onColumnFiltersChange={setColumnFilters} selectable={(pageTab === 'in_progress' || pageTab === 'posted_stage') && ["scanner", "coder"].includes(userRole)} selectedRows={selectedInvoiceIds} onSelectionChange={setSelectedInvoiceIds} />
                                 )}
                             </div>
                         </>

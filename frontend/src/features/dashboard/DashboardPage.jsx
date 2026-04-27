@@ -96,7 +96,11 @@ const DashboardPage = React.memo(() => {
     // ─── Render ──────────────────────────────────────────────────────────────────
 
     return (
-        <div className="bg-[#F7F7F7] p-2 space-y-2 overflow-y-auto h-[calc(90vh-5px)]">
+        <div className="bg-[#F7F7F7] p-2 space-y-4 overflow-y-auto h-[calc(90vh-5px)]">
+            {/* Header Area */}
+            {/* <div className="flex flex-col gap-1 px-2">
+                <h1 className="text-2xl font-extrabold text-[#333333]">Dashboard</h1>
+            </div> */}
 
             {/* Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -114,15 +118,15 @@ const DashboardPage = React.memo(() => {
                 ) : (
                     <>
                         <Card icon={icons.invoice} title="Total Invoices" value={summary?.total_invoices} />
-                        <Card 
-                            icon={icons.overdue} 
-                            title="Total Overdue" 
-                            value={new Intl.NumberFormat('en-US', { 
-                                style: 'currency', 
+                        <Card
+                            icon={icons.overdue}
+                            title="Total Overdue"
+                            value={new Intl.NumberFormat('en-US', {
+                                style: 'currency',
                                 currency: 'USD',
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2
-                            }).format(summary?.total_due || 0)} 
+                            }).format(summary?.total_due || 0)}
                         />
                         <Card icon={icons.approved} title="Approved" value={summary?.approved} />
                         <Card icon={icons.pending} title="Pending Approval" value={summary?.waiting_approval} />

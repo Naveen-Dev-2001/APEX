@@ -263,7 +263,7 @@ const CodingPage = () => {
         <div className="p-6 bg-[#f8fafc] min-h-screen pt-[5px]">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-4">
-                    <h2 className="text-xl font-bold">Coding</h2>
+                    <h2 className="text-xl font-extrabold">Coding</h2>
                     <div className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
                         {total}
                     </div>

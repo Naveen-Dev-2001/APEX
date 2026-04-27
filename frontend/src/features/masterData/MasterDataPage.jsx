@@ -241,71 +241,71 @@ const MasterDataPage = () => {
     const columns = (currentMaster?.columns || [])
         .filter(col => !(isReadOnly && col.accessor === 'actions'))
         .map((col) => {
-        if (col.accessor === 'gst_applicable') {
-            return {
-                ...col,
-                render: (val) => (
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
+            if (col.accessor === 'gst_applicable') {
+                return {
+                    ...col,
+                    render: (val) => (
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
                         ${val ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500'}`}>
-                        {val ? 'Yes' : 'No'}
-                    </span>
-                )
-            };
-        }
-        if (col.accessor === 'require_department' || col.accessor === 'require_location') {
-            return {
-                ...col,
-                render: (val) => (
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
+                            {val ? 'Yes' : 'No'}
+                        </span>
+                    )
+                };
+            }
+            if (col.accessor === 'require_department' || col.accessor === 'require_location') {
+                return {
+                    ...col,
+                    render: (val) => (
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
                         ${val ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500'}`}>
-                        {val ? 'Yes' : 'No'}
-                    </span>
-                )
-            };
-        }
-        if (col.accessor === 'actions') {
+                            {val ? 'Yes' : 'No'}
+                        </span>
+                    )
+                };
+            }
+            if (col.accessor === 'actions') {
+                return {
+                    ...col,
+                    render: (_, row, index) => {
+                        const isTopLevelEntity = isEntityTab && (row.entity_name === 'Top Level' || row.entity_name === 'Default Entity');
+                        const hasInvoices = isEntityTab && row.invoice_count > 0;
+                        const isDeleteDisabled = isTopLevelEntity;
+
+                        let deleteTooltip = "Delete";
+                        if (isTopLevelEntity) deleteTooltip = "Top Level Entity cannot be deleted";
+                        else if (hasInvoices) deleteTooltip = "Cannot delete: Invoice created under this entity";
+
+                        if (isReadOnly) return null;
+
+                        return (
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && openEdit(row, index)}
+                                    className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                                    title="Edit"
+                                >
+                                    <Pencil size={18} />
+                                </button>
+                                <button
+                                    onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && handleDelete(row, index)}
+                                    disabled={isDeleteDisabled}
+                                    className={`transition-colors p-1 ${isDeleteDisabled
+                                        ? 'text-gray-300 cursor-not-allowed'
+                                        : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
+                                    title={deleteTooltip}
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
+                        );
+                    },
+                };
+            }
             return {
                 ...col,
-                render: (_, row, index) => {
-                    const isTopLevelEntity = isEntityTab && (row.entity_name === 'Top Level' || row.entity_name === 'Default Entity');
-                    const hasInvoices = isEntityTab && row.invoice_count > 0;
-                    const isDeleteDisabled = isTopLevelEntity;
-
-                    let deleteTooltip = "Delete";
-                    if (isTopLevelEntity) deleteTooltip = "Top Level Entity cannot be deleted";
-                    else if (hasInvoices) deleteTooltip = "Cannot delete: Invoice created under this entity";
-
-                    if (isReadOnly) return null;
-
-                    return (
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && openEdit(row, index)}
-                                className="text-gray-500 hover:text-gray-700 transition-colors p-1"
-                                title="Edit"
-                            >
-                                <Pencil size={18} />
-                            </button>
-                            <button
-                                onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && handleDelete(row, index)}
-                                disabled={isDeleteDisabled}
-                                className={`transition-colors p-1 ${isDeleteDisabled
-                                    ? 'text-gray-300 cursor-not-allowed'
-                                    : 'text-[#ff4d4f] hover:text-[#d32f2f]'}`}
-                                title={deleteTooltip}
-                            >
-                                <Trash2 size={18} />
-                            </button>
-                        </div>
-                    );
-                },
+                onClick: col.sortable ? () => setSort(col.accessor) : undefined
             };
-        }
-        return {
-            ...col,
-            onClick: col.sortable ? () => setSort(col.accessor) : undefined
-        };
-    });
+        });
 
     // Vendor Upload View Component
     const VendorUploadView = () => {
@@ -485,11 +485,9 @@ const MasterDataPage = () => {
     return (
         <div className="p-6 flex flex-col gap-6 w-full bg-[#FBFBFB] min-h-screen">
             {/* Header */}
-            {/* <div className="flex items-center gap-3">
-                <h1 className="text-[28px] font-semibold text-[#333333]">Master Data Management</h1>
-                <span className="bg-[#E5E5E5] text-[#666666] px-2 py-0.5 rounded-full text-sm font-medium">
-                    {filteredData.length}
-                </span>
+            {/* <div className="flex flex-col gap-1">
+                <h1 className="text-[28px] font-extrabold text-[#333333]">Master Data Management</h1>
+                <p className="text-sm text-gray-500">Manage your system reference data and configurations</p>
             </div> */}
 
             {/* Controls Row */}
@@ -500,11 +498,11 @@ const MasterDataPage = () => {
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 h-full text-[13px] font-medium transition-all duration-150 whitespace-nowrap
+                            className={`px-4 h-full text-[14px] ${activeTab === tab ? 'font-bold' : 'font-medium'} transition-colors duration-150 whitespace-nowrap
                                 ${index !== tabs.length - 1 ? 'border-r border-gray-200' : ''}
                                 ${activeTab === tab
-                                    ? 'bg-[#9AD4EF] text-[#333333]'
-                                    : 'bg-white text-gray-500 hover:bg-gray-50'
+                                    ? 'bg-[#9AD4EF] text-black'
+                                    : 'bg-white text-black hover:bg-gray-50'
                                 }`}
                         >
                             {tab}
@@ -556,8 +554,8 @@ const MasterDataPage = () => {
                             onClick={handleSync}
                             disabled={syncingData}
                             className={`flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium border rounded-[4px] transition-all whitespace-nowrap
-                                ${syncingData 
-                                    ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50' 
+                                ${syncingData
+                                    ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50'
                                     : 'text-gray-700 border-[#24A1DD] hover:bg-[#F0F9FF]'}`}
                         >
                             <RefreshCw size={15} className={`${syncingData ? 'text-gray-400 animate-spin' : 'text-[#24A1DD]'}`} />
