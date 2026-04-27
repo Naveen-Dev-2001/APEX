@@ -143,20 +143,20 @@ const SettingsPage = () => {
                 </span>
             )
         },
-        {
-            header: 'Type',
-            accessor: 'is_parallel',
-            filterable: true,
-            getFilterValue: (row) => row.is_parallel ? 'Parallel' : 'Sequential',
-            render: (val) => (
-                <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
-                    ${val
-                        ? 'bg-blue-50 text-blue-600 border-blue-100'
-                        : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
-                    {val ? 'Parallel' : 'Sequential'}
-                </span>
-            )
-        },
+        // {
+        //     header: 'Type',
+        //     accessor: 'is_parallel',
+        //     filterable: true,
+        //     getFilterValue: (row) => row.is_parallel ? 'Parallel' : 'Sequential',
+        //     render: (val) => (
+        //         <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
+        //             ${val
+        //                 ? 'bg-blue-50 text-blue-600 border-blue-100'
+        //                 : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+        //             {val ? 'Parallel' : 'Sequential'}
+        //         </span>
+        //     )
+        // },
         {
             header: 'Threshold',
             accessor: 'is_threshold_enabled',
