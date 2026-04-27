@@ -164,6 +164,15 @@
 /* Ant Design Tabs font weight for selected tab */
 .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
     font-weight: 800 !important;
+    color: black !important;
+}
+
+.ant-tabs-tab .ant-tabs-tab-btn {
+    color: black !important;
+}
+
+.ant-tabs-tab:hover .ant-tabs-tab-btn {
+    color: black !important;
 }
 
 .ant-modal {

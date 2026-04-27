@@ -314,11 +314,11 @@ const Invoice = () => {
                                 { key: "archive", label: "Archived Invoices" },
                             ].map(({ key, label }, index, arr) => {
                                 const isActive = pageTab === key;
-                                return (
-                                    <button key={key} onClick={() => setPageTab(key)} style={{ padding: "8px 24px", fontSize: 13, fontWeight: isActive ? 800 : 500, color: isActive ? "#003A8C" : "#595959", background: isActive ? "#BAE7FF" : "#FFFFFF", border: "none", borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none", cursor: "pointer", transition: "all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1)", outline: "none", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "120px" }} onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }} onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}>
-                                        {label}
-                                    </button>
-                                );
+                                    return (
+                                        <button key={key} onClick={() => setPageTab(key)} style={{ padding: "8px 24px", fontSize: 13, fontWeight: isActive ? 800 : 500, color: "black", background: isActive ? "#BAE7FF" : "#FFFFFF", border: "none", borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none", cursor: "pointer", transition: "all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1)", outline: "none", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "120px" }} onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }} onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}>
+                                            {label}
+                                        </button>
+                                    );
                             })}
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">

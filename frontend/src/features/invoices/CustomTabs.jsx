@@ -15,8 +15,8 @@ const CustomTabs = ({ tabs = [], activeTab, onChange }) => {
                                     ${i === tabs.length - 1 ? "rounded-tr-md rounded-br-md" : ""}
                                     ${i === 0 ? "rounded-tl-md rounded-bl-md" : ""}
                                     ${isActive
-                                        ? "bg-[#8dc3e3] text-gray-800"
-                                        : "bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50 "
+                                        ? "bg-[#8dc3e3] text-black"
+                                        : "bg-white text-black hover:text-black hover:bg-gray-50 "
                                     }`}
                             >
                                 {tab}
