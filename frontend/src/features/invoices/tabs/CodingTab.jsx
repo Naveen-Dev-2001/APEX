@@ -173,16 +173,19 @@ Checkbox.displayName = "Checkbox";
 // ─────────────────────────────────────────────────────────────────────────────
 // applyCalculation — unchanged from original
 // ─────────────────────────────────────────────────────────────────────────────
+const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+
 const applyCalculation = (item, key, value) => {
     let updated = { ...item, [key]: value };
     if (key === "netAmount") {
         updated.isNetAmountOverridden = true;
+        updated.netAmount = roundTo2(parseFloat(value) || 0);
     } else if (["qty", "unitPrice", "discount"].includes(key)) {
         updated.isNetAmountOverridden = false;
         const qty = parseFloat(updated.qty) || 0;
         const price = parseFloat(updated.unitPrice) || 0;
         const discount = parseFloat(updated.discount) || 0;
-        updated.netAmount = qty * price - discount;
+        updated.netAmount = roundTo2(qty * price - discount);
     }
     return updated;
 };

@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+
 export const useInvoiceStore = create((set, get) => ({
 
     invoiceSection: 1,
@@ -169,7 +171,7 @@ export const useInvoiceStore = create((set, get) => ({
         const totalInvoiceAmount = parseFloat(
             formData?.totalInvoiceAmount || formData?.total_invoice_amount || 0
         );
-        const tdsValue = -Math.abs(tdsRate * totalInvoiceAmount);
+        const tdsValue = roundTo2(-Math.abs(tdsRate * totalInvoiceAmount));
         const isTdsApplicable = formData?.tdsApplicability === "Yes";
 
         const gstRow = {
@@ -231,11 +233,11 @@ export const useInvoiceStore = create((set, get) => ({
             ...firstRow,
             id: "grouped-1",
             description: firstRow.description, //  keep first row desc
-            qty: regularItems.reduce((s, r) => s + (Number(r.qty) || 0), 0),
-            unitPrice: regularItems.reduce((s, r) => s + (Number(r.unitPrice) || 0), 0),
-            discount: regularItems.reduce((s, r) => s + (Number(r.discount) || 0), 0),
-            netAmount: regularItems.reduce((s, r) => s + (Number(r.netAmount) || 0), 0),
-            taxAmt: regularItems.reduce((s, r) => s + (Number(r.taxAmt) || 0), 0),
+            qty: roundTo2(regularItems.reduce((s, r) => s + (Number(r.qty) || 0), 0)),
+            unitPrice: roundTo2(regularItems.reduce((s, r) => s + (Number(r.unitPrice) || 0), 0)),
+            discount: roundTo2(regularItems.reduce((s, r) => s + (Number(r.discount) || 0), 0)),
+            netAmount: roundTo2(regularItems.reduce((s, r) => s + (Number(r.netAmount) || 0), 0)),
+            taxAmt: roundTo2(regularItems.reduce((s, r) => s + (Number(r.taxAmt) || 0), 0)),
             isNetAmountOverridden: false,
         };
 
