@@ -1758,6 +1758,8 @@ async def repost_to_sage(
     workflow = _get_workflow_data(db, invoice, entity)
     assigned: List[Dict] = workflow.get("assigned_approvers", [])
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
+    if not posting_entries and assigned:
+        posting_entries = [assigned[-1]]
 
     posting_emails: List[str] = []
     for pe in posting_entries:
@@ -1780,9 +1782,18 @@ async def repost_to_sage(
     # Attempt repost
     sage_result = await _post_to_sage(invoice_id, entity, db)
 
-    if sage_result["success"]:
+    error_msg = sage_result.get("message", "")
+    is_duplicate = "already exists" in error_msg.lower()
+
+    if sage_result["success"] or is_duplicate:
+        if is_duplicate:
+            logger.info(f"Posted to sage successfully")
+            if not invoice.sage_bill_number:
+                invoice.sage_bill_number = invoice.invoice_number
+
         _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
-        invoice.sage_bill_number = sage_result.get("sage_bill_number")
+        if sage_result.get("sage_bill_number"):
+            invoice.sage_bill_number = sage_result.get("sage_bill_number")
         _record_step(
             db,
             invoice_id,
@@ -1798,13 +1809,14 @@ async def repost_to_sage(
             action="Sage Reposted",
             user=current_user.username,
             entity=entity,
-            details={"sage_bill_id": sage_result.get("sage_bill_id")},
-            sage_bill_number=sage_result.get("sage_bill_id")
+            details={"sage_bill_number": invoice.sage_bill_number},
+            sage_bill_number=invoice.sage_bill_number
         )
         db.commit()
+        msg = "Invoice successfully reposted to Sage." if not is_duplicate else "Invoice successfully reposted to Sage."
         return ActionResponse(
             success=True,
-            message="Invoice successfully reposted to Sage.",
+            message=msg,
             new_status=InvoiceStatus.SAGE_POSTED,
             sage_post_result=sage_result,
         )
