@@ -37,7 +37,7 @@ export const useInvoiceStore = create((set, get) => ({
     skip: 0,
     setSkip: (skip) => set((state) => (state.skip === skip ? state : { skip })),
 
-    limit: 10,
+    limit: 15,
     setLimit: (limit) => set((state) => (state.limit === limit ? state : { limit })),
 
     viewInvoiceId: null,

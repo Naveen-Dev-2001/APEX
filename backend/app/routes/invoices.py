@@ -631,7 +631,7 @@ async def get_invoices(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity),
     skip: int = 0,
-    limit: int = 10,
+    limit: int = 15,
     search: str = None,
     filters: Optional[str] = Query(None),
     sort_by: str = "uploaded_at",

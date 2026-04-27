@@ -4,7 +4,7 @@ export const getInvoices = (params = {}, options = {}) =>
     API.get(`/invoices/`, {
         params: {
             skip: params.skip || 0,
-            limit: params.limit || 10,
+            limit: params.limit || 15,
             search: params.search || undefined,
             filters: params.filters ? JSON.stringify(params.filters) : undefined,
             sort_by: params.sort_by || "uploaded_at",
