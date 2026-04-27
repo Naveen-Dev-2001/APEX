@@ -234,20 +234,33 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                 ? form.vendorName.split("|")
                 : [null, null];
 
+        const buildCleanApprover = (index) => {
+            if (index > form.approverCount) return [];
+            return form.approvers[index] || [];
+        };
+
+        const buildCleanFinanceFlags = () => {
+            const flags = {};
+            for (let i = 1; i <= 5; i++) {
+                flags[i] = i <= form.approverCount ? (form.financeFlags[i] ?? false) : false;
+            }
+            return flags;
+        };
+
         const commonFields = {
             approver_count: form.approverCount,
-            mandatory_approver_1: buildApprover(1),
-            mandatory_approver_2: buildApprover(2),
-            mandatory_approver_3: buildApprover(3),
-            mandatory_approver_4: buildApprover(4),
-            mandatory_approver_5: buildApprover(5),
+            mandatory_approver_1: buildCleanApprover(1),
+            mandatory_approver_2: buildCleanApprover(2),
+            mandatory_approver_3: buildCleanApprover(3),
+            mandatory_approver_4: buildCleanApprover(4),
+            mandatory_approver_5: buildCleanApprover(5),
             is_threshold_enabled: form.thresholdEnabled,
             amount_threshold: form.thresholdEnabled ? Number(form.thresholdAmount) : null,
             threshold_approver: form.thresholdEnabled
                 ? form.thresholdApprover ? [form.thresholdApprover] : []
                 : null,
             posting_approver: form.postingApprover,
-            approver_flags: buildFinanceFlags(),
+            approver_flags: buildCleanFinanceFlags(),
         };
 
         const payload =
