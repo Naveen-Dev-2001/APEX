@@ -1,8 +1,7 @@
 import axios from "axios";
+import { API_BASE_URL } from "../../api/config";
 
-const baseURL =
-    window._env_?.VITE_BACKEND_URL ||
-    import.meta.env.VITE_BACKEND_URL;
+const baseURL = API_BASE_URL;
 
 const API = axios.create({
     baseURL: baseURL,
