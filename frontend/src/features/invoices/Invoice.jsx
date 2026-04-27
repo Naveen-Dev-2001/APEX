@@ -405,7 +405,7 @@ const Invoice = () => {
                                     <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.2)" }} />
 
                                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                        {pageTab === 'in_progress' && (
+                                        {pageTab === 'in_progress' && ["scanner", "coder"].includes(userRole) && (
                                             <Popconfirm
                                                 title="Delete Invoices"
                                                 description={`Are you sure you want to delete ${selectedInvoiceIds.length} invoices?`}
@@ -435,7 +435,7 @@ const Invoice = () => {
                                                 </button>
                                             </Popconfirm>
                                         )}
-                                        {pageTab === 'posted_stage' && (
+                                        {pageTab === 'posted_stage' && ["scanner", "coder"].includes(userRole) && (
                                             <Popconfirm
                                                 title="Archive Invoices"
                                                 description={`Are you sure you want to archive ${selectedInvoiceIds.length} invoices?`}
@@ -493,7 +493,7 @@ const Invoice = () => {
 
                             <div className="overflow-x-auto w-full">
                                 {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
-                                    <DataTable columns={columnDefs} data={invoices ?? []} loading={isLoading} totalItems={total} currentPage={(skip / limit) + 1} itemsPerPage={limit} onPageChange={(page) => setSkip((page - 1) * limit)} onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} sortColumn={sortColumn} sortDirection={sortDirection} onSort={(col, dir) => setSort(col, dir)} maxHeight="calc(100vh - 250px)" stickyHeader={true} enableColumnFilters={true} columnFilters={columnFilters} onColumnFiltersChange={setColumnFilters} selectable={pageTab === 'in_progress' || pageTab === 'posted_stage'} selectedRows={selectedInvoiceIds} onSelectionChange={setSelectedInvoiceIds} />
+                                    <DataTable columns={columnDefs} data={invoices ?? []} loading={isLoading} totalItems={total} currentPage={(skip / limit) + 1} itemsPerPage={limit} onPageChange={(page) => setSkip((page - 1) * limit)} onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} sortColumn={sortColumn} sortDirection={sortDirection} onSort={(col, dir) => setSort(col, dir)} maxHeight="calc(100vh - 250px)" stickyHeader={true} enableColumnFilters={true} onColumnFiltersChange={setColumnFilters} selectable={(pageTab === 'in_progress' || pageTab === 'posted_stage') && ["scanner", "coder"].includes(userRole)} selectedRows={selectedInvoiceIds} onSelectionChange={setSelectedInvoiceIds} />
                                 )}
                             </div>
                         </>
