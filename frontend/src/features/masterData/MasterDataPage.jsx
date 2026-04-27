@@ -485,12 +485,10 @@ const MasterDataPage = () => {
     return (
         <div className="p-6 flex flex-col gap-6 w-full bg-[#FBFBFB] min-h-screen">
             {/* Header */}
-            {/* <div className="flex items-center gap-3">
-                <h1 className="text-[28px] font-semibold text-[#333333]">Master Data Management</h1>
-                <span className="bg-[#E5E5E5] text-[#666666] px-2 py-0.5 rounded-full text-sm font-medium">
-                    {filteredData.length}
-                </span>
-            </div> */}
+            <div className="flex flex-col gap-1">
+                <h1 className="text-[28px] font-extrabold text-[#333333]">Master Data Management</h1>
+                <p className="text-sm text-gray-500">Manage your system reference data and configurations</p>
+            </div>
 
             {/* Controls Row */}
             <div className="flex items-center gap-3 flex-wrap">
@@ -500,7 +498,7 @@ const MasterDataPage = () => {
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 h-full text-[13px] font-medium transition-all duration-150 whitespace-nowrap
+                            className={`px-4 h-full text-[13px] ${activeTab === tab ? 'font-extrabold' : 'font-medium'} transition-all duration-150 whitespace-nowrap
                                 ${index !== tabs.length - 1 ? 'border-r border-gray-200' : ''}
                                 ${activeTab === tab
                                     ? 'bg-[#9AD4EF] text-[#333333]'

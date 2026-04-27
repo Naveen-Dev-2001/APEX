@@ -11,7 +11,7 @@ const CustomTabs = ({ tabs = [], activeTab, onChange }) => {
                             <button
                                 key={tab}
                                 onClick={() => onChange(tab)}
-                                className={`px-5 py-0 h-full text-[13px] font-medium border-r border-gray-200 last:border-r-0 flex items-center justify-center  whitespace-nowrap transition-colors
+                                className={`px-5 py-0 h-full text-[13px] ${isActive ? 'font-extrabold' : 'font-medium'} border-r border-gray-200 last:border-r-0 flex items-center justify-center  whitespace-nowrap transition-colors
                                     ${i === tabs.length - 1 ? "rounded-tr-md rounded-br-md" : ""}
                                     ${i === 0 ? "rounded-tl-md rounded-bl-md" : ""}
                                     ${isActive

@@ -161,6 +161,11 @@
     background-color: #f9fafb !important;
 }
 
+/* Ant Design Tabs font weight for selected tab */
+.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+    font-weight: 800 !important;
+}
+
 .ant-modal {
     margin: 0;
     padding: 0;
