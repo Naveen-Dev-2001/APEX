@@ -40,7 +40,7 @@ const RegisterPage = () => {
                 email,
                 username,
                 password,
-                department: "non-finance team"
+                department: "finance team"
             };
             console.log("Submitting:", payload);
 

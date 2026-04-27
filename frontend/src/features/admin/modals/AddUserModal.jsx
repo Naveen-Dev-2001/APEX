@@ -40,8 +40,8 @@ const AddUserModal = ({ isOpen, onClose, onAdd, roles = [], isUpdating }) => {
         }
         if (!form.password.trim()) newErrors.password = 'Password is required';
         if (!form.role) newErrors.role = 'Role is required';
-        if (form.role === 'approver' && !form.department) {
-            newErrors.department = 'Department is required for approvers';
+        if (!form.department) {
+            newErrors.department = 'Department is required';
         }
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -52,10 +52,8 @@ const AddUserModal = ({ isOpen, onClose, onAdd, roles = [], isUpdating }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (validate()) {
-            // Default department to 'non-finance' for non-approver roles
             const payload = {
-                ...form,
-                department: form.role === 'approver' ? form.department : 'non-finance team'
+                ...form
             };
             onAdd(payload);
         }
@@ -173,26 +171,24 @@ const AddUserModal = ({ isOpen, onClose, onAdd, roles = [], isUpdating }) => {
                                         }}
                                     />
                                 </div>
-                                {form.role === 'approver' && (
-                                    <div className="space-y-1 animate-fadeIn">
-                                        <Dropdown
-                                            label="Department"
-                                            required
-                                            value={form.department || ''}
-                                            options={[
-                                                { label: 'Finance Team', value: 'finance' },
-                                                { label: 'Non-Finance Team', value: 'non-finance' }
-                                            ]}
-                                            placeholder="Select Dept"
-                                            error={errors.department}
-                                            className="!gap-1"
-                                            onChange={(val) => {
-                                                setForm({ ...form, department: val });
-                                                if (errors.department) setErrors({ ...errors, department: '' });
-                                            }}
-                                        />
-                                    </div>
-                                )}
+                                <div className="space-y-1 animate-fadeIn">
+                                    <Dropdown
+                                        label="Department"
+                                        required
+                                        value={form.department || ''}
+                                        options={[
+                                            { label: 'Finance Team', value: 'finance' },
+                                            { label: 'Non-Finance Team', value: 'non-finance' }
+                                        ]}
+                                        placeholder="Select Dept"
+                                        error={errors.department}
+                                        className="!gap-1"
+                                        onChange={(val) => {
+                                            setForm({ ...form, department: val });
+                                            if (errors.department) setErrors({ ...errors, department: '' });
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>

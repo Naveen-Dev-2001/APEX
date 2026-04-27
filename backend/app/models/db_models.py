@@ -61,7 +61,7 @@ class User(Base):
     # pending, active, rejected
     status = Column(String(50), nullable=False, default="pending")
     department = Column(String(100), nullable=False,
-                        default="non-finance", index=True)  # finance, non-finance
+                        default="finance", index=True)  # finance, non-finance
     isCreatedByUser = Column(Boolean, nullable=False, default=True)
     createdby = Column(String(100), nullable=False, default="self")
     ispasswordchange = Column(Boolean, nullable=False, default=True)

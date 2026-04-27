@@ -108,18 +108,16 @@ const AdminPage = () => {
                                     options={statusOptions}
                                     onChange={(val) => setEditForm({ ...editForm, status: val })}
                                 />
-                                {editForm.role?.includes('approver') && (
-                                    <Dropdown
-                                        label="Department"
-                                        value={editForm.department || ''}
-                                        options={[
-                                            { label: 'Finance Team', value: 'finance' },
-                                            { label: 'Non-Finance Team', value: 'non-finance' }
-                                        ]}
-                                        placeholder="Select Department"
-                                        onChange={(val) => setEditForm({ ...editForm, department: val })}
-                                    />
-                                )}
+                                <Dropdown
+                                    label="Department"
+                                    value={editForm.department || ''}
+                                    options={[
+                                        { label: 'Finance Team', value: 'finance' },
+                                        { label: 'Non-Finance Team', value: 'non-finance' }
+                                    ]}
+                                    placeholder="Select Department"
+                                    onChange={(val) => setEditForm({ ...editForm, department: val })}
+                                />
                             </div>
                             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
                                 <button
