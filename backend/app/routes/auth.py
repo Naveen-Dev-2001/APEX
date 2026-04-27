@@ -130,10 +130,16 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         db, filters={"email": login_data.email}, limit=1)
     user = user_list[0] if user_list else None
 
-    if not user or not verify_password(login_data.password, user.password):
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email id not registered"
+        )
+
+    if not verify_password(login_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Invalid password"
         )
 
     # Check status
