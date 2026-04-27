@@ -1813,7 +1813,7 @@ async def repost_to_sage(
             sage_bill_number=invoice.sage_bill_number
         )
         db.commit()
-        msg = "Invoice successfully reposted to Sage." if not is_duplicate else "Invoice already exists in Sage. Status updated to Posted."
+        msg = "Invoice successfully reposted to Sage." if not is_duplicate else "Invoice successfully reposted to Sage."
         return ActionResponse(
             success=True,
             message=msg,
