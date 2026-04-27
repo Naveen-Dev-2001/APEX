@@ -9,6 +9,7 @@ from app.models.workflow import WorkflowStepType, WorkflowStepStatus
 from app.database.database import get_db, SessionLocal
 
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_, exists, func, cast, Date, DateTime
 from app.middleware.logger import logger
 error_logger = logging.getLogger("application_error")
 from fastapi import Query
@@ -39,7 +40,7 @@ from app.database.db_utils import (
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
 from app.models.user import UserResponse
-from datetime import datetime
+from datetime import datetime, date
 import os
 import uuid
 import asyncio
@@ -642,7 +643,7 @@ async def get_invoices(
 ):
     repo_filters = {"entity": entity}
     
-    from sqlalchemy import or_, and_, exists, func
+
     from sqlalchemy.orm import joinedload
     user_email = current_user.email.lower()
     user_dept = (current_user.department or "").lower()
@@ -707,7 +708,7 @@ async def get_invoices(
 
                 # Apply special coding_view logic if requested
                 if extra_filters.get("coding_view"):
-                    from sqlalchemy import or_, and_
+
                     expressions.append(
                         or_(
                             Invoice.status == InvoiceStatusEnum.WAITING_CODING,
@@ -808,6 +809,25 @@ async def get_invoices(
                         )
                     )
                     del extra_filters["approvals_view"]
+
+                # Handle mm-dd-yyyy date filters
+                to_delete = []
+                for k, v in extra_filters.items():
+                    col_attr = getattr(Invoice, k, None)
+                    if col_attr is not None and hasattr(col_attr, "type"):
+                        from sqlalchemy import Date as SADate, DateTime as SADateTime, cast
+                        if isinstance(col_attr.type, (SADate, SADateTime)):
+                            vals = v if isinstance(v, list) else [v]
+                            try:
+                                parsed_dates = [datetime.strptime(str(x), "%m-%d-%Y").date() for x in vals]
+                                from sqlalchemy import cast, Date
+                                expressions.append(cast(col_attr, Date).in_(parsed_dates))
+                                to_delete.append(k)
+                            except:
+                                # Not a date string, skip custom handling
+                                pass
+                for k in to_delete:
+                    del extra_filters[k]
 
                 # Convert list of values to list if they're not already
                 for k, v in extra_filters.items():
@@ -918,11 +938,6 @@ async def get_invoice_filter_options(
         
         return sorted([o for o in options if o], key=lambda x: str(x))
 
-    if not hasattr(Invoice, column):
-        raise HTTPException(status_code=400, detail=f"Column '{column}' does not exist on Invoice model")
-
-    col_attr = getattr(Invoice, column)
-    
     if filters:
         try:
             extra_filters = json.loads(filters)
@@ -932,17 +947,60 @@ async def get_invoice_filter_options(
             print(f"Error parsing filters in filter-options: {e}")
 
     # Query unique non-null values for the column with applied filters
+    target_model = Invoice
+    
+    if tab == "delete":
+        target_model = DeletedInvoice
+        expressions = [DeletedInvoice.entity == entity]
+
+    if not hasattr(target_model, column):
+        raise HTTPException(status_code=400, detail=f"Column '{column}' does not exist on {target_model.__name__} model")
+
+    col_attr = getattr(target_model, column)
+
     query = db.query(col_attr)
-    query = invoice_repo._apply_filters(query, repo_filters)
+    
+    # Apply filters manually for simplicity if it's DeletedInvoice, or use repo for Invoice
+    if target_model == Invoice:
+        query = invoice_repo._apply_filters(query, repo_filters)
+    else:
+        # Manual filter application for DeletedInvoice to avoid repo dependency issues
+        for field, value in repo_filters.items():
+            if hasattr(DeletedInvoice, field):
+                attr = getattr(DeletedInvoice, field)
+                if isinstance(value, list):
+                    query = query.filter(attr.in_(value))
+                else:
+                    query = query.filter(attr == value)
+
     for expr in expressions:
         query = query.filter(expr)
         
     results = query.filter(col_attr != None).distinct().all()
     
     # Flatten result list (SQLAlchemy returns tuples)
-    options = [r[0] for r in results if r[0] is not None and str(r[0]).strip() != ""]
+    raw_values = [r[0] for r in results if r[0] is not None and str(r[0]).strip() != ""]
     
-    return sorted(list(set(options)), key=lambda x: str(x))
+    # Sort raw values (this handles chronological sorting for dates)
+    try:
+        raw_values.sort()
+    except:
+        # Fallback if mixed types or non-sortable
+        raw_values = sorted(raw_values, key=lambda x: str(x))
+    
+    formatted_options = []
+    seen = set()
+    for val in raw_values:
+        if isinstance(val, (datetime, date)):
+            fmt = val.strftime("%m-%d-%Y")
+        else:
+            fmt = val
+        
+        if fmt not in seen:
+            formatted_options.append(fmt)
+            seen.add(fmt)
+            
+    return formatted_options
 
 
 @router.get("/{invoice_id}/", response_model=InvoiceResponse)
@@ -2802,6 +2860,7 @@ async def list_deleted_invoices(
     limit: int = Query(50, ge=1, le=500),
     sort_by: str = Query("deleted_at", description="Field to sort by"),
     sort_dir: str = Query("desc", description="Sort direction (asc/desc)"),
+    filters: Optional[str] = Query(None, description="JSON string of filters"),
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -2820,6 +2879,36 @@ async def list_deleted_invoices(
         query = query.filter(DeletedInvoice.vendor_id == vendor_id)
     if invoice_number:
         query = query.filter(DeletedInvoice.invoice_number == invoice_number)
+
+    if filters:
+        try:
+            extra_filters = json.loads(filters)
+            if isinstance(extra_filters, dict):
+                to_delete = []
+                for k, v in extra_filters.items():
+                    col_attr = getattr(DeletedInvoice, k, None)
+                    if col_attr is not None and hasattr(col_attr, "type"):
+                        from sqlalchemy import Date, DateTime, cast
+                        if isinstance(col_attr.type, (Date, DateTime)):
+                            vals = v if isinstance(v, list) else [v]
+                            try:
+                                parsed_dates = [datetime.strptime(str(x), "%m-%d-%Y").date() for x in vals]
+                                query = query.filter(cast(col_attr, Date).in_(parsed_dates))
+                                to_delete.append(k)
+                            except:
+                                pass
+                for k in to_delete:
+                    del extra_filters[k]
+                # Basic filters (equality or in_)
+                for field, value in extra_filters.items():
+                    if hasattr(DeletedInvoice, field):
+                        attr = getattr(DeletedInvoice, field)
+                        if isinstance(value, list):
+                            query = query.filter(attr.in_(value))
+                        else:
+                            query = query.filter(attr == value)
+        except Exception as e:
+            print(f"Error parsing filters in list_deleted_invoices: {e}")
 
     # Dynamic sorting
     if hasattr(DeletedInvoice, sort_by):
@@ -2904,19 +2993,19 @@ async def list_deleted_invoices(
             "entity": r.entity,
             "status": r.status,
             "uploaded_by": r.uploaded_by,
-            "uploaded_at": r.uploaded_at.isoformat() if r.uploaded_at else None,
+            "uploaded_at": r.uploaded_at.strftime("%m-%d-%Y") if r.uploaded_at else None,
             "deleted_by": r.deleted_by,
-            "deleted_at": r.deleted_at.isoformat() if r.deleted_at else None,
+            "deleted_at": r.deleted_at.strftime("%m-%d-%Y") if r.deleted_at else None,
             "sage_bill_number": r.sage_bill_number,
             "extracted_data": extracted_data,
             "total_amount": float(r.total_amount) if r.total_amount else None,
             "amount_due": float(r.amount_due) if r.amount_due else None,
-            "invoice_date": r.invoice_date.isoformat() if r.invoice_date else None,
-            "due_date": r.due_date.isoformat() if r.due_date else None,
+            "invoice_date": r.invoice_date.strftime("%m-%d-%Y") if r.invoice_date else None,
+            "due_date": r.due_date.strftime("%m-%d-%Y") if r.due_date else None,
             "confidence_score": r.confidence_score,
-            "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+            "processed_at": r.processed_at.strftime("%m-%d-%Y") if r.processed_at else None,
             "last_modified_by": last_modified_by,
-            "action_time": r.processed_at.isoformat() if r.processed_at else None,
+            "action_time": r.processed_at.strftime("%m-%d-%Y") if r.processed_at else None,
         }
 
     return {
