@@ -62,6 +62,7 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minima
         "amount_due": float(invoice.amount_due) if invoice.amount_due else None,
         "invoice_date": invoice.invoice_date,
         "due_date": invoice.due_date,
+        "updated_at": invoice.updated_at,
         "required_approvers": invoice.required_approvers,
         "current_approver_level": invoice.current_approver_level,
     }

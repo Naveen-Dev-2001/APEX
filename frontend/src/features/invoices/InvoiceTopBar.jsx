@@ -79,7 +79,9 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     const handleEnableEditing = async () => {
         try {
-            await workflowActionsAPI.enableEditing(viewInvoiceId);
+            await workflowActionsAPI.enableEditing(viewInvoiceId, {
+                last_updated_at: activeInvoiceData?.updated_at
+            });
             setEditingEnabled(true);
             setActiveInvoiceData({
                 ...activeInvoiceData,
@@ -139,9 +141,22 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     // ── Scanner / Coder actions ────────────────────────────────────────────
     const handleSendToCoding = async () => {
         setActionLoading("sendToCoding");
+
         try {
-            await handleSave();
-            const payload = await saveInvoice(viewInvoiceId, { status: "waiting_coding" });
+            const saveRes = await handleSave();
+
+            const payload = await saveInvoice(viewInvoiceId, {
+                status: "waiting_coding",
+                last_updated_at: saveRes?.updated_at || activeInvoiceData?.updated_at
+            });
+
+            // FIRST: check for conflict / error
+            if (payload?.error || payload?.message?.toLowerCase().includes("modified")) {
+                toast.error(payload.message || "This invoice was updated by another user.");
+                return;
+            }
+
+            // THEN: success case
             if (payload?.status === "waiting_coding") {
                 toast.success("Invoice sent for coding successfully!");
                 await queryClient.invalidateQueries(["invoices"]);
@@ -151,6 +166,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             } else {
                 toast.error(payload?.message || "Something went wrong while sending for coding.");
             }
+
         } catch (err) {
             console.error("Send to coding error:", err);
             toast.error("Failed to send invoice for coding.");
@@ -159,7 +175,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         }
     };
 
-     const handleDiscard = () => {
+
+    const handleDiscard = () => {
         setInvoiceData(activeInvoiceData);
         toast.success("Changes discarded!");
     };
@@ -208,7 +225,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         if (currentStatus === "reworked") {
             extraFields.status = "waiting_approval";
         }
-        
+
         setActionLoading("saving");
         try {
             const response = await handleSave(extraFields);
@@ -228,7 +245,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     const Back = () => {
         resetQuickView();
-        
+
         if (navigationOrigin) {
             const origin = navigationOrigin;
             setNavigationOrigin(null); // Clear origin
@@ -257,22 +274,26 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
         setActionLoading(action);
         try {
+            const actionPayload = {
+                comment: commentText,
+                last_updated_at: activeInvoiceData?.updated_at
+            };
             let result;
             switch (action) {
                 case "approve":
-                    result = await workflowActionsAPI.approve(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.approve(viewInvoiceId, actionPayload);
                     break;
                 case "reject":
-                    result = await workflowActionsAPI.reject(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.reject(viewInvoiceId, actionPayload);
                     break;
                 case "rework":
-                    result = await workflowActionsAPI.rework(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.rework(viewInvoiceId, actionPayload);
                     break;
                 case "repost-sage":
-                    result = await workflowActionsAPI.repostSage(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.repostSage(viewInvoiceId, actionPayload);
                     break;
                 case "recall":
-                    result = await workflowActionsAPI.recall(viewInvoiceId, { comment: commentText });
+                    result = await workflowActionsAPI.recall(viewInvoiceId, actionPayload);
                     break;
                 default:
                     return;
@@ -288,7 +309,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             queryClient.invalidateQueries(["workflow", viewInvoiceId]);
             queryClient.invalidateQueries(["auditFlow", viewInvoiceId]);
             queryClient.invalidateQueries(["invoices"]);
-            
+
             resetQuickView();
 
             // If it was a recall, navigate back to the coding queue
@@ -392,9 +413,9 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                             <CustomButton variant="outline" height="h-[34px]" onClick={handleDiscard}>Discard</CustomButton>
                                         </div>
                                         <div className="w-[130px]">
-                                            <CustomButton 
-                                                variant="primary" 
-                                                height="h-[34px]" 
+                                            <CustomButton
+                                                variant="primary"
+                                                height="h-[34px]"
                                                 disabled={!!actionLoading}
                                                 onClick={handleSaveInvoice}
                                             >
@@ -448,11 +469,11 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                             )}
 
                                             {/* Save — appears once editing is unlocked */}
-                                            {editingEnabled &&(currentStatus === "waiting_approval" || currentStatus === "reworked") && (
+                                            {editingEnabled && (currentStatus === "waiting_approval" || currentStatus === "reworked") && (
                                                 <div className="w-[130px]">
-                                                    <CustomButton 
-                                                        variant="primary" 
-                                                        height="h-[34px]" 
+                                                    <CustomButton
+                                                        variant="primary"
+                                                        height="h-[34px]"
                                                         disabled={!!actionLoading}
                                                         onClick={handleSaveInvoice}
                                                     >
@@ -512,7 +533,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                 </>
                             )}
 
-                             {/* Recall (Coder only, if level 1) */}
+                            {/* Recall (Coder only, if level 1) */}
                             {userRole.includes("coder") &&
                                 (currentStatus || "").toLowerCase().includes("waiting_approval") &&
                                 (workflowData?.current_approver_level === 1 || !workflowData) && (
@@ -527,8 +548,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                         </>
                     )}
                     <div className="w-[130px]">
-                        <CustomButton 
-                            variant="outline" 
+                        <CustomButton
+                            variant="outline"
                             height="h-[34px]"
                             onClick={onTogglePdf}
                         >
@@ -567,7 +588,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                         )}
                         {modal.action === "rework" && (
                             <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-700">
-                                {uiStatus?.current_level === 1 
+                                {uiStatus?.current_level === 1
                                     ? "The invoice will be sent back to the coder for coding."
                                     : "The invoice will be sent back to the previous Finance Team approver for corrections."}
                             </div>

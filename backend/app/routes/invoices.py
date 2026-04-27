@@ -1804,6 +1804,18 @@ async def update_invoice(
     # Capture state BEFORE updates
     old_invoice_dict = invoice_to_dict(invoice)
 
+    # ─── Concurrency Check (Optimistic Locking) ───
+    if invoice_update.last_updated_at and invoice.updated_at:
+        # Round to seconds to handle potential precision mismatch across DB/Protocols
+        db_ts = invoice.updated_at.replace(microsecond=0)
+        req_ts = invoice_update.last_updated_at.replace(microsecond=0)
+        
+        if db_ts > req_ts:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This invoice has been modified by another user. Please refresh."
+            )
+
     # --- Duplicate Check Logic (Constraint Enforcement) ---
     # Determine the effective vendor_id and invoice_number after update
     # Check if they are being updated in extracted_data

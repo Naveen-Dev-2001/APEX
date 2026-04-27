@@ -81,10 +81,12 @@ class StepType:
 # ─────────────────────────────────────────────
 class ActionRequest(BaseModel):
     comment: Optional[str] = None
+    last_updated_at: Optional[datetime] = None
 
 
 class EnableEditingRequest(BaseModel):
     comment: Optional[str] = None
+    last_updated_at: Optional[datetime] = None
 
 
 class ActionResponse(BaseModel):
@@ -146,6 +148,17 @@ def _parse_list(val: Any) -> List[str]:
                 pass
         return [s] if s else []
     return []
+
+
+def _check_concurrency(invoice: Invoice, last_updated_at: Optional[datetime]):
+    if last_updated_at and invoice.updated_at:
+        db_ts = invoice.updated_at.replace(microsecond=0)
+        req_ts = last_updated_at.replace(microsecond=0)
+        if db_ts > req_ts:
+            raise HTTPException(
+                status_code=409,
+                detail="This invoice has been modified by another user. Please refresh."
+            )
 
 
 def _get_finance_users(db: Session, entity: str) -> List[str]:
@@ -922,6 +935,8 @@ async def approve_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
+    _check_concurrency(invoice, payload.last_updated_at)
+
     current_status = (
         invoice.status.value
         if hasattr(invoice.status, "value")
@@ -1352,6 +1367,8 @@ async def reject_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
+    _check_concurrency(invoice, payload.last_updated_at)
+
     current_status = (
         invoice.status.value
         if hasattr(invoice.status, "value")
@@ -1474,6 +1491,8 @@ async def rework_invoice(
     invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         raise HTTPException(404, "Invoice not found")
+
+    _check_concurrency(invoice, payload.last_updated_at)
 
     current_status = (
         invoice.status.value
@@ -1638,6 +1657,8 @@ async def enable_editing(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
+    _check_concurrency(invoice, payload.last_updated_at)
+
     current_status = (
         invoice.status.value
         if hasattr(invoice.status, "value")
@@ -1722,6 +1743,8 @@ async def repost_to_sage(
     invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         raise HTTPException(404, "Invoice not found")
+
+    _check_concurrency(invoice, payload.last_updated_at)
 
     current_status = (
         invoice.status.value
@@ -1827,6 +1850,8 @@ async def recall_invoice(
     invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+
+    _check_concurrency(invoice, request.last_updated_at)
 
     # Strictly Coder check
     user_role = (current_user.role or "").lower()
