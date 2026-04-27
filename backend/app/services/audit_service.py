@@ -11,7 +11,7 @@ class AuditService:
     def __init__(self):
         pass
 
-    async def log_action(self, db: Session, invoice_id: Any, action: str, user: str, entity: str, details: Optional[Dict[str, Any]] = None):
+    async def log_action(self, db: Session, invoice_id: Any, action: str, user: str, entity: str, details: Optional[Dict[str, Any]] = None, sage_bill_number: Optional[str] = None):
         """
         Logs an action into the audit_logs table (SQL Server).
         """
@@ -30,6 +30,7 @@ class AuditService:
             "user": user,
             "entity": entity,
             "details": json.dumps(details) if details else None,
+            "sage_bill_number": sage_bill_number,
             "timestamp": datetime.utcnow()
         }
         audit_log_repo.create(db, obj_in=log_data)
