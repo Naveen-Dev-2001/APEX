@@ -427,7 +427,7 @@ const SettingsPage = () => {
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 h-full text-[13px] ${activeTab === tab ? 'font-extrabold' : 'font-medium'} transition-all duration-150 whitespace-nowrap
+                            className={`px-4 h-full text-[14px] ${activeTab === tab ? 'font-bold' : 'font-medium'} transition-colors duration-150 whitespace-nowrap
                                 ${index !== tabs.length - 1 ? 'border-r border-gray-200' : ''}
                                 ${activeTab === tab
                                     ? 'bg-[#9AD4EF] text-[#333333]'

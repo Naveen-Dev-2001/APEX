@@ -315,7 +315,7 @@ const Invoice = () => {
                             ].map(({ key, label }, index, arr) => {
                                 const isActive = pageTab === key;
                                     return (
-                                        <button key={key} onClick={() => setPageTab(key)} style={{ padding: "8px 24px", fontSize: 13, fontWeight: isActive ? 800 : 500, color: "black", background: isActive ? "#BAE7FF" : "#FFFFFF", border: "none", borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none", cursor: "pointer", transition: "all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1)", outline: "none", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "120px" }} onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }} onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}>
+                                        <button key={key} onClick={() => setPageTab(key)} style={{ padding: "8px 24px", fontSize: 14, fontWeight: isActive ? 700 : 500, color: "black", background: isActive ? "#BAE7FF" : "#FFFFFF", border: "none", borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none", cursor: "pointer", transition: "background-color 0.2s, color 0.2s", outline: "none", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "120px" }} onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }} onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}>
                                             {label}
                                         </button>
                                     );
