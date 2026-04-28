@@ -243,6 +243,28 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         }
     };
 
+    const handleRefresh = async () => {
+        setActionLoading("refreshing");
+        try {
+            await Promise.all([
+                queryClient.invalidateQueries(["invoice-preview", viewInvoiceId]),
+                queryClient.invalidateQueries(["workflow", viewInvoiceId]),
+                queryClient.invalidateQueries(["auditFlow", viewInvoiceId]),
+                queryClient.invalidateQueries(["vendor", selectedVendorId]),
+                queryClient.invalidateQueries(["coding-suggestions", viewInvoiceId, selectedVendorId]),
+                queryClient.invalidateQueries(["invoices"]),
+            ]);
+
+            await fetchUIStatus();
+            toast.success("Details refreshed!");
+        } catch (err) {
+            console.error("Refresh error:", err);
+            toast.error("Failed to refresh details.");
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     const Back = () => {
         resetQuickView();
 
@@ -457,6 +479,15 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
                                     {["waiting_approval", "reworked"].includes(currentStatus) && (
                                         <>
+                                            {/* Refresh */}
+                                            <button
+                                                onClick={handleRefresh}
+                                                disabled={!!actionLoading}
+                                                className={getBtnClass("blue", !actionLoading)}
+                                            >
+                                                {busy("refreshing") ? "Refreshing..." : "Refresh"}
+                                            </button>
+
                                             {/* Enable Editing — no API, flips local state only */}
                                             {!editingEnabled && (
                                                 <button
