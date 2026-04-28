@@ -99,22 +99,11 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                 <div className="overflow-y-auto px-6 py-5 flex flex-col gap-4">
                     {/* Row 1 */}
                     {(() => {
-                        const isTopLevel = form.entity_name === 'Top Level' || form.entity_name === 'Default Entity';
-                        const hasInvoices = rowData?.invoice_count > 0;
-                        const isFieldReadOnly = isEdit && (isTopLevel || hasInvoices);
+                        const isFieldReadOnly = isEdit;
 
                         return (
                             <>
-                                {/* {isFieldReadOnly && (
-                                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 mb-2">
-                                        <AlertCircle size={18} className="flex-shrink-0" />
-                                        <span className="text-[13px] leading-tight">
-                                            {isTopLevel 
-                                                ? "Top Level Entity ID and Name cannot be edited." 
-                                                : "Entity ID and Name cannot be edited because this entity has associated invoices."}
-                                        </span>
-                                    </div>
-                                )} */}
+                             
                                 <div className="grid grid-cols-2 gap-4">
                                     <FormField
                                         label="Entity Id"

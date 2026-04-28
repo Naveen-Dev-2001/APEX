@@ -19,7 +19,7 @@ from app.database.database import get_db
 from app.models.db_models import (
     EntityMaster, VendorMaster, TdsRate, GLMaster,
     LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster,
-    Currency
+    Currency, Invoice, DeletedInvoice
 )
 from app.repository.repositories import (
     entity_master_repo, vendor_master_repo, tds_rate_repo, gl_master_repo, lob_master_repo, department_master_repo, 
@@ -399,8 +399,37 @@ async def upload_master_file(
 
                 records_to_insert.append(record)
 
-        # Clear existing and insert
+        # Clear existing and insert (except for Entity Master which skips duplicates)
         repo = TAB_REPO_MAP.get(tab_name)
+        if tab_name in ["Entity_Master", "entity_master", "Entity"]:
+            # For Entity Master, we don't delete all. We skip existing ones.
+            if records_to_insert:
+                # Fetch existing IDs and Names to avoid duplicates
+                existing_entities = db.query(EntityMaster.entity_id, EntityMaster.entity_name).all()
+                existing_ids = {e.entity_id for e in existing_entities if e.entity_id}
+                existing_names = {e.entity_name for e in existing_entities if e.entity_name}
+                
+                # Filter out records that already exist
+                filtered_records = []
+                for r in records_to_insert:
+                    r_id = str(r.get("entity_id", ""))
+                    r_name = str(r.get("entity_name", ""))
+                    if r_id not in existing_ids and r_name not in existing_names:
+                        filtered_records.append(r)
+                        # Add to sets to avoid internal duplicates within the same upload file
+                        existing_ids.add(r_id)
+                        existing_names.add(r_name)
+                
+                if filtered_records:
+                    if repo:
+                        repo.bulk_create(db, obj_list=filtered_records)
+                    else:
+                        db.bulk_insert_mappings(model, filtered_records)
+                        db.commit()
+            
+            return {"message": f"Processed {len(records_to_insert)} rows. Uploaded {len(filtered_records) if 'filtered_records' in locals() else 0} new rows to {tab_name}."}
+
+        # Standard behavior for other tabs: Clear and Replace
         if repo:
             repo.delete_all(db)
             if records_to_insert:
@@ -478,6 +507,24 @@ async def get_sheet_data(
         rows = db.query(model).order_by(model.id).all()
         total_count = len(rows)
 
+    # Pre-calculate invoice counts for Entity Master to avoid N+1 queries
+    active_invoice_map = {}
+    deleted_invoice_map = {}
+    if identifier in ["Entity_Master", "entity_master", "Entity"]:
+        # Count active invoices per entity
+        active_counts = db.query(
+            Invoice.entity, 
+            func.count(Invoice.id).label('count')
+        ).filter(Invoice.entity.isnot(None)).group_by(Invoice.entity).all()
+        active_invoice_map = {e: c for e, c in active_counts}
+
+        # Count deleted invoices per entity
+        deleted_counts = db.query(
+            DeletedInvoice.entity, 
+            func.count(DeletedInvoice.id).label('count')
+        ).filter(DeletedInvoice.entity.isnot(None)).group_by(DeletedInvoice.entity).all()
+        deleted_invoice_map = {e: c for e, c in deleted_counts}
+
     # Convert SQLAlchemy objects to dicts
     result = []
     for row in rows:
@@ -497,8 +544,13 @@ async def get_sheet_data(
                     row_dict[column.name] = val
                     continue
 
-
             row_dict[column.name] = val
+        
+        # Add invoice_count for Entity Master
+        if identifier in ["Entity_Master", "entity_master", "Entity"]:
+            ent_id = row_dict.get('entity_id')
+            row_dict['invoice_count'] = active_invoice_map.get(ent_id, 0) + deleted_invoice_map.get(ent_id, 0)
+
         result.append(row_dict)
 
     # Wrap result in a standardized paginated response
@@ -635,6 +687,15 @@ def add_row(
     if not repo:
         raise HTTPException(404, "Table not found")
 
+    # Check for existing Entity ID or Name to prevent duplicates
+    if identifier in ["Entity_Master", "entity_master", "Entity"]:
+        existing = db.query(EntityMaster).filter(
+            (EntityMaster.entity_id == final_data.get('entity_id')) | 
+            (EntityMaster.entity_name == final_data.get('entity_name'))
+        ).first()
+        if existing:
+            raise HTTPException(400, "Entity ID or Entity Name already exists")
+
     try:
         new_record = repo.create(db, obj_in=final_data)
         return {"status": "success", "id": new_record.id}
@@ -681,6 +742,10 @@ def edit_row(
 
         m_col = k
         if hasattr(record, m_col):
+            # Do not allow updating entity_id or entity_name for Entity Master
+            if identifier in ["Entity_Master", "entity_master", "Entity"] and m_col in ["entity_id", "entity_name"]:
+                continue
+
             # Boolean Conversion
             col_info = repo.model.__table__.columns.get(m_col)
             if col_info is not None and isinstance(col_info.type, Boolean):
@@ -729,6 +794,14 @@ def delete_row(
         repo.model.id).offset(row_index).limit(1).first()
     
     if record:
+        # Restriction: Prevent deletion if invoices exist for this entity
+        if identifier in ["Entity_Master", "entity_master", "Entity"]:
+            active_count = db.query(Invoice).filter(Invoice.entity == record.entity_id).count()
+            deleted_count = db.query(DeletedInvoice).filter(DeletedInvoice.entity == record.entity_id).count()
+            
+            if active_count > 0 or deleted_count > 0:
+                raise HTTPException(status_code=400, detail="invoices is under this level,you can't deelte")
+
         repo.remove(db, id=record.id)
 
     return {"status": "deleted"}
