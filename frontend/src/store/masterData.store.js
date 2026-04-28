@@ -917,6 +917,7 @@ const useMasterDataStore = create((set, get) => ({
         else if (tabIdentifier === 'Customer Master') await get().fetchCustomerMasterData();
         else if (tabIdentifier === 'Item Master') await get().fetchItemMasterData();
         else if (tabIdentifier === 'Currency') await get().fetchCurrencyData();
+        else if (tabIdentifier === 'Exchange Rate Master') await get().fetchExchangeRateData();
     },
 
     // ─── Filtered data getter ─────────────────────────────────────────────────
