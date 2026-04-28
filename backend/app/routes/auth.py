@@ -5,7 +5,7 @@ from app.models.user import User as UserPydantic, UserResponse
 from app.models.db_models import User as UserDB
 from app.repository.repositories import user_repo, otp_repo
 from app.database.database import get_db
-from app.auth.jwt import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token
+from app.auth.jwt import verify_password, get_password_hash, create_access_token, create_refresh_token, verify_token, get_current_user
 from app.services.email_service import email_service
 from app.services.otp_service import otp_service
 from datetime import datetime, timedelta
@@ -166,7 +166,8 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         "email": user.email,
         "role": user.role,
         "department": getattr(user, 'department', None),
-        "ispasswordchange": user.ispasswordchange
+        "ispasswordchange": user.ispasswordchange,
+        "email_notifications": getattr(user, 'email_notifications', True)
     }
 
 
@@ -206,7 +207,8 @@ async def refresh_token_endpoint(refresh_token: str, db: Session = Depends(get_d
         "token_type": "bearer",
         "username": user.username,
         "role": user.role,
-        "ispasswordchange": user.ispasswordchange
+        "ispasswordchange": user.ispasswordchange,
+        "email_notifications": getattr(user, 'email_notifications', True)
     }
 
 
@@ -265,3 +267,17 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
     user_repo.update(db, db_obj=user, obj_in={"password": hashed_password})
 
     return {"message": "Password updated successfully"}
+
+
+@router.post("/toggle-email-notifications")
+async def toggle_email_notifications(
+    enabled: bool,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    user = user_repo.get(db, int(current_user.id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user_repo.update(db, db_obj=user, obj_in={"email_notifications": enabled})
+    return {"message": f"Email notifications {'enabled' if enabled else 'disabled'}", "email_notifications": enabled}

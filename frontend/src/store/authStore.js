@@ -36,5 +36,12 @@ export const useAuthStore = create((set) => ({
     sessionStorage.removeItem('active_role');
     sessionStorage.removeItem('selected_entity');
     set({ token: null, user: null, refreshToken: null });
+  },
+
+  updateUser: (updatedUser) => {
+    const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const newUser = { ...user, ...updatedUser };
+    sessionStorage.setItem('user', JSON.stringify(newUser));
+    set({ user: newUser });
   }
 }));

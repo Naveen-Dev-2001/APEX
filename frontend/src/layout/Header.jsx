@@ -22,6 +22,7 @@ import invoiceSelectIcon from '../assets/header-icons/invoics-icon-select.png';
 import invoiceUnselectIcon from '../assets/header-icons/invoics-icon-unselect.png';
 import useAdminStore from '../store/useAdminStore';
 import { useInvoiceStore } from '../store/invoice.store';
+import API from '../api/api';
 
 const tabs = [
     { name: 'Dashboard', route: '/dashboard', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
@@ -51,7 +52,7 @@ const Header = () => {
     const location = useLocation();
     const { setInvoiceSection } = useInvoiceStore()
     const { activeTab, setActiveTab } = useUIStore();
-    const { logout, user, activeRole, setActiveRole } = useAuthStore();
+    const { logout, user, activeRole, setActiveRole, updateUser } = useAuthStore();
     const entity = useCommonStore((state) => state.entity);
     // Use the display name for UI; fall back to entity_id or a default
     const selectedEntityName = sessionStorage.getItem('selected_entity_name') || entity || sessionStorage.getItem('selected_entity') || 'consolidated analytics';
@@ -164,6 +165,16 @@ const Header = () => {
         }
         setActiveTab(tab.name);
         navigate(tab.route);
+    };
+
+    const handleToggleEmail = async () => {
+        try {
+            const newValue = user?.email_notifications === false ? true : false;
+            await API.post(`/auth/toggle-email-notifications?enabled=${newValue}`);
+            updateUser({ email_notifications: newValue });
+        } catch (error) {
+            console.error("Failed to toggle email notifications:", error);
+        }
     };
 
     // Close dropdowns if clicked outside
@@ -380,6 +391,31 @@ const Header = () => {
                                         Change Entity
                                     </span>
                                 </button>
+
+                                {/* Email Notification Toggle */}
+                                <div className="flex items-center justify-between w-full mt-2 py-0.5">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-1 rounded-lg text-[#3ba5d8]">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-[14px] font-medium text-gray-700">
+                                            Email Notification
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleEmail();
+                                        }}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${user?.email_notifications !== false ? 'bg-[#1e9bd8]' : 'bg-gray-200'}`}
+                                    >
+                                        <span
+                                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${user?.email_notifications !== false ? 'translate-x-5' : 'translate-x-1'}`}
+                                        />
+                                    </button>
+                                </div>
                                
                                 {/* Change Role Action (only if user has multiple roles and not on select-entity route) */}
                                 {Array.isArray(allRoles) && allRoles.length >= 2 && location.pathname !== '/select-entity' && (

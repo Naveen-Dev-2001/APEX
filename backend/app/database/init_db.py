@@ -43,12 +43,12 @@ def create_database_if_not_exists():
             count = result.scalar()
             if count == 0:
                 conn.execute(text("CREATE DATABASE accounts_payable"))
-                print("✓ Database 'accounts_payable' created successfully")
+                print("SUCCESS: Database 'accounts_payable' created successfully")
             else:
-                print("✓ Database 'accounts_payable' already exists")
+                print("SUCCESS: Database 'accounts_payable' already exists")
         master_engine.dispose()
     except Exception as e:
-        print(f"✗ Failed to create database: {e}")
+        print(f"ERROR: Failed to create database: {e}")
         raise
 
 
@@ -67,11 +67,20 @@ def create_tables():
             if result.scalar() == 0:
                 conn.execute(text("ALTER TABLE users ADD department NVARCHAR(100) NULL"))
                 conn.execute(text("COMMIT"))
-                print("✓ Added department column to users table")
+                print("SUCCESS: Added department column to users table")
+            
+            # Check if email_notifications column exists
+            result = conn.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'email_notifications'"
+            ))
+            if result.scalar() == 0:
+                conn.execute(text("ALTER TABLE users ADD email_notifications BIT NOT NULL DEFAULT 1"))
+                conn.execute(text("COMMIT"))
+                print("SUCCESS: Added email_notifications column to users table")
     except Exception as e:
         print(f"Migration error (might be expected if table newly created): {e}")
 
-    print("✓ All tables created successfully")
+    print("SUCCESS: All tables created successfully")
 
 
 def create_admin_user(db):
@@ -89,9 +98,9 @@ def create_admin_user(db):
         )
         db.add(admin_user)
         db.commit()
-        print(f"✓ Admin user created: {settings.ADMIN_EMAIL}")
+        print(f"SUCCESS: Admin user created: {settings.ADMIN_EMAIL}")
     else:
-        print(f"✓ Admin user already exists: {settings.ADMIN_EMAIL}")
+        print(f"SUCCESS: Admin user already exists: {settings.ADMIN_EMAIL}")
 
 
 def create_default_currencies(db):
@@ -112,9 +121,9 @@ def create_default_currencies(db):
             currency = Currency(**curr_data)
             db.add(currency)
         db.commit()
-        print(f"✓ Created {len(default_currencies)} default currencies")
+        print(f"SUCCESS: Created {len(default_currencies)} default currencies")
     else:
-        print(f"✓ Currencies already exist ({existing_count} currencies)")
+        print(f"SUCCESS: Currencies already exist ({existing_count} currencies)")
 
 
 def create_default_settings(db):
@@ -145,9 +154,9 @@ def create_default_settings(db):
         )
         db.add(setting)
         db.commit()
-        print("✓ Default global settings created")
+        print("SUCCESS: Default global settings created")
     else:
-        print("✓ Global settings already exist")
+        print("SUCCESS: Global settings already exist")
 
 
 def create_default_entity(db):
@@ -173,9 +182,9 @@ def create_default_entity(db):
         )
         db.add(default_entity)
         db.commit()
-        print("✓ Default entity created (entity_id='DEFAULT') — replace by uploading an entity master file")
+        print("SUCCESS: Default entity created (entity_id='DEFAULT') — replace by uploading an entity master file")
     else:
-        print(f"✓ Entity master already has {existing_count} record(s), skipping default")
+        print(f"SUCCESS: Entity master already has {existing_count} record(s), skipping default")
 
 
 def init_database():
@@ -205,11 +214,11 @@ def init_database():
         create_default_entity(db)
         
         print("\n" + "="*50)
-        print("✓ DATABASE INITIALIZATION COMPLETE")
+        print("SUCCESS: DATABASE INITIALIZATION COMPLETE")
         print("="*50 + "\n")
         
     except Exception as e:
-        print(f"✗ Error during initialization: {e}")
+        print(f"ERROR: Error during initialization: {e}")
         db.rollback()
         raise
     finally:
@@ -256,11 +265,11 @@ async def seed_api_master_data(db, force=False):
                 sync_func = getattr(service, sync_method)
                 await sync_func()
                 new_count = db.query(model).count()
-                print(f"  ✓ {model.__name__} {action.lower()} completed ({new_count} records)")
+                print(f"  SUCCESS: {model.__name__} {action.lower()} completed ({new_count} records)")
             else:
-                print(f"✓ {model.__name__} already has {count} records, skipping seed (use force to re-sync)")
+                print(f"SUCCESS: {model.__name__} already has {count} records, skipping seed (use force to re-sync)")
         except Exception as e:
-            print(f"  ✗ Error checking/syncing {model.__name__}: {e}")
+            print(f"  ERROR: Error checking/syncing {model.__name__}: {e}")
     
     print("-"*30 + "\n")
 

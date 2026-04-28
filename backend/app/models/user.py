@@ -9,6 +9,7 @@ class User(BaseModel):
     role: str = "user"  # admin, coder, approver, user
     status: str = "pending"  # pending, active, rejected
     department: Optional[str] = None
+    email_notifications: bool = True
     created_at: Optional[datetime] = None
 
 class UserInDB(User):
@@ -26,6 +27,7 @@ class UserResponse(BaseModel):
     isCreatedByUser: bool = True
     createdby: str = "self"
     ispasswordchange: bool = True
+    email_notifications: bool = True
     created_at: datetime
 
 class UserPaginatedResponse(BaseModel):
