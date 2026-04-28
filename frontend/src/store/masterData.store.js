@@ -272,7 +272,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.uploadEntityMaster(file);
             await get().fetchEntityMasterData();
         } catch (err) {
-            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            set({ entityLoading: false });
             throw err;
         }
     },
@@ -283,7 +283,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.uploadTDSRatesData(file);
             await get().fetchTDSRatesData();
         } catch (err) {
-            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+            set({ tdsLoading: false });
             throw err;
         }
     },
@@ -294,7 +294,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.uploadVendorMaster(file);
             await get().fetchVendorMasterData();
         } catch (err) {
-            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            set({ vendorLoading: false });
             throw err;
         }
     },
@@ -305,7 +305,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.uploadGLMaster(file);
             await get().fetchGLMasterData();
         } catch (err) {
-            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+            set({ glLoading: false });
             throw err;
         }
     },
@@ -316,7 +316,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.uploadLOBMaster(file);
             await get().fetchLOBMasterData();
         } catch (err) {
-            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+            set({ lobLoading: false });
             throw err;
         }
     },
@@ -327,7 +327,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.uploadDepartmentMaster(file);
             await get().fetchDepartmentMasterData();
         } catch (err) {
-            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+            set({ departmentLoading: false });
             throw err;
         }
     },
@@ -338,7 +338,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.uploadCustomerMaster(file);
             await get().fetchCustomerMasterData();
         } catch (err) {
-            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+            set({ customerLoading: false });
             throw err;
         }
     },
@@ -349,7 +349,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.uploadItemMaster(file);
             await get().fetchItemMasterData();
         } catch (err) {
-            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+            set({ itemLoading: false });
             throw err;
         }
     },
@@ -395,7 +395,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addEntityRow(payload);
             await get().fetchEntityMasterData();
         } catch (err) {
-            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            set({ entityLoading: false });
             throw err;
         }
     },
@@ -421,7 +421,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editEntityRow(rowIndex, payload);
             await get().fetchEntityMasterData();
         } catch (err) {
-            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            set({ entityLoading: false });
             throw err;
         }
     },
@@ -433,7 +433,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteEntityRow(rowIndex);
             await get().fetchEntityMasterData();
         } catch (err) {
-            set({ entityLoading: false, entityError: err?.response?.data?.detail || err.message });
+            set({ entityLoading: false });
             throw err;
         }
     },
@@ -472,7 +472,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editVendorRow(rowIndex, payload);
             await get().fetchVendorMasterData();
         } catch (err) {
-            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            set({ vendorLoading: false });
             throw err;
         }
     },
@@ -510,7 +510,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addVendorRow(payload);
             await get().fetchVendorMasterData();
         } catch (err) {
-            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            set({ vendorLoading: false });
             throw err;
         }
     },
@@ -522,7 +522,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteVendorRow(rowIndex);
             await get().fetchVendorMasterData();
         } catch (err) {
-            set({ vendorLoading: false, vendorError: err?.response?.data?.detail || err.message });
+            set({ vendorLoading: false });
             throw err;
         }
     },
@@ -539,7 +539,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addTDSRateRow(payload);
             await get().fetchTDSRatesData();
         } catch (err) {
-            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+            set({ tdsLoading: false });
             throw err;
         }
     },
@@ -556,7 +556,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editTDSRateRow(rowIndex, payload);
             await get().fetchTDSRatesData();
         } catch (err) {
-            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+            set({ tdsLoading: false });
             throw err;
         }
     },
@@ -567,7 +567,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteTDSRateRow(rowIndex);
             await get().fetchTDSRatesData();
         } catch (err) {
-            set({ tdsLoading: false, tdsError: err?.response?.data?.detail || err.message });
+            set({ tdsLoading: false });
             throw err;
         }
     },
@@ -590,7 +590,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addGLRow(payload);
             await get().fetchGLMasterData();
         } catch (err) {
-            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+            set({ glLoading: false });
             throw err;
         }
     },
@@ -613,7 +613,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editGLRow(rowIndex, payload);
             await get().fetchGLMasterData();
         } catch (err) {
-            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+            set({ glLoading: false });
             throw err;
         }
     },
@@ -624,7 +624,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteGLRow(rowIndex);
             await get().fetchGLMasterData();
         } catch (err) {
-            set({ glLoading: false, glError: err?.response?.data?.detail || err.message });
+            set({ glLoading: false });
             throw err;
         }
     },
@@ -641,7 +641,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addLOBRow(payload);
             await get().fetchLOBMasterData();
         } catch (err) {
-            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+            set({ lobLoading: false });
             throw err;
         }
     },
@@ -658,7 +658,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editLOBRow(rowIndex, payload);
             await get().fetchLOBMasterData();
         } catch (err) {
-            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+            set({ lobLoading: false });
             throw err;
         }
     },
@@ -669,7 +669,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteLOBRow(rowIndex);
             await get().fetchLOBMasterData();
         } catch (err) {
-            set({ lobLoading: false, lobError: err?.response?.data?.detail || err.message });
+            set({ lobLoading: false });
             throw err;
         }
     },
@@ -685,7 +685,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addDepartmentRow(payload);
             await get().fetchDepartmentMasterData();
         } catch (err) {
-            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+            set({ departmentLoading: false });
             throw err;
         }
     },
@@ -701,7 +701,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editDepartmentRow(rowIndex, payload);
             await get().fetchDepartmentMasterData();
         } catch (err) {
-            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+            set({ departmentLoading: false });
             throw err;
         }
     },
@@ -712,7 +712,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteDepartmentRow(rowIndex);
             await get().fetchDepartmentMasterData();
         } catch (err) {
-            set({ departmentLoading: false, departmentError: err?.response?.data?.detail || err.message });
+            set({ departmentLoading: false });
             throw err;
         }
     },
@@ -728,7 +728,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addCustomerRow(payload);
             await get().fetchCustomerMasterData();
         } catch (err) {
-            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+            set({ customerLoading: false });
             throw err;
         }
     },
@@ -744,7 +744,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editCustomerRow(rowIndex, payload);
             await get().fetchCustomerMasterData();
         } catch (err) {
-            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+            set({ customerLoading: false });
             throw err;
         }
     },
@@ -755,7 +755,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteCustomerRow(rowIndex);
             await get().fetchCustomerMasterData();
         } catch (err) {
-            set({ customerLoading: false, customerError: err?.response?.data?.detail || err.message });
+            set({ customerLoading: false });
             throw err;
         }
     },
@@ -773,7 +773,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addItemRow(payload);
             await get().fetchItemMasterData();
         } catch (err) {
-            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+            set({ itemLoading: false });
             throw err;
         }
     },
@@ -791,7 +791,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editItemRow(rowIndex, payload);
             await get().fetchItemMasterData();
         } catch (err) {
-            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+            set({ itemLoading: false });
             throw err;
         }
     },
@@ -802,7 +802,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteItemRow(rowIndex);
             await get().fetchItemMasterData();
         } catch (err) {
-            set({ itemLoading: false, itemError: err?.response?.data?.detail || err.message });
+            set({ itemLoading: false });
             throw err;
         }
     },
@@ -823,7 +823,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addExchangeRateRow(payload);
             await get().fetchExchangeRateData();
         } catch (err) {
-            set({ exchangeRateLoading: false, exchangeRateError: err?.response?.data?.detail || err.message });
+            set({ exchangeRateLoading: false });
             throw err;
         }
     },
@@ -845,7 +845,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editExchangeRateRow(rowIndex, payload);
             await get().fetchExchangeRateData();
         } catch (err) {
-            set({ exchangeRateLoading: false, exchangeRateError: err?.response?.data?.detail || err.message });
+            set({ exchangeRateLoading: false });
             throw err;
         }
     },
@@ -857,7 +857,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteExchangeRateRow(rowIndex);
             await get().fetchExchangeRateData();
         } catch (err) {
-            set({ exchangeRateLoading: false, exchangeRateError: err?.response?.data?.detail || err.message });
+            set({ exchangeRateLoading: false });
             throw err;
         }
     },
@@ -874,7 +874,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.addCurrencyRow(payload);
             await get().fetchCurrencyData();
         } catch (err) {
-            set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
+            set({ currencyLoading: false });
             throw err;
         }
     },
@@ -890,7 +890,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.editCurrencyRow(currencyId, payload);
             await get().fetchCurrencyData();
         } catch (err) {
-            set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
+            set({ currencyLoading: false });
             throw err;
         }
     },
@@ -901,7 +901,7 @@ const useMasterDataStore = create((set, get) => ({
             await masterDataService.deleteCurrencyRow(currencyId);
             await get().fetchCurrencyData();
         } catch (err) {
-            set({ currencyLoading: false, currencyError: err?.response?.data?.detail || err.message });
+            set({ currencyLoading: false });
             throw err;
         }
     },

@@ -399,8 +399,37 @@ async def upload_master_file(
 
                 records_to_insert.append(record)
 
-        # Clear existing and insert
+        # Clear existing and insert (except for Entity Master which skips duplicates)
         repo = TAB_REPO_MAP.get(tab_name)
+        if tab_name in ["Entity_Master", "entity_master", "Entity"]:
+            # For Entity Master, we don't delete all. We skip existing ones.
+            if records_to_insert:
+                # Fetch existing IDs and Names to avoid duplicates
+                existing_entities = db.query(EntityMaster.entity_id, EntityMaster.entity_name).all()
+                existing_ids = {e.entity_id for e in existing_entities if e.entity_id}
+                existing_names = {e.entity_name for e in existing_entities if e.entity_name}
+                
+                # Filter out records that already exist
+                filtered_records = []
+                for r in records_to_insert:
+                    r_id = str(r.get("entity_id", ""))
+                    r_name = str(r.get("entity_name", ""))
+                    if r_id not in existing_ids and r_name not in existing_names:
+                        filtered_records.append(r)
+                        # Add to sets to avoid internal duplicates within the same upload file
+                        existing_ids.add(r_id)
+                        existing_names.add(r_name)
+                
+                if filtered_records:
+                    if repo:
+                        repo.bulk_create(db, obj_list=filtered_records)
+                    else:
+                        db.bulk_insert_mappings(model, filtered_records)
+                        db.commit()
+            
+            return {"message": f"Processed {len(records_to_insert)} rows. Uploaded {len(filtered_records) if 'filtered_records' in locals() else 0} new rows to {tab_name}."}
+
+        # Standard behavior for other tabs: Clear and Replace
         if repo:
             repo.delete_all(db)
             if records_to_insert:
@@ -657,6 +686,15 @@ def add_row(
     repo = TAB_REPO_MAP.get(identifier)
     if not repo:
         raise HTTPException(404, "Table not found")
+
+    # Check for existing Entity ID or Name to prevent duplicates
+    if identifier in ["Entity_Master", "entity_master", "Entity"]:
+        existing = db.query(EntityMaster).filter(
+            (EntityMaster.entity_id == final_data.get('entity_id')) | 
+            (EntityMaster.entity_name == final_data.get('entity_name'))
+        ).first()
+        if existing:
+            raise HTTPException(400, "Entity ID or Entity Name already exists")
 
     try:
         new_record = repo.create(db, obj_in=final_data)
