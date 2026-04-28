@@ -133,6 +133,14 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         render:     (_, row) => row?.extracted_data?.amounts?.amount_due?.value ?? "-",
     },
     {
+        header:     "Uploaded At",
+        accessor:   "uploaded_at",
+        sortable:   true,
+        filterable: true,
+        filterType: 'date',
+        render:     (val) => val ? new Date(val).toLocaleDateString() : "-",
+    },
+    {
         header:     "Last Updated",
         accessor:   "processed_at",
         sortable:   true,
@@ -234,6 +242,14 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable:     true,
         getFilterValue: (row) => row?.extracted_data?.client_info?.shipping_address?.value ?? "",
         render:         (_, row) => row?.extracted_data?.client_info?.shipping_address?.value ?? "-",
+    },
+    {
+        header:         "Uploaded At",
+        accessor:       "uploaded_at",
+        sortable:       true,
+        filterable:     true,
+        filterType:     'date',
+        render:         (val) => val ? new Date(val).toLocaleDateString() : "-",
     },
     {
         header:     "Invoice Number",

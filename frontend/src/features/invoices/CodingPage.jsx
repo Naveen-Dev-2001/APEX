@@ -15,7 +15,8 @@ const ACCESSOR_TO_DB_FIELD = {
     uploaded_by: "uploaded_by",
     status: "status",
     total_amount: "total_amount",
-    processed_at: "processed_at"
+    processed_at: "processed_at",
+    uploaded_at: "uploaded_at"
 };
 
 const CodingPage = () => {
@@ -27,7 +28,7 @@ const CodingPage = () => {
     const [itemsPerPage, setItemsPerPage] = useState(15);
 
     // Sort and Filter state
-    const [sortColumn, setSortColumn] = useState("processed_at");
+    const [sortColumn, setSortColumn] = useState("uploaded_at");
     const [sortDirection, setSortDirection] = useState("desc");
     const [columnFilters, setColumnFilters] = useState({});
 
@@ -152,6 +153,23 @@ const CodingPage = () => {
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[dbField];
                 return await getInvoiceFilterOptions(dbField, otherFilters);
+            }
+        },
+        {
+            header: "Uploaded At",
+            accessor: "uploaded_at",
+            minWidth: 200,
+            sortable: true,
+            render: (val) => {
+                if (!val) return "N/A";
+                return new Date(val).toLocaleString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                }).replace(',', ' -');
             }
         },
         {

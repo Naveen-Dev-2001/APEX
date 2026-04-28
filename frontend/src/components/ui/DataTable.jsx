@@ -392,7 +392,7 @@ const DataTable = ({
   loading = false,
   skeletonRows = 8,
   totalItems, 
-  itemsPerPageOptions = [15, 30, 50],
+  itemsPerPageOptions = [15, 30, 50, 100],
   onPageChange,
   onItemsPerPageChange,
   currentPage = 1,

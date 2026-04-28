@@ -867,6 +867,7 @@ async def get_invoices(
         search=search,
         search_fields=search_fields,
         order_by=sort_by,
+        descending=(sort_dir.lower() == "desc"),
         expressions=expressions,
         options=[
             joinedload(Invoice.workflow_steps),

@@ -30,6 +30,8 @@ const ACCESSOR_TO_DB_FIELD = {
     status: "status",
     total_amount: "total_amount",
     amount_due: "amount_due",
+    uploaded_at: "uploaded_at",
+    processed_at: "processed_at",
 };
 
 const Invoice = () => {

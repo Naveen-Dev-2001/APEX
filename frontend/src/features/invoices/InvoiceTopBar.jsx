@@ -412,15 +412,25 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     return (
         <>
-            <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4 flex items-center justify-between">
-
-                {/* Left — Back */}
-                <div
-                    onClick={Back}
-                    className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                >
-                    <img src={icons.arrowLeft} alt="Back" />
-                    <span className="text-lg font-bold text-gray-500 custom-font-jura">Back</span>
+            <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4 flex items-center ">
+                <div className="flex items-center gap-5"> 
+                    {/* Left — Back */}
+                    <div
+                        onClick={Back}
+                        className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                        <img src={icons.arrowLeft} alt="Back" />
+                        <span className="text-lg font-bold text-gray-500 custom-font-jura">Back</span>
+                    </div>
+                    <div className="w-[130px]">
+                            <CustomButton
+                                variant="outline"
+                                height="h-[34px]"
+                                onClick={onTogglePdf}
+                            >
+                                {isPdfVisible ? "Hide PDF" : "Show PDF"}
+                            </CustomButton>
+                    </div>
                 </div>
 
                 {/* Right — Action buttons */}
@@ -578,7 +588,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                 )}
                         </>
                     )}
-                    <div className="w-[130px]">
+                    {/* <div className="w-[130px]">
                         <CustomButton
                             variant="outline"
                             height="h-[34px]"
@@ -586,7 +596,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                         >
                             {isPdfVisible ? "Hide PDF" : "Show PDF"}
                         </CustomButton>
-                    </div>
+                    </div> */}
                 </div>
             </div>
 
