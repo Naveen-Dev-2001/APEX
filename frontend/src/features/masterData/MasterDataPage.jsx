@@ -196,13 +196,7 @@ const MasterDataPage = () => {
             onConfirm: async () => {
                 // Restriction: Check for invoices only after confirmation
                 if (isEntityTab && row.invoice_count > 0) {
-                    showConfirm({
-                        message: 'Restriction Alert',
-                        subMessage: "You can't delete this entity because an invoice has already been created for it.",
-                        confirmLabel: 'OK',
-                        showCancel: false,
-                        variant: 'danger'
-                    });
+                    toast.error("You can't delete this entity because an invoice has already been created for it.");
                     return;
                 }
 
