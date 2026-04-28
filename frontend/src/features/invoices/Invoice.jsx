@@ -493,7 +493,7 @@ const Invoice = () => {
 
                             <div className="overflow-x-auto w-full">
                                 {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
-                                    <DataTable columns={columnDefs} data={invoices ?? []} loading={isLoading} totalItems={total} currentPage={(skip / limit) + 1} itemsPerPage={limit} onPageChange={(page) => setSkip((page - 1) * limit)} onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} sortColumn={sortColumn} sortDirection={sortDirection} onSort={(col, dir) => setSort(col, dir)} maxHeight="calc(100vh - 250px)" stickyHeader={true} enableColumnFilters={true} onColumnFiltersChange={setColumnFilters} selectable={(pageTab === 'in_progress' || pageTab === 'posted_stage') && ["scanner", "coder"].includes(userRole)} selectedRows={selectedInvoiceIds} onSelectionChange={setSelectedInvoiceIds} />
+                                    <DataTable columns={columnDefs} data={invoices ?? []} loading={isLoading} totalItems={total} currentPage={(skip / limit) + 1} itemsPerPage={limit} onPageChange={(page) => setSkip((page - 1) * limit)} onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} sortColumn={sortColumn} sortDirection={sortDirection} onSort={(col, dir) => setSort(col, dir)} maxHeight="calc(100vh - 250px)" stickyHeader={true} enableColumnFilters={true} columnFilters={columnFilters} onColumnFiltersChange={setColumnFilters} selectable={(pageTab === 'in_progress' || pageTab === 'posted_stage') && ["scanner", "coder"].includes(userRole)} selectedRows={selectedInvoiceIds} onSelectionChange={setSelectedInvoiceIds} />
                                 )}
                             </div>
                         </>
