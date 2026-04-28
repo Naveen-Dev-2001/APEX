@@ -50,6 +50,21 @@ class EmailService:
     @staticmethod
     def send_email(to_email: str, subject: str, title: str, name: str, body: str, action_text: str = None, is_otp: bool = False):
         try:
+            # Check user preference from database
+            from app.database.database import SessionLocal
+            from app.models.db_models import User
+            
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.email == to_email).first()
+                if user and hasattr(user, 'email_notifications') and not user.email_notifications:
+                    logger.info(f"Email skipped for {to_email} due to user preference: {subject}")
+                    return True # Return True to indicate it was "handled"
+            except Exception as db_err:
+                logger.error(f"Error checking user preference for {to_email}: {db_err}")
+            finally:
+                db.close()
+
             msg = MIMEMultipart()
             msg['From'] = os.getenv("EMAIL_USER")
             msg['To'] = to_email

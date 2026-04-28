@@ -93,7 +93,8 @@ async def get_current_user(
         created_at=user.created_at,
         role=actual_role,
         status=user.status,
-        department=user.department
+        department=user.department,
+        email_notifications=getattr(user, 'email_notifications', True)
     )
         
     return user_response

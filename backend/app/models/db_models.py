@@ -65,6 +65,7 @@ class User(Base):
     isCreatedByUser = Column(Boolean, nullable=False, default=True)
     createdby = Column(String(100), nullable=False, default="self")
     ispasswordchange = Column(Boolean, nullable=False, default=True)
+    email_notifications = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Relationships

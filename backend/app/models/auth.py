@@ -31,6 +31,7 @@ class Token(BaseModel):
     role: Optional[str] = None
     department: Optional[str] = None
     ispasswordchange: bool = True
+    email_notifications: bool = True
 
 class ChangePasswordFirstTimeRequest(BaseModel):
     email: EmailStr
