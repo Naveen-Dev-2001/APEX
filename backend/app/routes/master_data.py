@@ -19,7 +19,7 @@ from app.database.database import get_db
 from app.models.db_models import (
     EntityMaster, VendorMaster, TdsRate, GLMaster,
     LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster,
-    Currency
+    Currency, Invoice, DeletedInvoice
 )
 from app.repository.repositories import (
     entity_master_repo, vendor_master_repo, tds_rate_repo, gl_master_repo, lob_master_repo, department_master_repo, 
@@ -478,6 +478,24 @@ async def get_sheet_data(
         rows = db.query(model).order_by(model.id).all()
         total_count = len(rows)
 
+    # Pre-calculate invoice counts for Entity Master to avoid N+1 queries
+    active_invoice_map = {}
+    deleted_invoice_map = {}
+    if identifier in ["Entity_Master", "entity_master", "Entity"]:
+        # Count active invoices per entity
+        active_counts = db.query(
+            Invoice.entity, 
+            func.count(Invoice.id).label('count')
+        ).filter(Invoice.entity.isnot(None)).group_by(Invoice.entity).all()
+        active_invoice_map = {e: c for e, c in active_counts}
+
+        # Count deleted invoices per entity
+        deleted_counts = db.query(
+            DeletedInvoice.entity, 
+            func.count(DeletedInvoice.id).label('count')
+        ).filter(DeletedInvoice.entity.isnot(None)).group_by(DeletedInvoice.entity).all()
+        deleted_invoice_map = {e: c for e, c in deleted_counts}
+
     # Convert SQLAlchemy objects to dicts
     result = []
     for row in rows:
@@ -497,8 +515,13 @@ async def get_sheet_data(
                     row_dict[column.name] = val
                     continue
 
-
             row_dict[column.name] = val
+        
+        # Add invoice_count for Entity Master
+        if identifier in ["Entity_Master", "entity_master", "Entity"]:
+            ent_id = row_dict.get('entity_id')
+            row_dict['invoice_count'] = active_invoice_map.get(ent_id, 0) + deleted_invoice_map.get(ent_id, 0)
+
         result.append(row_dict)
 
     # Wrap result in a standardized paginated response
@@ -729,6 +752,14 @@ def delete_row(
         repo.model.id).offset(row_index).limit(1).first()
     
     if record:
+        # Restriction: Prevent deletion if invoices exist for this entity
+        if identifier in ["Entity_Master", "entity_master", "Entity"]:
+            active_count = db.query(Invoice).filter(Invoice.entity == record.entity_id).count()
+            deleted_count = db.query(DeletedInvoice).filter(DeletedInvoice.entity == record.entity_id).count()
+            
+            if active_count > 0 or deleted_count > 0:
+                raise HTTPException(status_code=400, detail="invoices is under this level,you can't deelte")
+
         repo.remove(db, id=record.id)
 
     return {"status": "deleted"}

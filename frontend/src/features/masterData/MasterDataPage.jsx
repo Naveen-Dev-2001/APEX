@@ -186,11 +186,6 @@ const MasterDataPage = () => {
     };
 
     const handleDelete = (row, indexInPage) => {
-        if (isEntityTab && row.invoice_count > 0) {
-            toast.error("You can’t delete this entity because an invoice has already been created for it.");
-            return;
-        }
-
         const itemName = row.entity_name || row.entityName || row.vendor_name || row.vendorName || 'this item';
 
         showConfirm({
@@ -199,6 +194,18 @@ const MasterDataPage = () => {
             confirmLabel: 'Delete',
             variant: 'danger',
             onConfirm: async () => {
+                // Restriction: Check for invoices only after confirmation
+                if (isEntityTab && row.invoice_count > 0) {
+                    showConfirm({
+                        message: 'Restriction Alert',
+                        subMessage: "You can't delete this entity because an invoice has already been created for it.",
+                        confirmLabel: 'OK',
+                        showCancel: false,
+                        variant: 'danger'
+                    });
+                    return;
+                }
+
                 const loadingToast = toast.loading(`Deleting ${itemName}...`);
                 try {
                     const masterData = masters[activeTab].data;
