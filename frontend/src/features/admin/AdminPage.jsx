@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import UserManagementTab from './UserManagementTab';
 import useAdminStore from '../../store/useAdminStore';
+import { useAuthStore } from '../../store/authStore';
 import Dropdown from '../../components/ui/Dropdown';
 import GlobalConfigTab from './GlobalConfigTab';
 import DelegationsTab from './DelegationsTab';
@@ -25,7 +26,10 @@ const AdminPage = () => {
     const roleOptions = roles?.map(r => ({ label: r.charAt(0).toUpperCase() + r.slice(1), value: r }));
     const statusOptions = statuses?.map(s => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }));
 
-    const tabs = ['User Management', 'Global Config', 'Delegations'];
+    const { user } = useAuthStore();
+    const tabs = user?.email?.toLowerCase() === 'admin@example.com' 
+        ? ['User Management', 'Global Config', 'Delegations'] 
+        : ['User Management', 'Delegations'];
 
     const handleRoleLogic = (newSelectedRoles, previousRoles) => {
         const multiRoles = ['admin', 'approver'];
