@@ -60,7 +60,8 @@ class VendorMatcher:
         text = re.sub(r"[^\w\s]", " ", text)
 
         tokens = text.split()
-        tokens = [t for t in tokens if t not in STOP_WORDS]
+        # Filter stop words and noise (single character tokens)
+        tokens = [t for t in tokens if len(t) > 1 and t not in STOP_WORDS]
 
         if deep_clean:
             tokens = [t for t in tokens if t not in GENERIC_WORDS]
@@ -217,7 +218,7 @@ class VendorMatcher:
             input_core,
             self.deep_clean_names,
             scorer=fuzz.token_set_ratio,
-            limit=7
+            limit=20
         )
 
         for _, score, idx in top:
@@ -225,10 +226,16 @@ class VendorMatcher:
             record = self.master_records[idx]
             name_score = score / 100
 
-            # Brand containment boost
+            # Brand containment boost (space-insensitive)
             master_core = self.deep_clean_names[idx]
-            if input_core in master_core or master_core in input_core:
-                name_score = max(name_score, 0.97)
+            
+            # Use space-insensitive check to handle concatenated/split words
+            input_no_space = input_core.replace(" ", "")
+            master_no_space = master_core.replace(" ", "")
+            
+            if input_no_space and master_no_space:
+                if input_no_space in master_no_space or master_no_space in input_no_space:
+                    name_score = max(name_score, 0.97)
 
             addr_score = self._score_address(input_address, record)
 

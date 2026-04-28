@@ -50,6 +50,9 @@ def get_vendor_id_from_master(
     normalized_name = normalize_vendor(vendor_name) if vendor_name else None
     normalized_address = normalize_address(vendor_address) if vendor_address else None
 
+    print("normalized_name", normalized_name)
+    print("normalized_address", normalized_address)
+
     # -------------------------------------------------------
     # 1. Vendor Metadata Lookup (SQL Server) - LEARNED MAPPINGS
     # -------------------------------------------------------

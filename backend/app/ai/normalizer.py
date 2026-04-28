@@ -39,6 +39,12 @@ def normalize_vendor(name: str) -> str:
     
     # Remove all non-alphanumeric (keep spaces)
     text = re.sub(r"[^a-z0-9 ]", " ", text)
+    
+    tokens = text.split()
+    # Filter noise (single character tokens)
+    tokens = [t for t in tokens if len(t) > 1]
+    text = " ".join(tokens)
+
     # Collapse multiple spaces and strip
     text = re.sub(r"\s+", " ", text).strip()
 
