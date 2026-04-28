@@ -132,14 +132,14 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         getFilterValue: (row) => row?.extracted_data?.amounts?.amount_due?.value ?? "",
         render:     (_, row) => row?.extracted_data?.amounts?.amount_due?.value ?? "-",
     },
-    {
-        header:     "Uploaded At",
-        accessor:   "uploaded_at",
-        sortable:   true,
-        filterable: true,
-        filterType: 'date',
-        render:     (val) => val ? new Date(val).toLocaleDateString() : "-",
-    },
+    // {
+    //     header:     "Uploaded At",
+    //     accessor:   "uploaded_at",
+    //     sortable:   true,
+    //     filterable: true,
+    //     filterType: 'date',
+    //     render:     (val) => val ? new Date(val).toLocaleDateString() : "-",
+    // },
     {
         header:     "Last Updated",
         accessor:   "processed_at",
