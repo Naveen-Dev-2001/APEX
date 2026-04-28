@@ -412,7 +412,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     return (
         <>
-            <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4 flex items-center ">
+            <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4 flex items-center justify-between ">
                 <div className="flex items-center gap-5"> 
                     {/* Left — Back */}
                     <div
