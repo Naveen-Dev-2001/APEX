@@ -94,6 +94,7 @@ const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, 
             placeholder="Select"
             size="small"
             style={{ width: "100%", height: "32px", fontSize: "13px", display: "block" }}
+            popupMatchSelectWidth={false}
         />
     </div>
 ),
@@ -610,11 +611,11 @@ const CodingTab = ({ isActive = false }) => {
                                     <col style={{ width: 90 }} />    {/* qty */}
                                     <col style={{ width: 110 }} />   {/* unit price */}
                                     <col style={{ width: 120 }} />   {/* net amount */}
-                                    <col style={{ width: 170 }} />   {/* GL code */}
-                                    <col style={{ width: 140 }} />   {/* LOB */}
-                                    <col style={{ width: 155 }} />   {/* department */}
-                                    <col style={{ width: 155 }} />   {/* customer */}
-                                    <col style={{ width: 145 }} />   {/* item */}
+                                    <col style={{ width: 250 }} />   {/* GL code */}
+                                    <col style={{ width: 250 }} />   {/* LOB */}
+                                    <col style={{ width: 250 }} />   {/* department */}
+                                    <col style={{ width: 250 }} />   {/* customer */}
+                                    <col style={{ width: 250 }} />   {/* item */}
                                     <col style={{ width: 56 }} />    {/* action */}
                                 </colgroup>
 
