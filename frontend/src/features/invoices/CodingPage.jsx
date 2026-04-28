@@ -155,23 +155,23 @@ const CodingPage = () => {
                 return await getInvoiceFilterOptions(dbField, otherFilters);
             }
         },
-        {
-            header: "Uploaded At",
-            accessor: "uploaded_at",
-            minWidth: 200,
-            sortable: true,
-            render: (val) => {
-                if (!val) return "N/A";
-                return new Date(val).toLocaleString('en-US', {
-                    month: '2-digit',
-                    day: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                }).replace(',', ' -');
-            }
-        },
+        // {
+        //     header: "Uploaded At",
+        //     accessor: "uploaded_at",
+        //     minWidth: 200,
+        //     sortable: true,
+        //     render: (val) => {
+        //         if (!val) return "N/A";
+        //         return new Date(val).toLocaleString('en-US', {
+        //             month: '2-digit',
+        //             day: '2-digit',
+        //             year: 'numeric',
+        //             hour: '2-digit',
+        //             minute: '2-digit',
+        //             hour12: true
+        //         }).replace(',', ' -');
+        //     }
+        // },
         {
             header: "Total Amount ($)",
             accessor: "total_amount",
