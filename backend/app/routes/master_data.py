@@ -742,6 +742,10 @@ def edit_row(
 
         m_col = k
         if hasattr(record, m_col):
+            # Do not allow updating entity_id or entity_name for Entity Master
+            if identifier in ["Entity_Master", "entity_master", "Entity"] and m_col in ["entity_id", "entity_name"]:
+                continue
+
             # Boolean Conversion
             col_info = repo.model.__table__.columns.get(m_col)
             if col_info is not None and isinstance(col_info.type, Boolean):
