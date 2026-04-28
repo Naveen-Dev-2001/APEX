@@ -9,7 +9,7 @@ import workflowAPI from '../../api/workflowAPI';
 import toast from '../../utils/toast';
 import { useSettingsStore } from '../../store/settings.store';
 
-const TABS = ['Vendor Based Workflow', 'Config Based Workflow'];
+const TABS = ['Vendor Based Workflow', 'Codification Based Workflow'];
 
 // Helper: read approver_flags safely regardless of key type (number or string)
 const getFinanceFlag = (data, index) =>
@@ -70,7 +70,7 @@ const Settings = () => {
         if (!deleteTarget) return;
         try {
             setDeleteLoading(true);
-            if (activeSettingsTab === 'Config Based Workflow') {
+            if (activeSettingsTab === 'Codification Based Workflow') {
                 await workflowAPI.deleteCodificationWorkflow(deleteTarget.id);
                 fetchCodification();
             } else {
@@ -93,7 +93,7 @@ const Settings = () => {
     };
 
     const handleSuccess = () => {
-        if (activeSettingsTab === 'Config Based Workflow') {
+        if (activeSettingsTab === 'Codification Based Workflow') {
             fetchCodification();
         } else {
             fetchVendor();
@@ -316,7 +316,7 @@ const Settings = () => {
         },
     ];
 
-    const isConfigTab = activeSettingsTab === 'Config Based Workflow';
+    const isConfigTab = activeSettingsTab === 'Codification Based Workflow';
 
     return (
         <div className="h-screen flex flex-col bg-[#f8fafc] p-4">
@@ -370,7 +370,7 @@ const Settings = () => {
                             rowHeight={52}
                         />
                     )}
-                    {activeSettingsTab === 'Config Based Workflow' && (
+                    {activeSettingsTab === 'Codification Based Workflow' && (
                         <ReusableDataTable
                             title="Codification Workflows"
                             columnDefs={codificationColumns}

@@ -186,7 +186,7 @@ const useWorkflowStore = create((set, get) => ({
                 w.vendor_name?.toLowerCase().includes(query) || 
                 w.vendor_id?.toLowerCase().includes(query)
             );
-        } else if (activeTab === 'Config Based Workflow') {
+        } else if (activeTab === 'Codification Based Workflow') {
              return codificationWorkflows.filter(w => 
                 w.lob?.toLowerCase().includes(query) || 
                 w.department_id?.toLowerCase().includes(query)

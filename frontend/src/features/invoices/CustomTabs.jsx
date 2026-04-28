@@ -11,12 +11,12 @@ const CustomTabs = ({ tabs = [], activeTab, onChange }) => {
                             <button
                                 key={tab}
                                 onClick={() => onChange(tab)}
-                                className={`px-5 py-0 h-full text-[13px] font-medium border-r border-gray-200 last:border-r-0 flex items-center justify-center  whitespace-nowrap transition-colors
+                                className={`px-5 py-0 h-full text-[14px] ${isActive ? 'font-bold' : 'font-medium'} border-r border-gray-200 last:border-r-0 flex items-center justify-center  whitespace-nowrap transition-colors
                                     ${i === tabs.length - 1 ? "rounded-tr-md rounded-br-md" : ""}
                                     ${i === 0 ? "rounded-tl-md rounded-bl-md" : ""}
                                     ${isActive
-                                        ? "bg-[#8dc3e3] text-gray-800"
-                                        : "bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50 "
+                                        ? "bg-[#8dc3e3] text-black"
+                                        : "bg-white text-black hover:text-black hover:bg-gray-50 "
                                     }`}
                             >
                                 {tab}

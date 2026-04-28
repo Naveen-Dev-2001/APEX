@@ -29,7 +29,7 @@ const AdminPage = () => {
 
     const handleRoleLogic = (newSelectedRoles, previousRoles) => {
         const multiRoles = ['admin', 'approver'];
-        
+
         // If a role was removed, just return the new list
         if (newSelectedRoles.length < previousRoles.length) {
             return newSelectedRoles;
@@ -80,7 +80,7 @@ const AdminPage = () => {
 
     return (
         <div className="p-2 sm:p-4 flex flex-col gap-4 sm:gap-5 w-full bg-gray-50 min-h-0">
-            {/* <h1 className="text-2xl font-semibold mb-2 text-[#333333] text-left">
+            {/* <h1 className="text-2xl font-extrabold mb-2 text-[#333333] text-left">
                 Admin Dashboard
             </h1> */}
 
@@ -140,7 +140,7 @@ const AdminPage = () => {
                 )}
 
                 {/* Add User Modal Component */}
-                <AddUserModal 
+                <AddUserModal
                     isOpen={isAddModalOpen}
                     onClose={() => setIsAddModalOpen(false)}
                     onAdd={handleAddUser}
@@ -153,18 +153,21 @@ const AdminPage = () => {
 
                     {/* Tabs */}
                     <div className="flex border border-gray-200 rounded-md overflow-x-auto h-[38px] w-full sm:w-auto no-scrollbar">
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`px-5 py-0 text-[13px] font-medium transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center whitespace-nowrap ${activeTab === tab
-                                    ? 'bg-[#8dc3e3] text-gray-800'
-                                    : 'bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                    }`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
+                        {tabs.map((tab) => {
+                            const isActive = activeTab === tab;
+                            return (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`px-5 py-0 text-[14px] ${isActive ? 'font-bold' : 'font-medium'} transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center whitespace-nowrap ${isActive
+                                        ? 'bg-[#8dc3e3] text-gray-800'
+                                        : 'bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {tab}
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* Right side actions - conditional on activeTab */}

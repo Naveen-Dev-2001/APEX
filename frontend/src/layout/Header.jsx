@@ -238,7 +238,7 @@ const Header = () => {
                                 alt={`${tab.name} icon`}
                                 className="w-4 h-4 object-contain"
                             />
-                            <span className={`text-[14px] ${isActive ? 'font-medium' : 'font-normal'}`}>
+                            <span className={`text-[14px] ${isActive ? 'font-bold' : 'font-normal'}`}>
                                 {tab.name}
                             </span>
                             {/* Active Bottom Border */}

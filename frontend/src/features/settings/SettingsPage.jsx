@@ -37,7 +37,7 @@ const SettingsPage = () => {
         if (activeTab === 'Vendor Based Workflow') {
             fetchVendorWorkflows();
             fetchVendorMetadata();
-        } else if (activeTab === 'Config Based Workflow') {
+        } else if (activeTab === 'Codification Based Workflow') {
             fetchCodificationWorkflows();
             fetchCodificationMetadata();
         }
@@ -363,7 +363,7 @@ const SettingsPage = () => {
         }] : [])
     ];
 
-    const tabs = ['Vendor Based Workflow', 'Config Based Workflow'];
+    const tabs = ['Vendor Based Workflow', 'Codification Based Workflow'];
 
     const renderTabContent = () => {
         const columns = activeTab === 'Vendor Based Workflow' ? vendorColumns : codificationColumns;
@@ -416,7 +416,7 @@ const SettingsPage = () => {
         <div className="p-4 flex flex-col gap-4 w-full bg-gray-50 min-h-0 h-full">
             {/* Header Area */}
             {/* <div className="flex flex-col gap-1">
-                <h1 className="text-[28px] font-semibold text-[#333333]">Approval Workflow Settings</h1>
+                <h1 className="text-[28px] font-extrabold text-[#333333]">Approval Workflow Settings</h1>
             </div> */}
 
             {/* Controls Row */}
@@ -427,7 +427,7 @@ const SettingsPage = () => {
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 h-full text-[13px] font-medium transition-all duration-150 whitespace-nowrap
+                            className={`px-4 h-full text-[14px] ${activeTab === tab ? 'font-bold' : 'font-medium'} transition-colors duration-150 whitespace-nowrap
                                 ${index !== tabs.length - 1 ? 'border-r border-gray-200' : ''}
                                 ${activeTab === tab
                                     ? 'bg-[#9AD4EF] text-[#333333]'
