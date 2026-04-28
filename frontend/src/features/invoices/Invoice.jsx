@@ -30,6 +30,8 @@ const ACCESSOR_TO_DB_FIELD = {
     status: "status",
     total_amount: "total_amount",
     amount_due: "amount_due",
+    uploaded_at: "uploaded_at",
+    processed_at: "processed_at",
 };
 
 const Invoice = () => {
@@ -348,7 +350,7 @@ const Invoice = () => {
                             </div>
                             {userRole === 'scanner' && pageTab === 'in_progress' && (
                                 <div style={{ minWidth: 160 }}>
-                                    <CustomButton variant="primary" type="button" onClick={() => setIsModalOpen(true)}>Create Invoice</CustomButton>
+                                    <CustomButton variant="primary" type="button" onClick={() => setIsModalOpen(true)}>Add Invoice</CustomButton>
                                 </div>
                             )}
                         </div>
