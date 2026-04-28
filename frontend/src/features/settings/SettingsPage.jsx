@@ -37,7 +37,7 @@ const SettingsPage = () => {
         if (activeTab === 'Vendor Based Workflow') {
             fetchVendorWorkflows();
             fetchVendorMetadata();
-        } else if (activeTab === 'Config Based Workflow') {
+        } else if (activeTab === 'Codification Based Workflow') {
             fetchCodificationWorkflows();
             fetchCodificationMetadata();
         }
@@ -363,7 +363,7 @@ const SettingsPage = () => {
         }] : [])
     ];
 
-    const tabs = ['Vendor Based Workflow', 'Config Based Workflow'];
+    const tabs = ['Vendor Based Workflow', 'Codification Based Workflow'];
 
     const renderTabContent = () => {
         const columns = activeTab === 'Vendor Based Workflow' ? vendorColumns : codificationColumns;
