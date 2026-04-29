@@ -21,7 +21,10 @@ const UserManagementTab = ({ onEdit }) => {
     const safeUsers = users || [];
 
     // Processed users now handled by backend
-    const displayUsers = users || [];
+    const displayUsers = (users || []).map((user, idx) => ({
+        ...user,
+        sno: (currentPage - 1) * itemsPerPage + idx + 1
+    }));
 
     const getRoleStyles = (role) => {
         switch (role?.toLowerCase()) {
@@ -34,6 +37,13 @@ const UserManagementTab = ({ onEdit }) => {
     };
 
     const columns = [
+        {
+            header: 'S.No',
+            accessor: 'sno',
+            sortable: true,
+            filterable: true,
+            onClick: () => setSort('sno')
+        },
         {
             header: 'User Name',
             accessor: 'username',

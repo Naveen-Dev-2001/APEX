@@ -156,7 +156,7 @@ const useAdminStore = create((set, get) => ({
                 skip: (currentPage - 1) * itemsPerPage,
                 limit: itemsPerPage,
                 search: searchQuery,
-                sort_by: sortColumn,
+                sort_by: sortColumn === 'sno' ? 'id' : sortColumn,
                 sort_dir: sortDirection
             });
             // response is { data, total, ... }
