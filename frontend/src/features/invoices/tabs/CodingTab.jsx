@@ -408,6 +408,14 @@ const CodingTab = ({ isActive = false }) => {
         () => Array.from(new Set((rows || []).map((r) => r.department).filter(Boolean))),
         [rows]
     );
+    const initialCustomerValues = useMemo(
+        () => Array.from(new Set((rows || []).map((r) => r.customer).filter(Boolean))),
+        [rows]
+    );
+    const initialItemValues = useMemo(
+        () => Array.from(new Set((rows || []).map((r) => r.item).filter(Boolean))),
+        [rows]
+    );
 
     // Remote Master Data Hooks
     const gl = useRemoteMasterData("GL", {
@@ -430,11 +438,15 @@ const CodingTab = ({ isActive = false }) => {
     });
     const customer = useRemoteMasterData("Customer", {
         mapOption: i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id }),
-        enabled: loadMasterData
+        enabled: loadMasterData,
+        preload: true,
+        initialValues: initialCustomerValues
     });
     const item = useRemoteMasterData("Item", {
         mapOption: i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id }),
-        enabled: loadMasterData
+        enabled: loadMasterData,
+        preload: true,
+        initialValues: initialItemValues
     });
 
     // selectedIds ref — avoids stale closure in handleUpdate
@@ -600,9 +612,9 @@ const CodingTab = ({ isActive = false }) => {
                         >
                             <table
                                 className="border-collapse border-spacing-0"
-                                style={{ width: "100%", minWidth: 1597, tableLayout: "fixed" }}
+                                style={{ width: "100%", minWidth: "max-content", tableLayout: "auto" }}
                             >
-                                {/* Fixed column widths — tableLayout:fixed requires width not minWidth */}
+                                {/* Fixed column widths for standard fields, flexible for coding fields */}
                                 <colgroup>
                                     <col style={{ width: 44 }} />    {/* checkbox */}
                                     <col style={{ width: 52 }} />    {/* S.No */}
@@ -611,11 +623,11 @@ const CodingTab = ({ isActive = false }) => {
                                     <col style={{ width: 90 }} />    {/* qty */}
                                     <col style={{ width: 110 }} />   {/* unit price */}
                                     <col style={{ width: 120 }} />   {/* net amount */}
-                                    <col style={{ width: 250 }} />   {/* GL code */}
-                                    <col style={{ width: 250 }} />   {/* LOB */}
-                                    <col style={{ width: 250 }} />   {/* department */}
-                                    <col style={{ width: 250 }} />   {/* customer */}
-                                    <col style={{ width: 250 }} />   {/* item */}
+                                    <col />                          {/* GL code */}
+                                    <col />                          {/* LOB */}
+                                    <col />                          {/* department */}
+                                    <col />                          {/* customer */}
+                                    <col />                          {/* item */}
                                     <col style={{ width: 56 }} />    {/* action */}
                                 </colgroup>
 
@@ -640,11 +652,11 @@ const CodingTab = ({ isActive = false }) => {
                                         <th className="p-2 text-right text-[12px] font-medium border-r border-[#ffffff1a]">Qty</th>
                                         <th className="p-2 text-right text-[12px] font-medium border-r border-[#ffffff1a]">Unit Price</th>
                                         <th className="p-2 text-right text-[12px] font-medium border-r border-[#ffffff1a]">Net Amount</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">GL Code</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">LOB</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">Department</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">Customer</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]">Item</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>GL Code</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>LOB</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Department</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Customer</th>
+                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Item</th>
                                         <th className="p-2 text-center text-[12px] font-medium">Action</th>
                                     </tr>
                                 </thead>
