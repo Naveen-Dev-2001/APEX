@@ -249,7 +249,7 @@ const Header = () => {
                                 alt={`${tab.name} icon`}
                                 className="w-4 h-4 object-contain"
                             />
-                            <span className={`text-[14px] ${isActive ? 'font-bold' : 'font-normal'}`}>
+                            <span className={`text-[14px] whitespace-nowrap ${isActive ? 'font-bold' : 'font-normal'}`}>
                                 {tab.name}
                             </span>
                             {/* Active Bottom Border */}
@@ -284,7 +284,7 @@ const Header = () => {
                                         alt={`${tab.name} icon`}
                                         className="w-5 h-5 object-contain"
                                     />
-                                    <span className={`text-[15px] ${isActive ? 'font-bold' : 'font-medium'}`}>
+                                    <span className={`text-[15px] whitespace-nowrap ${isActive ? 'font-bold' : 'font-medium'}`}>
                                         {tab.name}
                                     </span>
                                 </div>
@@ -301,7 +301,7 @@ const Header = () => {
                     <svg className="w-4.5 h-4.5 text-[#1e9bd8] shrink-0" style={{width:'18px',height:'18px'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    <span className="text-[13px] font-semibold text-black uppercase tracking-wide leading-none">Entity:</span>
+
                     <span className="text-[13px] font-medium text-[#1e9bd8] max-w-[160px] truncate leading-none capitalize">{selectedEntityName}</span>
                 </div>
 
