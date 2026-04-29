@@ -8,7 +8,7 @@ from app.models.invoice import InvoiceCreate, InvoiceResponse, InvoiceStatus, In
 from app.models.workflow import WorkflowStepType, WorkflowStepStatus
 from app.database.database import get_db, SessionLocal
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_, exists, func, cast, Date, DateTime
 from app.middleware.logger import logger
 error_logger = logging.getLogger("application_error")
@@ -864,6 +864,62 @@ async def get_invoices(
                         repo_filters["status"] = actual_statuses
                         del extra_filters["status"]
 
+                # Special handling for virtual column: next_approver
+                if "next_approver" in extra_filters:
+                    vals = extra_filters["next_approver"]
+                    if not isinstance(vals, list): vals = [vals]
+                    
+                    conditions = []
+                    # Pre-fetch user map for name-to-email resolution
+                    user_map_rev = {u.username.lower(): u.email.lower() for u in db.query(User).all() if u.username}
+                    
+                    for val in vals:
+                        if not val: continue
+                        if val == "Finance Team":
+                            conditions.append(
+                                and_(
+                                    Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                    exists().where(
+                                        and_(
+                                            InvoiceAssignedApprover.invoice_id == Invoice.id,
+                                            InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
+                                            InvoiceAssignedApprover.is_finance == True
+                                        )
+                                    )
+                                )
+                            )
+                        elif val == "Completed":
+                            conditions.append(Invoice.status.in_([InvoiceStatusEnum.SAGE_POSTED, InvoiceStatusEnum.APPROVED]))
+                        elif val == "Rejected":
+                            conditions.append(Invoice.status == InvoiceStatusEnum.REJECTED)
+                        else:
+                            # Try to match name to email from user table
+                            email = user_map_rev.get(val.lower())
+                            
+                            # Build the subquery condition
+                            if email:
+                                approver_cond = InvoiceAssignedApprover.approver_email == email
+                            else:
+                                # Fallback: match by email prefix (common for auto-generated names)
+                                approver_cond = InvoiceAssignedApprover.approver_email.ilike(f"{val}@%")
+                            
+                            conditions.append(
+                                and_(
+                                    Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                    exists().where(
+                                        and_(
+                                            InvoiceAssignedApprover.invoice_id == Invoice.id,
+                                            InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
+                                            approver_cond
+                                        )
+                                    )
+                                )
+                            )
+                    
+                    if conditions:
+                        expressions.append(or_(*conditions))
+                    del extra_filters["next_approver"]
+
                 # Convert list of values to list if they're not already
                 for k, v in extra_filters.items():
                     if isinstance(v, list):
@@ -982,6 +1038,37 @@ async def get_invoice_filter_options(
                 repo_filters.update(extra_filters)
         except Exception as e:
             print(f"Error parsing filters in filter-options: {e}")
+
+    if column == "next_approver":
+        # Get all invoices matching the current tab/filters
+        query = db.query(Invoice).filter(Invoice.entity == entity)
+        query = invoice_repo._apply_filters(query, repo_filters)
+        for expr in expressions:
+            query = query.filter(expr)
+        
+        # Load relationships for calculation
+        invoices = query.options(joinedload(Invoice.assigned_approvers_list)).all()
+        
+        user_map = {u.email.lower(): u.username for u in db.query(User).all()}
+        
+        options = set()
+        for inv in invoices:
+            if inv.status == InvoiceStatusEnum.WAITING_APPROVAL:
+                level = inv.current_approver_level or 1
+                # Find approvers for this level
+                approvers = [a for a in inv.assigned_approvers_list if a.sequence_order == level]
+                for a in approvers:
+                    if a.is_finance:
+                        options.add("Finance Team")
+                    else:
+                        name = user_map.get(a.approver_email.lower()) or a.approver_email.split("@")[0]
+                        options.add(name)
+            elif inv.status in [InvoiceStatusEnum.SAGE_POSTED, InvoiceStatusEnum.APPROVED]:
+                options.add("Completed")
+            elif inv.status == InvoiceStatusEnum.REJECTED:
+                options.add("Rejected")
+        
+        return sorted([o for o in options if o], key=lambda x: str(x))
 
     if column == "status":
         query = db.query(Invoice.status, Invoice.current_approver_level)
