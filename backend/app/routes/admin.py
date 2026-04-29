@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from datetime import datetime
 from typing import List, Dict, Any, Optional 
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from app.database.database import get_db
 from app.models.db_models import User as DBUser
 from app.repository.repositories import user_repo
@@ -89,6 +89,30 @@ async def get_all_users(
         order_by=sort_by,
         descending=(sort_dir.lower() == 'desc')
     )
+    
+    # Calculate sequential SNO for each user (rank based on ID)
+    final_data = []
+    for user in paginated_res["data"]:
+        sno_count = db.query(func.count(DBUser.id)).filter(DBUser.id <= user.id).scalar()
+        
+        # Manually construct the response dict to ensure sno is included
+        user_data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role,
+            "status": user.status,
+            "department": user.department,
+            "isCreatedByUser": user.isCreatedByUser,
+            "createdby": user.createdby,
+            "ispasswordchange": user.ispasswordchange,
+            "email_notifications": user.email_notifications,
+            "created_at": user.created_at,
+            "sno": sno_count
+        }
+        final_data.append(user_data)
+    
+    paginated_res["data"] = final_data
     return paginated_res
 
 

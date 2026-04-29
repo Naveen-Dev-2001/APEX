@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     ispasswordchange: bool = True
     email_notifications: bool = True
     created_at: datetime
+    sno: Optional[int] = None
 
 class UserPaginatedResponse(BaseModel):
     data: List[UserResponse]
