@@ -1,12 +1,14 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getInvoices } from "../../api/invoiceApi";
+import { useCommonStore } from "../../store/common.store";
 
 export const useInvoiceData = ({ skip = 0, limit = 10, search = "", filters = {}, sort_by = "uploaded_at", sort_dir = "desc", tab = undefined } = {}) => {
+    const entity = useCommonStore((state) => state.entity);
     const filtersKey = useMemo(() => JSON.stringify(filters || {}), [filters]);
 
     const { data, isLoading, isError, refetch } = useQuery({
-        queryKey: ["invoices", skip, limit, search, filtersKey, sort_by, sort_dir, tab],
+        queryKey: ["invoices", skip, limit, search, filtersKey, sort_by, sort_dir, tab, entity],
         queryFn: async ({ signal }) => {
             const start = performance.now();
 

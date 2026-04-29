@@ -418,13 +418,17 @@ async def _finalize_and_post(db: Session, invoice: Invoice, current_user: UserRe
     if sage_result["success"]:
         invoice = invoice_repo.get(db, invoice_id)
         _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
-        invoice.sage_bill_id = sage_result.get("sage_bill_id")
+        
+        # Use the correct column name 'sage_bill_number' from db_models.py
+        actual_bill_no = sage_result.get("sage_bill_number")
+        invoice.sage_bill_number = actual_bill_no
+        
         _record_step(
             db, invoice_id,
             step_name="Posted to Sage",
             step_type=StepType.POSTED,
             user_email=email,
-            comment=f"Sage Bill ID: {sage_result.get('sage_bill_id')}",
+            comment=f"Sage Bill Number: {actual_bill_no}",
             entity=entity,
         )
         await audit_service.log_action(
@@ -433,8 +437,8 @@ async def _finalize_and_post(db: Session, invoice: Invoice, current_user: UserRe
             action=AuditAction.SAGE_POSTED,
             user=current_user.username,
             entity=entity,
-            details={"sage_bill_id": sage_result.get("sage_bill_id")},
-            sage_bill_number=sage_result.get("sage_bill_id")
+            details={"sage_bill_number": actual_bill_no},
+            sage_bill_number=actual_bill_no
         )
         db.commit()
         return ActionResponse(
@@ -534,7 +538,8 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
 
         if post_result and post_result.get("success"):
             sage_response = post_result.get("data", {})
-            intended_bill_no = f"{invoice.invoice_number}-{invoice.id}"
+            # User requested Sage bill number to be same as invoice number
+            intended_bill_no = f"{invoice.invoice_number}"
             sage_bill_no = sage_response.get("billNumber") or intended_bill_no
             return {
                 "success": True,
