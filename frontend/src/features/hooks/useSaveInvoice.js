@@ -250,6 +250,11 @@ export const useSaveInvoice = () => {
             const response = await saveInvoice(viewInvoiceId, object);
             console.log("Save response →", response);
 
+            // Sync the store with the server response (contains latest updated_at)
+            if (response) {
+                setActiveInvoiceData(response);
+            }
+
             return response;
         } catch (err) {
             const errorData = err?.response?.data;
