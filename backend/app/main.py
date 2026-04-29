@@ -5,6 +5,7 @@ from app.database.init_db import init_database, seed_api_master_data
 from app.database.database import engine, Base
 from app.routes import master_data, workflow, approval, admin, settings as settings_route, workflow_config, delegation, audit
 from app.routes import auth, invoices, coding, dashboard, currency
+from app.routes.auth import sso_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends
 import os
@@ -33,6 +34,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(sso_router, tags=["sso-authentication"])
 app.include_router(invoices.router, prefix="/invoices",
                    tags=["invoices"], dependencies=[Depends(get_current_user)])
 app.include_router(coding.router, prefix="/coding",
