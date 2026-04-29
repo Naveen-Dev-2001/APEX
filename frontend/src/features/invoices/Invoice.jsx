@@ -21,6 +21,7 @@ import { useAuthStore } from "../../store/authStore";
 import ArchivedInvoicesTab from "./ArchivedInvoicesTab";
 import { useLocation, useNavigate } from "react-router-dom";
 import AlertModal from "../../shared/components/AlertModal";
+import { useCommonStore } from "../../store/common.store";
 
 const ACCESSOR_TO_DB_FIELD = {
     vendor_name: "vendor_name",
@@ -114,6 +115,8 @@ const Invoice = () => {
     const [deleteModalState, setDeleteModalState] = useState({ isOpen: false, data: null, loading: false });
     const [archiveModalState, setArchiveModalState] = useState({ isOpen: false, data: null, loading: false });
 
+    const entity = useCommonStore((state) => state.entity);
+
     useEffect(() => {
         fetchEntityMaster().then((res) => {
             const data = res.data || [];
@@ -121,7 +124,7 @@ const Invoice = () => {
             const selectedEntity = data.filter((item) => item.entity_id === selectedEntityId);
             setEntityMaster(selectedEntity?.[0] || {});
         }).catch((err) => console.error("Failed to fetch entity master", err));
-    }, []);
+    }, [entity]);
 
     useEffect(() => {
         // Redundant refetch removed as useInvoiceData already watches pageTab

@@ -7,6 +7,7 @@ import { getInvoices, getInvoiceFilterOptions } from '../../api/invoiceApi';
 import toast from '../../utils/toast';
 import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
+import { useCommonStore } from '../../store/common.store';
 
 const ACCESSOR_TO_DB_FIELD = {
     vendor_name: "vendor_name",
@@ -63,6 +64,8 @@ const CodingPage = () => {
         return filters;
     }, [columnFilters]);
 
+    const entity = useCommonStore((state) => state.entity);
+
     const fetchInvoices = useCallback(async () => {
         abortRef.current?.abort();
         const controller = new AbortController();
@@ -96,7 +99,7 @@ const CodingPage = () => {
                 setLoading(false);
             }
         }
-    }, [currentPage, itemsPerPage, sortColumn, sortDirection, backendFilters]);
+    }, [currentPage, itemsPerPage, sortColumn, sortDirection, backendFilters, entity]);
 
     useEffect(() => {
         fetchInvoices();

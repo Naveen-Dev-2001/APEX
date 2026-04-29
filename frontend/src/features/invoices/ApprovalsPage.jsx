@@ -11,6 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import toast from '../../utils/toast';
 import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
+import { useCommonStore } from '../../store/common.store';
 
 const { confirm } = Modal;
 
@@ -118,11 +119,13 @@ const ApprovalsPage = () => {
         }
     };
 
+    const entity = useCommonStore((state) => state.entity);
+
     useEffect(() => {
         if (user) {
             fetchData();
         }
-    }, [user, currentPage, itemsPerPage, sortColumn, sortDirection]);
+    }, [user, currentPage, itemsPerPage, sortColumn, sortDirection, entity]);
 
     const handleView = (invoice) => {
         // Navigate to invoices page to show the invoices screen
