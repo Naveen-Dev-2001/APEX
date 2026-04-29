@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CustomInput from "../../shared/components/CustomInput";
-import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined, ReloadOutlined, DeleteOutlined, InboxOutlined, CloseOutlined } from "@ant-design/icons";
+import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined, ReloadOutlined, InboxOutlined, CloseOutlined } from "@ant-design/icons";
+import { Trash2 } from "lucide-react";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
 import DataTable from "../../components/ui/DataTable";
@@ -436,7 +437,7 @@ const Invoice = () => {
                                                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
                                                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                                                 >
-                                                    <DeleteOutlined /> Bulk Delete
+                                                    <Trash2 size={16} /> Bulk Delete
                                                 </button>
                                             </Popconfirm>
                                         )}

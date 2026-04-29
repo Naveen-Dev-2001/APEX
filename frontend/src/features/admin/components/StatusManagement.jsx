@@ -3,6 +3,7 @@ import addIcon from '../../../assets/admin-icons/add-icon.png';
 import useAdminStore from '../../../store/useAdminStore';
 import useToastStore from '../../../store/useToastStore';
 import Skeleton from '../../../components/ui/Skeleton';
+import { Trash2 } from 'lucide-react';
 
 const StatusManagement = ({ statuses, onAdd, loading = false }) => {
     const { removeStatus, isUpdating } = useAdminStore();
@@ -60,7 +61,7 @@ const StatusManagement = ({ statuses, onAdd, loading = false }) => {
                                 disabled={isUpdating}
                                 className="text-[#a1a1a1] hover:text-[#ef4444] transition-colors leading-none text-base"
                             >
-                                &times;
+                                <Trash2 size={14} />
                             </button>
                         </div>
                     ))}

@@ -1,12 +1,12 @@
 import { useState, useCallback, useMemo, memo, useEffect, useRef } from "react";
 import {
-    DeleteOutlined,
     PlusOutlined,
     DownloadOutlined,
     UploadOutlined,
     CaretUpOutlined,
     ExclamationCircleOutlined
 } from "@ant-design/icons";
+import { Trash2 } from "lucide-react";
 import { Modal } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
@@ -781,7 +781,7 @@ const CodingTab = ({ isActive = false }) => {
                                                                 flexShrink: 0,
                                                             }}
                                                         >
-                                                            <DeleteOutlined style={{ fontSize: 12, color: "inherit" }} />
+                                                            <Trash2 size={14} color="inherit" />
                                                         </button>
                                                     )}
                                                 </td>

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Modal } from "antd";
-import { DeleteOutlined } from "@ant-design/icons";
+import { Trash2 } from "lucide-react";
 import CustomButton from "../../shared/components/CustomButton";
 
 const AddInvoiceModal = ({
@@ -248,7 +248,7 @@ const AddInvoiceModal = ({
                                         }}
                                         className="text-[#F87171] hover:text-red-600"
                                     >
-                                        <DeleteOutlined style={{ fontSize: 14 }} />
+                                        <Trash2 size={14} />
                                     </button>
                                 </div>
                             ))}

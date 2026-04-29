@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, Tag, Space, Button, Modal } from 'antd';
-import { EyeOutlined, DeleteOutlined, ExclamationCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { EyeOutlined, ExclamationCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Trash2 } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import DelegationManager from './components/DelegationManager';
 import { getUnapprovedInvoices, updateApprovalStatus } from '../../api/approvalApi';
@@ -229,7 +230,7 @@ const ApprovalsPage = () => {
                         className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                         title="Delete"
                     >
-                        <DeleteOutlined style={{ fontSize: 16 }} />
+                        <Trash2 size={16} />
                     </button> */}
                 </div>
             )

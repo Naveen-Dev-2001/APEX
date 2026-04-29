@@ -1,4 +1,5 @@
-import { EyeOutlined, DeleteOutlined, LoadingOutlined, InboxOutlined } from "@ant-design/icons";
+import { EyeOutlined, LoadingOutlined, InboxOutlined } from "@ant-design/icons";
+import { Trash2 } from "lucide-react";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
 const StatusBadge = ({ value, level }) => {
@@ -105,7 +106,7 @@ const actionsCol = (onView, onDelete, onArchive, userRole, openingInvoiceId, hid
                         className="text-red-400 hover:text-red-600 transition-colors cursor-pointer"
                         title="Delete"
                     >
-                        <DeleteOutlined style={{ fontSize: 16 }} />
+                        <Trash2 size={16} />
                     </button>
                 )}
                 {canArchive && onArchive && (

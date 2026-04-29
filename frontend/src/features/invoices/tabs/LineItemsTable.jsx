@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, CaretUpOutlined, CaretDownOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { PlusOutlined, DownloadOutlined, UploadOutlined, CaretUpOutlined, CaretDownOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { Trash2 } from "lucide-react";
 import { Modal } from "antd";
 import ReusableDataTable from '../../../shared/components/ReusableDataTable' // adjust path
 
@@ -337,7 +338,7 @@ const LineItemsTable = () => {
                     }}
                     className="text-red-400 hover:text-red-600 transition-colors p-1 rounded hover:bg-red-50"
                 >
-                    <DeleteOutlined style={{ fontSize: 15 }} />
+                    <Trash2 size={15} />
                 </button>
             ),
         },
