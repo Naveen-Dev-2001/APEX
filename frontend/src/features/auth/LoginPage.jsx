@@ -6,6 +6,7 @@ import CustomButton from '../../shared/components/CustomButton';
 import API from '../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from '../../utils/toast';
+import { icons } from '../../file';
 
 const LoginPage = () => {
     const navigate = useNavigate();
@@ -59,6 +60,12 @@ const LoginPage = () => {
         }
     };
 
+    const handleMicrosoftLogin = () => {
+        const baseURL = window._env_?.VITE_BACKEND_URL
+        let url = `${baseURL}/ValidateAzureAD`
+        window.location.href = url;
+    }
+
     return (
         <AuthLayout title="Welcome Back">
             <form onSubmit={handleLogin} className="w-full">
@@ -110,6 +117,31 @@ const LoginPage = () => {
                     >
                         {loading ? 'Signing in...' : 'Login'}
                     </CustomButton>
+                </div>
+                <div className="mt-4">
+                    <button
+                        type="button"
+                        onClick={handleMicrosoftLogin}
+                        className="
+                            w-full h-10
+                            flex items-center justify-center gap-3
+                            border border-[#0078D4]
+                            rounded-lg
+                            bg-white
+                            hover:bg-[#f5faff]
+                            transition
+                            cursor-pointer
+                        "
+                    >
+                        <img
+                            src={icons.microsoft}
+                            alt="Microsoft"
+                            className="w-5 h-5"
+                        />
+                        <span className="text-base font-medium text-gray-800">
+                            Microsoft
+                        </span>
+                    </button>
                 </div>
 
                 <div className="mt-6 text-center text-sm text-gray-500">

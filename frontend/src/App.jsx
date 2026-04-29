@@ -12,6 +12,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
 import ChangePasswordFirstTimePage from './features/auth/ChangePasswordFirstTimePage';
+import SSOCallback from './features/auth/SSOCallback';
 
 import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
@@ -40,6 +41,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/test-date-picker" element={<TestDatePicker />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/sso" element={<SSOCallback />} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
