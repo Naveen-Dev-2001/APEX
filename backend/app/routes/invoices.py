@@ -829,6 +829,41 @@ async def get_invoices(
                 for k in to_delete:
                     del extra_filters[k]
 
+                # Special handling for status with levels: "waiting_approval (level 1)"
+                if "status" in extra_filters:
+                    status_vals = extra_filters["status"]
+                    if not isinstance(status_vals, list):
+                        status_vals = [status_vals]
+                    
+                    actual_statuses = []
+                    level_filters = []
+                    
+                    for val in status_vals:
+                        if val and " (level " in str(val):
+                            try:
+                                parts = str(val).split(" (level ")
+                                status_part = parts[0]
+                                level_part = int(parts[1].rstrip(")"))
+                                level_filters.append((status_part, level_part))
+                            except:
+                                actual_statuses.append(val)
+                        else:
+                            actual_statuses.append(val)
+                    
+                    if level_filters:
+                        level_conditions = [
+                            and_(Invoice.status == s, Invoice.current_approver_level == l)
+                            for s, l in level_filters
+                        ]
+                        if actual_statuses:
+                            level_conditions.append(Invoice.status.in_(actual_statuses))
+                        
+                        expressions.append(or_(*level_conditions))
+                        del extra_filters["status"]
+                    elif actual_statuses:
+                        repo_filters["status"] = actual_statuses
+                        del extra_filters["status"]
+
                 # Convert list of values to list if they're not already
                 for k, v in extra_filters.items():
                     if isinstance(v, list):
@@ -947,6 +982,29 @@ async def get_invoice_filter_options(
                 repo_filters.update(extra_filters)
         except Exception as e:
             print(f"Error parsing filters in filter-options: {e}")
+
+    if column == "status":
+        query = db.query(Invoice.status, Invoice.current_approver_level)
+        query = invoice_repo._apply_filters(query, repo_filters)
+        for expr in expressions:
+            query = query.filter(expr)
+            
+        results = query.distinct().all()
+        formatted_options = []
+        seen = set()
+        for s, l in results:
+            # Use .value if it's an Enum member, otherwise use str()
+            status_val = s.value if hasattr(s, 'value') else str(s)
+            
+            if status_val == "waiting_approval" and l:
+                label = f"waiting_approval (level {l})"
+            else:
+                label = status_val
+            
+            if label and label not in seen:
+                formatted_options.append(label)
+                seen.add(label)
+        return sorted(formatted_options)
 
     # Query unique non-null values for the column with applied filters
     target_model = Invoice
