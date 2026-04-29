@@ -19,7 +19,8 @@ from app.database.database import get_db
 from app.models.db_models import (
     EntityMaster, VendorMaster, TdsRate, GLMaster,
     LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster,
-    Currency, Invoice, DeletedInvoice
+    Currency, Invoice, DeletedInvoice, Coding, AuditLog, WorkflowStep, 
+    Delegation, VendorWorkflow, CodificationWorkflow
 )
 from app.repository.repositories import (
     entity_master_repo, vendor_master_repo, tds_rate_repo, gl_master_repo, lob_master_repo, department_master_repo, 
@@ -455,6 +456,45 @@ async def delete_tab_data(
     tab_name: str,
     db: Session = Depends(get_db)
 ):
+    # Special handling for Entity Master: Preserve entities with invoices or top-level entities
+    if tab_name in ["Entity_Master", "entity_master", "Entity", "master_data_Entity_Master"]:
+        try:
+            # 1. Collect all entity_ids currently in use to avoid breaking data integrity
+            used_ids = set()
+            
+            # Check Invoices (Active and Deleted)
+            active_inv = db.query(Invoice.entity).filter(Invoice.entity.isnot(None)).distinct().all()
+            deleted_inv = db.query(DeletedInvoice.entity).filter(DeletedInvoice.entity.isnot(None)).distinct().all()
+            used_ids.update([r[0] for r in active_inv])
+            used_ids.update([r[0] for r in deleted_inv])
+            
+            # Check other referencing tables to prevent FK violations
+            used_ids.update([r[0] for r in db.query(Coding.entity).filter(Coding.entity.isnot(None)).distinct().all()])
+            used_ids.update([r[0] for r in db.query(AuditLog.entity).filter(AuditLog.entity.isnot(None)).distinct().all()])
+            used_ids.update([r[0] for r in db.query(WorkflowStep.entity).filter(WorkflowStep.entity.isnot(None)).distinct().all()])
+            used_ids.update([r[0] for r in db.query(Delegation.entity).filter(Delegation.entity.isnot(None)).distinct().all()])
+            used_ids.update([r[0] for r in db.query(VendorWorkflow.entity).filter(VendorWorkflow.entity.isnot(None)).distinct().all()])
+            used_ids.update([r[0] for r in db.query(CodificationWorkflow.entity).filter(CodificationWorkflow.entity.isnot(None)).distinct().all()])
+            used_ids.update([r[0] for r in db.query(VendorMaster.entity_id).filter(VendorMaster.entity_id.isnot(None)).distinct().all()])
+
+            # 2. Identify "Top Level" entities that should always be preserved
+            top_level_entities = db.query(EntityMaster.entity_id).filter(
+                (EntityMaster.entity_name == "Top Level") | 
+                (EntityMaster.entity_name == "Default Entity")
+            ).all()
+            used_ids.update([r[0] for r in top_level_entities])
+
+            # 3. Delete only those that are NOT used and NOT top-level
+            delete_query = db.query(EntityMaster).filter(EntityMaster.entity_id.not_in(used_ids))
+            count = delete_query.delete(synchronize_session=False)
+            db.commit()
+            
+            return {"message": f"Cleared {count} unused entities. Entities with invoices or Top Level status were preserved."}
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error clearing Entity Master: {e}")
+            raise HTTPException(500, f"Failed to clear Entity Master: {str(e)}")
+
     repo = TAB_REPO_MAP.get(tab_name)
     if repo:
         repo.delete_all(db)
