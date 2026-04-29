@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import TableSkeleton from './TableSkeleton';
 
 // ─── Funnel / filter icon (inline SVG, no extra dep) ─────────────────────────
@@ -864,7 +865,7 @@ const DataTable = ({
         </div>
 
         {/* ── Filter Popover (portal-like, fixed positioning) ── */}
-        {openFilter && (
+        {openFilter && createPortal(
             <FilterPopover
                 col={openFilter.col}
                 data={getDataForFilterPopover(openFilter.accessor)}
@@ -872,7 +873,8 @@ const DataTable = ({
                 anchorPos={openFilter.anchorPos}
                 onApply={(selected) => applyFilter(openFilter.accessor, selected)}
                 onClose={() => setOpenFilter(null)}
-            />
+            />,
+            document.body
         )}
         </>
     );
