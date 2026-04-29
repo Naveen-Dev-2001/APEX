@@ -196,9 +196,9 @@ const ApprovalsPage = () => {
             accessor: "status",
             filterable: true,
             getFilterValue: (row) => "Waiting for Approval",
-            render: () => (
+            render: (val, row) => (
                 <div className="bg-orange-50 text-orange-500 px-3 py-1 rounded-full text-[12px] font-medium inline-block border border-orange-100">
-                    Waiting for Approval
+                    Waiting for Approval {row.current_approver_level ? `(Level ${row.current_approver_level})` : ''}
                 </div>
             )
         },

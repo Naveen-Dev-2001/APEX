@@ -1,7 +1,7 @@
 import { EyeOutlined, DeleteOutlined, LoadingOutlined, InboxOutlined } from "@ant-design/icons";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
-const StatusBadge = ({ value }) => {
+const StatusBadge = ({ value, level }) => {
     const colorMap = {
         approved:        "bg-green-100 text-green-700",
         pending:         "bg-yellow-100 text-yellow-700",
@@ -29,7 +29,11 @@ const StatusBadge = ({ value }) => {
     };
 
     const cls = colorMap[value] ?? "bg-gray-100 text-gray-600";
-    const label = labelMap[value] ?? value;
+    let label = labelMap[value] ?? value;
+
+    if (value === 'waiting_approval' && level) {
+        label = `${label} (Level ${level})`;
+    }
 
     return (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${cls}`}>
@@ -159,7 +163,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         accessor:       "status",
         sortable:       true,
         filterable:     true,
-        render:         (val) => <StatusBadge value={val} />,
+        render:         (val, row) => <StatusBadge value={val} level={row?.current_approver_level} />,
     },
     {
         header:         "Last Modified By",
@@ -345,7 +349,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         accessor:   "status",
         sortable:   true,
         filterable:     true,
-        render:     (val) => <StatusBadge value={val} />,
+        render:     (val, row) => <StatusBadge value={val} level={row?.current_approver_level} />,
     },
     {
         header:         "Last Modified By",

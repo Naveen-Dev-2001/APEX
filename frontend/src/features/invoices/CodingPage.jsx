@@ -222,13 +222,16 @@ const CodingPage = () => {
             minWidth: 160,
             sortable: true,
             filterable: true,
-            render: (status) => {
+            render: (status, row) => {
                 let colorClass = "bg-orange-100 text-orange-600";
                 let label = "Waiting for coding";
 
                 if (status === 'waiting_approval') {
                     colorClass = "bg-blue-100 text-blue-600";
                     label = "Waiting approval";
+                    if (row.current_approver_level) {
+                        label += ` (Level ${row.current_approver_level})`;
+                    }
                 } else if (status === 'reworked') {
                     colorClass = "bg-purple-100 text-purple-600";
                     label = "Reworked";
