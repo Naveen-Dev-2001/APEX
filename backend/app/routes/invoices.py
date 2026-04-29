@@ -876,7 +876,8 @@ async def get_invoices(
     )
     
     # Convert models to dicts (Minimal mode for list performance)
-    data = [invoice_to_dict(inv, minimal=True) for inv in paginated_res["data"]]
+    user_map = {u.email.lower(): u.username for u in db.query(User).all()}
+    data = [invoice_to_dict(inv, minimal=True, user_map=user_map) for inv in paginated_res["data"]]
     
     return {
         "data": data,
@@ -1022,7 +1023,8 @@ async def get_raw_invoice(invoice_id: int, db: Session = Depends(get_db)):
     invoice = invoice_repo.get(db, invoice_id)
     if not invoice:
         return {"error": "Not found"}
-    return invoice_to_dict(invoice)
+    user_map = {u.email.lower(): u.username for u in db.query(User).all()}
+    return invoice_to_dict(invoice, user_map=user_map)
 
 
 @router.get("/{invoice_id}/file")

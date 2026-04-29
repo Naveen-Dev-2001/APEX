@@ -35,7 +35,7 @@ def deserialize_json_field(json_str: Optional[str]) -> Any:
         return json_str
 
 
-def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minimal: bool = False) -> Dict[str, Any]:
+def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minimal: bool = False, user_map: Dict[str, str] = None) -> Dict[str, Any]:
     """
     Convert SQLAlchemy Invoice model to dictionary (MongoDB-like format).
     This provides backward compatibility with existing frontend code.
@@ -109,8 +109,10 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minima
         
     # 3. Format the display name (resolve email to username if possible)
     if last_modified_by and "@" in last_modified_by:
-        # If we are in minimal mode, just use the prefix to avoid N+1 queries
-        if minimal:
+        # Use user_map if provided for efficiency
+        if user_map and last_modified_by.lower() in user_map:
+             last_modified_by = user_map[last_modified_by.lower()]
+        elif minimal:
              last_modified_by = last_modified_by.split("@")[0]
         else:
             db = object_session(invoice)
@@ -132,7 +134,7 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minima
             result["status_history"] = [
                 {
                     "status": h.status,
-                    "user": h.user,
+                    "user": user_map.get(h.user.lower()) if user_map and h.user and "@" in h.user else h.user,
                     "timestamp": h.timestamp,
                     "comment": h.comment,
                     "approver_level": h.approver_level
@@ -152,19 +154,31 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minima
         result["status_history"] = []
         result["approved_by"] = []
         
-        # Assigned approvers (Grouped by sequence_order/level)
+    # Assigned approvers (Grouped by sequence_order/level)
+    # This is needed in both minimal and full mode for "Next Approver" display
+    if include_relationships:
         if invoice.assigned_approvers_list:
             # Sort by sequence_order first
             sorted_approvers = sorted(invoice.assigned_approvers_list, key=lambda x: x.sequence_order)
-            grouped = {}        # { seq_order: {"emails": [...], "is_finance": bool} }
+            grouped = {}        # { seq_order: {"emails": [...], "names": [...], "is_finance": bool} }
             for a in sorted_approvers:
                 seq = a.sequence_order
                 if seq not in grouped:
-                    grouped[seq] = {"emails": [], "is_finance": bool(a.is_finance)}
-                grouped[seq]["emails"].append(a.approver_email)
+                    grouped[seq] = {"emails": [], "names": [], "is_finance": bool(a.is_finance)}
+                
+                email = a.approver_email
+                grouped[seq]["emails"].append(email)
+                
+                # Resolve name
+                name = email
+                if user_map and email.lower() in user_map:
+                    name = user_map[email.lower()]
+                elif email and "@" in email:
+                    name = email.split("@")[0]
+                grouped[seq]["names"].append(name)
             
             # Return as a list of level dicts ordered by sequence_order
-            # Each dict: { "emails": [...], "is_finance": bool }
+            # Each dict: { "emails": [...], "names": [...], "is_finance": bool }
             result["assigned_approvers"] = [grouped[seq] for seq in sorted(grouped.keys())]
         else:
             result["assigned_approvers"] = []
