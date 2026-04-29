@@ -199,8 +199,11 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
         setActionLoading("sendToApproval");
         try {
-            await handleSave();
-            const payload = await saveInvoice(viewInvoiceId, { status: "waiting_approval" });
+            const saveRes = await handleSave();
+            const payload = await saveInvoice(viewInvoiceId, { 
+                status: "waiting_approval",
+                last_updated_at: saveRes?.updated_at || activeInvoiceData?.updated_at
+            });
             if (payload?.status === "waiting_approval") {
                 toast.success("Invoice sent for approval successfully!");
                 await queryClient.invalidateQueries(["invoices"]);

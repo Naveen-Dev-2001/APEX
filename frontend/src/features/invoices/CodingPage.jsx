@@ -222,13 +222,16 @@ const CodingPage = () => {
             minWidth: 160,
             sortable: true,
             filterable: true,
-            render: (status) => {
+            render: (status, row) => {
                 let colorClass = "bg-orange-100 text-orange-600";
                 let label = "Waiting for coding";
 
                 if (status === 'waiting_approval') {
                     colorClass = "bg-blue-100 text-blue-600";
                     label = "Waiting approval";
+                    if (row.current_approver_level) {
+                        label += ` (Level ${row.current_approver_level})`;
+                    }
                 } else if (status === 'reworked') {
                     colorClass = "bg-purple-100 text-purple-600";
                     label = "Reworked";
@@ -242,6 +245,42 @@ const CodingPage = () => {
             },
             onGetOptions: async () => {
                 return ['waiting_coding', 'waiting_approval', 'reworked'];
+            }
+        },
+        {
+            header: "Next Approver",
+            accessor: "next_approver",
+            minWidth: 200,
+            filterable: true,
+            render: (_, row) => {
+                const status = (row?.status || "").toLowerCase();
+                if (status === 'sage_posted' || status === 'approved') return "Completed";
+                if (status === 'rejected') return "Rejected";
+                
+                const currentLevel = row?.current_approver_level || 1;
+                const stage = row?.assigned_approvers?.[currentLevel - 1];
+                
+                if (!stage) return "-";
+                
+                if (stage.is_finance === true) return "Finance Team";
+                
+                const names = stage.names || stage.emails;
+                if (Array.isArray(names)) {
+                    return names.map(n => {
+                        if (typeof n === 'string' && n.includes('@')) {
+                            return n.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+                        }
+                        return n;
+                    }).join(", ");
+                }
+                if (typeof names === 'string') {
+                    if (names.includes('@')) {
+                        return names.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+                    }
+                    return names;
+                }
+                
+                return "-";
             }
         },
         {
