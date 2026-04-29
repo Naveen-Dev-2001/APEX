@@ -21,9 +21,9 @@ const UserManagementTab = ({ onEdit }) => {
     const safeUsers = users || [];
 
     // Processed users now handled by backend
-    const displayUsers = (users || []).map((user, idx) => ({
+    const displayUsers = (users || []).map((user) => ({
         ...user,
-        sno: (currentPage - 1) * itemsPerPage + idx + 1
+        sno: user.sno
     }));
 
     const getRoleStyles = (role) => {

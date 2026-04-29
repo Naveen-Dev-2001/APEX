@@ -13,8 +13,8 @@ const useAdminStore = create((set, get) => ({
     searchQuery: '',
     currentPage: 1,
     itemsPerPage: 15,
-    sortColumn: 'username',
-    sortDirection: 'asc',
+    sortColumn: 'sno',
+    sortDirection: 'desc',
     isUpdating: false,
     delegations: [],
     approvers: [],
@@ -176,6 +176,13 @@ const useAdminStore = create((set, get) => ({
         set({ isUpdating: true });
         try {
             await adminService.addUser(userData);
+            // Reset to default sort, page 1 and clear search to show new user at top
+            set({ 
+                sortColumn: 'sno', 
+                sortDirection: 'desc', 
+                currentPage: 1,
+                searchQuery: '' 
+            });
             await get().fetchUsers();
             toast.success('User created successfully');
             return true;
