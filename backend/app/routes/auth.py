@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.models.auth import LoginRequest, Token, CheckEmailRequest, ResetPasswordRequest, SendOTPRequest, VerifyOTPRequest, ChangePasswordFirstTimeRequest
@@ -21,6 +21,10 @@ import base64
 import zlib
 import xmltodict
 import uuid
+import logging
+
+logger = logging.getLogger("app")
+
 SSO_TEMP_STORE = {}
 SSO_TOKEN_TTL = 60
 
@@ -34,7 +38,7 @@ class SSOVerifyModel(BaseModel):
 
 
 @router.post("/send-otp")
-async def send_otp(request: SendOTPRequest, db: Session = Depends(get_db)):
+async def send_otp(request: SendOTPRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # If purpose is forgot_password, check if email exists
     if request.purpose == "forgot_password":
         user = user_repo.get_multi(
@@ -52,19 +56,14 @@ async def send_otp(request: SendOTPRequest, db: Session = Depends(get_db)):
 
     otp = otp_service.create_otp_record(db, request.email, request.purpose)
 
-    success = False
     if request.purpose == "registration":
-        success = email_service.send_registration_otp(request.email, otp)
+        background_tasks.add_task(email_service.send_registration_otp, request.email, otp)
     else:
         user_list = user_repo.get_multi(
             db, filters={"email": request.email}, limit=1)
         user = user_list[0] if user_list else None
-        success = email_service.send_forgot_password_otp(
+        background_tasks.add_task(email_service.send_forgot_password_otp, 
             request.email, user.username if user else "User", otp)
-
-    if not success:
-        raise HTTPException(
-            status_code=500, detail="Failed to send email notification")
 
     return {"message": "OTP sent successfully"}
 
@@ -79,7 +78,7 @@ async def verify_otp(request: VerifyOTPRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=UserResponse)
-async def register(user: UserPydantic, db: Session = Depends(get_db)):
+async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # Check if OTP was verified
     if not otp_service.is_verified(db, user.email, "registration"):
         raise HTTPException(
@@ -120,17 +119,36 @@ async def register(user: UserPydantic, db: Session = Depends(get_db)):
 
     # Notify all Admins and the user
     admins = db.query(UserDB).filter(UserDB.role == "admin").all()
-    for admin in admins:
-        email_service.send_admin_new_user_notification(
+    
+    # Filter out reserved/example emails from admin list
+    reserved_domains = ["example.com", "example.net", "example.org", ".example", ".test", ".invalid", ".localhost"]
+    filtered_admins = [
+        admin for admin in admins 
+        if admin.email.lower() != "admin@example.com" and 
+        not any(admin.email.lower().endswith(domain) for domain in reserved_domains)
+    ]
+
+    for admin in filtered_admins:
+        background_tasks.add_task(email_service.send_admin_new_user_notification,
             admin.email, new_user.email, new_user.username)
 
-    # If no admins found in DB, fallback to settings default admin email
-    if not admins:
-        email_service.send_admin_new_user_notification(
-            settings.ADMIN_EMAIL, new_user.email, new_user.username)
+    # If no valid admins found in DB, fallback to settings default admin email
+    # but only if the default itself is not a reserved address
+    if not filtered_admins:
+        admin_email = settings.ADMIN_EMAIL
+        admin_email_lower = admin_email.lower()
+        is_reserved = (
+            admin_email_lower == "admin@example.com" or 
+            any(admin_email_lower.endswith(domain) for domain in reserved_domains)
+        )
+        if not is_reserved:
+            background_tasks.add_task(email_service.send_admin_new_user_notification,
+                admin_email, new_user.email, new_user.username)
+        else:
+            logger.info(f"Skipping admin notification as default ADMIN_EMAIL ({admin_email}) is a reserved address")
 
     # NEW: Send confirmation to the user that their account is pending approval
-    email_service.send_user_pending_approval(new_user.email, new_user.username)
+    background_tasks.add_task(email_service.send_user_pending_approval, new_user.email, new_user.username)
 
     return UserResponse(
         id=str(new_user.id),
