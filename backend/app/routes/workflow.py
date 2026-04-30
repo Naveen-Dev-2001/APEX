@@ -479,11 +479,43 @@ async def get_workflow_history(
         except: pass
     currency = extracted.get("invoice_details", {}).get("currency", {}).get("value", "USD")
 
-    requirement_data = get_required_approver_count(
-        db, vendor_name, total_amount, invoice_id, invoice_data=invoice, 
-        currency=currency, entity=entity, force_vendor_id=vendor_id, force_vendor_name=vendor_name,
-        force_lob=preview_lob, force_dept=preview_department_id
-    )
+    # --- SNAPSHOT LOCK ---
+    # If the invoice already has a persisted approver snapshot (waiting_approval / reworked),
+    # read it directly from the DB.  Do NOT re-run get_required_approver_count with live
+    # config params, because that bypasses the snapshot guard and returns current workflow
+    # config values instead of the locked-in approvers.
+    invoice_status_str = invoice.status.value if hasattr(invoice.status, "value") else str(invoice.status)
+    snapshot_statuses = {"waiting_approval", "reworked"}
+    snapshot_approvers_list = getattr(invoice, "assigned_approvers_list", None) or []
+
+    if invoice_status_str in snapshot_statuses and snapshot_approvers_list:
+        # Reconstruct levels from persisted rows
+        levels = {}
+        for a in snapshot_approvers_list:
+            seq = a.sequence_order
+            if seq not in levels:
+                levels[seq] = {
+                    "emails": [],
+                    "is_finance": getattr(a, "is_finance", False),
+                    "level": seq,
+                    "type": "mandatory",
+                }
+            levels[seq]["emails"].append(a.approver_email)
+        locked_approvers = [levels[s] for s in sorted(levels.keys())]
+        requirement_data = {
+            "required": invoice.required_approvers or len(locked_approvers),
+            "assigned_approvers": locked_approvers,
+            "workflow_type": "persisted",
+            "breakdown": {},
+        }
+    else:
+        # Invoice is not yet submitted (or is in a terminal state) —
+        # use live workflow config so the tab shows a preview of who would approve.
+        requirement_data = get_required_approver_count(
+            db, vendor_name, total_amount, invoice_id, invoice_data=invoice,
+            currency=currency, entity=entity, force_vendor_id=vendor_id, force_vendor_name=vendor_name,
+            force_lob=preview_lob, force_dept=preview_department_id
+        )
     
     steps = workflow_step_repo.get_multi(
         db, 
