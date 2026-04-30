@@ -181,16 +181,25 @@ const WorkflowTab = () => {
 
 
 
-    // Pass the same preview params as InvoiceTopBar so codification workflows resolve correctly
-    // Memoize so React Query doesn't see a new key object on every render → prevents re-fetches
+    // Pass preview params only for invoices that have NOT yet entered the approval cycle.
+    // Once an invoice is waiting_approval / reworked the backend returns the locked snapshot;
+    // sending preview params would trigger a live config re-evaluation and overwrite the snapshot.
+    const currentStatus = (activeInvoiceData?.status || "").toLowerCase();
+    const isInApproval = ["waiting_approval", "reworked"].includes(currentStatus);
+
     const firstLine = lineItems?.[0] || {};
 
-    const workflowParams = useMemo(() => ({
-        preview_vendor_id: selectedVendorId,
-        preview_lob: firstLine.lob,
-        preview_department_id: firstLine.department,
+    // Memoize so React Query doesn't see a new key object on every render → prevents re-fetches
+    const workflowParams = useMemo(() => {
+        // For in-approval invoices send no preview overrides — backend reads the DB snapshot.
+        if (isInApproval) return {};
+        return {
+            preview_vendor_id: selectedVendorId,
+            preview_lob: firstLine.lob,
+            preview_department_id: firstLine.department,
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [selectedVendorId, firstLine.lob, firstLine.department]);
+    }, [isInApproval, selectedVendorId, firstLine.lob, firstLine.department]);
 
     const {
 
@@ -210,9 +219,12 @@ const WorkflowTab = () => {
 
 
 
-    const currentStatus = (activeInvoiceData?.status || "processed").toLowerCase();
+    // currentStatus is already computed above (for isInApproval guard).
+    // Alias with "processed" default for the step-rendering logic below.
+    const renderStatus = currentStatus || "processed";
 
     const historySteps = workflowData?.steps || [];
+
 
     const assignedApprovers = workflowData?.assigned_approvers || [];
 
@@ -282,7 +294,7 @@ const WorkflowTab = () => {
 
     // Part 2: Pending and Future Stages (if not finished)
 
-    const isFinished = ["sage_posted", "rejected"].includes(currentStatus);
+    const isFinished = ["sage_posted", "rejected"].includes(renderStatus);
 
     if (!isFinished) {
 
@@ -290,13 +302,13 @@ const WorkflowTab = () => {
 
         const hasCoding = historySteps.some(s => s.step_type === "coding");
 
-        if (!hasCoding && (currentStatus === "waiting_coding" || currentStatus === "processed")) {
+        if (!hasCoding && (renderStatus === "waiting_coding" || renderStatus === "processed")) {
 
             steps.push({
 
-                title: currentStatus === "waiting_coding" ? "Pending Coding" : "Coding Stage",
+                title: renderStatus === "waiting_coding" ? "Pending Coding" : "Coding Stage",
 
-                status: currentStatus === "waiting_coding" ? "pending" : "queued"
+                status: renderStatus === "waiting_coding" ? "pending" : "queued"
 
             });
 
@@ -306,9 +318,9 @@ const WorkflowTab = () => {
 
         // 2. Approvers
 
-        const isWaitingApproval = ["waiting_approval", "reworked"].includes(currentStatus);
+        const isWaitingApproval = ["waiting_approval", "reworked"].includes(renderStatus);
 
-        if (isWaitingApproval || currentStatus === "waiting_coding" || currentStatus === "processed") {
+        if (isWaitingApproval || renderStatus === "waiting_coding" || renderStatus === "processed") {
 
             assignedApprovers.forEach((stage, index) => {
 
@@ -378,13 +390,13 @@ const WorkflowTab = () => {
 
         // 3. Final Posting
 
-        if (currentStatus !== "sage_posted") {
+        if (renderStatus !== "sage_posted") {
 
             steps.push({
 
-                title: currentStatus === "approved" ? "Pending Final Posting" : "Final Posting",
+                title: renderStatus === "approved" ? "Pending Final Posting" : "Final Posting",
 
-                status: currentStatus === "approved" ? "pending" : "queued"
+                status: renderStatus === "approved" ? "pending" : "queued"
 
             });
 
