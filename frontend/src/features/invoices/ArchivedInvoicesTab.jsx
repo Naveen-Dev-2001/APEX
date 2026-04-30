@@ -105,25 +105,28 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch, userRole, v
             )}
 
             {/* ── Table ── */}
-            <DataTable
-                columns={columnDefs}
-                data={records}
-                loading={isLoading}
-                totalItems={total}
-                currentPage={Math.floor(skip / limit) + 1}
-                itemsPerPage={limit}
-                onPageChange={handlePageChange}
-                onItemsPerPageChange={(l) => {
-                    setLimit(l);
-                    setSkip(0);
-                }}
-                sortColumn={sortColumn}
-                sortDirection={sortDirection}
-                onSort={handleSort}
-                maxHeight="calc(100vh - 250px)"
-                stickyHeader={true}
-                enableColumnFilters={true}
-            />
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4">
+                <DataTable
+                    columns={columnDefs}
+                    data={records}
+                    loading={isLoading}
+                    totalItems={total}
+                    currentPage={Math.floor(skip / limit) + 1}
+                    itemsPerPage={limit}
+                    onPageChange={handlePageChange}
+                    onItemsPerPageChange={(l) => {
+                        setLimit(l);
+                        setSkip(0);
+                    }}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    maxHeight="calc(100vh - 250px)"
+                    stickyHeader={true}
+                    enableColumnFilters={true}
+                    transparent={true}
+                />
+            </div>
         </div>
     );
 };

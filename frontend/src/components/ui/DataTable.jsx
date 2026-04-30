@@ -412,6 +412,7 @@ const DataTable = ({
   selectable = false,
   selectedRows = [],
   onSelectionChange,
+  transparent = false,
 }) => {
     // ── Row Expansion state ──────────────────────────────────────────────────
     const [expandedRow, setExpandedRow] = useState(null);
@@ -610,7 +611,7 @@ const DataTable = ({
 
     return (
         <>
-        <div className="w-full flex flex-col bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <div className={`w-full flex flex-col ${transparent ? 'bg-transparent' : 'bg-white rounded-md border border-gray-200 shadow-sm'} overflow-hidden`}>
             <div 
                 className="w-full overflow-x-auto overflow-y-auto"
                 style={maxHeight ? { maxHeight } : {}}

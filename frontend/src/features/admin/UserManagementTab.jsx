@@ -132,7 +132,7 @@ const UserManagementTab = ({ onEdit }) => {
     ];
 
     return (
-        <div className="w-full mt-2 animate-fadeIn">
+        <div className="w-full mt-2 animate-fadeIn bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <DataTable
                 columns={columns}
                 data={displayUsers}
@@ -147,6 +147,7 @@ const UserManagementTab = ({ onEdit }) => {
                 maxHeight="calc(100vh - 280px)"
                 stickyHeader={true}
                 enableColumnFilters={true}
+                transparent={true}
             />
         </div>
     );

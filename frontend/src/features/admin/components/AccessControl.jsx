@@ -70,8 +70,8 @@ const AccessControl = ({ roles, navigation, onAdd, onEdit, loading = false }) =>
             </div>
             
             <div className="overflow-x-auto w-full">
-                <table className="w-full text-left">
-                    <thead className="bg-[#106fa4] text-white text-[13px] font-medium">
+                <table className="w-full text-left rounded-lg overflow-hidden border border-gray-200">
+                    <thead className="bg-[#106fa4] text-white text-[13px] font-medium rounded-t-lg overflow-hidden">
                         <tr>
                             <th className="px-6 py-2.5 w-[20%] border-r border-white/20">Role</th>
                             <th className="px-6 py-2.5 w-[65%] border-r border-white/20">Accessible Labels</th>

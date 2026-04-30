@@ -266,6 +266,7 @@ const ApprovalsPage = () => {
                         maxHeight="calc(100vh - 320px)"
                         stickyHeader={true}
                         enableColumnFilters={true}
+                        transparent={true}
                     />
                 </div>
             ),
@@ -310,7 +311,7 @@ const ApprovalsPage = () => {
                     </div>
                 </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm p-2">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <Tabs
                     defaultActiveKey="1"
                     items={items}
