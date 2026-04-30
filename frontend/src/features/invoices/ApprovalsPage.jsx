@@ -289,7 +289,7 @@ const ApprovalsPage = () => {
     return (
         <div className="p-6 bg-[#f8fafc] min-h-screen pt-[10px]">
             <div className="flex items-center justify-between mb-4">
-                <h1 className="text-3xl font-extrabold custom-font-jura">Approvals</h1>
+                <h1 className="text-3xl font-extrabold custom-font-jura"> </h1>
                 <div className="flex items-center gap-3">
                     <div className="w-[150px]">
                         <CustomButton 
