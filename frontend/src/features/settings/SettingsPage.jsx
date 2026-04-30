@@ -9,6 +9,7 @@ import DataTable from '../../components/ui/DataTable';
 import VendorWorkflowModal from './VendorWorkflowModal';
 import CodificationWorkflowModal from './CodificationWorkflowModal';
 import RuleModal from './RuleModal';
+import RefreshButton from '../../shared/components/RefreshButton';
 
 const SettingsPage = () => {
     const {
@@ -462,12 +463,10 @@ const SettingsPage = () => {
                         >
                             <Plus size={16} /> Add Rule
                         </button>
-                        <button
+                        <RefreshButton
                             onClick={() => activeTab === 'Vendor Based Workflow' ? fetchVendorWorkflows() : fetchCodificationWorkflows()}
-                            className="bg-[#2b3345] hover:bg-[#1a2235] text-white px-4 py-0 h-[34px] rounded-[4px] flex items-center gap-1.5 text-[13px] font-medium transition-colors"
-                        >
-                            Refresh
-                        </button>
+                            loading={activeTab === 'Vendor Based Workflow' ? vendorLoading : codificationLoading}
+                        />
                     </div>
                 )}
             </div>

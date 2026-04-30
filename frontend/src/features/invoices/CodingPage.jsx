@@ -7,6 +7,7 @@ import { getInvoices, getInvoiceFilterOptions } from '../../api/invoiceApi';
 import toast from '../../utils/toast';
 import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
+import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
 
 const ACCESSOR_TO_DB_FIELD = {
@@ -330,14 +331,11 @@ const CodingPage = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="w-[150px]">
-                        <CustomButton 
-                            variant="outline"
+                        <RefreshButton 
                             onClick={fetchInvoices}
                             loading={loading}
-                            className="!h-[42px] border-[#D9D9D9] !text-[#595959]"
-                        >
-                            <ReloadOutlined /> Refresh
-                        </CustomButton>
+                            className="!h-[42px] w-full"
+                        />
                     </div>
                     <div className="w-[150px]">
                         <ExportButton

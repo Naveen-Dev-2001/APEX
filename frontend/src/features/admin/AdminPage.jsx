@@ -7,6 +7,7 @@ import GlobalConfigTab from './GlobalConfigTab';
 import DelegationsTab from './DelegationsTab';
 import AddUserModal from './modals/AddUserModal';
 import CustomButton from '../../shared/components/CustomButton';
+import RefreshButton from '../../shared/components/RefreshButton';
 import toast from '../../utils/toast';
 
 const AdminPage = () => {
@@ -200,7 +201,7 @@ const AdminPage = () => {
                                 {activeTab === 'User Management' && (
                                     <CustomButton
                                         onClick={() => setIsAddModalOpen(true)}
-                                        className="!h-[34px] !w-auto !px-4 !rounded-[4px] !text-[13px] font-medium"
+                                        className="!h-[34px] !w-auto !px-4 !rounded-lg !text-[13px] font-medium"
                                     >
                                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -210,7 +211,7 @@ const AdminPage = () => {
                                 )}
 
                                 {/* Refresh Button */}
-                                <button
+                                <RefreshButton
                                     onClick={() => {
                                         if (activeTab === 'User Management') {
                                             fetchUsers();
@@ -219,19 +220,9 @@ const AdminPage = () => {
                                             fetchDelegations();
                                         }
                                     }}
-                                    disabled={loading}
-                                    title="Refresh data"
-                                    className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-[4px] flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {loading ? (
-                                        <div className="loading-spinner border-white/30 border-t-white"></div>
-                                    ) : (
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                    )}
-                                    <span>Refresh</span>
-                                </button>
+                                    loading={loading}
+                                    className="flex-1 sm:flex-none"
+                                />
                             </div>
                         </div>
                     )}
