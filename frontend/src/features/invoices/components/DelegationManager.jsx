@@ -45,7 +45,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
         }
     }, [isAdmin, user?.email]);
 
-    const approverOptions = isAdmin 
+    const approverOptions = isAdmin
         ? [
             { label: 'Select Approver', value: '' },
             ...(storeApprovers || []).map(u => ({
@@ -145,7 +145,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                 const now = dayjs().startOf('day');
                 const start = dayjs(row.start_date).startOf('day');
                 const end = dayjs(row.end_date).endOf('day');
-                
+
                 if (now.isSame(start) || (now.isAfter(start) && now.isBefore(end))) {
                     return (
                         <span className="px-2.5 py-0.5 rounded-[4px] bg-[#f0fdf4] text-[#22c55e] text-[12px] font-medium border border-[#dcfce7]">
@@ -171,7 +171,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
             header: 'Action',
             accessor: 'id',
             render: (id, row) => (
-                <button 
+                <button
                     onClick={() => showConfirm({
                         message: 'Revert Delegation?',
                         subMessage: `This will remove the delegation from ${getUsernameByEmail(row.original_approver)} to ${getUsernameByEmail(row.substitute_approver)}.`,
@@ -206,13 +206,13 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
         return 0;
     });
-    
+
     const paginatedDelegations = displayDelegations.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    
+
     const isLoading = storeLoading || pageLoading;
     // Form fields should only show skeletons on absolute initial load (when data is missing)
     const isInitialLoading = isLoading && (
-        (isAdmin && (!users || users.length === 0)) || 
+        (isAdmin && (!users || users.length === 0)) ||
         (!isAdmin && (!user))
     );
 
@@ -297,20 +297,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
 
             {/* Table Section */}
             <div className="w-full flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-gray-800">Delegations</h3>
-                    <button 
-                        onClick={() => {
-                            fetchDelegations();
-                            // Removed global onUpdate() to prevent full page re-render and flickering
-                        }}
-                        disabled={isLoading}
-                        className="h-[40px] px-6 bg-[#24a0ed] hover:bg-[#1c8ad1] text-white rounded-[4px] text-[13px] font-semibold transition-colors disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                        <ReloadOutlined spin={isLoading && storeLoading} />
-                        <span>Refresh</span>
-                    </button>
-                </div>
+
                 <DataTable
                     columns={columns}
                     data={paginatedDelegations}

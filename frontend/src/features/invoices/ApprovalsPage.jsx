@@ -36,7 +36,7 @@ const ApprovalsPage = () => {
         setLoading(true);
         try {
             const skip = (currentPage - 1) * itemsPerPage;
-            
+
             // Fetch invoices, delegations, and approvers in parallel
             const [invoiceRes, delegationData, approverData] = await Promise.all([
                 getUnapprovedInvoices({
@@ -57,7 +57,7 @@ const ApprovalsPage = () => {
 
             // Filter active delegations where the current user is the substitute
             const safeDelegations = Array.isArray(delegationData?.data) ? delegationData.data : (Array.isArray(delegationData) ? delegationData : []);
-            
+
             const active = safeDelegations.filter(d => {
                 const start = new Date(d.start_date);
                 start.setHours(0, 0, 0, 0);
@@ -99,7 +99,7 @@ const ApprovalsPage = () => {
                     : stageEmails.length > 0
                         ? stageEmails.join(", ")
                         : 'Pending';
-                
+
                 // Active delegation check for the label
                 const isDelegated = !isFinanceLevel && stageEmails.some(e => active.includes(e));
 
@@ -243,6 +243,50 @@ const ApprovalsPage = () => {
         return invoices.map((item, index) => ({ ...item, index }));
     }, [invoices]);
 
+    const items = [
+        {
+            key: '1',
+            label: 'Unapproved Invoices',
+            children: (
+                <div className="pt-4">
+                    <DataTable
+                        columns={columnDefs}
+                        data={displayInvoices}
+                        loading={loading}
+                        totalItems={totalItems}
+                        currentPage={currentPage}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onItemsPerPageChange={(val) => {
+                            setItemsPerPage(val);
+                            setCurrentPage(1);
+                        }}
+                        onSort={handleSort}
+                        sortColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        maxHeight="calc(100vh - 320px)"
+                        stickyHeader={true}
+                        enableColumnFilters={true}
+                        transparent={true}
+                    />
+                </div>
+            ),
+        },
+        {
+            key: '2',
+            label: 'Change Approver (Delegation)',
+            children: (
+                <div className="pt-4">
+                    <DelegationManager
+                        isAdmin={activeRole?.toLowerCase() === 'admin'}
+                        onUpdate={fetchData}
+                        approvers={approvers}
+                        loading={loading}
+                    />
+                </div>
+            ),
+        },
+    ];
 
     return (
         <div className="p-0 bg-[#f8fafc] min-h-screen">
@@ -283,7 +327,7 @@ const ApprovalsPage = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="w-[150px]">
-                        <CustomButton 
+                        <CustomButton
                             variant="outline"
                             onClick={fetchData}
                             loading={loading}
@@ -293,10 +337,10 @@ const ApprovalsPage = () => {
                         </CustomButton>
                     </div>
                     <div className="w-[150px]">
-                        <ExportButton 
-                            data={invoices} 
-                            columns={columnDefs} 
-                            fileName="Approvals.xlsx" 
+                        <ExportButton
+                            data={invoices}
+                            columns={columnDefs}
+                            fileName="Approvals.xlsx"
                         />
                     </div>
                 </div>
