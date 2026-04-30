@@ -631,8 +631,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     // Label for the GST system row
     const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
 
-    const user = useAuthStore((state) => state.user);
-    const userRole = user?.role?.toLowerCase();
+    const { user, activeRole } = useAuthStore();
+    const userRole = (activeRole || user?.role || "").toLowerCase();
 
     const isViewOnly = useMemo(() => {
         if (activeInvoiceData?.is_archived) return true;
@@ -746,7 +746,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             >
                 <DownloadOutlined style={{ fontSize: 12 }} /> Export
             </button>
-            {activeInvoiceData?.status?.toLowerCase() === "waiting_coding" && (
+            {userRole === "coder" && activeInvoiceData?.status?.toLowerCase() === "waiting_coding" && (
                 <>
                     <button
                         onClick={(e) => { e.stopPropagation(); fileInputRef.current.click(); }}

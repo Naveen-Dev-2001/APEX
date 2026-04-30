@@ -262,11 +262,10 @@ const CodingTab = ({ isActive = false }) => {
     const rows = lineItems;
     const queryClient = useQueryClient();
 
-    const user = useAuthStore((state) => state.user);
-    const userRole = user?.role?.toLowerCase();
+    const { user, activeRole } = useAuthStore();
+    const userRole = (activeRole || user?.role || "").toLowerCase();
 
     const { workflowData } = useWorkflowDataSync(viewInvoiceId);
-    const currentApproverLevel = workflowData?.current_approver_level || 1;
 
     const isViewOnly = useMemo(() => {
         if (activeInvoiceData?.is_archived) return true;
@@ -282,11 +281,14 @@ const CodingTab = ({ isActive = false }) => {
 
         if (isMyEditingSession) return false; // unlock all fields
 
+        if (userRole === 'scanner') {
+            return status !== 'processed';
+        }
+
         if (userRole === 'coder') {
-            if (status === 'processed') return true;
+            if (status === 'processed' || status === 'waiting_approval') return true;
             if (status === 'waiting_coding') return false;
-            if (status === 'waiting_approval' && currentApproverLevel > 1) return true;
-            return false;
+            return true;
         }
 
         // Approvers always view-only UNLESS editing session active (handled above)
@@ -294,7 +296,7 @@ const CodingTab = ({ isActive = false }) => {
 
         const VIEW_ONLY_STATUSES = ["waiting_coding", "processed", "sage_posted"];
         return VIEW_ONLY_STATUSES.includes(status);
-    }, [activeInvoiceData, userRole, user?.email, currentApproverLevel]);
+    }, [activeInvoiceData, userRole, user?.email]);
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);
@@ -571,7 +573,7 @@ const CodingTab = ({ isActive = false }) => {
                         >
                             <DownloadOutlined style={{ fontSize: 12 }} /> Export
                         </button>
-                        {activeInvoiceData?.status?.toLowerCase() === "waiting_coding" && (
+                        {userRole === "coder" && activeInvoiceData?.status?.toLowerCase() === "waiting_coding" && (
                             <>
                                 <button
                                     onClick={() => fileInputRef.current.click()}
