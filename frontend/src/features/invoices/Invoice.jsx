@@ -329,7 +329,7 @@ const Invoice = () => {
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
                             <div style={{ width: 280 }}>
-                                <CustomInput placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."} value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} icon={<SearchOutlined />} rightIcon={localSearch && <CloseCircleOutlined />} onRightIconClick={() => setLocalSearch("")} className="mb-0" />
+                                <CustomInput placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."} value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} icon={<SearchOutlined />} rightIcon={localSearch && <CloseCircleOutlined />} onRightIconClick={() => setLocalSearch("")} className="mb-0" allowClear={false} />
                             </div>
                             <div style={{ width: 200 }}>
                                 <Dropdown options={VIEW_OPTIONS} placeholder="Select View" value={view} onChange={(val) => setView(val)} />

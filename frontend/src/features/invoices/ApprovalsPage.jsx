@@ -30,6 +30,7 @@ const ApprovalsPage = () => {
     const [totalItems, setTotalItems] = useState(0);
     const [sortColumn, setSortColumn] = useState('uploaded_at');
     const [sortDirection, setSortDirection] = useState('desc');
+    const [activeTab, setActiveTab] = useState('1'); // 1: Unapproved Invoices, 2: Change Approver
 
     const fetchData = async () => {
         setLoading(true);
@@ -242,54 +243,44 @@ const ApprovalsPage = () => {
         return invoices.map((item, index) => ({ ...item, index }));
     }, [invoices]);
 
-    const items = [
-        {
-            key: '1',
-            label: 'Unapproved Invoices',
-            children: (
-                <div className="pt-4">
-                    <DataTable
-                        columns={columnDefs}
-                        data={displayInvoices}
-                        loading={loading}
-                        totalItems={totalItems}
-                        currentPage={currentPage}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={setCurrentPage}
-                        onItemsPerPageChange={(val) => {
-                            setItemsPerPage(val);
-                            setCurrentPage(1);
-                        }}
-                        onSort={handleSort}
-                        sortColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        maxHeight="calc(100vh - 320px)"
-                        stickyHeader={true}
-                        enableColumnFilters={true}
-                    />
-                </div>
-            ),
-        },
-        {
-            key: '2',
-            label: 'Change Approver (Delegation)',
-            children: (
-                <div className="pt-4">
-                    <DelegationManager
-                        isAdmin={activeRole?.toLowerCase() === 'admin'}
-                        onUpdate={fetchData}
-                        approvers={approvers}
-                        loading={loading}
-                    />
-                </div>
-            ),
-        },
-    ];
 
     return (
-        <div className="p-6 bg-[#f8fafc] min-h-screen pt-[10px]">
-            <div className="flex items-center justify-between mb-4">
-                <h1 className="text-3xl font-extrabold custom-font-jura"> </h1>
+        <div className="p-0 bg-[#f8fafc] min-h-screen">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px", background: "#F7F7F7", borderBottom: "1px solid #E5E7EB", flexWrap: "wrap", gap: "12px" }}>
+                <div style={{ display: "flex", border: "1px solid #D9D9D9", borderRadius: "4px", overflow: "hidden", background: "#FFFFFF", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+                    {[
+                        { key: '1', label: 'Unapproved Invoices' },
+                        { key: '2', label: 'Change Approver (Delegation)' },
+                    ].map(({ key, label }, index, arr) => {
+                        const isActive = activeTab === key;
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => setActiveTab(key)}
+                                style={{
+                                    padding: "8px 24px",
+                                    fontSize: 14,
+                                    fontWeight: isActive ? 700 : 500,
+                                    color: "black",
+                                    background: isActive ? "#BAE7FF" : "#FFFFFF",
+                                    border: "none",
+                                    borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none",
+                                    cursor: "pointer",
+                                    transition: "background-color 0.2s, color 0.2s",
+                                    outline: "none",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    minWidth: "120px"
+                                }}
+                                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }}
+                                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}
+                            >
+                                {label}
+                            </button>
+                        );
+                    })}
+                </div>
                 <div className="flex items-center gap-3">
                     <div className="w-[150px]">
                         <CustomButton 
@@ -310,13 +301,40 @@ const ApprovalsPage = () => {
                     </div>
                 </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm p-2">
-                <Tabs
-                    defaultActiveKey="1"
-                    items={items}
-                    className="approvals-tabs"
-                    tabBarStyle={{ marginBottom: 0, paddingLeft: '1rem' }}
-                />
+
+            <div className="p-4">
+                {activeTab === '1' ? (
+                    <div className="bg-white rounded-xl shadow-sm p-2">
+                        <DataTable
+                            columns={columnDefs}
+                            data={displayInvoices}
+                            loading={loading}
+                            totalItems={totalItems}
+                            currentPage={currentPage}
+                            itemsPerPage={itemsPerPage}
+                            onPageChange={setCurrentPage}
+                            onItemsPerPageChange={(val) => {
+                                setItemsPerPage(val);
+                                setCurrentPage(1);
+                            }}
+                            onSort={handleSort}
+                            sortColumn={sortColumn}
+                            sortDirection={sortDirection}
+                            maxHeight="calc(100vh - 250px)"
+                            stickyHeader={true}
+                            enableColumnFilters={true}
+                        />
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-xl shadow-sm p-4">
+                        <DelegationManager
+                            isAdmin={activeRole?.toLowerCase() === 'admin'}
+                            onUpdate={fetchData}
+                            approvers={approvers}
+                            loading={loading}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );
