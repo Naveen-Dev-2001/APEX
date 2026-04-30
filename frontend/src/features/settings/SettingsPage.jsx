@@ -456,7 +456,7 @@ const SettingsPage = () => {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={openAdd}
-                            className="bg-[#24a0ed] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-[4px] flex items-center gap-1.5 text-[13px] font-medium transition-colors"
+                            className="bg-[#24A1DD] hover:bg-[#1c8ad1] text-white px-4 py-0 h-[34px] rounded-lg flex items-center gap-1.5 text-[13px] font-medium transition-colors"
                         >
                             <Plus size={16} /> Add Rule
                         </button>
