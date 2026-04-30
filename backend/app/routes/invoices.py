@@ -3221,6 +3221,8 @@ async def get_deleted_invoice(
         "processed_at": record.processed_at.isoformat() if record.processed_at else None,
         "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
         "deleted_by": record.deleted_by,
+        "current_approver_level": record.current_approver_level or 1,
+        "required_approvers": record.required_approvers or 0,
         # Snapshots
         "status_history": _safe_json(record.status_history_json),
         "workflow_steps": _safe_json(record.workflow_steps_json),
@@ -3228,6 +3230,20 @@ async def get_deleted_invoice(
         "audit_logs": _safe_json(record.audit_logs_json),
         "is_archived": True
     }
+
+    # Resolve User Names for Workflow Steps
+    if res["workflow_steps"]:
+        involved_users = set()
+        for step in res["workflow_steps"]:
+            if step.get("user"):
+                involved_users.add(step.get("user").lower())
+        
+        if involved_users:
+            user_list = db.query(User).filter(User.email.in_(list(involved_users))).all()
+            user_names_map = {u.email.lower(): u.username for u in user_list}
+            # For each step, if it has a user email, try to attach username if not already there
+            # (Though history snapshot might already have some names, resolution ensures consistency)
+            res["user_names"] = user_names_map
 
     # Normalize approved_by
     approved_by_snap = _safe_json(record.approved_by_json) or []
