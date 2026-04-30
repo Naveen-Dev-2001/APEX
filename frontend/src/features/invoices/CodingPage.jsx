@@ -7,6 +7,7 @@ import { getInvoices, getInvoiceFilterOptions } from '../../api/invoiceApi';
 import toast from '../../utils/toast';
 import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
+import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
 
 const ACCESSOR_TO_DB_FIELD = {
@@ -294,7 +295,7 @@ const CodingPage = () => {
                 <div className="flex items-center justify-center h-full">
                     <button
                         onClick={() => handleView(row)}
-                        className="text-gray-400 hover:text-[#1e9bd8] transition-colors cursor-pointer p-2"
+                        className="text-blue-500 hover:text-blue-700 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                         title="View"
                     >
                         <EyeOutlined style={{ fontSize: 18 }} />
@@ -330,14 +331,11 @@ const CodingPage = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="w-[150px]">
-                        <CustomButton 
-                            variant="outline"
+                        <RefreshButton 
                             onClick={fetchInvoices}
                             loading={loading}
-                            className="!h-[42px] border-[#D9D9D9] !text-[#595959]"
-                        >
-                            <ReloadOutlined /> Refresh
-                        </CustomButton>
+                            className="!h-[42px] w-full"
+                        />
                     </div>
                     <div className="w-[150px]">
                         <ExportButton

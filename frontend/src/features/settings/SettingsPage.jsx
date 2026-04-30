@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tooltip } from 'antd';
 import { Plus, Search, Pencil, Trash2, AlertCircle } from 'lucide-react';
+import SearchInput from '../../shared/components/SearchInput';
 import useWorkflowStore from '../../store/workflow.store';
 import { useAuthStore } from '../../store/authStore';
 import useToastStore from '../../store/useToastStore';
@@ -9,6 +10,7 @@ import DataTable from '../../components/ui/DataTable';
 import VendorWorkflowModal from './VendorWorkflowModal';
 import CodificationWorkflowModal from './CodificationWorkflowModal';
 import RuleModal from './RuleModal';
+import RefreshButton from '../../shared/components/RefreshButton';
 
 const SettingsPage = () => {
     const {
@@ -442,16 +444,12 @@ const SettingsPage = () => {
                 <div className="flex-1" />
 
                 {/* Search */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                    <input
-                        type="text"
-                        placeholder="Search"
-                        className="pl-9 pr-4 h-[36px] w-[220px] border border-gray-200 rounded-[4px] text-[13px] outline-none focus:border-[#24A1DD] transition-all bg-white"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
+                <SearchInput
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onClear={() => setSearchQuery('')}
+                    width="220px"
+                />
 
                 {/* Add Action */}
                 {!isCoder && (
@@ -462,12 +460,10 @@ const SettingsPage = () => {
                         >
                             <Plus size={16} /> Add Rule
                         </button>
-                        <button
+                        <RefreshButton
                             onClick={() => activeTab === 'Vendor Based Workflow' ? fetchVendorWorkflows() : fetchCodificationWorkflows()}
-                            className="bg-[#2b3345] hover:bg-[#1a2235] text-white px-4 py-0 h-[34px] rounded-[4px] flex items-center gap-1.5 text-[13px] font-medium transition-colors"
-                        >
-                            Refresh
-                        </button>
+                            loading={activeTab === 'Vendor Based Workflow' ? vendorLoading : codificationLoading}
+                        />
                     </div>
                 )}
             </div>

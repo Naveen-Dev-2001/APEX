@@ -6,6 +6,7 @@ import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import CustomButton from "./CustomButton";
+import SearchInput from "./SearchInput";
 
 // AG Grid v33+
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -119,15 +120,14 @@ export default function ReusableDataTable({
 
                     {/* Search */}
                     {tableSearch && (
-                        <div className="relative w-[360px] ml-auto">
-                            <SearchOutlined className="absolute left-[14px] top-1/2 -translate-y-1/2" />
-                            <input
-                                value={internalSearchText}
-                                onChange={(e) => setInternalSearchText(e.target.value)}
-                                placeholder={searchPlaceholder}
-                                className="w-full rounded-lg border border-[#E0E0E0] pt-[10px] pr-[14px] pb-[10px] pl-[42px] focus:outline-none focus:border-[#1e9bd8] transition-colors"
-                            />
-                        </div>
+                        <SearchInput
+                            value={internalSearchText}
+                            onChange={(e) => setInternalSearchText(e.target.value)}
+                            onClear={() => setInternalSearchText("")}
+                            placeholder={searchPlaceholder}
+                            width="360px"
+                            className="ml-auto"
+                        />
                     )}
 
                     {showFilter && (

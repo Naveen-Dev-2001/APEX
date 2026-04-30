@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Trash2, Upload, Plus, Pencil, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import SearchInput from '../../shared/components/SearchInput';
 import useMasterDataStore from '../../store/masterData.store';
 import useToastStore from '../../store/useToastStore';
 import toast from '../../utils/toast';
@@ -523,16 +524,12 @@ const MasterDataPage = () => {
                 />
 
                 {/* Search */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                    <input
-                        type="text"
-                        placeholder="Search"
-                        className="pl-9 pr-4 h-[36px] w-[220px] border border-gray-200 rounded-[4px] text-[13px] outline-none focus:border-[#1D71AB] transition-all bg-white"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
+                <SearchInput
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onClear={() => setSearchQuery('')}
+                    width="220px"
+                />
 
                 {/* Actions */}
                 {!isCurrencyTab && !isReadOnly && (

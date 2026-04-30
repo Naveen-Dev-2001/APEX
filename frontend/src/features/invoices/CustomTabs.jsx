@@ -1,3 +1,5 @@
+import { EyeOutlined } from "@ant-design/icons";
+
 const CustomTabs = ({ tabs = [], activeTab, onChange }) => {
     return (
         <div className="w-full overflow-hidden ">
@@ -19,6 +21,9 @@ const CustomTabs = ({ tabs = [], activeTab, onChange }) => {
                                         : "bg-white text-black hover:text-black hover:bg-gray-50 "
                                     }`}
                             >
+                                {tab === 'Coding' && (
+                                    <EyeOutlined style={{ marginRight: 8, color: '#24A1DD', fontSize: 16 }} />
+                                )}
                                 {tab}
                             </button>
                         );

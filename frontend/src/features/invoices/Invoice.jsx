@@ -4,6 +4,8 @@ import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined, ReloadO
 import { Trash2 } from "lucide-react";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
+import RefreshButton from "../../shared/components/RefreshButton";
+import SearchInput from "../../shared/components/SearchInput";
 import DataTable from "../../components/ui/DataTable";
 import { Skeleton } from "antd";
 import { useInvoiceData } from "../hooks/useInvoiceData";
@@ -328,9 +330,13 @@ const Invoice = () => {
                             })}
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
-                            <div style={{ width: 280 }}>
-                                <CustomInput placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."} value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} icon={<SearchOutlined />} rightIcon={localSearch && <CloseCircleOutlined />} onRightIconClick={() => setLocalSearch("")} className="mb-0" allowClear={false} />
-                            </div>
+                            <SearchInput
+                                placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."}
+                                value={localSearch}
+                                onChange={(e) => setLocalSearch(e.target.value)}
+                                onClear={() => setLocalSearch("")}
+                                width="280px"
+                            />
                             <div style={{ width: 200 }}>
                                 <Dropdown options={VIEW_OPTIONS} placeholder="Select View" value={view} onChange={(val) => setView(val)} />
                             </div>
@@ -338,8 +344,7 @@ const Invoice = () => {
                                 <ExportButton data={pageTab === 'delete' ? archivedRecords : invoices} columns={columnDefs} fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`} />
                             </div>
                             <div style={{ minWidth: 120 }}>
-                                <CustomButton
-                                    variant="outline"
+                                <RefreshButton
                                     onClick={() => {
                                         if (pageTab === 'delete') {
                                             setRefreshKey(prev => prev + 1);
@@ -347,10 +352,9 @@ const Invoice = () => {
                                             refetch();
                                         }
                                     }}
-                                    className="!h-[42px] border-[#D9D9D9] !text-[#595959]"
-                                >
-                                    <ReloadOutlined /> Refresh
-                                </CustomButton>
+                                    loading={isLoading}
+                                    className="!h-[42px] w-full"
+                                />
                             </div>
                             {userRole === 'scanner' && pageTab === 'in_progress' && (
                                 <div style={{ minWidth: 160 }}>
