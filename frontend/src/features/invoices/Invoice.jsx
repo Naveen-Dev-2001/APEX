@@ -357,7 +357,7 @@ const Invoice = () => {
                                 />
                             </div>
                             {userRole === 'scanner' && pageTab === 'in_progress' && (
-                                <div style={{ minWidth: 160 }}>
+                                <div style={{ minWidth: 120 }}>
                                     <CustomButton variant="primary" type="button" onClick={() => setIsModalOpen(true)}>Add Invoice</CustomButton>
                                 </div>
                             )}
