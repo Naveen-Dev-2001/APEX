@@ -54,6 +54,15 @@ class EmailService:
             from app.database.database import SessionLocal
             from app.models.db_models import User
             
+            # List of reserved email addresses and domains to skip
+            reserved_emails = ["admin@example.com"]
+            reserved_domains = ["example.com", "example.net", "example.org", ".example", ".test", ".invalid", ".localhost"]
+            
+            email_lower = to_email.lower()
+            if email_lower in reserved_emails or any(email_lower.endswith(domain) for domain in reserved_domains):
+                logger.info(f"Email skipped for {to_email} as it is a reserved/example address: {subject}")
+                return True # Return True to indicate it was "handled"
+
             db = SessionLocal()
             try:
                 user = db.query(User).filter(User.email == to_email).first()
