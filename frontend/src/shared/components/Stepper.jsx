@@ -12,7 +12,7 @@ const Stepper = memo(({ steps, currentStep }) => {
                 const isUpcoming = currentStep < step.number;
 
                 return (
-                    <div key={step.number} className="relative z-10 flex items-center  px-2">
+                    <div key={step.number} className="relative z-10 flex items-center bg-white px-2">
                         <div
                             className={`
                                 flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold
