@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
 import RefreshButton from "../../shared/components/RefreshButton";
+import SearchInput from "../../shared/components/SearchInput";
 import DataTable from "../../components/ui/DataTable";
 import { Skeleton } from "antd";
 import { useInvoiceData } from "../hooks/useInvoiceData";
@@ -329,9 +330,13 @@ const Invoice = () => {
                             })}
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
-                            <div style={{ width: 280 }}>
-                                <CustomInput placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."} value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} icon={<SearchOutlined />} rightIcon={localSearch && <CloseCircleOutlined />} onRightIconClick={() => setLocalSearch("")} className="mb-0" allowClear={false} />
-                            </div>
+                            <SearchInput
+                                placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."}
+                                value={localSearch}
+                                onChange={(e) => setLocalSearch(e.target.value)}
+                                onClear={() => setLocalSearch("")}
+                                width="280px"
+                            />
                             <div style={{ width: 200 }}>
                                 <Dropdown options={VIEW_OPTIONS} placeholder="Select View" value={view} onChange={(val) => setView(val)} />
                             </div>
