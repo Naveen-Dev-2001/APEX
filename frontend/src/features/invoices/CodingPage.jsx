@@ -295,7 +295,7 @@ const CodingPage = () => {
                 <div className="flex items-center justify-center h-full">
                     <button
                         onClick={() => handleView(row)}
-                        className="text-gray-400 hover:text-[#1e9bd8] transition-colors cursor-pointer p-2"
+                        className="text-blue-500 hover:text-blue-700 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                         title="View"
                     >
                         <EyeOutlined style={{ fontSize: 18 }} />
