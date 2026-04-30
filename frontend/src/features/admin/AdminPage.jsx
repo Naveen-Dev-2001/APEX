@@ -88,7 +88,7 @@ const AdminPage = () => {
                 Admin Dashboard
             </h1> */}
 
-            <div className="bg-white rounded-[4px] shadow-sm w-full p-5 border border-gray-200 min-h-[200px] flex flex-col relative text-left">
+            <div className="w-full p-5 flex flex-col relative text-left">
 
                 {/* Edit Modal */}
                 {editingUser && (
@@ -238,7 +238,7 @@ const AdminPage = () => {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 w-full">
+                <div className="w-full">
                     {activeTab === 'User Management' && <UserManagementTab onEdit={handleEditClick} />}
                     {activeTab === 'Global Config' && <GlobalConfigTab />}
                     {activeTab === 'Delegations' && <DelegationsTab />}

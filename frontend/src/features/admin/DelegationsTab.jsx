@@ -216,7 +216,7 @@ const DelegationsTab = () => {
             </div>
 
             {/* Table Section */}
-            <div className="w-full">
+            <div className="w-full bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                 <DataTable
                     columns={columns}
                     data={displayDelegations}
@@ -230,6 +230,7 @@ const DelegationsTab = () => {
                     sortDirection={sortDirection}
                     maxHeight="calc(100vh - 420px)"
                     stickyHeader={true}
+                    transparent={true}
                 />
             </div>
         </div>

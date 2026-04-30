@@ -349,27 +349,30 @@ const CodingPage = () => {
                 </div>
             </div>
 
-            <DataTable
-                columns={columns}
-                data={invoices}
-                loading={loading}
-                totalItems={total}
-                currentPage={currentPage}
-                itemsPerPage={itemsPerPage}
-                onPageChange={handlePageChange}
-                onItemsPerPageChange={handleItemsPerPageChange}
-                sortColumn={sortColumn}
-                sortDirection={sortDirection}
-                onSort={handleSort}
-                maxHeight="calc(100vh - 250px)"
-                stickyHeader={true}
-                enableColumnFilters={true}
-                columnFilters={columnFilters}
-                onColumnFiltersChange={(filters) => {
-                    setColumnFilters(filters);
-                    setCurrentPage(1);
-                }}
-            />
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <DataTable
+                    columns={columns}
+                    data={invoices}
+                    loading={loading}
+                    totalItems={total}
+                    currentPage={currentPage}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={handlePageChange}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    maxHeight="calc(100vh - 250px)"
+                    stickyHeader={true}
+                    enableColumnFilters={true}
+                    columnFilters={columnFilters}
+                    onColumnFiltersChange={(filters) => {
+                        setColumnFilters(filters);
+                        setCurrentPage(1);
+                    }}
+                    transparent={true}
+                />
+            </div>
         </div>
     );
 };

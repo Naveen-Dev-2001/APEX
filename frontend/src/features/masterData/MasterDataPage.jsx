@@ -576,7 +576,7 @@ const MasterDataPage = () => {
             </div>
 
             {/* Table Area */}
-            <div className="flex-1 relative">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) || (currencyError && isCurrencyTab) || (exchangeRateError && isExchangeRateTab) ? (
                     <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
@@ -626,6 +626,7 @@ const MasterDataPage = () => {
                                 maxHeight="calc(100vh - 280px)"
                                 stickyHeader={true}
                                 enableColumnFilters={true}
+                                transparent={true}
                             />
                         )}
                     </>
