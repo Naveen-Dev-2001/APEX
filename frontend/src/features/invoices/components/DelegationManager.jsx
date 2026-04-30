@@ -38,12 +38,12 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
         fetchDelegations();
     }, [isAdmin, fetchUsers, fetchDelegations, fetchApprovers]);
 
-    // Handle pre-filling for non-admins
+    // Handle pre-filling for all users
     useEffect(() => {
-        if (!isAdmin && user?.email) {
+        if (user?.email) {
             setForm(prev => ({ ...prev, original_approver: user.email.toLowerCase() }));
         }
-    }, [isAdmin, user?.email]);
+    }, [user?.email]);
 
     const approverOptions = isAdmin
         ? [
@@ -70,7 +70,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
         const success = await addDelegation(form);
         if (success) {
             setForm({
-                original_approver: isAdmin ? '' : (user?.email?.toLowerCase() || ''),
+                original_approver: user?.email?.toLowerCase() || '',
                 substitute_approver: '',
                 start_date: '',
                 end_date: ''
@@ -232,7 +232,7 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                             value={form.original_approver}
                             options={approverOptions}
                             onChange={(val) => setForm({ ...form, original_approver: val })}
-                            disabled={!isAdmin}
+                            disabled={true}
                         />
                     )}
                 </div>

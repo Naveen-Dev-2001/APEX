@@ -17,7 +17,8 @@ const Dropdown = ({
     onSearch,
     loading,
     onClear,
-    searchValue
+    searchValue,
+    disabled
 }) => {
     return (
         <div className={`flex flex-col gap-1.5 ${className}`}>
@@ -43,6 +44,7 @@ const Dropdown = ({
                 onSearch={onSearch}
                 onClear={onClear}
                 searchValue={searchValue}
+                disabled={disabled}
                 allowClear
                 className={`${mode ? 'min-h-[40px]' : 'h-[40px]'}`}
                 style={{
