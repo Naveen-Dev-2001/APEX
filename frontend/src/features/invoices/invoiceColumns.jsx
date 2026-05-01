@@ -1,5 +1,6 @@
 import { EyeOutlined, LoadingOutlined, InboxOutlined } from "@ant-design/icons";
 import { Trash2 } from "lucide-react";
+import { formatCurrency } from "../../utils/formatters";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
 const StatusBadge = ({ value, level }) => {
@@ -159,7 +160,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.total_invoice_amount?.value ?? "",
-        render:     (_, row) => row?.extracted_data?.amounts?.total_invoice_amount?.value ?? "-",
+        render:     (_, row) => formatCurrency(row?.extracted_data?.amounts?.total_invoice_amount?.value),
     },
     {
         header:     "Amount Due",
@@ -167,7 +168,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.amount_due?.value ?? "",
-        render:     (_, row) => row?.extracted_data?.amounts?.amount_due?.value ?? "-",
+        render:     (_, row) => formatCurrency(row?.extracted_data?.amounts?.amount_due?.value),
     },
     // {
     //     header:     "Uploaded At",
@@ -349,7 +350,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable:     true,
         filterType:     'number',
         getFilterValue: (row) => row?.extracted_data?.Items?.value?.[0]?.amount?.value ?? "",
-        render:         (_, row) => row?.extracted_data?.Items?.value?.[0]?.amount?.value ?? "-",
+        render:         (_, row) => formatCurrency(row?.extracted_data?.Items?.value?.[0]?.amount?.value),
     },
     {
         header:         "Tax Amount",
@@ -357,7 +358,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable:     true,
         filterType:     'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.total_tax_amount?.value ?? "",
-        render:         (_, row) => row?.extracted_data?.amounts?.total_tax_amount?.value ?? "-",
+        render:         (_, row) => formatCurrency(row?.extracted_data?.amounts?.total_tax_amount?.value),
     },
     {
         header:         "Subtotal",
@@ -365,7 +366,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable:     true,
         filterType:     'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.subtotal?.value ?? "",
-        render:         (_, row) => row?.extracted_data?.amounts?.subtotal?.value ?? "-",
+        render:         (_, row) => formatCurrency(row?.extracted_data?.amounts?.subtotal?.value),
     },
     {
         header:         "Total Amount",
@@ -373,7 +374,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable:     true,
         filterType:     'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.total_invoice_amount?.value ?? "",
-        render:         (_, row) => row?.extracted_data?.amounts?.total_invoice_amount?.value ?? "-",
+        render:         (_, row) => formatCurrency(row?.extracted_data?.amounts?.total_invoice_amount?.value),
     },
     {
         header:         "Amount Due",
@@ -381,7 +382,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable:     true,
         filterType:     'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.amount_due?.value ?? "",
-        render:         (_, row) => row?.extracted_data?.amounts?.amount_due?.value ?? "-",
+        render:         (_, row) => formatCurrency(row?.extracted_data?.amounts?.amount_due?.value),
     },
     {
         header:     "Approval Status",

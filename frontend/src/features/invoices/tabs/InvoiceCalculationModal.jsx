@@ -1,5 +1,6 @@
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useVendorDetailSync } from "../../hooks/useInvoiceDetailSync";
+import { formatCurrency } from "../../../utils/formatters";
 
 const InvoiceCalculationModal = ({ open, onClose }) => {
     const { quickViewFormData, lineItems, originalLineItems, selectedVendorId } = useInvoiceStore();
@@ -93,19 +94,14 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
     const baseTotal = invoiceTotalUsed;
     const totalPayable = baseTotal + tdsDeduction;
 
-    const fmt = (val) =>
-        Number(val).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
 
     const rows = [
-        ["Line Items (Subtotal)", `$ ${fmt(lineItemsSubtotal)}`],
-        ["Total Tax (GST/VAT)", `$ ${fmt(totalTax)}`],
-        ["Extracted Subtotal (if different)", `$ ${fmt(extractedSubtotal)}`],
-        ["Amount Paid", `$ ${fmt(amountPaid)}`],
-        ["Shipping / Handling / Fees", `$ ${fmt(shipping)}`],
-        ["Surcharges", `$ ${fmt(surcharges)}`],
+        ["Line Items (Subtotal)", formatCurrency(lineItemsSubtotal)],
+        ["Total Tax (GST/VAT)", formatCurrency(totalTax)],
+        ["Extracted Subtotal (if different)", formatCurrency(extractedSubtotal)],
+        ["Amount Paid", formatCurrency(amountPaid)],
+        ["Shipping / Handling / Fees", formatCurrency(shipping)],
+        ["Surcharges", formatCurrency(surcharges)],
         ["TDS Rate (from Vendor)", `${tdsRate.toFixed(2)}%`],
     ];
 
@@ -148,7 +144,7 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                         <div className="flex justify-between px-3 py-2 border-t">
                             <span className="text-red-500">TDS Deduction Amount</span>
                             <span className="text-red-500">
-                                - $ {fmt(Math.abs(tdsDeduction))}
+                                - {formatCurrency(Math.abs(tdsDeduction))}
                             </span>
                         </div>
                     </div>
@@ -164,7 +160,7 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                                 <span>Base Invoice Total Used:</span>
                                 <div className="text-right">
                                     <div className="text-gray-800">
-                                        $ {fmt(baseTotal)}
+                                        {formatCurrency(baseTotal)}
                                     </div>
                                     <div className="text-[11px] text-gray-400">
                                         (via {invoiceTotalSourceName})
@@ -174,12 +170,12 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
 
                             <div className="flex justify-between text-red-500">
                                 <span>Less TDS Deduction:</span>
-                                <span>- $ {fmt(Math.abs(tdsDeduction))}</span>
+                                <span>- {formatCurrency(Math.abs(tdsDeduction))}</span>
                             </div>
 
                             <div className="flex justify-between font-medium border-t pt-1">
                                 <span>Total Amount Payable:</span>
-                                <span>$ {fmt(totalPayable)}</span>
+                                <span>{formatCurrency(totalPayable)}</span>
                             </div>
                         </div>
                     </div>
@@ -190,10 +186,10 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                             Heuristic Calculations:
                         </div>
                         <div className="text-[12px] space-y-1">
-                            <div>1. Line Items + Tax: $ {fmt(invoiceTotal_calc1)}</div>
-                            <div>2. Subtotal + Tax: $ {fmt(invoiceTotal_calc2)}</div>
+                            <div>1. Line Items + Tax: {formatCurrency(invoiceTotal_calc1)}</div>
+                            <div>2. Subtotal + Tax: {formatCurrency(invoiceTotal_calc2)}</div>
                             <div>
-                                3. Total Reconciliation: $ {fmt(invoiceTotal_calc3)}
+                                3. Total Reconciliation: {formatCurrency(invoiceTotal_calc3)}
                                 <div className="text-[11px] text-gray-400">
                                     (Line Items + Tax + Shipping + Surcharges - Amount Paid)
                                 </div>
@@ -204,7 +200,7 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                     {/* Extraction Value Status */}
                     <div className={`mt-4 text-[12px] border-t pt-3 ${hasMismatch ? 'text-orange-500' : 'text-green-600'}`}>
                         <div className="font-medium">
-                            Extraction Value: $ {fmt(extractionValue)}
+                            Extraction Value: {formatCurrency(extractionValue)}
                         </div>
                         <div className="flex items-center gap-1 mt-1">
                             {hasMismatch ? (

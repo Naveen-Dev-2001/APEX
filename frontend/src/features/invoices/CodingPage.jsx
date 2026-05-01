@@ -9,6 +9,7 @@ import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
 import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
+import { formatCurrency } from '../../utils/formatters';
 
 const ACCESSOR_TO_DB_FIELD = {
     vendor_name: "vendor_name",
@@ -177,15 +178,15 @@ const CodingPage = () => {
         //     }
         // },
         {
-            header: "Total Amount ($)",
+            header: "Total Amount",
             accessor: "total_amount",
             minWidth: 150,
             sortable: true,
             filterType: 'number',
             filterable: true,
             render: (_, row) => {
-                const val = row.extracted_data?.amounts?.total_invoice_amount?.value || "0.00";
-                return `$ ${val}`;
+                const val = row.extracted_data?.amounts?.total_invoice_amount?.value;
+                return formatCurrency(val);
             },
             valueGetter: (p) => p.data?.extracted_data?.amounts?.total_invoice_amount?.value || "0.00",
         },

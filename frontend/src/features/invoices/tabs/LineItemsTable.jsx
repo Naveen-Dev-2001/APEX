@@ -3,6 +3,7 @@ import { PlusOutlined, DownloadOutlined, UploadOutlined, CaretUpOutlined, CaretD
 import { Trash2 } from "lucide-react";
 import { Modal } from "antd";
 import ReusableDataTable from '../../../shared/components/ReusableDataTable' // adjust path
+import { formatCurrency } from '../../../utils/formatters'
 
 const LINE_TYPE_OPTIONS = ["Expense", "Revenue", "Asset", "Liability"];
 const GL_CODE_OPTIONS = ["GL-001", "GL-002", "GL-003", "GL-004"];
@@ -44,7 +45,7 @@ const NumberCell = ({ value, onChange, prefix }) => (
     <div className="flex items-center border border-gray-200 rounded overflow-hidden bg-white focus-within:border-blue-400">
         {prefix && (
             <span className="px-2 text-[13px] text-gray-500 border-r border-gray-200 bg-gray-50">
-                {prefix}
+                {prefix} 
             </span>
         )}
         <input
@@ -245,11 +246,9 @@ const LineItemsTable = () => {
             headerName: "Unit Price",
             width: 130,
             cellRenderer: ({ data }) => (
-                <NumberCell
-                    value={data.unitPrice}
-                    onChange={(v) => updateRow(data.id, "unitPrice", v)}
-                    prefix="$"
-                />
+                <div className="text-[13px] text-gray-800 px-2">
+                    {formatCurrency(data.unitPrice)}
+                </div>
             ),
         },
         {
@@ -257,11 +256,9 @@ const LineItemsTable = () => {
             headerName: "Net Amount",
             width: 130,
             cellRenderer: ({ data }) => (
-                <NumberCell
-                    value={data.netAmount}
-                    onChange={(v) => updateRow(data.id, "netAmount", v)}
-                    prefix="$"
-                />
+                <div className="text-[13px] text-gray-800 px-2">
+                    {formatCurrency(data.netAmount)}
+                </div>
             ),
         },
         {

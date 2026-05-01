@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useGLMasterSync } from "../../hooks/useMasterDataSync";
+import { formatCurrency } from "../../../utils/formatters";
 
 const GLSummaryTab = ({ isActive = false }) => {
     const { lineItems } = useInvoiceStore();
@@ -45,13 +46,6 @@ const GLSummaryTab = ({ isActive = false }) => {
         [distributionRows]
     );
 
-    const formatCurrency = (value) =>
-        new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "USD",
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(value);
 
     return (
         <div className="p-2 h-full overflow-y-auto">

@@ -14,6 +14,7 @@ import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
 import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
+import { formatCurrency } from '../../utils/formatters';
 
 const { confirm } = Modal;
 
@@ -183,12 +184,12 @@ const ApprovalsPage = () => {
             onClick: () => handleSort("invoice_number")
         },
         {
-            header: "Total Amount ($)",
+            header: "Total Amount",
             accessor: "total_amount",
             sortable: true,
             filterable: true,
             onClick: () => handleSort("total_amount"),
-            render: (val) => `$ ${val}`
+            render: (val) => formatCurrency(val)
         },
         {
             header: "Updated By",

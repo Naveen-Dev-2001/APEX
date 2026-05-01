@@ -11,6 +11,7 @@ import VendorWorkflowModal from './VendorWorkflowModal';
 import CodificationWorkflowModal from './CodificationWorkflowModal';
 import RuleModal from './RuleModal';
 import RefreshButton from '../../shared/components/RefreshButton';
+import { formatCurrency } from '../../utils/formatters';
 
 const SettingsPage = () => {
     const {
@@ -206,7 +207,7 @@ const SettingsPage = () => {
         {
             header: 'Amount Threshold',
             accessor: 'amount_threshold',
-            render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
+            render: (val) => formatCurrency(val)
         },
         {
             header: 'Posting Approver',
@@ -334,7 +335,7 @@ const SettingsPage = () => {
         {
             header: 'Amount Threshold',
             accessor: 'amount_threshold',
-            render: (val) => val ? `$${val.toLocaleString()}` : <span className="text-gray-400">-</span>
+            render: (val) => formatCurrency(val)
         },
         {
             header: 'Posting Approver',
