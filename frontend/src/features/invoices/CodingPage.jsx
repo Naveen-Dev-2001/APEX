@@ -9,6 +9,7 @@ import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
 import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
+import { formatCurrency } from '../../utils/formatters';
 
 const ACCESSOR_TO_DB_FIELD = {
     vendor_name: "vendor_name",
@@ -177,15 +178,15 @@ const CodingPage = () => {
         //     }
         // },
         {
-            header: "Total Amount ($)",
+            header: "Total Amount",
             accessor: "total_amount",
             minWidth: 150,
             sortable: true,
             filterType: 'number',
             filterable: true,
             render: (_, row) => {
-                const val = row.extracted_data?.amounts?.total_invoice_amount?.value || "0.00";
-                return `$ ${val}`;
+                const val = row.extracted_data?.amounts?.total_invoice_amount?.value;
+                return formatCurrency(val);
             },
             valueGetter: (p) => p.data?.extracted_data?.amounts?.total_invoice_amount?.value || "0.00",
         },
@@ -227,18 +228,23 @@ const CodingPage = () => {
             sortable: true,
             filterable: true,
             render: (status, row) => {
-                let colorClass = "bg-orange-100 text-orange-600";
-                let label = "Waiting for coding";
+                const labelMap = {
+                    waiting_coding: "Waiting For Coding",
+                    waiting_approval: "Waiting approval",
+                    reworked: "Reworked",
+                };
 
-                if (status === 'waiting_approval') {
-                    colorClass = "bg-blue-100 text-blue-600";
-                    label = "Waiting approval";
-                    if (row.current_approver_level) {
-                        label += ` (Level ${row.current_approver_level})`;
-                    }
-                } else if (status === 'reworked') {
-                    colorClass = "bg-purple-100 text-purple-600";
-                    label = "Reworked";
+                const colorMap = {
+                    waiting_coding: "bg-orange-100 text-orange-600",
+                    waiting_approval: "bg-blue-100 text-blue-600",
+                    reworked: "bg-purple-100 text-purple-600",
+                };
+
+                let label = labelMap[status] ?? status;
+                const colorClass = colorMap[status] ?? "bg-gray-100 text-gray-600";
+
+                if (status === 'waiting_approval' && row.current_approver_level) {
+                    label += ` (Level ${row.current_approver_level})`;
                 }
 
                 return (
@@ -247,27 +253,34 @@ const CodingPage = () => {
                     </div>
                 );
             },
+            filterRender: (val) => {
+                const labelMap = {
+                    waiting_coding: "Waiting For Coding",
+                    waiting_approval: "Waiting approval",
+                    reworked: "Reworked",
+                };
+                return labelMap[val] ?? val;
+            },
             onGetOptions: async () => {
                 return ['waiting_coding', 'waiting_approval', 'reworked'];
             }
         },
         {
-            header: "Next Approver",
+            header: "Next Action By",
             accessor: "next_approver",
             minWidth: 200,
             filterable: true,
-            render: (_, row) => {
+            getFilterValue: (row) => {
                 const status = (row?.status || "").toLowerCase();
                 if (status === 'sage_posted' || status === 'approved') return "Completed";
                 if (status === 'rejected') return "Rejected";
-                
+                if (status === 'waiting_coding' || status === 'processed') return "Finance Team";
+
                 const currentLevel = row?.current_approver_level || 1;
                 const stage = row?.assigned_approvers?.[currentLevel - 1];
-                
                 if (!stage) return "-";
-                
                 if (stage.is_finance === true) return "Finance Team";
-                
+
                 const names = stage.names || stage.emails;
                 if (Array.isArray(names)) {
                     return names.map(n => {
@@ -283,7 +296,37 @@ const CodingPage = () => {
                     }
                     return names;
                 }
-                
+                return "-";
+            },
+            render: (_, row) => {
+                const status = (row?.status || "").toLowerCase();
+                if (status === 'sage_posted' || status === 'approved') return "Completed";
+                if (status === 'rejected') return "Rejected";
+                if (status === 'waiting_coding' || status === 'processed') return "Finance Team";
+
+                const currentLevel = row?.current_approver_level || 1;
+                const stage = row?.assigned_approvers?.[currentLevel - 1];
+
+                if (!stage) return "-";
+
+                if (stage.is_finance === true) return "Finance Team";
+
+                const names = stage.names || stage.emails;
+                if (Array.isArray(names)) {
+                    return names.map(n => {
+                        if (typeof n === 'string' && n.includes('@')) {
+                            return n.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+                        }
+                        return n;
+                    }).join(", ");
+                }
+                if (typeof names === 'string') {
+                    if (names.includes('@')) {
+                        return names.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+                    }
+                    return names;
+                }
+
                 return "-";
             }
         },
@@ -331,7 +374,7 @@ const CodingPage = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="w-[150px]">
-                        <RefreshButton 
+                        <RefreshButton
                             onClick={fetchInvoices}
                             loading={loading}
                             className="!h-[42px] w-full"

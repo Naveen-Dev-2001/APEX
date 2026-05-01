@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
+import { formatCurrency } from '../../utils/formatters';
 import Card from './charts/Card';
 import { icons } from '../../file';
 import BarChart from './charts/BarChart';
@@ -31,7 +32,7 @@ const DashboardPage = React.memo(() => {
     const mapStatusData = useCallback((data = {}) => {
         const labelMap = {
             processed: "Processed",
-            waiting_coding: "Waiting Coding",
+            waiting_coding: "Waiting For Coding",
             waiting_approval: "Waiting Approval",
             approved: "Approved",
             rejected: "Rejected",
@@ -121,12 +122,7 @@ const DashboardPage = React.memo(() => {
                         <Card
                             icon={icons.overdue}
                             title="Total Overdue"
-                            value={new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: 'USD',
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2
-                            }).format(summary?.total_due || 0)}
+                            value={formatCurrency(summary?.total_due || 0)}
                         />
                         <Card icon={icons.approved} title="Approved" value={summary?.approved} />
                         <Card icon={icons.pending} title="Pending Approval" value={summary?.waiting_approval} />

@@ -8,6 +8,7 @@ import RuleModal from './RuleModal';
 import workflowAPI from '../../api/workflowAPI';
 import toast from '../../utils/toast';
 import { useSettingsStore } from '../../store/settings.store';
+import { formatCurrency } from '../../utils/formatters';
 
 const TABS = ['Vendor Based Workflow', 'Codification Based Workflow'];
 
@@ -206,7 +207,7 @@ const Settings = () => {
             width: 150,
             cellRenderer: ({ value }) =>
                 value
-                    ? <span className="text-xs text-gray-700">{value}</span>
+                    ? <span className="text-xs text-gray-700">{formatCurrency(value)}</span>
                     : <span className="text-gray-300 text-xs">—</span>,
         },
         {
@@ -288,7 +289,7 @@ const Settings = () => {
             width: 150,
             cellRenderer: ({ value }) =>
                 value
-                    ? <span className="text-xs text-gray-700">{value}</span>
+                    ? <span className="text-xs text-gray-700">{formatCurrency(value)}</span>
                     : <span className="text-gray-300 text-xs">—</span>,
         },
         {

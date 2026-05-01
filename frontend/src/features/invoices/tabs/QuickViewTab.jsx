@@ -16,6 +16,7 @@ import loadLineItemTable from "../../../utils/lineItemLogic";
 import * as XLSX from "xlsx";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { Trash2 } from "lucide-react";
+import { formatCurrency } from "../../../utils/formatters";
 
 dayjs.extend(customParseFormat);
 
@@ -855,13 +856,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                                     : col.key === "qty"
                                                                                         ? "1"
                                                                                         : col.key === "unitPrice"
-                                                                                            ? Number((row.unitPrice || 0).toString().replace(/,/g, ""))
-                                                                                                .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                            ? formatCurrency(row.unitPrice)
                                                                                             : col.key === "discount"
                                                                                                 ? "0"
                                                                                                 : col.key === "netAmount"
-                                                                                                    ? Number((row.netAmount || 0).toString().replace(/,/g, ""))
-                                                                                                        .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                                                                    ? formatCurrency(row.netAmount)
                                                                                                     : col.key === "taxAmt"
                                                                                                         ? "0"
                                                                                                         : ""
@@ -923,13 +922,13 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                             Total Sum of Line Items <span className="text-xs">(Excl GST)</span> :
                                         </span>
                                         <span className="text-sm font-semibold text-gray-800 min-w-[120px] text-right">
-                                            $ {regularItemsSum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {formatCurrency(regularItemsSum)}
                                         </span>
                                     </div>
                                     <div className="flex justify-end items-center gap-4 pr-2 pb-2">
                                         <span className="text-sm text-gray-500">Total Amount Payable :</span>
                                         <span className="text-base font-bold text-[#2F5D7C] min-w-[120px] text-right">
-                                            $ {totalAmountPayable.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {formatCurrency(totalAmountPayable)}
                                         </span>
                                         <button
                                             className="text-[#2F5D7C] hover:text-[#1e4560] transition-colors"
