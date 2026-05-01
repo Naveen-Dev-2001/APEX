@@ -50,7 +50,7 @@ const StatusBadge = ({ value, level }) => {
     );
 };
 
-// ─── Next Approver helper ───────────────────────────────────────────────────
+// ─── Next Action By helper ───────────────────────────────────────────────────
 const getNextApprover = (row) => {
     const status = (row?.status || "").toLowerCase();
     if (status === 'sage_posted' || status === 'approved') return "Completed";
@@ -207,7 +207,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         render:         (val, row) => <StatusBadge value={val} level={row?.current_approver_level} />,
     },
     {
-        header:         "Next Approver",
+        header:         "Next Action By",
         accessor:       "next_approver",
         filterable:     true,
         render:         (_, row) => getNextApprover(row),
@@ -400,7 +400,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         render:     (val, row) => <StatusBadge value={val} level={row?.current_approver_level} />,
     },
     {
-        header:     "Next Approver",
+        header:     "Next Action By",
         accessor:   "next_approver",
         filterable: true,
         render:     (_, row) => getNextApprover(row),

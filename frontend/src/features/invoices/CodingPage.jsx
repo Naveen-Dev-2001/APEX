@@ -266,7 +266,7 @@ const CodingPage = () => {
             }
         },
         {
-            header: "Next Approver",
+            header: "Next Action By",
             accessor: "next_approver",
             minWidth: 200,
             filterable: true,
