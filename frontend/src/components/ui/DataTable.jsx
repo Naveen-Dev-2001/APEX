@@ -218,7 +218,7 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                             </div>
                         ) : visibleValues.map(val => {
                             const checked = pendingSet.has(val);
-                            const label = String(val);
+                            const label = col.filterRender ? col.filterRender(val) : String(val);
                             return (
                                 <label
                                     key={val}

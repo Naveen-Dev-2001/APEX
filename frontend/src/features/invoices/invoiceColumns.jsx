@@ -3,6 +3,29 @@ import { Trash2 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
+const getStatusLabel = (value, level) => {
+    const labelMap = {
+        approved:        "Approved",
+        pending:         "Pending",
+        rejected:        "Rejected",
+        processed:       "Processed",
+        waiting_approval:"Waiting Approval",
+        waiting_coding:  "waiting coding",
+        sage_posted:     "Posted to Sage",
+        sage_post_failed: "Sage Post Failed",
+        reworked:        "Reworked",
+        archived:        "Archived",
+    };
+
+    let label = labelMap[value] ?? value;
+
+    if (value === 'waiting_approval' && level) {
+        label = `${label} (Level ${level})`;
+    }
+    return label;
+};
+
+// ─── Status badge helper ──────────────────────────────────────────────────────
 const StatusBadge = ({ value, level }) => {
     const colorMap = {
         approved:        "bg-green-100 text-green-700",
@@ -17,25 +40,8 @@ const StatusBadge = ({ value, level }) => {
         archived:        "bg-indigo-100 text-indigo-700",
     };
 
-    const labelMap = {
-        approved:        "Approved",
-        pending:         "Pending",
-        rejected:        "Rejected",
-        processed:       "Processed",
-        waiting_approval:"Waiting Approval",
-        waiting_coding:  "Waiting for coding",
-        sage_posted:     "Posted to Sage",
-        sage_post_failed: "Sage Post Failed",
-        reworked:        "Reworked",
-        archived:        "Archived",
-    };
-
     const cls = colorMap[value] ?? "bg-gray-100 text-gray-600";
-    let label = labelMap[value] ?? value;
-
-    if (value === 'waiting_approval' && level) {
-        label = `${label} (Level ${level})`;
-    }
+    const label = getStatusLabel(value, level);
 
     return (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${cls}`}>
@@ -197,6 +203,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         accessor:       "status",
         sortable:       true,
         filterable:     true,
+        filterRender:   (val) => getStatusLabel(val),
         render:         (val, row) => <StatusBadge value={val} level={row?.current_approver_level} />,
     },
     {
@@ -389,6 +396,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         accessor:   "status",
         sortable:   true,
         filterable:     true,
+        filterRender:   (val) => getStatusLabel(val),
         render:     (val, row) => <StatusBadge value={val} level={row?.current_approver_level} />,
     },
     {

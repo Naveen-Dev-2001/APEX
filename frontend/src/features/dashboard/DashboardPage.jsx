@@ -32,7 +32,7 @@ const DashboardPage = React.memo(() => {
     const mapStatusData = useCallback((data = {}) => {
         const labelMap = {
             processed: "Processed",
-            waiting_coding: "Waiting for coding",
+            waiting_coding: "waiting coding",
             waiting_approval: "Waiting Approval",
             approved: "Approved",
             rejected: "Rejected",

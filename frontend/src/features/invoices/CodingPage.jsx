@@ -228,18 +228,23 @@ const CodingPage = () => {
             sortable: true,
             filterable: true,
             render: (status, row) => {
-                let colorClass = "bg-orange-100 text-orange-600";
-                let label = "Waiting for coding";
+                const labelMap = {
+                    waiting_coding: "waiting coding",
+                    waiting_approval: "Waiting approval",
+                    reworked: "Reworked",
+                };
+                
+                const colorMap = {
+                    waiting_coding: "bg-orange-100 text-orange-600",
+                    waiting_approval: "bg-blue-100 text-blue-600",
+                    reworked: "bg-purple-100 text-purple-600",
+                };
 
-                if (status === 'waiting_approval') {
-                    colorClass = "bg-blue-100 text-blue-600";
-                    label = "Waiting approval";
-                    if (row.current_approver_level) {
-                        label += ` (Level ${row.current_approver_level})`;
-                    }
-                } else if (status === 'reworked') {
-                    colorClass = "bg-purple-100 text-purple-600";
-                    label = "Reworked";
+                let label = labelMap[status] ?? status;
+                const colorClass = colorMap[status] ?? "bg-gray-100 text-gray-600";
+
+                if (status === 'waiting_approval' && row.current_approver_level) {
+                    label += ` (Level ${row.current_approver_level})`;
                 }
 
                 return (
@@ -247,6 +252,14 @@ const CodingPage = () => {
                         {label}
                     </div>
                 );
+            },
+            filterRender: (val) => {
+                const labelMap = {
+                    waiting_coding: "waiting coding",
+                    waiting_approval: "Waiting approval",
+                    reworked: "Reworked",
+                };
+                return labelMap[val] ?? val;
             },
             onGetOptions: async () => {
                 return ['waiting_coding', 'waiting_approval', 'reworked'];
