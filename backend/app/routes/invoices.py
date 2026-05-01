@@ -3184,12 +3184,23 @@ async def get_deleted_invoice(
 
     # Reconstruct a dictionary similar to invoice_to_dict but from snapshots
     extracted_data = _safe_json(record.extracted_data) or {}
-    coding_snapshot = _safe_json(record.coding_json) or []
+    coding_row = _safe_json(record.coding_json)
+    
+    line_items_list = []
+    if coding_row and isinstance(coding_row, dict):
+        line_items_str = coding_row.get("line_items")
+        if line_items_str:
+            line_items_list = _safe_json(line_items_str) or []
     
     # Ensure the frontend's loadLineItemTable sees this as a saved record with a snapshot
-    if coding_snapshot:
+    if line_items_list:
         extracted_data["isModified"] = True
-        extracted_data["lineItemsSnapshot"] = coding_snapshot
+        extracted_data["lineItemsSnapshot"] = line_items_list
+    
+    # Enrich extracted_data with metadata for specific UI views
+    if record.status in ['waiting_approval', 'approved', 'processed', 'sage_posted', 'rejected', 'reworked']:
+        if line_items_list:
+            extracted_data["is_coded"] = True
 
     res = {
         "id": record.id,
@@ -3221,13 +3232,29 @@ async def get_deleted_invoice(
         "processed_at": record.processed_at.isoformat() if record.processed_at else None,
         "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
         "deleted_by": record.deleted_by,
+        "current_approver_level": record.current_approver_level or 1,
+        "required_approvers": record.required_approvers or 0,
         # Snapshots
         "status_history": _safe_json(record.status_history_json),
         "workflow_steps": _safe_json(record.workflow_steps_json),
-        "coding": coding_snapshot,
+        "coding": coding_row,
         "audit_logs": _safe_json(record.audit_logs_json),
         "is_archived": True
     }
+
+    # Resolve User Names for Workflow Steps
+    if res["workflow_steps"]:
+        involved_users = set()
+        for step in res["workflow_steps"]:
+            if step.get("user"):
+                involved_users.add(step.get("user").lower())
+        
+        if involved_users:
+            user_list = db.query(User).filter(User.email.in_(list(involved_users))).all()
+            user_names_map = {u.email.lower(): u.username for u in user_list}
+            # For each step, if it has a user email, try to attach username if not already there
+            # (Though history snapshot might already have some names, resolution ensures consistency)
+            res["user_names"] = user_names_map
 
     # Normalize approved_by
     approved_by_snap = _safe_json(record.approved_by_json) or []

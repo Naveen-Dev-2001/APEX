@@ -202,36 +202,33 @@ const WorkflowTab = () => {
     }, [isInApproval, selectedVendorId, firstLine.lob, firstLine.department]);
 
     const {
-
-        workflowData,
-
+        workflowData: liveWorkflowData,
         isLoadingWorkflowData
-
     } = useWorkflowDataSync(!isArchived ? viewInvoiceId : null, workflowParams);
 
-
+    const workflowData = useMemo(() => {
+        if (!isArchived) return liveWorkflowData;
+        
+        return {
+            steps: activeInvoiceData?.workflow_steps || [],
+            assigned_approvers: activeInvoiceData?.assigned_approvers || [],
+            current_approver_level: activeInvoiceData?.current_approver_level || 1,
+            delegations: {}, 
+            user_names: activeInvoiceData?.user_names || {},
+            workflow_type: activeInvoiceData?.workflow_type || "archived",
+            required_approvers: activeInvoiceData?.required_approvers || (activeInvoiceData?.assigned_approvers?.length || 0)
+        };
+    }, [isArchived, liveWorkflowData, activeInvoiceData]);
 
     if (isLoadingWorkflowData) {
-
         return <div className="p-6 text-gray-400 font-normal">Loading analysis...</div>;
-
     }
 
-
-
-    // currentStatus is already computed above (for isInApproval guard).
-    // Alias with "processed" default for the step-rendering logic below.
     const renderStatus = currentStatus || "processed";
-
     const historySteps = workflowData?.steps || [];
-
-
     const assignedApprovers = workflowData?.assigned_approvers || [];
-
     const currentApproverLevel = workflowData?.current_approver_level || 1;
-
     const delegations = workflowData?.delegations || {};
-
     const userNamesMap = workflowData?.user_names || {};
 
     const getUserDisplayName = (email) => userNamesMap[email?.toLowerCase()] || email;
