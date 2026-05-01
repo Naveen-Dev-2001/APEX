@@ -329,21 +329,26 @@ const Invoice = () => {
                                     );
                             })}
                         </div>
-                        <div className="flex items-center gap-3 flex-wrap">
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                             <SearchInput
                                 placeholder={pageTab === 'delete' ? "Search deleted..." : "Search invoices..."}
                                 value={localSearch}
                                 onChange={(e) => setLocalSearch(e.target.value)}
                                 onClear={() => setLocalSearch("")}
-                                width="280px"
+                                width="220px"
                             />
-                            <div style={{ width: 200 }}>
+                            <div style={{ width: 180, flexShrink: 0 }}>
                                 <Dropdown options={VIEW_OPTIONS} placeholder="Select View" value={view} onChange={(val) => setView(val)} />
                             </div>
-                            <div style={{ minWidth: 120 }}>
-                                <ExportButton data={pageTab === 'delete' ? archivedRecords : invoices} columns={columnDefs} fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`} />
+                            <div style={{ flexShrink: 0 }}>
+                                <ExportButton
+                                    data={pageTab === 'delete' ? archivedRecords : invoices}
+                                    columns={columnDefs}
+                                    fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`}
+                                    className="!w-auto !h-10 px-4"
+                                />
                             </div>
-                            <div style={{ minWidth: 120 }}>
+                            <div style={{ flexShrink: 0 }}>
                                 <RefreshButton
                                     onClick={() => {
                                         if (pageTab === 'delete') {
@@ -353,12 +358,19 @@ const Invoice = () => {
                                         }
                                     }}
                                     loading={isLoading}
-                                    className="!h-[40px] w-full"
+                                    className="!w-auto !h-10 px-4"
                                 />
                             </div>
                             {userRole === 'scanner' && pageTab === 'in_progress' && (
-                                <div style={{ minWidth: 120 }}>
-                                    <CustomButton variant="primary" type="button" onClick={() => setIsModalOpen(true)}>Add Invoice</CustomButton>
+                                <div style={{ flexShrink: 0 }}>
+                                    <CustomButton
+                                        variant="primary"
+                                        type="button"
+                                        onClick={() => setIsModalOpen(true)}
+                                        className="!w-auto !h-10 px-4"
+                                    >
+                                        Add Invoice
+                                    </CustomButton>
                                 </div>
                             )}
                         </div>

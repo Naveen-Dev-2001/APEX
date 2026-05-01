@@ -25,8 +25,7 @@ const RefreshButton = ({
             onClick={onClick}
             disabled={loading}
             title={title}
-            className={`!w-fit ${className}`}
-            height="h-[34px]"
+            className={`${className}`}
             variant="primary"
         >
             {loading ? (
