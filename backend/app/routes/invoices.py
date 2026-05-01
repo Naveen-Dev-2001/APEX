@@ -3184,12 +3184,23 @@ async def get_deleted_invoice(
 
     # Reconstruct a dictionary similar to invoice_to_dict but from snapshots
     extracted_data = _safe_json(record.extracted_data) or {}
-    coding_snapshot = _safe_json(record.coding_json) or []
+    coding_row = _safe_json(record.coding_json)
+    
+    line_items_list = []
+    if coding_row and isinstance(coding_row, dict):
+        line_items_str = coding_row.get("line_items")
+        if line_items_str:
+            line_items_list = _safe_json(line_items_str) or []
     
     # Ensure the frontend's loadLineItemTable sees this as a saved record with a snapshot
-    if coding_snapshot:
+    if line_items_list:
         extracted_data["isModified"] = True
-        extracted_data["lineItemsSnapshot"] = coding_snapshot
+        extracted_data["lineItemsSnapshot"] = line_items_list
+    
+    # Enrich extracted_data with metadata for specific UI views
+    if record.status in ['waiting_approval', 'approved', 'processed', 'sage_posted', 'rejected', 'reworked']:
+        if line_items_list:
+            extracted_data["is_coded"] = True
 
     res = {
         "id": record.id,
@@ -3226,7 +3237,7 @@ async def get_deleted_invoice(
         # Snapshots
         "status_history": _safe_json(record.status_history_json),
         "workflow_steps": _safe_json(record.workflow_steps_json),
-        "coding": coding_snapshot,
+        "coding": coding_row,
         "audit_logs": _safe_json(record.audit_logs_json),
         "is_archived": True
     }

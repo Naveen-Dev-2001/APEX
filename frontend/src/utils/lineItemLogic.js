@@ -145,7 +145,24 @@ const loadLineItemTable = (props) => {
     //  CASE 1: Saved + NO vendor change → return snapshot
     if (isSaved && !isVendorChanged) {
         const snapshot = activeInvoiceData?.extracted_data?.lineItemsSnapshot;
-        if (snapshot?.length) return snapshot;
+        if (snapshot?.length) {
+            // Map snake_case from backend snapshot to camelCase for frontend components
+            return snapshot.map((item, index) => ({
+                ...item,
+                id: item.id || `snap-${index}`,
+                qty: item.qty ?? item.quantity ?? 0,
+                unitPrice: item.unitPrice ?? item.unit_price ?? 0,
+                netAmount: item.netAmount ?? item.net_amount ?? 0,
+                lineType: item.lineType ?? item.line_type ?? "Expense",
+                glCode: item.glCode ?? item.gl_code ?? "",
+                lob: item.lob ?? "",
+                department: item.department ?? "",
+                customer: item.customer ?? "",
+                item: item.item ?? "",
+                discount: item.discount ?? 0,
+                taxAmt: item.taxAmt ?? 0
+            }));
+        }
     }
 
     //  CASE 2: Saved + vendor changed → recompute
