@@ -15,6 +15,7 @@ import CustomerMasterModal from './CustomerMasterModal';
 import ItemMasterModal from './ItemMasterModal';
 import CurrencyMasterModal from './CurrencyMasterModal';
 import ExchangeRateMasterModal from './ExchangeRateMasterModal';
+import CustomButton from '../../shared/components/CustomButton';
 
 import { useAuthStore } from '../../store/authStore';
 
@@ -565,13 +566,16 @@ const MasterDataPage = () => {
                         </>
                     )}
                     {!isReadOnly && (
-                        <button
-                            onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) ? openAdd : undefined}
-                            className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
-                        >
-                            <Plus size={16} />
-                            <span>{isCurrencyTab ? 'Add Currency' : 'Add New'}</span>
-                        </button>
+                        <div style={{ minWidth: 120 }}>
+                            <CustomButton
+                                variant="primary"
+                                onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) ? openAdd : undefined}
+                                className="!h-[36px]"
+                            >
+                                <Plus size={16} />
+                                <span>{isCurrencyTab ? 'Add Currency' : 'Add New'}</span>
+                            </CustomButton>
+                        </div>
                     )}
                 </div>
             </div>
