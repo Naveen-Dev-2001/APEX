@@ -7,6 +7,7 @@ import API from '../services/api';
 import { useAuthStore } from '../../store/authStore';
 import toast from '../../utils/toast';
 import { icons } from '../../file';
+import AlertModal from '../../shared/components/AlertModal';
 
 const LoginPage = () => {
     const navigate = useNavigate();
@@ -15,11 +16,20 @@ const LoginPage = () => {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showAlert, setShowAlert] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
 
     const handleLogin = async (e) => {
         e.preventDefault();
         if (!email || !password) {
             setError('Email and password are required');
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setAlertMessage('Invalid Email Address');
+            setShowAlert(true);
             return;
         }
 
@@ -68,7 +78,7 @@ const LoginPage = () => {
 
     return (
         <AuthLayout title="Welcome Back">
-            <form onSubmit={handleLogin} className="w-full">
+            <form onSubmit={handleLogin} className="w-full" noValidate>
                 {error && (
                     <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded mb-4 text-sm text-center font-medium animate-shake">
                         {error}
@@ -148,6 +158,16 @@ const LoginPage = () => {
                     Don't have an account? <Link to="/register" className="text-blue-500 hover:underline">Register</Link>
                 </div>
             </form>
+
+            <AlertModal
+                isOpen={showAlert}
+                onClose={() => setShowAlert(false)}
+                onConfirm={() => setShowAlert(false)}
+                title="Invalid Input"
+                message={alertMessage}
+                type="warning"
+                confirmText="OK"
+            />
         </AuthLayout>
     );
 };
