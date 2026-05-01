@@ -229,11 +229,11 @@ const CodingPage = () => {
             filterable: true,
             render: (status, row) => {
                 const labelMap = {
-                    waiting_coding: "waiting coding",
+                    waiting_coding: "Waiting For Coding",
                     waiting_approval: "Waiting approval",
                     reworked: "Reworked",
                 };
-                
+
                 const colorMap = {
                     waiting_coding: "bg-orange-100 text-orange-600",
                     waiting_approval: "bg-blue-100 text-blue-600",
@@ -255,7 +255,7 @@ const CodingPage = () => {
             },
             filterRender: (val) => {
                 const labelMap = {
-                    waiting_coding: "waiting coding",
+                    waiting_coding: "Waiting For Coding",
                     waiting_approval: "Waiting approval",
                     reworked: "Reworked",
                 };
@@ -274,14 +274,14 @@ const CodingPage = () => {
                 const status = (row?.status || "").toLowerCase();
                 if (status === 'sage_posted' || status === 'approved') return "Completed";
                 if (status === 'rejected') return "Rejected";
-                
+
                 const currentLevel = row?.current_approver_level || 1;
                 const stage = row?.assigned_approvers?.[currentLevel - 1];
-                
+
                 if (!stage) return "-";
-                
+
                 if (stage.is_finance === true) return "Finance Team";
-                
+
                 const names = stage.names || stage.emails;
                 if (Array.isArray(names)) {
                     return names.map(n => {
@@ -297,7 +297,7 @@ const CodingPage = () => {
                     }
                     return names;
                 }
-                
+
                 return "-";
             }
         },
@@ -345,7 +345,7 @@ const CodingPage = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="w-[150px]">
-                        <RefreshButton 
+                        <RefreshButton
                             onClick={fetchInvoices}
                             loading={loading}
                             className="!h-[42px] w-full"

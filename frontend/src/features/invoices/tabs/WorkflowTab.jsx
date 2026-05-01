@@ -198,7 +198,7 @@ const WorkflowTab = () => {
             preview_lob: firstLine.lob,
             preview_department_id: firstLine.department,
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isInApproval, selectedVendorId, firstLine.lob, firstLine.department]);
 
     const {
@@ -306,7 +306,7 @@ const WorkflowTab = () => {
 
             steps.push({
 
-                title: renderStatus === "waiting_coding" ? "waiting coding" : "Coding Stage",
+                title: renderStatus === "waiting_coding" ? "Waiting For Coding" : "Coding Stage",
 
                 status: renderStatus === "waiting_coding" ? "pending" : "queued"
 
