@@ -126,13 +126,8 @@ const CodingPage = () => {
             sortable: true,
             filterable: true,
             render: (val, row) => row.vendor_name || row.extracted_data?.vendor_info?.name?.value || "N/A",
+            getFilterValue: (row) => row.vendor_name || row.extracted_data?.vendor_info?.name?.value || "N/A",
             valueGetter: (p) => p.data?.vendor_name || p.data?.extracted_data?.vendor_info?.name?.value || "N/A",
-            onGetOptions: async (accessor) => {
-                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
-                const otherFilters = { ...backendFilters };
-                delete otherFilters[dbField];
-                return await getInvoiceFilterOptions(dbField, otherFilters);
-            }
         },
         {
             header: "Vendor ID",
@@ -140,12 +135,6 @@ const CodingPage = () => {
             minWidth: 150,
             sortable: true,
             filterable: true,
-            onGetOptions: async (accessor) => {
-                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
-                const otherFilters = { ...backendFilters };
-                delete otherFilters[dbField];
-                return await getInvoiceFilterOptions(dbField, otherFilters);
-            }
         },
         {
             header: "Invoice ID",
@@ -153,12 +142,6 @@ const CodingPage = () => {
             minWidth: 150,
             sortable: true,
             filterable: true,
-            onGetOptions: async (accessor) => {
-                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
-                const otherFilters = { ...backendFilters };
-                delete otherFilters[dbField];
-                return await getInvoiceFilterOptions(dbField, otherFilters);
-            }
         },
         // {
         //     header: "Uploaded At",
@@ -214,12 +197,6 @@ const CodingPage = () => {
             minWidth: 180,
             sortable: true,
             filterable: true,
-            onGetOptions: async (accessor) => {
-                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
-                const otherFilters = { ...backendFilters };
-                delete otherFilters[dbField];
-                return await getInvoiceFilterOptions(dbField, otherFilters);
-            }
         },
         {
             header: "Status",
@@ -253,6 +230,7 @@ const CodingPage = () => {
                     </div>
                 );
             },
+            getFilterValue: (row) => row.status ?? '',
             filterRender: (val) => {
                 const labelMap = {
                     waiting_coding: "Waiting For Coding",
@@ -261,9 +239,6 @@ const CodingPage = () => {
                 };
                 return labelMap[val] ?? val;
             },
-            onGetOptions: async () => {
-                return ['waiting_coding', 'waiting_approval', 'reworked'];
-            }
         },
         {
             header: "Next Action By",
