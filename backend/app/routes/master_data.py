@@ -73,7 +73,7 @@ TAB_SEARCH_FIELDS = {
     "LOB": ["lob_id", "name"],
     "Department": ["department_id", "department_name"],
     "Customer": ["customer_id", "customer_name"],
-    "Exchange_Rate": ["code", "name"],
+    "Exchange_Rate": ["base_currency", "target_currency", "rate_key", "rate_type", "exchange_rate", "effective_date"],
     "Currency": ["code", "name"],
     "Entity": ["entity_id", "entity_name"],
     "Vendor": ["vendor_id", "vendor_name"],
