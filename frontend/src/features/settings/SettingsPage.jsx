@@ -456,7 +456,7 @@ const SettingsPage = () => {
                 {!isCoder && (
                     <button
                         onClick={openAdd}
-                        className="bg-[#24A1DD] hover:bg-[#1c8ad1] text-white px-4 h-[36px] min-w-[110px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
+                        className="bg-[#24A1DD] hover:bg-[#1c8ad1] text-white px-4 h-[40px] min-w-[110px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
                     >
                         <Plus size={16} className="flex-shrink-0" /> Add Rule
                     </button>
