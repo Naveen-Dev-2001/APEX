@@ -23,7 +23,7 @@ const StatusBadge = ({ value, level }) => {
         rejected:        "Rejected",
         processed:       "Processed",
         waiting_approval:"Waiting Approval",
-        waiting_coding:  "Waiting Coding",
+        waiting_coding:  "Waiting for coding",
         sage_posted:     "Posted to Sage",
         sage_post_failed: "Sage Post Failed",
         reworked:        "Reworked",

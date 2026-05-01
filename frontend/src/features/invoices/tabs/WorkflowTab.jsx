@@ -306,7 +306,7 @@ const WorkflowTab = () => {
 
             steps.push({
 
-                title: renderStatus === "waiting_coding" ? "Pending Coding" : "Coding Stage",
+                title: renderStatus === "waiting_coding" ? "Waiting for coding" : "Coding Stage",
 
                 status: renderStatus === "waiting_coding" ? "pending" : "queued"
 
