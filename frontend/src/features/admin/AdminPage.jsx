@@ -197,7 +197,7 @@ const AdminPage = () => {
                             {activeTab === 'User Management' && (
                                 <button
                                     onClick={() => setIsAddModalOpen(true)}
-                                    className="bg-[#24A1DD] hover:bg-[#1D71AB] text-white px-4 h-[36px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
+                                    className="bg-[#24A1DD] hover:bg-[#1D71AB] text-white px-4 h-[36px] min-w-[110px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
                                 >
                                     <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -218,7 +218,7 @@ const AdminPage = () => {
                                 }}
                                 loading={loading}
                                 height="h-[36px]"
-                                className="!w-auto"
+                                className="!w-auto !min-w-[110px] !text-[13px] !font-medium"
                             />
                         </div>
                     )}
