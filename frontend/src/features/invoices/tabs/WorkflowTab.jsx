@@ -277,7 +277,7 @@ const WorkflowTab = () => {
 
             subtitle: getUserDisplayName(s.user),
 
-            time: s.timestamp ? new Date(s.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : "",
+            time: s.timestamp ? new Date(s.timestamp + (s.timestamp.endsWith('Z') ? '' : 'Z')).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) + ' IST' : "",
 
             comment: s.comment,
 

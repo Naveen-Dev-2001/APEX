@@ -353,7 +353,7 @@ const Invoice = () => {
                                         }
                                     }}
                                     loading={isLoading}
-                                    className="!h-[42px] w-full"
+                                    className="!h-[40px] w-full"
                                 />
                             </div>
                             {userRole === 'scanner' && pageTab === 'in_progress' && (

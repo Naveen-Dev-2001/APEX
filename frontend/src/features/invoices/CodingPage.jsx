@@ -373,14 +373,14 @@ const CodingPage = () => {
                     </div> */}
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="w-[150px]">
-                        <RefreshButton
+                    <div className="w-[120px]">
+                        <RefreshButton 
                             onClick={fetchInvoices}
                             loading={loading}
-                            className="!h-[42px] w-full"
+                            className="!h-[40px] w-full"
                         />
                     </div>
-                    <div className="w-[150px]">
+                    <div className="w-[120px]">
                         <ExportButton
                             data={invoices}
                             columns={columns}

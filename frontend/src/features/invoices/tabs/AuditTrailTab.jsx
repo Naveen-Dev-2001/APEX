@@ -76,9 +76,14 @@ const AuditItem = memo(({ item, isLast }) => {
         });
     }, [item.details]);
 
-    const formattedTime = useMemo(() => 
-        dayjs(item.timestamp).format("MMM DD, YYYY - hh:mm A"), 
-    [item.timestamp]);
+    const formattedTime = useMemo(() => {
+        if (!item.timestamp) return "";
+        const dateStr = item.timestamp.endsWith('Z') ? item.timestamp : item.timestamp + 'Z';
+        const date = new Date(dateStr);
+        const datePart = date.toLocaleString("en-US", { month: "short", day: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
+        const timePart = date.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+        return `${datePart} - ${timePart} IST`;
+    }, [item.timestamp]);
 
     return (
         <div className="flex gap-4 group">
