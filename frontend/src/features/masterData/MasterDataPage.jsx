@@ -493,8 +493,8 @@ const MasterDataPage = () => {
             </div> */}
 
             {/* Controls Row */}
-            <div className="flex items-center gap-3 flex-wrap">
-                {/* Tabs */}
+            {/* Tabs Row */}
+            <div className="flex items-center gap-3">
                 <div className="flex bg-white border border-gray-200 rounded-[4px] overflow-hidden h-[36px] flex-shrink-0">
                     {tabs.map((tab, index) => (
                         <button
@@ -511,65 +511,69 @@ const MasterDataPage = () => {
                         </button>
                     ))}
                 </div>
+            </div>
 
-                <div className="flex-1" />
+            {/* Actions Row */}
+            <div className="flex items-center justify-end gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                    {/* Search */}
+                    <SearchInput
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onClear={() => setSearchQuery('')}
+                        width="280px"
+                        placeholder="Search"
+                    />
 
-                {/* Hidden Input for Reupload */}
-                <input
-                    type="file"
-                    ref={reuploadInputRef}
-                    onChange={handleReuploadSelect}
-                    style={{ display: 'none' }}
-                    accept=".xls,.xlsx,.csv"
-                />
+                    {/* Hidden Input for Reupload */}
+                    <input
+                        type="file"
+                        ref={reuploadInputRef}
+                        onChange={handleReuploadSelect}
+                        style={{ display: 'none' }}
+                        accept=".xls,.xlsx,.csv"
+                    />
 
-                {/* Search */}
-                <SearchInput
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onClear={() => setSearchQuery('')}
-                    width="220px"
-                />
-
-                {/* Actions */}
-                {!isCurrencyTab && !isReadOnly && (
-                    <>
+                    {/* Actions */}
+                    {!isCurrencyTab && !isReadOnly && (
+                        <>
+                            <button
+                                onClick={handleClearTab}
+                                className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-red-300 rounded-[4px] hover:bg-red-50 transition-all whitespace-nowrap"
+                            >
+                                <Trash2 size={15} className="text-red-500" />
+                                <span>Clear Tab</span>
+                            </button>
+                            <button
+                                onClick={() => reuploadInputRef.current?.click()}
+                                className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-[#24A1DD] rounded-[4px] hover:bg-[#F0F9FF] transition-all whitespace-nowrap"
+                            >
+                                <Upload size={15} className="text-[#24A1DD]" />
+                                <span>Reupload</span>
+                            </button>
+                            <button
+                                onClick={handleSync}
+                                disabled={syncingData}
+                                className={`flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium border rounded-[4px] transition-all whitespace-nowrap
+                                    ${syncingData
+                                        ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50'
+                                        : 'text-gray-700 border-[#24A1DD] hover:bg-[#F0F9FF]'}`}
+                            >
+                                <RefreshCw size={15} className={`${syncingData ? 'text-gray-400 animate-spin' : 'text-[#24A1DD]'}`} />
+                                <span>{syncingData ? 'Syncing...' : 'Sync'}</span>
+                            </button>
+                        </>
+                    )}
+                    {!isReadOnly && (
                         <button
-                            onClick={handleClearTab}
-                            className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-red-300 rounded-[4px] hover:bg-red-50 transition-all whitespace-nowrap"
+                            onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) ? openAdd : undefined}
+                            className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
                         >
-                            <Trash2 size={15} className="text-red-500" />
-                            <span>Clear Tab</span>
+                            <Plus size={16} />
+                            <span>{isCurrencyTab ? 'Add Currency' : 'Add New'}</span>
                         </button>
-                        <button
-                            onClick={() => reuploadInputRef.current?.click()}
-                            className="flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium text-gray-700 border border-[#24A1DD] rounded-[4px] hover:bg-[#F0F9FF] transition-all whitespace-nowrap"
-                        >
-                            <Upload size={15} className="text-[#24A1DD]" />
-                            <span>Reupload</span>
-                        </button>
-                        <button
-                            onClick={handleSync}
-                            disabled={syncingData}
-                            className={`flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium border rounded-[4px] transition-all whitespace-nowrap
-                                ${syncingData
-                                    ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50'
-                                    : 'text-gray-700 border-[#24A1DD] hover:bg-[#F0F9FF]'}`}
-                        >
-                            <RefreshCw size={15} className={`${syncingData ? 'text-gray-400 animate-spin' : 'text-[#24A1DD]'}`} />
-                            <span>{syncingData ? 'Syncing...' : 'Sync'}</span>
-                        </button>
-                    </>
-                )}
-                {!isReadOnly && (
-                    <button
-                        onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) ? openAdd : undefined}
-                        className="flex items-center gap-1.5 px-4 h-[36px] text-[13px] font-medium text-white bg-[#24A1DD] rounded-[4px] hover:bg-[#1D71AB] transition-all shadow-sm whitespace-nowrap"
-                    >
-                        <Plus size={16} />
-                        <span>{isCurrencyTab ? 'Add Currency' : 'Add New'}</span>
-                    </button>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* Table Area */}
