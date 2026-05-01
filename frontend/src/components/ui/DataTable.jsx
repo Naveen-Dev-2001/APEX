@@ -55,7 +55,14 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                 // Fallback to deriving from local data
                 const vals = [...new Set(data.map(row => getColFilterValue(col, row)))]
                     .filter(v => v && v !== '-')
-                    .sort((a, b) => String(a).localeCompare(String(b)));
+                    .sort((a, b) => {
+                        if (isNumber) {
+                            const numA = parseFloat(a);
+                            const numB = parseFloat(b);
+                            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                        }
+                        return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+                    });
                 setAllValues(vals);
                 return;
             }
@@ -64,7 +71,15 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
             try {
                 const options = await col.onGetOptions(col.accessor);
                 if (isMounted) {
-                    setAllValues(options);
+                    const sortedOptions = [...(options || [])].sort((a, b) => {
+                        if (isNumber) {
+                            const numA = parseFloat(a);
+                            const numB = parseFloat(b);
+                            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                        }
+                        return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+                    });
+                    setAllValues(sortedOptions);
                 }
             } catch (err) {
                 console.error('Error fetching filter options:', err);

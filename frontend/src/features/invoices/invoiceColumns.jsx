@@ -167,6 +167,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.total_invoice_amount?.value ?? "",
+        filterRender: (val) => formatCurrency(val),
         render: (_, row) => formatCurrency(row?.extracted_data?.amounts?.total_invoice_amount?.value),
     },
     {
@@ -175,6 +176,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.amount_due?.value ?? "",
+        filterRender: (val) => formatCurrency(val),
         render: (_, row) => formatCurrency(row?.extracted_data?.amounts?.amount_due?.value),
     },
     // {
@@ -359,6 +361,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.Items?.value?.[0]?.amount?.value ?? "",
+        filterRender: (val) => formatCurrency(val),
         render: (_, row) => formatCurrency(row?.extracted_data?.Items?.value?.[0]?.amount?.value),
     },
     {
@@ -367,6 +370,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.total_tax_amount?.value ?? "",
+        filterRender: (val) => formatCurrency(val),
         render: (_, row) => formatCurrency(row?.extracted_data?.amounts?.total_tax_amount?.value),
     },
     {
@@ -375,6 +379,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.subtotal?.value ?? "",
+        filterRender: (val) => formatCurrency(val),
         render: (_, row) => formatCurrency(row?.extracted_data?.amounts?.subtotal?.value),
     },
     {
@@ -383,6 +388,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.total_invoice_amount?.value ?? "",
+        filterRender: (val) => formatCurrency(val),
         render: (_, row) => formatCurrency(row?.extracted_data?.amounts?.total_invoice_amount?.value),
     },
     {
@@ -391,6 +397,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable: true,
         filterType: 'number',
         getFilterValue: (row) => row?.extracted_data?.amounts?.amount_due?.value ?? "",
+        filterRender: (val) => formatCurrency(val),
         render: (_, row) => formatCurrency(row?.extracted_data?.amounts?.amount_due?.value),
     },
     {

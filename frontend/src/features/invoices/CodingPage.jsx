@@ -184,6 +184,13 @@ const CodingPage = () => {
             sortable: true,
             filterType: 'number',
             filterable: true,
+            onGetOptions: async (accessor) => {
+                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
+                const otherFilters = { ...backendFilters };
+                delete otherFilters[dbField];
+                return await getInvoiceFilterOptions(dbField, otherFilters);
+            },
+            filterRender: (val) => formatCurrency(val),
             render: (_, row) => {
                 const val = row.extracted_data?.amounts?.total_invoice_amount?.value;
                 return formatCurrency(val);

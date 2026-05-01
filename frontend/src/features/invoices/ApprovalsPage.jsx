@@ -15,6 +15,7 @@ import CustomButton from '../../shared/components/CustomButton';
 import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
 import { formatCurrency } from '../../utils/formatters';
+import { getInvoiceFilterOptions } from '../../api/invoiceApi';
 
 const { confirm } = Modal;
 
@@ -183,6 +184,7 @@ const ApprovalsPage = () => {
             accessor: "vendor_name",
             sortable: true,
             filterable: true,
+            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
             onClick: () => handleSort("vendor_name")
         },
         {
@@ -190,6 +192,7 @@ const ApprovalsPage = () => {
             accessor: "invoice_number",
             sortable: true,
             filterable: true,
+            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
             onClick: () => handleSort("invoice_number")
         },
         {
@@ -197,7 +200,9 @@ const ApprovalsPage = () => {
             accessor: "total_amount",
             sortable: true,
             filterable: true,
+            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
             onClick: () => handleSort("total_amount"),
+            filterRender: (val) => formatCurrency(val),
             render: (val) => formatCurrency(val)
         },
         {
@@ -205,6 +210,7 @@ const ApprovalsPage = () => {
             accessor: "uploaded_by",
             sortable: true,
             filterable: true,
+            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
             onClick: () => handleSort("uploaded_by")
         },
         {
@@ -223,6 +229,7 @@ const ApprovalsPage = () => {
             accessor: "approver_name",
             sortable: true,
             filterable: true,
+            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
             onClick: () => handleSort("approver_name")
         },
         {

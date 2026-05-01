@@ -41,6 +41,7 @@ from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
 from app.models.user import UserResponse
 from datetime import datetime, date
+from decimal import Decimal
 import os
 import uuid
 import asyncio
@@ -984,6 +985,7 @@ async def get_invoice_filter_options(
     filters: Optional[str] = Query(None),
     tab: Optional[str] = Query(None),
     entity: str = Depends(get_current_entity),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -999,10 +1001,30 @@ async def get_invoice_filter_options(
     elif tab == "archive":
         expressions.append(Invoice.status == InvoiceStatusEnum.ARCHIVED)
     elif tab == "in_progress" or not tab:
+        # Default view: Exclude Posted and Archived
         expressions.append(and_(
             Invoice.status != InvoiceStatusEnum.SAGE_POSTED,
             Invoice.status != InvoiceStatusEnum.ARCHIVED
         ))
+    
+    # Pre-calculate user info for complex filters (same as get_invoices)
+    user_email = current_user.email.lower()
+    user_dept = (current_user.department or "").lower()
+    user_roles = [r.strip().lower() for r in (current_user.role or "user").split(",")]
+    is_finance_user = "finance" in user_dept and "non" not in user_dept
+    is_admin = "admin" in user_roles
+    is_coder = "coder" in user_roles
+    is_scanner = "scanner" in user_roles
+    
+    # Get active delegations for current level logic
+    curr_time = datetime.utcnow()
+    active_delegations = db.query(Delegation.delegator_email).filter(
+        Delegation.substitute_email.ilike(current_user.email),
+        Delegation.entity == entity,
+        Delegation.start_date <= curr_time,
+        Delegation.end_date >= curr_time
+    ).all()
+    target_emails = [user_email] + [d[0].lower() for d in active_delegations]
     if column == "last_modified_by":
         # Get unique users from workflow steps
         query = db.query(WorkflowStep.user).join(Invoice).filter(
@@ -1035,6 +1057,95 @@ async def get_invoice_filter_options(
         try:
             extra_filters = json.loads(filters)
             if isinstance(extra_filters, dict):
+                # Apply special coding_view logic
+                if extra_filters.get("coding_view"):
+                    expressions.append(
+                        or_(
+                            Invoice.status == InvoiceStatusEnum.WAITING_CODING,
+                            and_(
+                                Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                Invoice.current_approver_level == 1
+                            ),
+                            Invoice.status == InvoiceStatusEnum.REWORKED
+                        )
+                    )
+                    del extra_filters["coding_view"]
+
+                # Apply special approvals_view logic
+                if extra_filters.get("approvals_view"):
+                    approver_subquery = exists().where(
+                        and_(
+                            InvoiceAssignedApprover.invoice_id == Invoice.id,
+                            InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
+                            or_(
+                                InvoiceAssignedApprover.approver_email.in_(target_emails),
+                                and_(InvoiceAssignedApprover.is_finance == True, is_finance_user == True)
+                            )
+                        )
+                    )
+                    
+                    last_reset_subquery = db.query(func.max(WorkflowStep.timestamp)).filter(
+                        WorkflowStep.invoice_id == Invoice.id,
+                        WorkflowStep.step_type.in_([StepType.REWORKED, StepType.RECALLED])
+                    ).correlate(Invoice).scalar_subquery()
+
+                    is_last_stage_subquery = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                        InvoiceAssignedApprover.invoice_id == Invoice.id
+                    ).correlate(Invoice).scalar_subquery()
+
+                    user_acted_any_subquery = exists().where(
+                        and_(
+                            WorkflowStep.invoice_id == Invoice.id,
+                            func.lower(WorkflowStep.user) == user_email,
+                            WorkflowStep.step_type.in_([
+                                StepType.LEVEL_APPROVED,
+                                StepType.APPROVED,
+                                StepType.REJECTED,
+                                StepType.THRESHOLD_APPROVED,
+                                StepType.POSTING_APPROVED
+                            ]),
+                            or_(
+                                last_reset_subquery == None,
+                                WorkflowStep.timestamp > last_reset_subquery
+                            )
+                        )
+                    )
+
+                    user_acted_posting_subquery = exists().where(
+                        and_(
+                            WorkflowStep.invoice_id == Invoice.id,
+                            func.lower(WorkflowStep.user) == user_email,
+                            WorkflowStep.step_type == StepType.POSTING_APPROVED,
+                            or_(
+                                last_reset_subquery == None,
+                                WorkflowStep.timestamp > last_reset_subquery
+                            )
+                        )
+                    )
+
+                    hide_condition = or_(
+                        and_(
+                            Invoice.current_approver_level != is_last_stage_subquery,
+                            user_acted_any_subquery
+                        ),
+                        and_(
+                            Invoice.current_approver_level == is_last_stage_subquery,
+                            user_acted_posting_subquery
+                        )
+                    )
+
+                    expressions.append(
+                        and_(
+                            or_(
+                                Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                Invoice.status == InvoiceStatusEnum.REWORKED
+                            ),
+                            approver_subquery,
+                            ~hide_condition
+                        )
+                    )
+                    del extra_filters["approvals_view"]
+
                 repo_filters.update(extra_filters)
         except Exception as e:
             print(f"Error parsing filters in filter-options: {e}")
@@ -1126,9 +1237,23 @@ async def get_invoice_filter_options(
     results = query.filter(col_attr != None).distinct().all()
     
     # Flatten result list (SQLAlchemy returns tuples)
-    raw_values = [r[0] for r in results if r[0] is not None and str(r[0]).strip() != ""]
+    # Normalize numeric types to handle precision issues (e.g., 100.0 vs 100.00)
+    raw_values = []
+    seen_raw = set()
+    for r in results:
+        val = r[0]
+        if val is None or str(val).strip() == "":
+            continue
+        
+        # Normalize numeric types
+        if isinstance(val, (Decimal, float)):
+            val = float(val)
+        
+        if val not in seen_raw:
+            raw_values.append(val)
+            seen_raw.add(val)
     
-    # Sort raw values (this handles chronological sorting for dates)
+    # Sort raw values
     try:
         raw_values.sort()
     except:
@@ -1136,16 +1261,16 @@ async def get_invoice_filter_options(
         raw_values = sorted(raw_values, key=lambda x: str(x))
     
     formatted_options = []
-    seen = set()
+    seen_fmt = set()
     for val in raw_values:
         if isinstance(val, (datetime, date)):
             fmt = val.strftime("%m-%d-%Y")
         else:
             fmt = val
         
-        if fmt not in seen:
+        if fmt not in seen_fmt:
             formatted_options.append(fmt)
-            seen.add(fmt)
+            seen_fmt.add(fmt)
             
     return formatted_options
 
