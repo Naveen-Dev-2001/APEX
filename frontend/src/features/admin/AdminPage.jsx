@@ -90,7 +90,7 @@ const AdminPage = () => {
                 Admin Dashboard
             </h1> */}
 
-            <div className="w-full p-5 flex flex-col relative text-left">
+            <div className="w-full px-2 py-4 flex flex-col relative text-left">
 
                 {/* Edit Modal */}
                 {editingUser && (
@@ -155,20 +155,21 @@ const AdminPage = () => {
                 />
 
                 {/* Tabs & Top Actions */}
-                <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-5 gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-5 gap-3">
 
                     {/* Tabs */}
-                    <div className="flex border border-gray-200 rounded-md overflow-x-auto h-[38px] w-full sm:w-auto no-scrollbar">
+                    <div className="flex border border-gray-200 rounded-md overflow-x-auto h-[36px] w-full sm:w-auto no-scrollbar">
                         {tabs.map((tab) => {
                             const isActive = activeTab === tab;
                             return (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
-                                    className={`px-5 py-0 text-[14px] ${isActive ? 'font-bold' : 'font-medium'} transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center whitespace-nowrap ${isActive
-                                        ? 'bg-[#BAE7FF] text-black'
-                                        : 'bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                        }`}
+                                    className={`px-5 py-0 text-[13px] ${isActive ? 'font-bold' : 'font-medium'} transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center whitespace-nowrap ${
+                                        isActive
+                                            ? 'bg-[#BAE7FF] text-black'
+                                            : 'bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                    }`}
                                 >
                                     {tab}
                                 </button>
@@ -178,7 +179,7 @@ const AdminPage = () => {
 
                     {/* Right side actions - conditional on activeTab */}
                     {(activeTab === 'User Management' || activeTab === 'Delegations') && (
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                        <div className="flex flex-row items-center gap-3 w-full sm:w-auto">
                             <SearchInput
                                 value={searchQuery}
                                 onChange={(e) => {
@@ -192,35 +193,33 @@ const AdminPage = () => {
                                 width="260px"
                             />
 
-                            {/* Action Buttons */}
-                            <div className="flex items-center gap-2 w-full sm:w-auto">
-                                {/* Add User Button */}
-                                {activeTab === 'User Management' && (
-                                    <button
-                                        onClick={() => setIsAddModalOpen(true)}
-                                        className="bg-[#24A1DD] hover:bg-[#1D71AB] text-white px-4 py-0 h-[34px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                        <span>Add User</span>
-                                    </button>
-                                )}
+                            {/* Add User Button */}
+                            {activeTab === 'User Management' && (
+                                <button
+                                    onClick={() => setIsAddModalOpen(true)}
+                                    className="bg-[#24A1DD] hover:bg-[#1D71AB] text-white px-4 h-[36px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
+                                >
+                                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                    <span>Add User</span>
+                                </button>
+                            )}
 
-                                {/* Refresh Button */}
-                                <RefreshButton
-                                    onClick={() => {
-                                        if (activeTab === 'User Management') {
-                                            fetchUsers();
-                                            fetchSettings();
-                                        } else if (activeTab === 'Delegations') {
-                                            fetchDelegations();
-                                        }
-                                    }}
-                                    loading={loading}
-                                    className="flex-1 sm:flex-none"
-                                />
-                            </div>
+                            {/* Refresh Button */}
+                            <RefreshButton
+                                onClick={() => {
+                                    if (activeTab === 'User Management') {
+                                        fetchUsers();
+                                        fetchSettings();
+                                    } else if (activeTab === 'Delegations') {
+                                        fetchDelegations();
+                                    }
+                                }}
+                                loading={loading}
+                                height="h-[36px]"
+                                className="!w-auto"
+                            />
                         </div>
                     )}
                 </div>
