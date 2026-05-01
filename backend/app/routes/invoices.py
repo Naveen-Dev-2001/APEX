@@ -2323,14 +2323,13 @@ async def update_invoice(
 
     # --- Record Coding Completion Step ---
     if "status" in update_data and update_data["status"] == InvoiceStatusEnum.WAITING_APPROVAL:
-        # Check if already exists to avoid duplicates
-        existing_coding_step = db.query(WorkflowStep).filter(
-            WorkflowStep.invoice_id == invoice_id,
-            WorkflowStep.step_type == WorkflowStepTypeEnum.CODING,
-            WorkflowStep.status == WorkflowStepStatusEnum.COMPLETED
-        ).first()
+        # Check the most recent step to avoid back-to-back duplicate Coding steps
+        # but allow a new Coding step if it was previously Reworked
+        last_step = db.query(WorkflowStep).filter(
+            WorkflowStep.invoice_id == invoice_id
+        ).order_by(WorkflowStep.timestamp.desc()).first()
         
-        if not existing_coding_step:
+        if not last_step or last_step.step_type != WorkflowStepTypeEnum.CODING:
             db.add(WorkflowStep(
                 invoice_id=invoice_id,
                 step_name="Coding",

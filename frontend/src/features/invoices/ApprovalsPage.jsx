@@ -87,6 +87,15 @@ const ApprovalsPage = () => {
                 return [];
             };
 
+            const getUsernameByEmail = (email, approversList) => {
+                const found = (approversList || []).find(a => a.value?.toLowerCase() === email?.toLowerCase());
+                if (found) {
+                    // Label format is "Username (email)", extract Username
+                    return found.label.split(' (')[0];
+                }
+                return email;
+            };
+
             // Transform invoices
             const transformed = invoiceData.map(inv => {
                 const currentLevel = inv.current_approver_level || 1;
@@ -98,7 +107,7 @@ const ApprovalsPage = () => {
                 const approverLabel = isFinanceLevel
                     ? 'Finance Team'
                     : stageEmails.length > 0
-                        ? stageEmails.join(", ")
+                        ? stageEmails.map(email => getUsernameByEmail(email, approverData)).join(", ")
                         : 'Pending';
 
                 // Active delegation check for the label
@@ -327,14 +336,14 @@ const ApprovalsPage = () => {
                     })}
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="w-[150px]">
+                    <div className="w-[120px]">
                         <RefreshButton
                             onClick={fetchData}
                             loading={loading}
-                            className="!h-[42px] w-full"
+                            className="!h-[40px] w-full"
                         />
                     </div>
-                    <div className="w-[150px]">
+                    <div className="w-[120px]">
                         <ExportButton
                             data={invoices}
                             columns={columnDefs}
