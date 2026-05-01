@@ -55,6 +55,7 @@ const getNextApprover = (row) => {
     const status = (row?.status || "").toLowerCase();
     if (status === 'sage_posted' || status === 'approved') return "Completed";
     if (status === 'rejected') return "Rejected";
+    if (status === 'waiting_coding' || status === 'processed') return "Finance Team";
 
     const currentLevel = row?.current_approver_level || 1;
     const stage = row?.assigned_approvers?.[currentLevel - 1];
@@ -210,6 +211,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         header: "Next Action By",
         accessor: "next_approver",
         filterable: true,
+        getFilterValue: (row) => getNextApprover(row),
         render: (_, row) => getNextApprover(row),
     },
     {
@@ -403,6 +405,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         header: "Next Action By",
         accessor: "next_approver",
         filterable: true,
+        getFilterValue: (row) => getNextApprover(row),
         render: (_, row) => getNextApprover(row),
     },
     {

@@ -270,10 +270,39 @@ const CodingPage = () => {
             accessor: "next_approver",
             minWidth: 200,
             filterable: true,
+            getFilterValue: (row) => {
+                const status = (row?.status || "").toLowerCase();
+                if (status === 'sage_posted' || status === 'approved') return "Completed";
+                if (status === 'rejected') return "Rejected";
+                if (status === 'waiting_coding' || status === 'processed') return "Finance Team";
+
+                const currentLevel = row?.current_approver_level || 1;
+                const stage = row?.assigned_approvers?.[currentLevel - 1];
+                if (!stage) return "-";
+                if (stage.is_finance === true) return "Finance Team";
+
+                const names = stage.names || stage.emails;
+                if (Array.isArray(names)) {
+                    return names.map(n => {
+                        if (typeof n === 'string' && n.includes('@')) {
+                            return n.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+                        }
+                        return n;
+                    }).join(", ");
+                }
+                if (typeof names === 'string') {
+                    if (names.includes('@')) {
+                        return names.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+                    }
+                    return names;
+                }
+                return "-";
+            },
             render: (_, row) => {
                 const status = (row?.status || "").toLowerCase();
                 if (status === 'sage_posted' || status === 'approved') return "Completed";
                 if (status === 'rejected') return "Rejected";
+                if (status === 'waiting_coding' || status === 'processed') return "Finance Team";
 
                 const currentLevel = row?.current_approver_level || 1;
                 const stage = row?.assigned_approvers?.[currentLevel - 1];
