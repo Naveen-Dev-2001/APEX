@@ -166,7 +166,7 @@ const AdminPage = () => {
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
                                     className={`px-5 py-0 text-[14px] ${isActive ? 'font-bold' : 'font-medium'} transition-colors border-r border-gray-200 last:border-r-0 h-full flex items-center justify-center whitespace-nowrap ${isActive
-                                        ? 'bg-[#8dc3e3] text-gray-800'
+                                        ? 'bg-[#BAE7FF] text-black'
                                         : 'bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                                         }`}
                                 >

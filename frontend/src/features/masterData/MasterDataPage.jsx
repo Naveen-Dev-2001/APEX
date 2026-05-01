@@ -504,7 +504,7 @@ const MasterDataPage = () => {
                             className={`px-4 h-full text-[14px] ${activeTab === tab ? 'font-bold' : 'font-medium'} transition-colors duration-150 whitespace-nowrap
                                 ${index !== tabs.length - 1 ? 'border-r border-gray-200' : ''}
                                 ${activeTab === tab
-                                    ? 'bg-[#9AD4EF] text-black'
+                                    ? 'bg-[#BAE7FF] text-black'
                                     : 'bg-white text-black hover:bg-gray-50'
                                 }`}
                         >
