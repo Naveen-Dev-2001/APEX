@@ -2401,6 +2401,7 @@ async def update_invoice(
              if idx == 0:
                  level_1_emails = list(combined)
 
+
              for email in combined:
                  if email:
                      invoice_assigned_approver_repo.create(db, obj_in={
@@ -2692,12 +2693,42 @@ async def update_invoice(
     old_items = old_extracted.get("Items", {}).get("value", [])
     new_items = new_extracted.get("Items", {}).get("value", [])
     if len(old_items) != len(new_items):
-         audit_details["Line Items Count"] = {"old": len(old_items), "new": len(new_items)}
+        audit_details["Line Items Count"] = {"old": len(old_items), "new": len(new_items)}
 
-    # If extracted_data changed but no critical fields were caught, log generic
-    # This ensures we don't miss updates
-    if old_extracted != new_extracted and not any(k in audit_details for _, k in critical_checks) and "Line Items Count" not in audit_details:
-         audit_details["Extracted Data"] = "Content Updated (Details not specified)"
+    # 3. Check for Line Items (Coding) changes
+    old_coding = old_extracted.get("lineItemsSnapshot") or []
+    new_coding = new_extracted.get("lineItemsSnapshot") or []
+    if old_coding != new_coding:
+        # Format line items for readability in audit trail
+        coding_summary = []
+        for i, item in enumerate(new_coding):
+            gl = item.get("glCode") or item.get("gl_code")
+            lob = item.get("lob")
+            dept = item.get("department")
+            cust = item.get("customer")
+            prod_item = item.get("item")
+            desc = item.get("description")
+            
+            # Helper to check if a value is meaningful
+            def is_valid(v):
+                return v and str(v).strip() and str(v).upper() != "N/A"
+
+            parts = []
+            if is_valid(gl): parts.append(f"GL: {gl}")
+            if is_valid(lob): parts.append(f"LOB: {lob}")
+            if is_valid(dept): parts.append(f"Dept: {dept}")
+            if is_valid(cust): parts.append(f"Cust: {cust}")
+            if is_valid(prod_item): parts.append(f"Item: {prod_item}")
+            if is_valid(desc): parts.append(f"Desc: {desc}")
+            
+            if parts:
+                coding_summary.append(f"Item {i+1}:\n  " + " | ".join(parts))
+        
+        if coding_summary:
+            audit_details["Line Items (Coding)"] = "\n\n".join(coding_summary)
+
+   
+
 
     # [AUDIT] Log Update with Specific Action if Status Changed
     action = AuditAction.UPDATED
