@@ -57,13 +57,14 @@ async def send_otp(request: SendOTPRequest, background_tasks: BackgroundTasks, d
     otp = otp_service.create_otp_record(db, request.email, request.purpose)
 
     if request.purpose == "registration":
-        background_tasks.add_task(email_service.send_registration_otp, request.email, otp)
+        background_tasks.add_task(
+            email_service.send_registration_otp, request.email, otp)
     else:
         user_list = user_repo.get_multi(
             db, filters={"email": request.email}, limit=1)
         user = user_list[0] if user_list else None
-        background_tasks.add_task(email_service.send_forgot_password_otp, 
-            request.email, user.username if user else "User", otp)
+        background_tasks.add_task(email_service.send_forgot_password_otp,
+                                  request.email, user.username if user else "User", otp)
 
     return {"message": "OTP sent successfully"}
 
@@ -119,18 +120,20 @@ async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Se
 
     # Notify all Admins and the user
     admins = db.query(UserDB).filter(UserDB.role == "admin").all()
-    
+
     # Filter out reserved/example emails from admin list
-    reserved_domains = ["example.com", "example.net", "example.org", ".example", ".test", ".invalid", ".localhost"]
+    reserved_domains = ["example.com", "example.net",
+                        "example.org", ".example", ".test", ".invalid", ".localhost"]
     filtered_admins = [
-        admin for admin in admins 
-        if admin.email.lower() != "admin@example.com" and 
-        not any(admin.email.lower().endswith(domain) for domain in reserved_domains)
+        admin for admin in admins
+        if admin.email.lower() != "admin@example.com" and
+        not any(admin.email.lower().endswith(domain)
+                for domain in reserved_domains)
     ]
 
     for admin in filtered_admins:
         background_tasks.add_task(email_service.send_admin_new_user_notification,
-            admin.email, new_user.email, new_user.username)
+                                  admin.email, new_user.email, new_user.username)
 
     # If no valid admins found in DB, fallback to settings default admin email
     # but only if the default itself is not a reserved address
@@ -138,17 +141,20 @@ async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Se
         admin_email = settings.ADMIN_EMAIL
         admin_email_lower = admin_email.lower()
         is_reserved = (
-            admin_email_lower == "admin@example.com" or 
-            any(admin_email_lower.endswith(domain) for domain in reserved_domains)
+            admin_email_lower == "admin@example.com" or
+            any(admin_email_lower.endswith(domain)
+                for domain in reserved_domains)
         )
         if not is_reserved:
             background_tasks.add_task(email_service.send_admin_new_user_notification,
-                admin_email, new_user.email, new_user.username)
+                                      admin_email, new_user.email, new_user.username)
         else:
-            logger.info(f"Skipping admin notification as default ADMIN_EMAIL ({admin_email}) is a reserved address")
+            logger.info(
+                f"Skipping admin notification as default ADMIN_EMAIL ({admin_email}) is a reserved address")
 
     # NEW: Send confirmation to the user that their account is pending approval
-    background_tasks.add_task(email_service.send_user_pending_approval, new_user.email, new_user.username)
+    background_tasks.add_task(
+        email_service.send_user_pending_approval, new_user.email, new_user.username)
 
     return UserResponse(
         id=str(new_user.id),
@@ -339,7 +345,7 @@ async def login():
     # http://localhost:4000/api/SSOReplyURI
     # http://localhost:4000/api/SSOReplyURI
 
-    application_base_url = "LoanDNAPlatform"
+    application_base_url = "APEX_SSO"
     # application_base_url = "IncomeCalculator"
 
     xml = f"""<samlp:AuthnRequest
@@ -376,7 +382,7 @@ async def login():
     return RedirectResponse(url=redirect_url)
 
 
-@sso_router.post("/api/SSOReplyURI")
+@sso_router.post("/SSOReplyURI")
 async def SSOReplyURI(
     req: Request,
     db: Session = Depends(get_db)
