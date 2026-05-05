@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Modal, Radio, Checkbox } from "antd";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomInput from "../../shared/components/CustomInput";
@@ -41,6 +41,38 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
         deptsLoading,
         vendorsLoading,
     } = useWorkflowFormData(mode);
+
+    const financeApprovers = useMemo(() => {
+        return (allApprovers || []).filter(a => a.department?.toLowerCase() === 'finance');
+    }, [allApprovers]);
+
+    // ── Cascading Approver Filtering ──
+
+    // Get all mandatory approver IDs selected so far (across all levels)
+    const allSelectedMandatoryIds = useMemo(() => {
+        const selected = new Set();
+        Object.values(form.approvers).forEach(ids => {
+            if (Array.isArray(ids)) {
+                ids.forEach(id => selected.add(id));
+            }
+        });
+        return selected;
+    }, [form.approvers]);
+
+    // Filtered options for Threshold Approver (excludes all mandatory approvers)
+    const filteredThresholdOptions = useMemo(() => {
+        return (financeApprovers || []).filter(opt => !allSelectedMandatoryIds.has(opt.value));
+    }, [financeApprovers, allSelectedMandatoryIds]);
+
+    // Function to get filtered options for a specific mandatory level (excludes previous levels)
+    const getFilteredMandatoryOptions = (currentIndex) => {
+        const excluded = new Set();
+        for (let i = 1; i < currentIndex; i++) {
+            (form.approvers[i] || []).forEach(id => excluded.add(id));
+        }
+        if (excluded.size === 0) return allApprovers;
+        return (allApprovers || []).filter(opt => !excluded.has(opt.value));
+    };
 
     // ── Populate form when editing ──
     useEffect(() => {
@@ -463,7 +495,7 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                                             placeholder={approversLoading ? "Loading..." : "Select Approver(s)"}
                                             value={form.approvers[index]}
                                             onChange={(val) => handleApproverChange(index, val)}
-                                            options={allApprovers}
+                                            options={getFilteredMandatoryOptions(index)}
                                             loading={approversLoading}
                                             disabled={!!form.financeFlags[index] || approversLoading}
                                         />
@@ -492,7 +524,7 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                                     required
                                     value={form.thresholdApprover}
                                     onChange={(val) => setForm({ ...form, thresholdApprover: val })}
-                                    options={allApprovers}
+                                    options={filteredThresholdOptions}
                                     loading={approversLoading}
                                     disabled={approversLoading}
                                     placeholder={approversLoading ? "Loading..." : "Select Approver"}
@@ -508,7 +540,7 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                             required
                             value={form.postingApprover}
                             onChange={(val) => setForm({ ...form, postingApprover: val })}
-                            options={allApprovers}
+                            options={financeApprovers}
                             loading={approversLoading}
                             disabled={approversLoading}
                             placeholder={approversLoading ? "Loading..." : "Select Approver"}
