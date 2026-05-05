@@ -61,6 +61,7 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabl
     return (
         <CustomInput
             value={local}
+            title={local}
             onChange={handleChange}
             placeholder={placeholder}
             className="mb-0 w-full"
@@ -79,7 +80,7 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabl
 );
 
 const DropdownCell = memo(({ value, onChange, options, isLoading, filterOption, onSearch, onOpen, disabled = false }) => (
-    <div style={{ width: "100%" }}>
+    <div style={{ width: "100%" }} title={value}>
         <CustomDropdown
             value={value}
             onChange={onChange}

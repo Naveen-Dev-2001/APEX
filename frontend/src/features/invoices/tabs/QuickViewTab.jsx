@@ -196,6 +196,7 @@ const LineItemCell = memo(
                 onMouseEnter={() => onHover(rowId, colKey)}
                 onMouseLeave={onLeave}
                 className="w-full h-full min-h-[40px] flex items-center"
+                title={local}
             >
                 <CustomInput
                     value={local}
