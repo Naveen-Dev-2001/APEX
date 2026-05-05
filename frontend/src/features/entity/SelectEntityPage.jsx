@@ -24,12 +24,13 @@ const SelectEntityPage = () => {
   // Get entities from store and format them
   const entityData = masters['Entity Master']?.data || [];
   const entities = entityData.map((entity, index) => {
-    const displayName = entity.entity_name === 'Default Entity' ? 'Top Level' : entity.entity_name;
+    const baseName = entity.entity_name === 'Default Entity' ? 'Top Level' : entity.entity_name;
+    const combinedName = `${entity.entity_id} - ${baseName}`;
     return {
       id: entity.id || index,
       entityId: entity.entity_id,   // FK value used in DB
-      name: displayName,            // Display name for UI
-      displayName: displayName
+      name: baseName,               // Original display name
+      displayName: combinedName      // Combined display name for dropdown
     };
   });
 
