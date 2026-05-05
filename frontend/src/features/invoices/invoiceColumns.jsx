@@ -338,7 +338,10 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         accessor: "description",
         filterable: true,
         getFilterValue: (row) => row?.extracted_data?.Items?.value?.[0]?.description?.value ?? "",
-        render: (_, row) => row?.extracted_data?.Items?.value?.[0]?.description?.value ?? "-",
+        render: (_, row) => {
+            const val = row?.extracted_data?.Items?.value?.[0]?.description?.value ?? "-";
+            return <span title={val}>{val}</span>;
+        },
     },
     {
         header: "Item Code",

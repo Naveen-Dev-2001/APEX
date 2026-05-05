@@ -37,6 +37,7 @@ const TextCell = ({ value, onChange }) => (
     <input
         className={inputCls}
         value={value}
+        title={value}
         onChange={(e) => onChange(e.target.value)}
     />
 );
@@ -59,7 +60,7 @@ const NumberCell = ({ value, onChange, prefix }) => (
 
 const SelectCell = ({ value, onChange, options }) => (
     <div className="relative">
-        <select className={selectCls} value={value} onChange={(e) => onChange(e.target.value)}>
+        <select className={selectCls} value={value} title={value} onChange={(e) => onChange(e.target.value)}>
             <option value="">Select</option>
             {options.map((o) => (
                 <option key={o} value={o}>{o}</option>
