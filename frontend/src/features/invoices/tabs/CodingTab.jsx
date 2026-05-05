@@ -286,8 +286,8 @@ const CodingTab = ({ isActive = false }) => {
         }
 
         if (userRole === 'coder') {
-            if (status === 'processed' || status === 'waiting_approval') return true;
-            if (status === 'waiting_coding') return false;
+            if (status === 'waiting_approval') return true;
+            if (status === 'waiting_coding' || status === 'processed') return false;
             return true;
         }
 

@@ -441,7 +441,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                     {!activeInvoiceData?.is_archived && (
                         <>
                             {/* ── Scanner / Coder buttons ───────────────────────── */}
-                            {((userRole.includes("scanner") && (currentStatus || "").toLowerCase() === "processed") ||
+                            {(([ "scanner", "coder" ].some(r => userRole.includes(r)) && (currentStatus || "").toLowerCase() === "processed") ||
                                 (userRole.includes("coder") && (currentStatus || "").toLowerCase() === "waiting_coding")) && (
                                     <>
                                         <div className="w-[130px]">
