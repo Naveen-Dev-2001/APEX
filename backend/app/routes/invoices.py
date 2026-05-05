@@ -185,9 +185,7 @@ async def upload_invoices(
     upload_dir = get_folder_path("in_progress")
     os.makedirs(upload_dir, exist_ok=True)
     
-    # ⚡️ Concurrency Control: limit to 3 concurrent extractions
-    # This prevents DB lock contention and API rate limiting
-    extraction_semaphore = asyncio.Semaphore(3)
+    # 🔁 Sequential Processing: invoices are processed one at a time
 
     duplicates = []  # Track duplicate files
     saved_invoices = []  # Track successfully uploaded invoices
@@ -598,26 +596,17 @@ async def upload_invoices(
 
     await emit_progress("processing", f"Starting upload for {len(files)} files...")
 
-    # Run processing tasks concurrently with semaphore control
-    async def _semaphore_wrapped_task(file, idx, total):
-        async with extraction_semaphore:
-            return await _process_single_file(file, idx, total)
-
+    # 🔁 Sequential Processing: process one invoice at a time
     total_files = len(files)
-    tasks = [_semaphore_wrapped_task(file, idx + 1, total_files) for idx, file in enumerate(files)]
-    
-    # Use return_exceptions=True so one failure doesn't crash the whole batch
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Handle results
-    for res in results:
-        if isinstance(res, Exception):
-            failed_uploads.append({"filename": "unknown", "reason": f"System Error: {str(res)}"})
-            continue
-        if res["success"]:
-            saved_invoices.append(res["data"])
-        else:
-            failed_uploads.append({"filename": res["filename"], "reason": res["reason"]})
+    for idx, file in enumerate(files):
+        try:
+            res = await _process_single_file(file, idx + 1, total_files)
+            if res["success"]:
+                saved_invoices.append(res["data"])
+            else:
+                failed_uploads.append({"filename": res["filename"], "reason": res["reason"]})
+        except Exception as e:
+            failed_uploads.append({"filename": "unknown", "reason": f"System Error: {str(e)}"})
 
     await emit_progress("completed", f"Finished uploading {len(files)} files.")
 
