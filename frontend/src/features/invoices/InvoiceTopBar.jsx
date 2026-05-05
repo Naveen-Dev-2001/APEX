@@ -379,6 +379,10 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     };
 
     const openModal = (action) => {
+        if (action === "rework" && uiStatus?.rework_error) {
+            toast.error(uiStatus.rework_error);
+            return;
+        }
         setComment("");
         setModal({ action });
     };
