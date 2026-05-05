@@ -21,10 +21,21 @@ const UserManagementTab = ({ onEdit }) => {
     const safeUsers = users || [];
 
     // Processed users now handled by backend
-    const displayUsers = (users || []).map((user) => ({
-        ...user,
-        sno: user.sno
-    }));
+    const displayUsers = (users || []).map((user) => {
+        const dept = user.department?.toLowerCase().trim();
+        let normalizedDept = user.department;
+        if (dept === 'finance' || dept === 'finance team' || dept === 'finance-team') {
+            normalizedDept = 'Finance';
+        } else if (dept === 'non-finance' || dept === 'non-finance team' || dept === 'non-finance-team') {
+            normalizedDept = 'Non-Finance';
+        }
+
+        return {
+            ...user,
+            department: normalizedDept,
+            sno: user.sno
+        };
+    });
 
     const getRoleStyles = (role) => {
         switch (role?.toLowerCase()) {
@@ -83,9 +94,18 @@ const UserManagementTab = ({ onEdit }) => {
             sortable: true,
             filterable: true,
             onClick: () => setSort('department'),
-            render: (dept) => dept ? (
-                <span className="text-[12px] text-gray-600 capitalize">{dept.replace('-', ' ')}</span>
-            ) : <span className="text-gray-400">-</span>
+            render: (dept) => {
+                if (dept === 'finance') return <span className="text-[12px] text-gray-600 capitalize">Finance Team</span>;
+                if (dept === 'non-finance') return <span className="text-[12px] text-gray-600 capitalize">Non-Finance Team</span>;
+                return dept ? (
+                    <span className="text-[12px] text-gray-600 capitalize">{dept.replace('-', ' ')}</span>
+                ) : <span className="text-gray-400">-</span>;
+            },
+            filterRender: (val) => {
+                if (val === 'finance') return 'Finance Team';
+                if (val === 'non-finance') return 'Non-Finance Team';
+                return val ? val.charAt(0).toUpperCase() + val.slice(1).replace('-', ' ') : val;
+            }
         },
         {
             header: 'Status',
@@ -106,6 +126,11 @@ const UserManagementTab = ({ onEdit }) => {
                         {status || 'Pending'}
                     </span>
                 );
+            },
+            filterRender: (val) => {
+                if (val === 'finance') return 'Finance Team (Status Error)';
+                if (val === 'non-finance') return 'Non-Finance Team (Status Error)';
+                return val ? val.charAt(0).toUpperCase() + val.slice(1) : val;
             }
         },
         {

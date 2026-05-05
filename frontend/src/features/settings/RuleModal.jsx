@@ -19,8 +19,8 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
         approvers: {},
         financeFlags: {},
         thresholdAmount: "",
-        thresholdApprover: null,
-        postingApprover: null,
+        thresholdApprover: [],
+        postingApprover: [],
     };
 
     const [form, setForm] = useState(initialFormState);
@@ -42,36 +42,58 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
         vendorsLoading,
     } = useWorkflowFormData(mode);
 
-    const financeApprovers = useMemo(() => {
-        return (allApprovers || []).filter(a => a.department?.toLowerCase() === 'finance');
+    const formattedApprovers = useMemo(() => {
+        return (allApprovers || []).map(a => ({
+            ...a,
+            label: `${a.value} - ${a.department || 'N/A'}`
+        }));
     }, [allApprovers]);
+
+    const financeApprovers = useMemo(() => {
+        return (formattedApprovers || []).filter(a => a.department?.toLowerCase() === 'finance');
+    }, [formattedApprovers]);
 
     // ── Cascading Approver Filtering ──
 
-    // Get all mandatory approver IDs selected so far (across all levels)
-    const allSelectedMandatoryIds = useMemo(() => {
+    // Get ALL selected approver IDs across all fields (Mandatory, Threshold, Posting)
+    const allSelectedIds = useMemo(() => {
         const selected = new Set();
         Object.values(form.approvers).forEach(ids => {
             if (Array.isArray(ids)) {
                 ids.forEach(id => selected.add(id));
             }
         });
-        return selected;
-    }, [form.approvers]);
-
-    // Filtered options for Threshold Approver (excludes all mandatory approvers)
-    const filteredThresholdOptions = useMemo(() => {
-        return (financeApprovers || []).filter(opt => !allSelectedMandatoryIds.has(opt.value));
-    }, [financeApprovers, allSelectedMandatoryIds]);
-
-    // Function to get filtered options for a specific mandatory level (excludes previous levels)
-    const getFilteredMandatoryOptions = (currentIndex) => {
-        const excluded = new Set();
-        for (let i = 1; i < currentIndex; i++) {
-            (form.approvers[i] || []).forEach(id => excluded.add(id));
+        if (Array.isArray(form.thresholdApprover)) {
+            form.thresholdApprover.forEach(id => selected.add(id));
         }
-        if (excluded.size === 0) return allApprovers;
-        return (allApprovers || []).filter(opt => !excluded.has(opt.value));
+        if (Array.isArray(form.postingApprover)) {
+            form.postingApprover.forEach(id => selected.add(id));
+        }
+        return selected;
+    }, [form.approvers, form.thresholdApprover, form.postingApprover]);
+
+    // Filtered options for Threshold Approver
+    const filteredThresholdOptions = useMemo(() => {
+        const otherSelectedIds = new Set(allSelectedIds);
+        (form.thresholdApprover || []).forEach(id => otherSelectedIds.delete(id));
+        
+        return (financeApprovers || []).filter(opt => !otherSelectedIds.has(opt.value));
+    }, [financeApprovers, allSelectedIds, form.thresholdApprover]);
+
+    // Filtered options for Posting Approver
+    const filteredPostingOptions = useMemo(() => {
+        const otherSelectedIds = new Set(allSelectedIds);
+        (form.postingApprover || []).forEach(id => otherSelectedIds.delete(id));
+
+        return (financeApprovers || []).filter(opt => !otherSelectedIds.has(opt.value));
+    }, [financeApprovers, allSelectedIds, form.postingApprover]);
+
+    // Function to get filtered options for a specific mandatory level
+    const getFilteredMandatoryOptions = (currentIndex) => {
+        const otherSelectedIds = new Set(allSelectedIds);
+        (form.approvers[currentIndex] || []).forEach(id => otherSelectedIds.delete(id));
+
+        return (formattedApprovers || []).filter(opt => !otherSelectedIds.has(opt.value));
     };
 
     // ── Populate form when editing ──
@@ -107,8 +129,12 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                 approvers,
                 financeFlags,
                 thresholdAmount: editData.amount_threshold ? String(editData.amount_threshold) : "",
-                thresholdApprover: editData.threshold_approver?.[0] ?? null,
-                postingApprover: editData.posting_approver ?? null,
+                thresholdApprover: Array.isArray(editData.threshold_approver)
+                    ? editData.threshold_approver
+                    : editData.threshold_approver ? [editData.threshold_approver] : [],
+                postingApprover: Array.isArray(editData.posting_approver)
+                    ? editData.posting_approver
+                    : editData.posting_approver ? [editData.posting_approver] : [],
             });
 
             // Initialize searchedVendors with the current vendor if editing
@@ -236,9 +262,9 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
         }
         if (form.thresholdEnabled) {
             if (!form.thresholdAmount) return "Amount Threshold is required";
-            if (!form.thresholdApprover) return "Threshold Approver is required";
+            if (!form.thresholdApprover || form.thresholdApprover.length === 0) return "Threshold Approver is required";
         }
-        if (!form.postingApprover) return "Posting Approver is required";
+        if (!form.postingApprover || form.postingApprover.length === 0) return "Posting Approver is required";
         return null;
     };
 
@@ -289,9 +315,9 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
             is_threshold_enabled: form.thresholdEnabled,
             amount_threshold: form.thresholdEnabled ? Number(form.thresholdAmount) : null,
             threshold_approver: form.thresholdEnabled
-                ? form.thresholdApprover ? [form.thresholdApprover] : []
+                ? (form.thresholdApprover || [])
                 : null,
-            posting_approver: form.postingApprover,
+            posting_approver: form.postingApprover || [],
             approver_flags: buildCleanFinanceFlags(),
         };
 
@@ -522,12 +548,13 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                                 <Dropdown
                                     label="Threshold Approver"
                                     required
+                                    mode="multiple"
                                     value={form.thresholdApprover}
                                     onChange={(val) => setForm({ ...form, thresholdApprover: val })}
                                     options={filteredThresholdOptions}
                                     loading={approversLoading}
                                     disabled={approversLoading}
-                                    placeholder={approversLoading ? "Loading..." : "Select Approver"}
+                                    placeholder={approversLoading ? "Loading..." : "Select Approver(s)"}
                                 />
                             </div>
                         </div>
@@ -538,12 +565,13 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                         <Dropdown
                             label="Posting Approver"
                             required
+                            mode="multiple"
                             value={form.postingApprover}
                             onChange={(val) => setForm({ ...form, postingApprover: val })}
-                            options={financeApprovers}
+                            options={filteredPostingOptions}
                             loading={approversLoading}
                             disabled={approversLoading}
-                            placeholder={approversLoading ? "Loading..." : "Select Approver"}
+                            placeholder={approversLoading ? "Loading..." : "Select Approver(s)"}
                         />
                     </div>
                 </div>

@@ -194,7 +194,7 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose, onSuccess }) => {
             .filter(apt => !selected.has(apt.value))
             .map(opt => ({
                 ...opt,
-                label: opt.label.includes(' (') ? opt.label.split(' (')[0] : opt.label
+                label: `${opt.value} - ${opt.department || 'N/A'}`
             }));
     };
 

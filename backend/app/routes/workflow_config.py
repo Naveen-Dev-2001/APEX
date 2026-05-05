@@ -125,7 +125,7 @@ def transform_workflow_response(w):
         #  Same fix here
         "threshold_approver": deserialize_approver(w.threshold_approver),
         "approver_count": w.approver_count or 1,
-        "posting_approver": getattr(w, 'posting_approver', None),
+        "posting_approver": deserialize_approver(w.posting_approver),
         "entity": getattr(w, 'entity', None),
         "created_at": getattr(w, 'created_at', datetime.utcnow()),
         "updated_at": getattr(w, 'updated_at', None),
@@ -201,7 +201,7 @@ async def create_vendor_workflow(
             "threshold_approver": json.dumps(workflow.threshold_approver) if workflow.threshold_approver else None,
 
             "created_at": datetime.utcnow(),
-            "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None,
+            "posting_approver": json.dumps(workflow.posting_approver) if workflow.posting_approver else None,
             "approver_flags": json.dumps(workflow.approver_flags) if workflow.approver_flags else None,
         }
         new_workflow = vendor_workflow_repo.create(db, obj_in=new_wf_data)
@@ -247,7 +247,7 @@ async def update_vendor_workflow(
 
             "threshold_approver": json.dumps(workflow.threshold_approver) if workflow.threshold_approver else None,
 
-            "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None,
+            "posting_approver": json.dumps(workflow.posting_approver) if workflow.posting_approver else None,
             "approver_flags": json.dumps(workflow.approver_flags) if workflow.approver_flags else None,
 
             "entity": entity,
@@ -384,7 +384,7 @@ async def create_codification_workflow(
 
             "threshold_approver": json.dumps(workflow.threshold_approver) if workflow.threshold_approver else None,
 
-            "posting_approver": str(workflow.posting_approver) if workflow.posting_approver else None,
+            "posting_approver": json.dumps(workflow.posting_approver) if workflow.posting_approver else None,
             "created_at": datetime.utcnow(),
             "updated_at": None,
             "approver_flags": json.dumps(workflow.approver_flags) if workflow.approver_flags else None,
@@ -433,7 +433,7 @@ async def update_codification_workflow(
             "amount_threshold": workflow.amount_threshold if workflow.is_threshold_enabled else None,
             "threshold_approver": json.dumps(workflow.threshold_approver) if workflow.threshold_approver else None,
 
-            "posting_approver": workflow.posting_approver,
+            "posting_approver": json.dumps(workflow.posting_approver) if workflow.posting_approver else None,
             "entity": entity,
             "updated_at": datetime.utcnow(),
             "approver_flags": json.dumps(workflow.approver_flags) if workflow.approver_flags else None,
