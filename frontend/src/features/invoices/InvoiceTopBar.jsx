@@ -140,6 +140,13 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     // ── Scanner / Coder actions ────────────────────────────────────────────
     const handleSendToCoding = async () => {
+        // Validate invoice number before proceeding
+        const invoiceNumber = activeInvoiceData?.invoice_number;
+        if (!invoiceNumber || !String(invoiceNumber).trim()) {
+            toast.error("Invoice number is missing. Please add the invoice number before sending for coding.");
+            return;
+        }
+
         setActionLoading("sendToCoding");
 
         try {
