@@ -46,7 +46,8 @@ const useWorkflowStore = create((set, get) => ({
             set({
                 approversList: (approvers || []).map(a => ({ 
                     value: a.value, 
-                    label: a.label 
+                    label: a.label,
+                    department: a.department
                 })),
                 workflowVendors: vendors || []
             });
@@ -132,7 +133,8 @@ const useWorkflowStore = create((set, get) => ({
                 })), 
                 approversList: (approvers || []).map(a => ({ 
                     value: a.value, 
-                    label: a.label 
+                    label: a.label,
+                    department: a.department
                 })) 
             });
         } catch (err) {

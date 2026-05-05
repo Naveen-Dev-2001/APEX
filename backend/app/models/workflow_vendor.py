@@ -15,7 +15,7 @@ class VendorWorkflow(BaseModel):
     amount_threshold: Optional[float] = None
     approver_count: int = 1
     is_threshold_enabled: bool = False          # ── ADD
-    posting_approver: Optional[EmailStr] = None  # ── ADD
+    posting_approver: Optional[List[EmailStr]] = None  # ── multi-select
     approver_flags: Optional[dict] = None        # ── ADD
     # is_parallel: bool = False
 
@@ -26,7 +26,7 @@ class VendorWorkflow(BaseModel):
     @field_validator(
         'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3',
         'mandatory_approver_4', 'mandatory_approver_5',
-        'threshold_approver',
+        'threshold_approver', 'posting_approver',
         mode='before'
     )
     @classmethod
@@ -53,7 +53,7 @@ class VendorWorkflowResponse(BaseModel):
     amount_threshold: Optional[float] = None
     approver_count: int
     is_threshold_enabled: bool = False          # ── ADD
-    posting_approver: Optional[str] = None      # ── ADD
+    posting_approver: Optional[List[str]] = None  # ── multi-select
     approver_flags: Optional[dict] = None       # ── ADD
     # is_parallel: bool = False
 

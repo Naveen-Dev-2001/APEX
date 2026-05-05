@@ -19,12 +19,13 @@ class CodificationWorkflow(BaseModel):
     amount_threshold: Optional[float] = None
     threshold_approver: Optional[List[EmailStr]] = None
 
-    posting_approver: Optional[EmailStr] = None
+    posting_approver: Optional[List[EmailStr]] = None
     approver_flags: Optional[dict] = None
 
     @field_validator(
         'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3',
         'mandatory_approver_4', 'mandatory_approver_5', 'threshold_approver',
+        'posting_approver',
         mode='before'
     )
     @classmethod
@@ -61,7 +62,7 @@ class CodificationWorkflowResponse(BaseModel):
     amount_threshold: Optional[float] = None
     threshold_approver: Optional[List[str]] = None
 
-    posting_approver: Optional[str] = None
+    posting_approver: Optional[List[str]] = None
     entity: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -70,6 +71,7 @@ class CodificationWorkflowResponse(BaseModel):
     @field_validator(
         'mandatory_approver_1', 'mandatory_approver_2', 'mandatory_approver_3',
         'mandatory_approver_4', 'mandatory_approver_5', 'threshold_approver',
+        'posting_approver',
         mode='before'
     )
     @classmethod
