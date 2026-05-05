@@ -125,6 +125,7 @@ class ApproverUIStatus(BaseModel):
     already_acted: bool
     assigned_approvers: List[Dict]
     sage_post_error: Optional[str]
+    rework_error: Optional[str] = None
 
 
 # ─────────────────────────────────────────────
@@ -830,6 +831,43 @@ def _resolve_user_role_in_workflow(
     return result
 
 
+def _get_rework_error(db: Session, current_level: int, assigned: List[Dict]) -> Optional[str]:
+    """
+    Checks if rework is possible from the current level.
+    If current_level == 1, rework goes to coder (always possible).
+    If current_level > 1, checks if previous level is finance.
+    Returns None if OK, or a descriptive error message.
+    """
+    if current_level <= 1:
+        return None  # Rework to coder is always allowed
+        
+    prev_level_num = current_level - 1
+    prev_level_entry = next((a for a in assigned if a.get("level") == prev_level_num), None)
+    
+    if not prev_level_entry:
+        return "No previous approval level found to rework to."
+        
+    is_prev_finance = False
+    if prev_level_entry.get("is_finance"):
+        is_prev_finance = True
+    else:
+        # Check if any user at this level belongs to the finance department
+        prev_emails = _parse_list(prev_level_entry.get("emails", []))
+        if prev_emails:
+            # Use a case-insensitive check for "finance"
+            fin_user = db.query(User).filter(
+                User.email.in_(prev_emails),
+                func.lower(User.department) == "finance"
+            ).first()
+            if fin_user:
+                is_prev_finance = True
+                
+    if not is_prev_finance:
+        return "Previous level approver was not a finance team"
+        
+    return None
+
+
 @router.post("/status", response_model=ApproverUIStatus)
 async def get_ui_status_from_frontend(
     payload: Dict = Body(...),
@@ -1062,6 +1100,8 @@ async def get_ui_status_from_frontend(
             delegated_posting = True
             break
  
+    rework_error = _get_rework_error(db, current_level, assigned)
+
     return ApproverUIStatus(
         invoice_id=str(invoice_id),
         current_status=current_status,
@@ -1080,6 +1120,7 @@ async def get_ui_status_from_frontend(
         already_acted=already_acted,
         assigned_approvers=assigned,
         sage_post_error=None,
+        rework_error=rework_error,
     )
 
 @router.post("/approve/{invoice_id}", response_model=ActionResponse)
@@ -1789,36 +1830,18 @@ async def rework_invoice(
 
     assigned: List[Dict] = workflow.get("assigned_approvers", [])
     
-    # Check if the immediate previous level is finance
-    prev_level_num = current_level - 1
-    prev_level_entry = next((a for a in assigned if a.get("level") == prev_level_num), None)
-    
-    is_prev_finance = False
-    if prev_level_entry:
-        if prev_level_entry.get("is_finance"):
-            is_prev_finance = True
-        else:
-            # Check if any user at this level belongs to the finance department
-            prev_emails = _parse_list(prev_level_entry.get("emails", []))
-            if prev_emails:
-                # Use a case-insensitive check for "finance"
-                fin_user = db.query(User).filter(
-                    User.email.in_(prev_emails),
-                    func.lower(User.department) == "finance"
-                ).first()
-                if fin_user:
-                    is_prev_finance = True
-    
-    if not is_prev_finance:
+    rework_err = _get_rework_error(db, current_level, assigned)
+    if rework_err:
         raise HTTPException(
             400,
             detail={
                 "code": "PREVIOUS_NOT_FINANCE",
-                "message": "Previous level approver was not a finance team",
+                "message": rework_err,
             },
         )
 
     # Reset level to previous level
+    prev_level_num = current_level - 1
     prev_finance_level = prev_level_num
     # Reset level to previous finance level and clear approvals beyond it
     _advance_level(db, invoice, prev_finance_level)
