@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.auth.jwt import get_current_user
 from app.database.database import get_db
 from app.dependencies import get_current_entity
-from app.models.db_models import Invoice, User, WorkflowStep, EntityMaster, InvoiceApprovedBy
+from app.models.db_models import Invoice, User, WorkflowStep, EntityMaster, InvoiceApprovedBy, InvoiceAssignedApprover
 from app.models.user import UserResponse
 from app.repository.repositories import (
     coding_repo,
@@ -178,6 +178,38 @@ def _get_finance_users(db: Session, entity: str) -> List[str]:
     except Exception as exc:
         logger.warning("Could not fetch users: %s", exc)
         return []
+
+
+def _is_threshold_approver_db(db: Session, invoice_id: int, email: str) -> bool:
+    """
+    Query the DB to determine if `email` is a threshold approver for this invoice.
+    A threshold approver has an InvoiceAssignedApprover row where:
+      - is_finance = False  (dedicated slot, not a finance-team expansion row)
+      - sequence_order > 1  (not level 1)
+      - sequence_order < max(sequence_order)  (not the posting/last level)
+    This check is DB-authoritative and works even when the snapshot reconstruction
+    loses the original 'type' field (sets everything to 'mandatory').
+    """
+    try:
+        from sqlalchemy import func as sqla_func
+        max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id
+        ).scalar() or 0
+
+        if max_seq <= 1:
+            return False  # only one level — no threshold possible
+
+        row = db.query(InvoiceAssignedApprover).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id,
+            InvoiceAssignedApprover.approver_email.ilike(email),
+            InvoiceAssignedApprover.is_finance == False,
+            InvoiceAssignedApprover.sequence_order > 1,
+            InvoiceAssignedApprover.sequence_order < max_seq  # exclude posting (last) level
+        ).first()
+        return row is not None
+    except Exception as exc:
+        logger.warning("_is_threshold_approver_db error: %s", exc)
+        return False
 
 
 def _get_workflow_data(
@@ -602,22 +634,9 @@ def _resolve_user_role_in_workflow(
         "is_threshold_approver": False,
         "is_posting_approver": False,
         "level_already_approved": False,
-        "already_acted": False,
         "can_act": False,
     }
-
-    # Check if user already acted (any approve / reject)
-    acted_types = {
-        StepType.APPROVED,
-        StepType.REJECTED,
-        StepType.LEVEL_APPROVED,
-        StepType.THRESHOLD_APPROVED,
-        StepType.POSTING_APPROVED,
-    }
-    result["already_acted"] = any(
-        (s.user or "").lower() == email and s.step_type in acted_types
-        for s in current_cycle_steps
-    )
+    # (Broad global already_acted removed)
 
     # Walk assigned_approvers
     mandatory = [a for a in assigned if a.get("type") == "mandatory"]
@@ -686,7 +705,14 @@ def _resolve_user_role_in_workflow(
             or any(email in [s.lower() for s in check_active_delegation(db, e, entity)] for e in emails_at_lvl)
         )
         if is_eligible:
-            result["can_act"] = not result["level_already_approved"]
+            # Scoped to current mandatory level
+            already_acted_here = any(
+                (s.user or "").lower() == email 
+                and s.step_type == StepType.LEVEL_APPROVED 
+                and s.approver_number == current_level
+                for s in current_cycle_steps
+            )
+            result["can_act"] = not result["level_already_approved"] and not already_acted_here
             result["user_level"] = current_level
 
     # Explicit stage-based eligibility for virtual Posting/Threshold levels
@@ -700,7 +726,12 @@ def _resolve_user_role_in_workflow(
                     delegated_threshold = True
                     break
             if result["is_threshold_approver"] or delegated_threshold:
-                result["can_act"] = not result["already_acted"]
+                already_threshold = any(
+                    (s.user or "").lower() == email 
+                    and s.step_type == StepType.THRESHOLD_APPROVED 
+                    for s in current_cycle_steps
+                )
+                result["can_act"] = not already_threshold
         elif has_posting and not posting_done:
             delegated_posting = False
             for o_email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]:
@@ -710,7 +741,12 @@ def _resolve_user_role_in_workflow(
                     delegated_posting = True
                     break
             if result["is_posting_approver"] or delegated_posting:
-                result["can_act"] = not result["already_acted"]
+                already_posting = any(
+                    (s.user or "").lower() == email 
+                    and s.step_type == StepType.POSTING_APPROVED 
+                    for s in current_cycle_steps
+                )
+                result["can_act"] = not already_posting
     # else: all done — no one can act
 
     return result
@@ -724,9 +760,18 @@ async def get_ui_status_from_frontend(
     entity: str = Depends(get_current_entity),
 ):
     invoice_id = payload.get("invoice_id")
+    # Fetch fresh data from DB to avoid stale frontend state issues
+    invoice = invoice_repo.get(db, invoice_id)
+    if not invoice:
+        raise HTTPException(404, "Invoice not found")
+
     assigned = payload.get("assigned_approvers", [])
-    current_level = payload.get("current_approver_level", 1)
-    current_status = payload.get("current_status")
+    current_level = invoice.current_approver_level or 1
+    current_status = (
+        invoice.status.value
+        if hasattr(invoice.status, "value")
+        else str(invoice.status)
+    )
  
     email = current_user.email.lower()
     finance_users = _get_finance_users(db, entity)
@@ -779,7 +824,8 @@ async def get_ui_status_from_frontend(
     # ── already_acted defined HERE so all branches below can safely use it ──
     # FIX: was defined after the explicit check block, causing NameError when
     # can_act was False and the block tried to evaluate `not already_acted`.
-    already_acted = any((s.user or "").lower() == email for s in steps)
+    # FIX: use steps_for_level_check to only look at the current cycle
+    already_acted = any((s.user or "").lower() == email for s in steps_for_level_check)
  
     # ── can_act logic ────────────────────────────────────────────────────────
     can_act = False
@@ -802,17 +848,30 @@ async def get_ui_status_from_frontend(
                     delegated_authority = True
                     break
  
-            user_in_level = (
-                (is_finance_level and is_finance)
-                or (email in emails_at_level)
-                or delegated_authority
+            # Block threshold approvers from acting at Finance Team levels (DB check).
+            # If this user is a threshold approver, they must NOT be eligible at lower
+            # Finance Team levels via ANY path — not is_finance, not direct email match
+            # (email stored via pool expansion), not delegation.
+            is_threshold_at_lower_level = (
+                is_finance_level
+                and _is_threshold_approver_db(db, invoice_id, email)
             )
-            already_acted_in_workflow = any(
+
+            if is_threshold_at_lower_level:
+                user_in_level = False
+            else:
+                user_in_level = (
+                    (is_finance_level and is_finance)
+                    or (email in emails_at_level)
+                    or delegated_authority
+                )
+            already_acted_here = any(
                 (s.user or "").lower() == email
-                and s.step_type in approval_types
+                and s.step_type == StepType.LEVEL_APPROVED
+                and s.approver_number == current_level
                 for s in steps_for_level_check
             )
-            can_act = user_in_level and not already_acted_in_workflow
+            can_act = user_in_level and not already_acted_here
  
     elif has_threshold and not threshold_done:
         delegated_threshold = False
@@ -824,13 +883,13 @@ async def get_ui_status_from_frontend(
                 delegated_threshold = True
                 break
  
-        already_acted_in_workflow = any(
+        already_threshold = any(
             (s.user or "").lower() == email
-            and s.step_type in approval_types
+            and s.step_type == StepType.THRESHOLD_APPROVED
             for s in steps_for_level_check
         )
         can_act = (
-            is_threshold_approver or delegated_threshold) and not already_acted_in_workflow
+            is_threshold_approver or delegated_threshold) and not already_threshold
  
     elif has_posting and not posting_done:
         delegated_posting = False
@@ -1000,12 +1059,24 @@ async def approve_invoice(
                 delegated_authority = True
                 break
 
+        # ── Block threshold approvers from acting at lower Finance Team levels ──
+        # Query the DB directly — the snapshot reconstruction loses 'type' info,
+        # so we cannot rely on threshold_entries being populated here.
+        is_threshold_approver_here = (
+            is_finance_level
+            and _is_threshold_approver_db(db, invoice_id, email)
+        )
+
         user_eligible = (
-            (is_finance_level and email in [f.lower() for f in finance_users])
+            (is_finance_level and email in [f.lower() for f in finance_users]
+             and not is_threshold_approver_here)
             or (not is_finance_level and email in emails_at_level)
             or delegated_authority
         )
         if not user_eligible:
+            if is_threshold_approver_here:
+                raise HTTPException(
+                    403, "You are a threshold approver and cannot act at Finance Team levels.")
             raise HTTPException(
                 403, f"You are not an approver for level {current_level}")
 
@@ -1013,15 +1084,16 @@ async def approve_invoice(
             raise HTTPException(
                 400, f"Level {current_level} has already been approved")
 
-        # Check if user already acted in this cycle (any level)
+        # Check if user already acted at THIS SPECIFIC mandatory level.
+        # This allows posting approvers who approved at level 2 to approve again at level 5.
         already = any(
             (s.user or "").lower() == email
             and s.step_type == StepType.LEVEL_APPROVED
-            and s.approver_number == current_level   # ← scoped to current level only
+            and s.approver_number == current_level
             for s in current_cycle_steps
         )
         if already:
-            raise HTTPException(400, "You have already acted in this workflow cycle")
+            raise HTTPException(400, f"You have already acted at level {current_level}")
 
         _record_step(
             db, invoice_id,
@@ -1184,6 +1256,15 @@ async def approve_invoice(
         if email not in [e.lower() for e in threshold_emails] and not delegated_threshold:
             raise HTTPException(403, "You are not the threshold approver")
 
+        # Guard against double-approval at the threshold stage
+        already_threshold = any(
+            (s.user or "").lower() == email
+            and s.step_type == StepType.THRESHOLD_APPROVED
+            for s in current_cycle_steps
+        )
+        if already_threshold:
+            raise HTTPException(400, "You have already submitted your threshold approval")
+
         _record_step(
             db, invoice_id,
             step_name="Threshold Approval",
@@ -1291,6 +1372,15 @@ async def approve_invoice(
 
         if email not in [e.lower() for e in posting_emails] and not delegated_posting:
             raise HTTPException(403, "You are not the posting approver")
+
+        # Guard against double-approval at the posting stage
+        already_posting = any(
+            (s.user or "").lower() == email
+            and s.step_type == StepType.POSTING_APPROVED
+            for s in current_cycle_steps
+        )
+        if already_posting:
+            raise HTTPException(400, "You have already submitted your posting approval")
 
         return await _finalize_and_post(
             db, invoice, current_user, email, entity, payload.comment,
@@ -1518,14 +1608,8 @@ async def rework_invoice(
         db, email, workflow, steps, finance_users, current_level, entity
     )
 
-    # Explicitly allow Posting/Threshold approvers to rework
-    is_authorized = (
-        role["can_act"] 
-        or role["is_finance_team"]
-        or (role["is_posting_approver"] and not role["already_acted"])
-        or (role["is_threshold_approver"] and not role["already_acted"])
-        or (role["user_level"] == current_level)
-    )
+    # Explicitly allow Posting/Threshold approvers to rework if it's their turn
+    is_authorized = role["can_act"]
 
     if not is_authorized:
         raise HTTPException(

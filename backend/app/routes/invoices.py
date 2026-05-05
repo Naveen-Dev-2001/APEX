@@ -730,6 +730,29 @@ async def get_invoices(
                     # Get active delegations for current level
                     # (Already calculated at top)
 
+                    # Detect if this user is a THRESHOLD approver at a future level.
+                    # Threshold levels are non-finance (is_finance=False) and not the last level
+                    # (posting). Only these users are blocked from lower Finance Team levels.
+                    # Posting approvers (last level) and regular finance users are NOT affected.
+                    from sqlalchemy.orm import aliased
+                    FutureApprover = aliased(InvoiceAssignedApprover)
+                    # Compute max sequence_order (the posting/last level)
+                    max_level_sq = db.query(
+                        func.max(InvoiceAssignedApprover.sequence_order)
+                    ).filter(
+                        InvoiceAssignedApprover.invoice_id == Invoice.id
+                    ).correlate(Invoice).scalar_subquery()
+
+                    is_future_threshold_approver_subquery = exists().where(
+                        and_(
+                            FutureApprover.invoice_id == Invoice.id,
+                            FutureApprover.approver_email.in_(target_emails),
+                            FutureApprover.sequence_order > Invoice.current_approver_level,
+                            FutureApprover.sequence_order < max_level_sq,  # not the posting level
+                            FutureApprover.is_finance == False  # dedicated threshold slot
+                        )
+                    )
+
                     approver_subquery = exists().where(
                         and_(
                             InvoiceAssignedApprover.invoice_id == Invoice.id,
@@ -806,6 +829,10 @@ async def get_invoices(
                                 Invoice.status == InvoiceStatusEnum.REWORKED
                             ),
                             approver_subquery,
+                            # Block ONLY threshold approvers from seeing the invoice at lower
+                            # Finance Team levels. Posting approvers and regular finance users
+                            # are not affected.
+                            ~is_future_threshold_approver_subquery,
                             ~hide_condition
                         )
                     )
@@ -1073,6 +1100,26 @@ async def get_invoice_filter_options(
 
                 # Apply special approvals_view logic
                 if extra_filters.get("approvals_view"):
+                    # Detect if this user is a THRESHOLD approver at a future level.
+                    # Threshold levels are non-finance and not the last (posting) level.
+                    from sqlalchemy.orm import aliased
+                    FutureApproverFO = aliased(InvoiceAssignedApprover)
+                    max_level_fo_sq = db.query(
+                        func.max(InvoiceAssignedApprover.sequence_order)
+                    ).filter(
+                        InvoiceAssignedApprover.invoice_id == Invoice.id
+                    ).correlate(Invoice).scalar_subquery()
+
+                    is_future_threshold_approver_fo_subquery = exists().where(
+                        and_(
+                            FutureApproverFO.invoice_id == Invoice.id,
+                            FutureApproverFO.approver_email.in_(target_emails),
+                            FutureApproverFO.sequence_order > Invoice.current_approver_level,
+                            FutureApproverFO.sequence_order < max_level_fo_sq,  # not the posting level
+                            FutureApproverFO.is_finance == False  # dedicated threshold slot
+                        )
+                    )
+
                     approver_subquery = exists().where(
                         and_(
                             InvoiceAssignedApprover.invoice_id == Invoice.id,
@@ -1141,6 +1188,9 @@ async def get_invoice_filter_options(
                                 Invoice.status == InvoiceStatusEnum.REWORKED
                             ),
                             approver_subquery,
+                            # Block ONLY threshold approvers from seeing the invoice at lower
+                            # Finance Team levels.
+                            ~is_future_threshold_approver_fo_subquery,
                             ~hide_condition
                         )
                     )
@@ -1449,7 +1499,34 @@ async def update_invoice_status(
     if not user_assigned_levels:
         # User not assigned to any level
         raise HTTPException(status_code=403, detail="You are not authorized to approve this invoice.")
-    
+
+    # If the user is at the current level BUT ALSO has a future THRESHOLD-level assignment
+    # (non-finance, not the last/posting level), block them — their presence at the lower
+    # Finance Team level was from pool expansion, not an intentional assignment.
+    # Posting approvers (last level == max_assigned_level) are NOT blocked.
+    max_assigned_level = len(assigned_approvers)  # last level index in 1-based numbering
+    future_threshold_levels = []
+    for idx, group in enumerate(assigned_approvers):
+        level_num = idx + 1
+        if level_num <= current_level:
+            continue
+        if level_num >= max_assigned_level:
+            continue  # this is the posting (last) level — posting approvers can act at lower levels
+        # Check if this is a non-finance dedicated slot (threshold)
+        is_fin = False
+        if isinstance(group, dict):
+            is_fin = group.get("is_finance", False)
+        if not is_fin and _is_user_in_group(group, user_email, invoice.entity):
+            future_threshold_levels.append(level_num)
+
+    if current_level in user_assigned_levels and future_threshold_levels:
+        print(f"[AUTH] Blocking {user_email} from acting at level {current_level} — "
+              f"they are a threshold approver at future level(s) {future_threshold_levels}")
+        raise HTTPException(
+            status_code=400,
+            detail="It is not yet your turn for approval."
+        )
+
     # Check if user is at the CURRENT active level
     if current_level in user_assigned_levels:
         is_authorized = True

@@ -102,6 +102,19 @@ async def send_to_approval(
     # Store assigned approvers
     assigned_approvers = requirement_data.get("assigned_approvers", [])
     print(f"[APPROVAL] Total levels to store: {len(assigned_approvers)}")
+
+    # Pre-collect THRESHOLD approver emails to exclude from Finance Team pool expansion.
+    # Only threshold approvers must be restricted to their dedicated level.
+    # Posting approvers remain part of the general finance pool at lower levels.
+    higher_level_approver_emails = set()
+    for level_data in assigned_approvers:
+        if isinstance(level_data, dict):
+            lvl_type = level_data.get("type", "mandatory")
+            if lvl_type == "threshold":  # posting approvers are intentionally NOT excluded
+                for e in level_data.get("emails", []):
+                    if e:
+                        higher_level_approver_emails.add(e.lower())
+
     for idx, level_data in enumerate(assigned_approvers):
         # level_data is a dict: {"emails": [...], "is_finance": bool, "type": "mandatory", "level": X}
         # OR it could be a list of emails (fallback for older workflows)
@@ -115,9 +128,12 @@ async def send_to_approval(
         else:
             emails = [level_data] if isinstance(level_data, str) else level_data
 
-        # For finance-team levels: merge explicit emails with all finance users
+        # For finance-team levels: merge explicit emails with all finance users,
+        # but exclude anyone who is a threshold or posting approver — they must
+        # only appear at their own designated higher level.
         if is_finance_level and finance_emails:
-            combined = set(e.lower() for e in emails if e) | set(finance_emails)
+            eligible_finance = [e for e in finance_emails if e not in higher_level_approver_emails]
+            combined = set(e.lower() for e in emails if e) | set(eligible_finance)
         else:
             combined = set(e.lower() for e in emails if e)
 
