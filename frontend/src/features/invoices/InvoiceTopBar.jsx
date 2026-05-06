@@ -241,6 +241,9 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             const response = await handleSave(extraFields);
             if (response) {
                 toast.success("Invoice Saved Successfully!");
+                await queryClient.invalidateQueries(["invoices"]);
+                await queryClient.invalidateQueries(["invoice-preview", viewInvoiceId]);
+
                 if (currentStatus === "reworked") {
                     await fetchUIStatus();
                 }

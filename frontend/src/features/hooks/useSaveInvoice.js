@@ -9,6 +9,7 @@ export const useSaveInvoice = () => {
         quickViewFormData,
         activeInvoiceData,
         setActiveInvoiceData,
+        setInvoiceData,
         viewInvoiceId,
         lineItems
     } = useInvoiceStore();
@@ -252,7 +253,7 @@ export const useSaveInvoice = () => {
 
             // Sync the store with the server response (contains latest updated_at)
             if (response) {
-                setActiveInvoiceData(response);
+                setInvoiceData(response);
             }
 
             return response;
@@ -262,7 +263,7 @@ export const useSaveInvoice = () => {
             toast.error(typeof detail === "string" ? detail : (detail.message || "Something went wrong"));
             return null;
         }
-    }, [buildPayload, setActiveInvoiceData, viewInvoiceId]);
+    }, [buildPayload, setActiveInvoiceData, setInvoiceData, viewInvoiceId]);
 
     return { handleSave, buildPayload };
 };
