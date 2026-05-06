@@ -39,6 +39,7 @@ class InvoiceBase(BaseModel):
     vendor_id: Optional[str] = None
     vendor_name: Optional[str] = None
     invoice_number: Optional[str] = None
+    reference_number: Optional[str] = None
     invoice_date: Optional[date] = None
     due_date: Optional[date] = None
     total_amount: Optional[float] = None
@@ -62,6 +63,7 @@ class InvoiceUpdate(BaseModel):
     vendor_id: Optional[str] = None
     vendor_name: Optional[str] = None
     invoice_number: Optional[str] = None
+    reference_number: Optional[str] = None
     last_updated_at: Optional[datetime] = None
 
 class Invoice(InvoiceBase):

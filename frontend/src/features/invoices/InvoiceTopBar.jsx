@@ -36,6 +36,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         resetQuickView,
         setInvoiceActiveTab,
         activeInvoiceData,
+        quickViewFormData,
         setActiveInvoiceData,
         setInvoiceData,
         lineItems,
@@ -144,6 +145,12 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         const invoiceNumber = activeInvoiceData?.invoice_number;
         if (!invoiceNumber || !String(invoiceNumber).trim()) {
             toast.error("Invoice number is missing. Please add the invoice number before sending for coding.");
+            return;
+        }
+
+        const referenceNumber = quickViewFormData?.referenceNumber;
+        if (!referenceNumber || !String(referenceNumber).trim()) {
+            toast.error("Reference Number is missing. Please add the reference number before sending for coding.");
             return;
         }
 
