@@ -16,6 +16,7 @@ import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
 import { formatCurrency } from '../../utils/formatters';
 import { getInvoiceFilterOptions } from '../../api/invoiceApi';
+import { getWorkflowUsers } from './invoiceColumns';
 
 const { confirm } = Modal;
 
@@ -231,6 +232,23 @@ const ApprovalsPage = () => {
             filterable: true,
             onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
             onClick: () => handleSort("approver_name")
+        },
+        {
+            header: "Workflow Users",
+            accessor: "workflow_users",
+            filterable: true,
+            getFilterValue: (row) => getWorkflowUsers(row),
+            render: (_, row) => getWorkflowUsers(row),
+        },
+        {
+            header: "Entity",
+            accessor: "entity",
+            filterable: true,
+        },
+        {
+            header: "Confidence Score",
+            accessor: "confidence_score",
+            render: (val) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : "-",
         },
         {
             header: "Actions",

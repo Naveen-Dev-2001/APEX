@@ -83,6 +83,37 @@ const getNextApprover = (row) => {
     return "-";
 };
 
+// ─── Workflow Users helper ───────────────────────────────────────────────────
+export const getWorkflowUsers = (row) => {
+    if (!row?.assigned_approvers || !Array.isArray(row.assigned_approvers)) return "-";
+
+    const allUsers = [];
+    row.assigned_approvers.forEach(stage => {
+        if (stage.is_finance === true) {
+            if (!allUsers.includes("Finance Team")) allUsers.push("Finance Team");
+        } else {
+            const names = stage.names || stage.emails;
+            if (Array.isArray(names)) {
+                names.forEach(n => {
+                    let formatted = n;
+                    if (typeof n === 'string' && n.includes('@')) {
+                        formatted = n.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+                    }
+                    if (!allUsers.includes(formatted)) allUsers.push(formatted);
+                });
+            } else if (typeof names === 'string') {
+                let formatted = names;
+                if (names.includes('@')) {
+                    formatted = names.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+                }
+                if (!allUsers.includes(formatted)) allUsers.push(formatted);
+            }
+        }
+    });
+
+    return allUsers.length > 0 ? allUsers.join(", ") : "-";
+};
+
 // ─── Actions cell helper ──────────────────────────────────────────────────────
 const actionsCol = (onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete = false) => ({
     header: "Actions",
@@ -179,14 +210,6 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         filterRender: (val) => formatCurrency(val),
         render: (_, row) => formatCurrency(row?.extracted_data?.amounts?.amount_due?.value),
     },
-    // {
-    //     header:     "Uploaded At",
-    //     accessor:   "uploaded_at",
-    //     sortable:   true,
-    //     filterable: true,
-    //     filterType: 'date',
-    //     render:     (val) => val ? new Date(val).toLocaleDateString() : "-",
-    // },
     {
         header: "Last Updated",
         accessor: "processed_at",
@@ -228,6 +251,18 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         filterable: true,
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render: (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
+    },
+    {
+        header: "Workflow Users",
+        accessor: "workflow_users",
+        filterable: true,
+        getFilterValue: (row) => getWorkflowUsers(row),
+        render: (_, row) => getWorkflowUsers(row),
+    },
+    {
+        header: "Entity",
+        accessor: "entity",
+        filterable: true,
     },
     actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete),
 ];
@@ -430,6 +465,29 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         filterable: true,
         getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
         render: (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
+    },
+    {
+        header: "Workflow Users",
+        accessor: "workflow_users",
+        filterable: true,
+        getFilterValue: (row) => getWorkflowUsers(row),
+        render: (_, row) => getWorkflowUsers(row),
+    },
+    {
+        header: "Entity",
+        accessor: "entity",
+        filterable: true,
+    },
+    {
+        header: "Sage Bill Number",
+        accessor: "sage_bill_number",
+        filterable: true,
+        render: (val) => val || "-",
+    },
+    {
+        header: "Confidence Score",
+        accessor: "confidence_score",
+        render: (val) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : "-",
     },
     actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete),
 ];

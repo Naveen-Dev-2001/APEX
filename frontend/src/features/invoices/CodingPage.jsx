@@ -4,6 +4,7 @@ import { EyeOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
 import DataTable from '../../components/ui/DataTable';
 import { getInvoices, getInvoiceFilterOptions } from '../../api/invoiceApi';
+import { getWorkflowUsers } from './invoiceColumns';
 import toast from '../../utils/toast';
 import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
@@ -311,6 +312,25 @@ const CodingPage = () => {
 
                 return "-";
             }
+        },
+        {
+            header: "Workflow Users",
+            accessor: "workflow_users",
+            minWidth: 200,
+            filterable: true,
+            getFilterValue: (row) => getWorkflowUsers(row),
+            render: (_, row) => getWorkflowUsers(row),
+        },
+        {
+            header: "Entity",
+            accessor: "entity",
+            minWidth: 120,
+            filterable: true,
+        },
+        {
+            header: "Confidence Score",
+            accessor: "confidence_score",
+            render: (val) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : "-",
         },
         {
             header: "Actions",
