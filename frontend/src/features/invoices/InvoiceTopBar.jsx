@@ -41,7 +41,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         lineItems,
         selectedVendorId,
         navigationOrigin,
-        setNavigationOrigin
+        setNavigationOrigin,
+        setIsPreviewLoading
     } = useInvoiceStore();
 
     const { handleSave } = useSaveInvoice();
@@ -184,8 +185,12 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
 
     const handleDiscard = () => {
-        setInvoiceData(activeInvoiceData);
-        toast.success("Changes discarded!");
+        setIsPreviewLoading(true);
+        setTimeout(() => {
+            setInvoiceData(activeInvoiceData);
+            setIsPreviewLoading(false);
+            toast.success("Changes discarded!");
+        }, 100);
     };
 
     const handleSendToApproval = async () => {
@@ -207,7 +212,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         setActionLoading("sendToApproval");
         try {
             const saveRes = await handleSave();
-            const payload = await saveInvoice(viewInvoiceId, { 
+            const payload = await saveInvoice(viewInvoiceId, {
                 status: "waiting_approval",
                 last_updated_at: saveRes?.updated_at || activeInvoiceData?.updated_at
             });
@@ -237,6 +242,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         }
 
         setActionLoading("saving");
+        setIsPreviewLoading(true);
         try {
             const response = await handleSave(extraFields);
             if (response) {
@@ -253,6 +259,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             toast.error("Failed to save invoice.");
         } finally {
             setActionLoading(null);
+            setIsPreviewLoading(false);
         }
     };
 
@@ -430,7 +437,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     return (
         <>
             <div className="h-12 min-h-[50px] bg-white border-b border-[#E0E0E0] px-4 flex items-center justify-between ">
-                <div className="flex items-center gap-5"> 
+                <div className="flex items-center gap-5">
                     {/* Left — Back */}
                     <div
                         onClick={Back}
@@ -440,13 +447,13 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                         <span className="text-lg font-bold text-gray-500 custom-font-jura">Back</span>
                     </div>
                     <div className="w-[130px]">
-                            <CustomButton
-                                variant="outline"
-                                height="h-[34px]"
-                                onClick={onTogglePdf}
-                            >
-                                {isPdfVisible ? "Hide PDF" : "Show PDF"}
-                            </CustomButton>
+                        <CustomButton
+                            variant="outline"
+                            height="h-[34px]"
+                            onClick={onTogglePdf}
+                        >
+                            {isPdfVisible ? "Hide PDF" : "Show PDF"}
+                        </CustomButton>
                     </div>
                 </div>
 
@@ -455,7 +462,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                     {!activeInvoiceData?.is_archived && (
                         <>
                             {/* ── Scanner / Coder buttons ───────────────────────── */}
-                            {(([ "scanner", "coder" ].some(r => userRole.includes(r)) && (currentStatus || "").toLowerCase() === "processed") ||
+                            {((["scanner", "coder"].some(r => userRole.includes(r)) && (currentStatus || "").toLowerCase() === "processed") ||
                                 (userRole.includes("coder") && (currentStatus || "").toLowerCase() === "waiting_coding")) && (
                                     <>
                                         <div className="w-[130px]">
