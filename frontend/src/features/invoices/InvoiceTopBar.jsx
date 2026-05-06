@@ -143,7 +143,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     // ── Scanner / Coder actions ────────────────────────────────────────────
     const handleSendToCoding = async () => {
         // Validate invoice number before proceeding
-        const invoiceNumber = activeInvoiceData?.invoice_number;
+        const invoiceNumber = quickViewFormData?.invoiceNumber;
         if (!invoiceNumber || !String(invoiceNumber).trim()) {
             toast.error("Invoice number is missing. Please add the invoice number before sending for coding.");
             return;
@@ -202,6 +202,18 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
     const handleSendToApproval = async () => {
         // 1. Mandatory field validation (all rows)
+        const invoiceNumber = quickViewFormData?.invoiceNumber;
+        if (!invoiceNumber || !String(invoiceNumber).trim()) {
+            toast.error("Invoice number is missing. Please add the invoice number before sending for approval.");
+            return;
+        }
+
+        const referenceNumber = quickViewFormData?.referenceNumber;
+        if (!referenceNumber || !String(referenceNumber).trim()) {
+            toast.error("Reference Number is missing. Please add the reference number before sending for approval.");
+            return;
+        }
+
         const hasMissingCoding = lineItems
             .some(item => !item.glCode || !item.lob || !item.department);
 
