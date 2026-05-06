@@ -12,6 +12,7 @@ import workflowActionsAPI from "../../api/workflowActionsAPI";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Modal } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
+import DelegateModal from "./DelegateModal";
 
 
 
@@ -102,6 +103,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     const [actionLoading, setActionLoading] = useState(null);
     const [modal, setModal] = useState(null);
     const [comment, setComment] = useState("");
+    const [showDelegateModal, setShowDelegateModal] = useState(false);
     // Track workflow revision with a lightweight counter rather than JSON.stringify
     // which is O(n) on every render and causes micro-lag on large payloads.
     const prevWorkflowIdRef = useRef(null);
@@ -488,6 +490,25 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                 )}
 
                             {/* ── Approver buttons ──────────────────────────────── */}
+                            {/* ── Admin-only buttons ───────────────────────────── */}
+                            {userRole === "admin" && ["waiting_approval", "reworked"].includes(currentStatus) && (
+                                <>
+                                    <button
+                                        onClick={handleRefresh}
+                                        disabled={!!actionLoading}
+                                        className={getBtnClass("blue", !actionLoading)}
+                                    >
+                                        {busy("refreshing") ? "Refreshing..." : "Refresh"}
+                                    </button>
+                                    <button
+                                        onClick={() => setShowDelegateModal(true)}
+                                        className={getBtnClass("blue", true)}
+                                    >
+                                        Delegate
+                                    </button>
+                                </>
+                            )}
+
                             {isApproverView && (
                                 <>
                                     {/* Repost to Sage */}
@@ -670,6 +691,13 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                     </div>
                 )}
             </Modal>
+
+            <DelegateModal
+                visible={showDelegateModal}
+                onClose={() => setShowDelegateModal(false)}
+                invoiceId={viewInvoiceId}
+                onDelegateSuccess={handleRefresh}
+            />
         </>
     );
 };

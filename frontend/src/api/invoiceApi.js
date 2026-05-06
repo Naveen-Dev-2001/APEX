@@ -146,3 +146,9 @@ export const bulkDeleteInvoices = (invoiceIds) =>
 
 export const bulkArchiveInvoices = (invoiceIds) =>
     API.post(`/invoices/bulk-archive`, { invoice_ids: invoiceIds }).then(res => res.data);
+
+export const getDelegationInfo = (invoiceId) =>
+    API.get(`/invoices/${invoiceId}/delegation-info`).then(res => res.data);
+
+export const delegateInvoice = (invoiceId, payload) =>
+    API.post(`/invoices/${invoiceId}/delegate`, payload).then(res => res.data);

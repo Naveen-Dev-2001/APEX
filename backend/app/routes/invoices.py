@@ -747,8 +747,14 @@ async def get_invoices(
                             InvoiceAssignedApprover.invoice_id == Invoice.id,
                             InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
                             or_(
+                                # 1. Specifically assigned (always allowed, includes delegates)
                                 InvoiceAssignedApprover.approver_email.in_(target_emails),
-                                and_(InvoiceAssignedApprover.is_finance == True, is_finance_user == True)
+                                # 2. Finance pool (only allowed if not a future threshold approver)
+                                and_(
+                                    InvoiceAssignedApprover.is_finance == True, 
+                                    is_finance_user == True,
+                                    ~is_future_threshold_approver_subquery
+                                )
                             )
                         )
                     )
@@ -818,10 +824,6 @@ async def get_invoices(
                                 Invoice.status == InvoiceStatusEnum.REWORKED
                             ),
                             approver_subquery,
-                            # Block ONLY threshold approvers from seeing the invoice at lower
-                            # Finance Team levels. Posting approvers and regular finance users
-                            # are not affected.
-                            ~is_future_threshold_approver_subquery,
                             ~hide_condition
                         )
                     )
@@ -3500,6 +3502,152 @@ async def debug_last_approved(db: Session = Depends(get_db)):
     from app.models.db_models import Invoice
     invs = db.query(Invoice).filter(Invoice.status == InvoiceStatusEnum.APPROVED).order_by(Invoice.id.desc()).limit(10).all()
     return [{"id": i.id, "number": i.invoice_number, "status": i.status, "approvals": len(i.approved_by_list or []), "required": i.required_approvers} for i in invs]
+
+@router.get("/{invoice_id}/delegation-info")
+async def get_delegation_info(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(403, "Only admins can view delegation info")
+    
+    # 1. Get current cycle acted users and completed levels
+    last_reset = db.query(func.max(WorkflowStep.timestamp)).filter(
+        WorkflowStep.invoice_id == invoice_id,
+        WorkflowStep.step_type.in_([StepType.REWORKED, StepType.RECALLED])
+    ).scalar()
+
+    acted_query = db.query(WorkflowStep).filter(
+        WorkflowStep.invoice_id == invoice_id,
+        WorkflowStep.step_type.in_([
+            StepType.LEVEL_APPROVED, StepType.APPROVED, StepType.REJECTED,
+            StepType.THRESHOLD_APPROVED, StepType.POSTING_APPROVED
+        ])
+    )
+    if last_reset:
+        acted_query = acted_query.filter(WorkflowStep.timestamp > last_reset)
+    
+    steps = acted_query.all()
+    acted_users = set(s.user.lower() for s in steps if s.user)
+    completed_levels = set(s.approver_number for s in steps if s.approver_number)
+
+    # 2. Get current specific approvers who haven't acted and are in uncompleted levels
+    assigned_rows = db.query(InvoiceAssignedApprover).filter(
+        InvoiceAssignedApprover.invoice_id == invoice_id,
+        InvoiceAssignedApprover.is_finance == False
+    ).all()
+    
+    approver_map = {}
+    for a in assigned_rows:
+        email = a.approver_email.lower()
+        if email not in acted_users and a.sequence_order not in completed_levels:
+            if email not in approver_map:
+                approver_map[email] = []
+            approver_map[email].append(a.sequence_order)
+    
+    current_approvers = []
+    for email, lvls in approver_map.items():
+        current_approvers.append({
+            "email": email,
+            "levels": sorted(list(set(lvls)))
+        })
+    current_approvers.sort(key=lambda x: x["email"])
+
+    # 3. Get all active users who are approvers
+    all_users = db.query(User).filter(
+        User.status == "active",
+        User.role.ilike("%approver%")
+    ).all()
+    
+    current_approver_emails = set(approver_map.keys())
+    
+    eligible_users = []
+    for u in all_users:
+        email = u.email.lower()
+        levels = approver_map.get(email, [])
+        
+        eligible_users.append({
+            "email": email,
+            "username": u.username,
+            "department": u.department,
+            "role": u.role,
+            "assigned_levels": sorted(list(set(levels))),
+            "has_acted": email in acted_users
+        })
+    
+    return {
+        "current_approvers": current_approvers,
+        "eligible_users": eligible_users
+    }
+
+@router.post("/{invoice_id}/delegate")
+async def delegate_invoice(
+    invoice_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(403, "Only admins can delegate approvals")
+    
+    replace_email = payload.get("replace_email", "").lower()
+    assign_to_email = payload.get("assign_to_email", "").lower()
+    level = payload.get("level")
+    
+    if not replace_email or not assign_to_email:
+        raise HTTPException(400, "Both replace_email and assign_to_email are required")
+    
+    # Update InvoiceAssignedApprover
+    query = db.query(InvoiceAssignedApprover).filter(
+        InvoiceAssignedApprover.invoice_id == invoice_id,
+        InvoiceAssignedApprover.approver_email.ilike(replace_email)
+    )
+    
+    if level:
+        query = query.filter(InvoiceAssignedApprover.sequence_order == level)
+    else:
+        # If no level specified, only target specific (non-finance) rows by default
+        # to avoid accidentally replacing all finance team entries if the user happened 
+        # to be part of the pool.
+        query = query.filter(InvoiceAssignedApprover.is_finance == False)
+        
+    rows = query.all()
+    
+    if not rows:
+        raise HTTPException(404, f"Approver {replace_email} not found for this invoice")
+    
+    for row in rows:
+        row.approver_email = assign_to_email
+        row.is_finance = False # Replaced user becomes a specific approver
+    
+    # Add WorkflowStep for delegation history
+    from app.routes.approval_new import _record_step
+    _record_step(
+        db, invoice_id,
+        step_name=f"Delegated from {replace_email} to {assign_to_email}",
+        step_type="DELEGATED",
+        user_email=current_user.email,
+        comment=f"Admin delegation by {current_user.username}",
+        entity=rows[0].invoice.entity if rows[0].invoice else None
+    )
+    
+    # Audit log
+    await audit_service.log_action(
+        db=db,
+        invoice_id=invoice_id,
+        action=AuditAction.DELEGATED,
+        user=current_user.username,
+        entity=rows[0].invoice.entity if rows[0].invoice else None,
+        details={
+            "original_approver": replace_email,
+            "new_approver": assign_to_email,
+            "delegated_by": current_user.username
+        }
+    )
+    
+    db.commit()
+    return {"success": True, "message": f"Successfully delegated approvals from {replace_email} to {assign_to_email}"}
 
 @router.get("/{invoice_id}/generate-pdf-debug")
 async def generate_pdf_debug(invoice_id: int, db: Session = Depends(get_db)):
