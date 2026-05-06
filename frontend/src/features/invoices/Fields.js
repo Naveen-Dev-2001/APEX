@@ -6,6 +6,7 @@ export const QUICK_VIEW_CONFIG = [
             { key: "vendorId", label: "Vendor ID", type: "input", editable: true },
             { key: "vendorName", label: "Vendor Name", type: "input", editable: true },
             { key: "invoiceNumber", label: "Invoice Number", type: "input", editable: true },
+            { key: "referenceNumber", label: "Reference Number", type: "input", editable: true },
             { key: "invoiceDate", label: "Invoice Date", type: "date", editable: true },
             { key: "dueDate", label: "Due Date", type: "date", editable: true },
             { key: "paymentTerms", label: "Payment Terms", type: "input", editable: true },

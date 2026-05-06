@@ -2371,6 +2371,11 @@ async def update_invoice(
             update_data["vendor_name"] = new_vendor_name
         if new_invoice_number:
             update_data["invoice_number"] = new_invoice_number
+        
+        # Sync reference number
+        ref_num = extracted_data.get("invoice_details", {}).get("reference_number", {}).get("value")
+        if ref_num:
+            update_data["reference_number"] = ref_num
             
         # Sync back to extracted_data for frontend consistency
         if isinstance(extracted_data, dict):
@@ -2479,7 +2484,7 @@ async def update_invoice(
 
     # Update attributes
     update_fields = [
-        "vendor_id", "vendor_name", "invoice_number", "status", 
+        "vendor_id", "vendor_name", "invoice_number", "reference_number", "status", 
         "exchange_rate", "confidence_score", "total_amount", 
         "amount_due", "invoice_date", "due_date"
     ]

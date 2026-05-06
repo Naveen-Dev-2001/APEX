@@ -116,6 +116,7 @@ class Invoice(Base):
         "vendor_master.vendor_id"), nullable=True, index=True)
     vendor_name = Column(String(500), nullable=True, index=True)
     invoice_number = Column(String(200), nullable=True, index=True)
+    reference_number = Column(String(255), nullable=True, index=True)
     azure_vendor_name = Column(String(500), nullable=True)
     azure_vendor_address = Column(String(500), nullable=True)
     line_grouping = Column(String(10), nullable=True)  # Yes/No

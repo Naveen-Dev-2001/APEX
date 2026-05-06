@@ -317,7 +317,7 @@ def _create_ap_bill(
     bill_payload = {
         "billNumber": f"{invoice_number}",
         "vendor": {"id": str(vendor_id)},
-        "referenceNumber": str(invoice_number),
+        "referenceNumber": str(invoice.reference_number or invoice_number),
         "description": description,
         "createdDate": base_date_str,
         "postingDate": posting_date_str,

@@ -159,6 +159,7 @@ export const useSaveInvoice = () => {
             invoice_details: {
                 ...activeInvoiceData.extracted_data?.invoice_details,
                 invoice_number: { ...activeInvoiceData.extracted_data?.invoice_details?.invoice_number, value: f.invoiceNumber },
+                reference_number: { ...activeInvoiceData.extracted_data?.invoice_details?.reference_number, value: f.referenceNumber },
                 invoice_date: { ...activeInvoiceData.extracted_data?.invoice_details?.invoice_date, value: f.invoiceDate },
                 due_date: { ...activeInvoiceData.extracted_data?.invoice_details?.due_date, value: f.dueDate },
                 currency: { ...activeInvoiceData.extracted_data?.invoice_details?.currency, value: f.invoiceCurrency },
@@ -240,6 +241,7 @@ export const useSaveInvoice = () => {
                 vendor_id: finalPayload.vendor_id,
                 vendor_name: finalPayload.vendor_name,
                 invoice_number: finalPayload.invoice_number,
+                reference_number: finalPayload.extracted_data?.invoice_details?.reference_number?.value,
                 total_amount: finalPayload.extracted_data?.amounts?.total_invoice_amount?.value,
                 amount_due: finalPayload.extracted_data?.amounts?.amount_due?.value,
                 invoice_date: finalPayload.extracted_data?.invoice_details?.invoice_date?.value,
