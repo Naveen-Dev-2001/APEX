@@ -50,8 +50,8 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
     }, [allApprovers]);
 
     const financeApprovers = useMemo(() => {
-        return (formattedApprovers || []).filter(a => a.department?.toLowerCase() === 'finance');
-    }, [formattedApprovers]);
+        return (allApprovers || []).filter(a => a.department?.toLowerCase() === 'finance')});
+
 
     // ── Cascading Approver Filtering ──
 
@@ -568,7 +568,7 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                             mode="multiple"
                             value={form.postingApprover}
                             onChange={(val) => setForm({ ...form, postingApprover: val })}
-                            options={filteredPostingOptions}
+                            options={financeApprovers}
                             loading={approversLoading}
                             disabled={approversLoading}
                             placeholder={approversLoading ? "Loading..." : "Select Approver(s)"}
