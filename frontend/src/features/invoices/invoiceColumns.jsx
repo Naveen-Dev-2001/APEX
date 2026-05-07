@@ -249,8 +249,8 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         header: "Action Time",
         accessor: "action_time",
         filterable: true,
-        getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
-        render: (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
+        getFilterValue: (row) => row?.updated_at ? new Date(row.updated_at).toLocaleString() : "",
+        render: (_, row) => row?.updated_at ? new Date(row.updated_at).toLocaleString() : "-",
     },
     {
         header: "Workflow Users",
@@ -463,8 +463,8 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         header: "Approval Time",
         accessor: "approval_time",
         filterable: true,
-        getFilterValue: (row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "",
-        render: (_, row) => row?.processed_at ? new Date(row.processed_at).toLocaleString() : "-",
+        getFilterValue: (row) => row?.updated_at ? new Date(row.updated_at).toLocaleString() : "",
+        render: (_, row) => row?.updated_at ? new Date(row.updated_at).toLocaleString() : "-",
     },
     {
         header: "Workflow Users",
