@@ -2706,7 +2706,7 @@ async def update_invoice(
     # 1. Compare Top-Level Fields
     # List of simple fields to check
     simple_fields = [
-        "vendor_id", "vendor_name", "invoice_number", "status", 
+        "vendor_id", "vendor_name", "invoice_number", "reference_number", "status",
         "line_grouping", "confidence_score", "exchange_rate"
     ]
     
@@ -2729,6 +2729,7 @@ async def update_invoice(
         (["vendor_info", "name", "value"], "Extracted Vendor Name"),
         (["vendor_info", "address", "value"], "Extracted Vendor Address"),
         (["invoice_details", "invoice_number", "value"], "Extracted Invoice Number"),
+        (["invoice_details", "reference_number", "value"], "Reference Number"),
         (["invoice_details", "invoice_date", "value"], "Extracted Invoice Date"),
         (["invoice_details", "po_number", "value"], "PO Number"),
         (["amounts", "total_invoice_amount", "value"], "Total Invoice Amount"),
@@ -2825,6 +2826,7 @@ async def update_invoice(
             details=audit_details
         )
  
+    db.refresh(invoice)  # Reload updated_at from DB after commit
     return InvoiceResponse(**invoice_to_dict(invoice))
 
 
