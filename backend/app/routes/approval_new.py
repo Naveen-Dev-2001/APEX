@@ -181,15 +181,10 @@ def _get_finance_users(db: Session, entity: str) -> List[str]:
         return []
 
 
-def _is_threshold_approver_db(db: Session, invoice_id: int, email: str) -> bool:
+def _is_future_threshold_approver_db(db: Session, invoice_id: int, email: str, current_level: int) -> bool:
     """
-    Query the DB to determine if `email` is a threshold approver for this invoice.
-    A threshold approver has an InvoiceAssignedApprover row where:
-      - is_finance = False  (dedicated slot, not a finance-team expansion row)
-      - sequence_order > 1  (not level 1)
-      - sequence_order < max(sequence_order)  (not the posting/last level)
-    This check is DB-authoritative and works even when the snapshot reconstruction
-    loses the original 'type' field (sets everything to 'mandatory').
+    Query the DB to determine if `email` is a threshold approver for this invoice
+    at a stage LATER than the current level.
     """
     try:
         from sqlalchemy import func as sqla_func
@@ -198,18 +193,18 @@ def _is_threshold_approver_db(db: Session, invoice_id: int, email: str) -> bool:
         ).scalar() or 0
 
         if max_seq <= 1:
-            return False  # only one level — no threshold possible
+            return False
 
         row = db.query(InvoiceAssignedApprover).filter(
             InvoiceAssignedApprover.invoice_id == invoice_id,
             InvoiceAssignedApprover.approver_email.ilike(email),
             InvoiceAssignedApprover.is_finance == False,
-            InvoiceAssignedApprover.sequence_order > 1,
-            InvoiceAssignedApprover.sequence_order < max_seq  # exclude posting (last) level
+            InvoiceAssignedApprover.sequence_order > current_level, # Only future levels
+            InvoiceAssignedApprover.sequence_order < max_seq       # exclude posting
         ).first()
         return row is not None
     except Exception as exc:
-        logger.warning("_is_threshold_approver_db error: %s", exc)
+        logger.warning("_is_future_threshold_approver_db error: %s", exc)
         return False
 
 
@@ -235,6 +230,18 @@ def _is_posting_approver_db(db: Session, invoice_id: int, email: str) -> bool:
     except Exception as exc:
         logger.warning("_is_posting_approver_db error: %s", exc)
         return False
+
+
+def _is_finance_level_db(db: Session, invoice_id: int, level: int) -> bool:
+    """Check if a specific level is a Finance Team (pool-expanded) level in DB."""
+    try:
+        row = db.query(InvoiceAssignedApprover).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id,
+            InvoiceAssignedApprover.sequence_order == level,
+            InvoiceAssignedApprover.is_finance == True
+        ).first()
+        return row is not None
+    except: return False
 
 
 def _has_threshold_db(db: Session, invoice_id: int) -> bool:
@@ -669,7 +676,7 @@ def _resolve_user_role_in_workflow(
     # Determine if user is the posting/threshold approver via DB-authoritative check
     # (Snapshot reconstruction often loses the 'type' field, marking everything as mandatory).
     db_is_posting = _is_posting_approver_db(db, invoice_id, email)
-    db_is_threshold = _is_threshold_approver_db(db, invoice_id, email)
+    db_is_threshold = _is_future_threshold_approver_db(db, invoice_id, email, current_level)
 
     result = {
         "user_level": None,
@@ -938,7 +945,10 @@ async def get_ui_status_from_frontend(
     threshold_emails = []
     for te in threshold_entries:
         threshold_emails.extend(_parse_list(te.get("emails", [])))
-    is_threshold_approver = email in [e.lower() for e in threshold_emails]
+    is_threshold_approver = (
+        email in [e.lower() for e in threshold_emails]
+        or _is_future_threshold_approver_db(db, invoice_id, email, current_level)
+    )
  
     # ── already_acted defined HERE so all branches below can safely use it ──
     # FIX: was defined after the explicit check block, causing NameError when
@@ -968,12 +978,12 @@ async def get_ui_status_from_frontend(
                     break
  
             # Block threshold approvers from acting at Finance Team levels (DB check).
-            # If this user is a threshold approver, they must NOT be eligible at lower
-            # Finance Team levels via ANY path — not is_finance, not direct email match
-            # (email stored via pool expansion), not delegation.
+            #authoritative check for is_finance_level using DB.
+            is_fin_lvl_db = is_finance_level or _is_finance_level_db(db, invoice_id, current_level)
+            
             is_threshold_at_lower_level = (
-                is_finance_level
-                and _is_threshold_approver_db(db, invoice_id, email)
+                is_fin_lvl_db
+                and _is_future_threshold_approver_db(db, invoice_id, email, current_level)
             )
 
             if is_threshold_at_lower_level:
@@ -991,10 +1001,15 @@ async def get_ui_status_from_frontend(
                 for s in steps_for_level_check
             )
             # Rule: if user already acted at any OTHER mandatory level in this cycle,
-            # disable their button at this level — UNLESS they are the posting approver
-            # (posting approvers can act at their mandatory level AND posting stage).
+            # disable their button at this level — UNLESS this is the posting stage.
+            # We determine posting stage by checking if it's the max sequence.
+            from sqlalchemy import func as sqla_func
+            max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                InvoiceAssignedApprover.invoice_id == invoice_id
+            ).scalar() or 0
+
             already_acted_at_other_mandatory = (
-                not is_posting_approver
+                not (is_posting_approver and current_level == max_seq)
                 and any(
                     (s.user or "").lower() == email
                     and s.step_type == StepType.LEVEL_APPROVED
@@ -1034,16 +1049,14 @@ async def get_ui_status_from_frontend(
             if email in [s.lower() for s in substitutes]:
                 delegated_posting = True
                 break
- 
-        # FIX: only block if they already did POSTING_APPROVED specifically.
-        # A posting approver who approved at a mandatory level must NOT be blocked here.
+
         already_posting_approved = any(
             (s.user or "").lower() == email
             and s.step_type == StepType.POSTING_APPROVED
             for s in steps_for_level_check
         )
-        can_act = (
-            is_posting_approver or delegated_posting) and not already_posting_approved
+        # can_act is NOT set here to avoid incorrectly enabling buttons at earlier mandatory levels.
+        # It will be set in the explicit fallback block below if the level is correct.
  
     # ── Explicit fallback for virtual Posting/Threshold levels ───────────────
     # FIX: replaced `not already_acted` with stage-specific checks so a posting
@@ -1201,7 +1214,7 @@ async def approve_invoice(
         # so we cannot rely on threshold_entries being populated here.
         is_threshold_approver_here = (
             is_finance_level
-            and _is_threshold_approver_db(db, invoice_id, email)
+            and _is_future_threshold_approver_db(db, invoice_id, email, current_level)
         )
 
         user_eligible = (
