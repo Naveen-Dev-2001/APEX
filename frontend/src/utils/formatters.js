@@ -23,3 +23,31 @@ export const formatCurrency = (value) => {
         maximumFractionDigits: 2
     })}`;
 };
+/**
+ * Formats a date string into IST format: MM/DD/YYYY, HH:MM AM/PM IST
+ * Example: 05/08/2026, 01:15 PM IST
+ * 
+ * @param {string} dateString - The ISO date string or date object
+ * @returns {string} - The formatted IST string
+ */
+export const formatIST = (dateString) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
+
+    const options = {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    };
+
+    // Use en-US to get MM/DD/YYYY as requested in user's example "05/08/2026" for May 8th
+    const formatted = new Intl.DateTimeFormat('en-US', options).format(date);
+    
+    // formatted is like "05/08/2026, 01:15 PM"
+    return `${formatted} IST`;
+};

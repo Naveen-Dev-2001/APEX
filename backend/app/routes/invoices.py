@@ -49,6 +49,7 @@ import traceback
 from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
 from dateutil import parser
+from app.utils.date_utils import get_ist_now
 
 def remove_currency_format(value):
     if not value or value == "" or value == "N/A":
@@ -226,7 +227,7 @@ async def upload_invoices(
             name, ext = os.path.splitext(clean_name)
 
             # create timestamp
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = get_ist_now().strftime("%Y%m%d_%H%M%S")
 
             # new filename
             new_name = f"{name}_{timestamp}{ext}"
@@ -261,7 +262,7 @@ async def upload_invoices(
                 uploaded_by=current_user.username,
                 status=InvoiceStatusEnum.PROCESSED,
                 entity=entity,
-                uploaded_at=datetime.utcnow(),
+                uploaded_at=get_ist_now(),
                 extracted_data=serialize_json_field({}),
                 processing_steps=serialize_json_field([]),
             )
@@ -270,7 +271,7 @@ async def upload_invoices(
             history_item = InvoiceStatusHistory(
                 status=InvoiceStatusEnum.PROCESSED,
                 user=current_user.username,
-                timestamp=datetime.utcnow()
+                timestamp=get_ist_now()
             )
             new_invoice.status_history.append(history_item)
             
@@ -372,7 +373,7 @@ async def upload_invoices(
             new_invoice.processing_steps = serialize_json_field(extraction.get("processing_steps", []))
             new_invoice.validation_results = serialize_json_field(extraction.get("validation_results", {}))
             new_invoice.confidence_score = extraction.get("metadata", {}).get("confidence_score", "low")
-            new_invoice.processed_at = datetime.utcnow()
+            new_invoice.processed_at = get_ist_now()
 
             logger.info({
                 "request_id": request_id,
@@ -515,7 +516,7 @@ async def upload_invoices(
                 step_type=WorkflowStepTypeEnum.PROCESSED,
                 user=current_user.username,
                 status=WorkflowStepStatusEnum.COMPLETED,
-                timestamp=datetime.utcnow(),
+                timestamp=get_ist_now(),
                 entity=entity
             )
             workflow_step_repo.create(task_db, obj_in=workflow_step)
@@ -653,7 +654,7 @@ async def get_invoices(
     extra_filters = {}
 
     # Get active delegations for the current user
-    curr_time = datetime.utcnow()
+    curr_time = get_ist_now()
     active_delegations = db.query(Delegation.delegator_email).filter(
         Delegation.substitute_email.ilike(current_user.email),
         Delegation.entity == entity,
@@ -1035,7 +1036,7 @@ async def get_invoice_filter_options(
     is_scanner = "scanner" in user_roles
     
     # Get active delegations for current level logic
-    curr_time = datetime.utcnow()
+    curr_time = get_ist_now()
     active_delegations = db.query(Delegation.delegator_email).filter(
         Delegation.substitute_email.ilike(current_user.email),
         Delegation.entity == entity,
@@ -1392,7 +1393,7 @@ async def update_invoice_status(
 ):
 
     approver_name = current_user.username
-    timestamp = datetime.utcnow()
+    timestamp = get_ist_now()
     
     # DEBUG: Capture any request
     try:
@@ -1943,7 +1944,7 @@ async def update_invoice_status(
                     step_type=WorkflowStepTypeEnum.SAGE_POSTED,
                     user=current_user.username,
                     status=WorkflowStepStatusEnum.COMPLETED,
-                    timestamp=datetime.utcnow(),
+                    timestamp=get_ist_now(),
                     entity=invoice.entity
                 ))
                 
@@ -2096,7 +2097,7 @@ async def repost_to_sage(
                 step_type=WorkflowStepTypeEnum.SAGE_POSTED,
                 user=current_user.username,
                 status=WorkflowStepStatusEnum.COMPLETED,
-                timestamp=datetime.utcnow(),
+                timestamp=get_ist_now(),
                 entity=invoice.entity
             ))
             
@@ -2535,7 +2536,7 @@ async def update_invoice(
                 step_type=WorkflowStepTypeEnum.CODING,
                 user=current_user.username,
                 status=WorkflowStepStatusEnum.COMPLETED,
-                timestamp=datetime.utcnow(),
+                timestamp=get_ist_now(),
                 entity=invoice.entity
             ))
             db.commit()
@@ -2655,13 +2656,13 @@ async def update_invoice(
 
                 if existing_coding:
                     existing_coding.line_items = line_items_json
-                    existing_coding.updated_at = datetime.utcnow()
+                    existing_coding.updated_at = get_ist_now()
                 else:
                     bg_db.add(DBCoding(
                         invoice_id=inv_id,
                         line_items=line_items_json,
                         entity=inv.entity,
-                        created_at=datetime.utcnow()
+                        created_at=get_ist_now()
                     ))
 
                 logger.info(f"[CodingSync] invoice {inv_id} gl_codes: {[(li.description, li.gl_code) for li in coding_line_items]}")
@@ -2969,7 +2970,7 @@ async def delete_invoice(
             coding_json=coding_snapshot,
             audit_logs_json=audit_logs_snapshot,
             # Deletion metadata
-            deleted_at=datetime.utcnow(),
+            deleted_at=get_ist_now(),
             deleted_by=current_user.username,
         )
         db.add(deleted_record)
@@ -3038,7 +3039,7 @@ async def archive_invoice(
             invoice_id=invoice_id,
             status=InvoiceStatusEnum.ARCHIVED,
             user=current_user.username,
-            timestamp=datetime.utcnow(),
+            timestamp=get_ist_now(),
             comment="Invoiced archived by user"
         )
         db.add(history_item)
@@ -3142,7 +3143,7 @@ async def bulk_delete_invoices(
                 assigned_approvers_json=assigned_approvers_snapshot,
                 coding_json=coding_snapshot,
                 audit_logs_json=audit_logs_snapshot,
-                deleted_at=datetime.utcnow(),
+                deleted_at=get_ist_now(),
                 deleted_by=current_user.username,
             )
             db.add(deleted_record)
@@ -3204,7 +3205,7 @@ async def bulk_archive_invoices(
                 invoice_id=inv_id,
                 status=InvoiceStatusEnum.ARCHIVED,
                 user=current_user.username,
-                timestamp=datetime.utcnow(),
+                timestamp=get_ist_now(),
                 comment="Invoiced archived by user (Bulk)"
             )
             db.add(history_item)
@@ -3308,7 +3309,7 @@ async def list_deleted_invoices(
 
     if is_approver and not is_admin and not is_finance:
         from app.models.db_models import Delegation
-        curr_time = datetime.utcnow()
+        curr_time = get_ist_now()
         active_delegations = db.query(Delegation.delegator_email).filter(
             Delegation.substitute_email.ilike(current_user.email),
             Delegation.entity == entity,

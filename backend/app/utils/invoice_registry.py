@@ -11,6 +11,8 @@ from app.models.db_models import InvoiceRegistry, Invoice
 from app.repository.repositories import invoice_registry_repo, invoice_repo
 import logging
 
+from app.utils.date_utils import get_ist_now
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +49,7 @@ def register_invoice(
             "invoice_number": invoice_number,
             "entity": entity,
             "invoice_id": invoice_id,
-            "uploaded_at": datetime.utcnow(),
+            "uploaded_at": get_ist_now(),
             "uploaded_by": uploaded_by
         }
         invoice_registry_repo.create(db, obj_in=registry_data)

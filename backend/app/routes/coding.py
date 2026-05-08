@@ -19,6 +19,7 @@ from app.database.db_utils import invoice_to_dict
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
 from app.models.user import UserResponse
+from app.utils.date_utils import get_ist_now
 
 # AI helpers
 from app.ai.normalizer import normalize_description, normalize_vendor
@@ -103,7 +104,7 @@ def update_coding_history(db: Session, vendor_name: str, line_items: List[LineIt
                     "description": item.description,
                     "embedding": json.dumps(embedding),
                     "coding_json": json.dumps(coding_data),
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": get_ist_now(),
                     "vendor_id": vendor_id if vendor_id else history.vendor_id
                 })
             else:
@@ -176,13 +177,13 @@ def apply_coding_suggestions_to_invoice(db: Session, invoice: Any):
         existing_coding = db.query(DBCoding).filter(DBCoding.invoice_id == invoice.id).first()
         if existing_coding:
             existing_coding.line_items = line_items_json
-            existing_coding.updated_at = datetime.utcnow()
+            existing_coding.updated_at = get_ist_now()
         else:
             new_coding = DBCoding(
                 invoice_id=invoice.id,
                 line_items=line_items_json,
                 entity=invoice.entity,
-                created_at=datetime.utcnow()
+                created_at=get_ist_now()
             )
             db.add(new_coding)
 
@@ -443,7 +444,7 @@ async def get_coding(
     vendor_name = get_vendor_name(invoice)
     items = get_line_items(invoice)
     if not vendor_name or not items:
-        return CodingResponse(id="", invoice_id=str(invoice_id), line_items=[], total_amount=0.0, created_at=datetime.utcnow())
+        return CodingResponse(id="", invoice_id=str(invoice_id), line_items=[], total_amount=0.0, created_at=get_ist_now())
 
     suggestions = get_coding_suggestions(db, vendor_name, items, vendor_id=invoice.vendor_id)
     return CodingResponse(
@@ -452,7 +453,7 @@ async def get_coding(
         vendor_name=vendor_name,
         line_items=suggestions,
         total_amount=sum(i.net_amount for i in suggestions),
-        created_at=datetime.utcnow()
+        created_at=get_ist_now()
     )
 
 @router.get("/{invoice_id}/suggestions", response_model=List[LineItemCoding])
@@ -510,7 +511,7 @@ async def create_or_update_coding(
         coding_repo.update(db, db_obj=existing_coding, obj_in={
             "header_coding": coding_data.header_coding,
             "line_items": line_items_json,
-            "updated_at": datetime.utcnow()
+            "updated_at": get_ist_now()
         })
     else:
         new_coding_data = {
@@ -518,7 +519,7 @@ async def create_or_update_coding(
             "header_coding": coding_data.header_coding,
             "line_items": line_items_json,
             "entity": entity,
-            "created_at": datetime.utcnow()
+            "created_at": get_ist_now()
         }
         coding_repo.create(db, obj_in=new_coding_data)
     

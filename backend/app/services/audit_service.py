@@ -7,6 +7,8 @@ from app.repository.repositories import audit_log_repo
 from app.models.audit_log import AuditLogCreate, AuditLogResponse
 from app.middleware.trace_middleware import trace_logger
 
+from app.utils.date_utils import get_ist_now
+
 class AuditService:
     def __init__(self):
         pass
@@ -31,7 +33,7 @@ class AuditService:
             "entity": entity,
             "details": json.dumps(details) if details else None,
             "sage_bill_number": sage_bill_number,
-            "timestamp": datetime.utcnow()
+            "timestamp": get_ist_now()
         }
         audit_log_repo.create(db, obj_in=log_data)
         

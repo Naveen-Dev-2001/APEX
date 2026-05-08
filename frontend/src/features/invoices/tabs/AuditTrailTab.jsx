@@ -15,6 +15,7 @@ import { getAuditflowSync } from "../../hooks/useWorkflow";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { Spin, Empty } from "antd";
 import dayjs from "dayjs";
+import { formatIST } from "../../../utils/formatters";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STATIC CONFIGURATION (Outside component to prevent re-creation)
@@ -77,12 +78,7 @@ const AuditItem = memo(({ item, isLast }) => {
     }, [item.details]);
 
     const formattedTime = useMemo(() => {
-        if (!item.timestamp) return "";
-        const dateStr = item.timestamp.endsWith('Z') ? item.timestamp : item.timestamp + 'Z';
-        const date = new Date(dateStr);
-        const datePart = date.toLocaleString("en-US", { month: "short", day: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
-        const timePart = date.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
-        return `${datePart} - ${timePart} IST`;
+        return formatIST(item.timestamp);
     }, [item.timestamp]);
 
     return (

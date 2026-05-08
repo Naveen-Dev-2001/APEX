@@ -186,6 +186,8 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minima
     return result
 
 
+from app.utils.date_utils import get_ist_now
+
 def dict_to_invoice(data: Dict[str, Any], db: Session) -> Invoice:
     """
     Convert dictionary to SQLAlchemy Invoice model.
@@ -225,7 +227,7 @@ def dict_to_invoice(data: Dict[str, Any], db: Session) -> Invoice:
         history_entry = InvoiceStatusHistory(
             status=hist.get("status"),
             user=hist.get("user"),
-            timestamp=hist.get("timestamp", datetime.utcnow()),
+            timestamp=hist.get("timestamp", get_ist_now()),
             comment=hist.get("comment"),
             approver_level=hist.get("approver_level")
         )
