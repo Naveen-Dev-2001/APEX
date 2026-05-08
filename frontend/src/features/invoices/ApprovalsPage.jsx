@@ -245,11 +245,11 @@ const ApprovalsPage = () => {
             accessor: "entity",
             filterable: true,
         },
-        {
-            header: "Confidence Score",
-            accessor: "confidence_score",
-            render: (val) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : "-",
-        },
+        // {
+        //     header: "Confidence Score",
+        //     accessor: "confidence_score",
+        //     render: (val) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : "-",
+        // },
         {
             header: "Actions",
             accessor: "actions",
