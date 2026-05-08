@@ -13,6 +13,8 @@ import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Modal } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import DelegateModal from "./DelegateModal";
+import { QUICK_VIEW_CONFIG } from "./Fields";
+
 
 
 
@@ -141,21 +143,30 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         setUiStatusReady(false);
         fetchUIStatus();
     }, [workflowData, fetchUIStatus]);
+    
+    const validateRequiredFields = useCallback(() => {
+        for (const section of QUICK_VIEW_CONFIG) {
+            if (section.type !== "form") continue;
+            for (const field of section.fields) {
+                if (!field.required) continue;
+
+                // Check if visible
+                if (field.visible && !field.visible(quickViewFormData)) continue;
+
+                const value = quickViewFormData?.[field.key];
+                if (value === undefined || value === null || String(value).trim() === "") {
+                    toast.error(`${field.label} is missing.`);
+                    return false;
+                }
+            }
+        }
+        return true;
+    }, [quickViewFormData]);
+
 
     // ── Scanner / Coder actions ────────────────────────────────────────────
     const handleSendToCoding = async () => {
-        // Validate invoice number before proceeding
-        const invoiceNumber = quickViewFormData?.invoiceNumber;
-        if (!invoiceNumber || !String(invoiceNumber).trim()) {
-            toast.error("Invoice number is missing. Please add the invoice number before sending for coding.");
-            return;
-        }
-
-        const referenceNumber = quickViewFormData?.referenceNumber;
-        if (!referenceNumber || !String(referenceNumber).trim()) {
-            toast.error("Reference Number is missing. Please add the reference number before sending for coding.");
-            return;
-        }
+        if (!validateRequiredFields()) return;
 
         setActionLoading("sendToCoding");
 
@@ -203,18 +214,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     };
 
     const handleSendToApproval = async () => {
-        // 1. Mandatory field validation (all rows)
-        const invoiceNumber = quickViewFormData?.invoiceNumber;
-        if (!invoiceNumber || !String(invoiceNumber).trim()) {
-            toast.error("Invoice number is missing. Please add the invoice number before sending for approval.");
-            return;
-        }
-
-        const referenceNumber = quickViewFormData?.referenceNumber;
-        if (!referenceNumber || !String(referenceNumber).trim()) {
-            toast.error("Reference Number is missing. Please add the reference number before sending for approval.");
-            return;
-        }
+        if (!validateRequiredFields()) return;
 
         const hasMissingCoding = lineItems
             .some(item => !item.glCode || !item.lob || !item.department);
@@ -257,6 +257,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
 
     const handleSaveInvoice = async () => {
+        if (!validateRequiredFields()) return;
+
         const extraFields = {};
         if (currentStatus === "reworked") {
             extraFields.status = "waiting_approval";
