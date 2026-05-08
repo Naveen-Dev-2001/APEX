@@ -12,6 +12,7 @@ import CodificationWorkflowModal from './CodificationWorkflowModal';
 import RuleModal from './RuleModal';
 import RefreshButton from '../../shared/components/RefreshButton';
 import { formatCurrency } from '../../utils/formatters';
+import ExportButton from '../../shared/components/ExportButton';
 
 const SettingsPage = () => {
     const {
@@ -108,6 +109,13 @@ const SettingsPage = () => {
             </Tooltip>
         );
     }, [approversList]);
+    
+    const getApproverText = useCallback((email, isFinance = false) => {
+        if (isFinance) return "Finance Team";
+        if (!email) return "";
+        if (Array.isArray(email)) return email.join(", ");
+        return email;
+    }, []);
 
     const handleDelete = (row) => {
         showConfirm({
@@ -177,31 +185,37 @@ const SettingsPage = () => {
         {
             header: 'Approver 1',
             accessor: 'mandatory_approver_1',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_1, row?.approver_flags?.['1'] || row?.approver_flags?.[1]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['1'] || row?.approver_flags?.[1])
         },
         {
             header: 'Approver 2',
             accessor: 'mandatory_approver_2',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_2, row?.approver_flags?.['2'] || row?.approver_flags?.[2]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['2'] || row?.approver_flags?.[2])
         },
         {
             header: 'Approver 3',
             accessor: 'mandatory_approver_3',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_3, row?.approver_flags?.['3'] || row?.approver_flags?.[3]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['3'] || row?.approver_flags?.[3])
         },
         {
             header: 'Approver 4',
             accessor: 'mandatory_approver_4',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_4, row?.approver_flags?.['4'] || row?.approver_flags?.[4]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['4'] || row?.approver_flags?.[4])
         },
         {
             header: 'Approver 5',
             accessor: 'mandatory_approver_5',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_5, row?.approver_flags?.['5'] || row?.approver_flags?.[5]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['5'] || row?.approver_flags?.[5])
         },
         {
             header: 'Threshold Approver',
             accessor: 'threshold_approver',
+            getFilterValue: (row) => getApproverText(row.threshold_approver),
             render: (val) => getApproverName(val)
         },
         {
@@ -212,6 +226,7 @@ const SettingsPage = () => {
         {
             header: 'Posting Approver',
             accessor: 'posting_approver',
+            getFilterValue: (row) => getApproverText(row.posting_approver),
             render: (val) => getApproverName(val)
         },
         ...(!isCoder ? [{
@@ -305,31 +320,37 @@ const SettingsPage = () => {
         {
             header: 'Approver 1',
             accessor: 'mandatory_approver_1',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_1, row?.approver_flags?.['1'] || row?.approver_flags?.[1]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['1'] || row?.approver_flags?.[1])
         },
         {
             header: 'Approver 2',
             accessor: 'mandatory_approver_2',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_2, row?.approver_flags?.['2'] || row?.approver_flags?.[2]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['2'] || row?.approver_flags?.[2])
         },
         {
             header: 'Approver 3',
             accessor: 'mandatory_approver_3',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_3, row?.approver_flags?.['3'] || row?.approver_flags?.[3]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['3'] || row?.approver_flags?.[3])
         },
         {
             header: 'Approver 4',
             accessor: 'mandatory_approver_4',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_4, row?.approver_flags?.['4'] || row?.approver_flags?.[4]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['4'] || row?.approver_flags?.[4])
         },
         {
             header: 'Approver 5',
             accessor: 'mandatory_approver_5',
+            getFilterValue: (row) => getApproverText(row.mandatory_approver_5, row?.approver_flags?.['5'] || row?.approver_flags?.[5]),
             render: (val, row) => getApproverName(val, row?.approver_flags?.['5'] || row?.approver_flags?.[5])
         },
         {
             header: 'Threshold Approver',
             accessor: 'threshold_approver',
+            getFilterValue: (row) => getApproverText(row.threshold_approver),
             render: (val) => getApproverName(val)
         },
         {
@@ -340,6 +361,7 @@ const SettingsPage = () => {
         {
             header: 'Posting Approver',
             accessor: 'posting_approver',
+            getFilterValue: (row) => getApproverText(row.posting_approver),
             render: (val) => getApproverName(val)
         },
         ...(!isCoder ? [{
@@ -468,6 +490,14 @@ const SettingsPage = () => {
                     loading={activeTab === 'Vendor Based Workflow' ? vendorLoading : codificationLoading}
                     height="h-[36px]"
                     className="!w-auto !min-w-[110px] !text-[13px] !font-medium"
+                />
+
+                <ExportButton
+                    data={filteredData}
+                    columns={activeTab === 'Vendor Based Workflow' ? vendorColumns : codificationColumns}
+                    fileName={activeTab === 'Vendor Based Workflow' ? "vendor_workflows" : "codification_workflows"}
+                    variant="primary"
+                    className="!bg-[#24A1DD] hover:!bg-[#1c8ad1] !w-auto !min-w-[110px] h-[36px] !text-[13px] !font-medium"
                 />
             </div>
 

@@ -9,6 +9,7 @@ import workflowAPI from '../../api/workflowAPI';
 import toast from '../../utils/toast';
 import { useSettingsStore } from '../../store/settings.store';
 import { formatCurrency } from '../../utils/formatters';
+import ExportButton from '../../shared/components/ExportButton';
 
 const TABS = ['Vendor Based Workflow', 'Codification Based Workflow'];
 
@@ -167,6 +168,12 @@ const Settings = () => {
         cellRenderer: ({ value, data }) => (
             <ApproverCell value={value} isFinance={getFinanceFlag(data, index)} />
         ),
+        getFilterValue: (data) => {
+            if (getFinanceFlag(data, index)) return "Finance Team";
+            const val = data[field];
+            if (!val || val.length === 0) return "";
+            return Array.isArray(val) ? val.join(", ") : val;
+        }
     });
 
     // ── Column defs — Codification ──
@@ -182,6 +189,7 @@ const Settings = () => {
                     {value}
                 </span>
             ),
+            getFilterValue: (data) => data.is_threshold_enabled ? "Yes" : "No"
         },
         makeApproverCol("Approver 1", "mandatory_approver_1", 1),
         makeApproverCol("Approver 2", "mandatory_approver_2", 2),
@@ -200,6 +208,7 @@ const Settings = () => {
                     {value ? "Yes" : "No"}
                 </span>
             ),
+            getFilterValue: (data) => data.is_threshold_enabled ? "Yes" : "No"
         },
         {
             headerName: "Threshold Amount",
@@ -215,6 +224,7 @@ const Settings = () => {
             field: "threshold_approver",
             width: 160,
             cellRenderer: ({ value }) => <ApproverCell value={value} isFinance={false} />,
+            getFilterValue: (data) => Array.isArray(data.threshold_approver) ? data.threshold_approver.join(", ") : (data.threshold_approver || "")
         },
         {
             headerName: "Posting Approver",
@@ -264,6 +274,7 @@ const Settings = () => {
                     {value}
                 </span>
             ),
+            getFilterValue: (data) => data.is_threshold_enabled ? "Yes" : "No"
         },
         makeApproverCol("Approver 1", "mandatory_approver_1", 1),
         makeApproverCol("Approver 2", "mandatory_approver_2", 2),
@@ -282,6 +293,7 @@ const Settings = () => {
                     {value ? "Yes" : "No"}
                 </span>
             ),
+            getFilterValue: (data) => data.is_threshold_enabled ? "Yes" : "No"
         },
         {
             headerName: "Threshold Amount",
@@ -297,6 +309,7 @@ const Settings = () => {
             field: "threshold_approver",
             width: 160,
             cellRenderer: ({ value }) => <ApproverCell value={value} isFinance={false} />,
+            getFilterValue: (data) => Array.isArray(data.threshold_approver) ? data.threshold_approver.join(", ") : (data.threshold_approver || "")
         },
         {
             headerName: "Posting Approver",
@@ -353,6 +366,15 @@ const Settings = () => {
                             >
                                 Refresh
                             </CustomButton>
+                        </div>
+                        <div className="w-[120px]">
+                            <ExportButton
+                                data={activeSettingsTab === 'Vendor Based Workflow' ? vendorData : codificationData}
+                                columns={activeSettingsTab === 'Vendor Based Workflow' ? vendorColumns : codificationColumns}
+                                fileName={activeSettingsTab === 'Vendor Based Workflow' ? "vendor_workflows.xlsx" : "codification_workflows.xlsx"}
+                                variant="outline"
+                                className="w-full h-9"
+                            />
                         </div>
                     </div>
                 </div>
