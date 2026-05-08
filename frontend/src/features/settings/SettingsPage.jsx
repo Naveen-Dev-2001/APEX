@@ -36,14 +36,23 @@ const SettingsPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(15);
 
+    // Sorting State
+    const [sortConfig, setSortConfig] = useState({ key: 'vendor_id', direction: 'asc' });
+
+    const handleSort = (key, direction) => {
+        setSortConfig({ key, direction });
+    };
+
     useEffect(() => {
         setCurrentPage(1); // Reset page on tab change
         if (activeTab === 'Vendor Based Workflow') {
             fetchVendorWorkflows();
             fetchVendorMetadata();
+            setSortConfig({ key: 'vendor_id', direction: 'asc' });
         } else if (activeTab === 'Codification Based Workflow') {
             fetchCodificationWorkflows();
             fetchCodificationMetadata();
+            setSortConfig({ key: 'lob', direction: 'asc' });
         }
     }, [activeTab, fetchVendorWorkflows, fetchVendorMetadata, fetchCodificationWorkflows, fetchCodificationMetadata]);
 
@@ -120,7 +129,7 @@ const SettingsPage = () => {
     const handleDelete = (row) => {
         showConfirm({
             message: 'Delete Workflow Rule?',
-            subMessage: `Are you sure you want to delete the workflow rule for "${row.vendor_name || row.lob + ' - ' + row.department_id}"?`,
+            subMessage: `Are you sure you want to delete the workflow rule for "${row.vendor_id ? row.vendor_id + ' - ' : ''}${row.vendor_name || row.lob + ' - ' + row.department_id}"?`,
             confirmLabel: 'Delete',
             variant: 'danger',
             onConfirm: async () => {
@@ -140,14 +149,27 @@ const SettingsPage = () => {
 
     const vendorColumns = [
         {
+            header: 'Vendor ID',
+            accessor: 'vendor_id',
+            sortable: true,
+            filterable: true,
+            render: (val) => (
+                <span className="text-[11px] font-mono text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 whitespace-nowrap">
+                    {val}
+                </span>
+            )
+        },
+        {
             header: 'Vendor Name',
             accessor: 'vendor_name',
             sortable: true,
-            filterable: true
+            filterable: true,
+            render: (val) => <span className="font-medium text-gray-700">{val}</span>
         },
         {
             header: 'Approvers',
             accessor: 'approver_count',
+            sortable: true,
             render: (val) => (
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
                     {val}
@@ -171,6 +193,7 @@ const SettingsPage = () => {
         {
             header: 'Threshold',
             accessor: 'is_threshold_enabled',
+            sortable: true,
             filterable: true,
             getFilterValue: (row) => row.is_threshold_enabled ? 'Yes' : 'No',
             render: (val) => (
@@ -221,12 +244,13 @@ const SettingsPage = () => {
         {
             header: 'Amount Threshold',
             accessor: 'amount_threshold',
+            sortable: true,
             render: (val) => formatCurrency(val)
         },
         {
             header: 'Posting Approver',
             accessor: 'posting_approver',
-            getFilterValue: (row) => getApproverText(row.posting_approver),
+            sortable: true,
             render: (val) => getApproverName(val)
         },
         ...(!isCoder ? [{
@@ -257,6 +281,7 @@ const SettingsPage = () => {
         {
             header: 'LOB',
             accessor: 'lob',
+            sortable: true,
             filterable: true,
             getFilterValue: (row) => {
                 const opt = useWorkflowStore.getState().lobsList.find(o => o.value === row.lob);
@@ -270,6 +295,7 @@ const SettingsPage = () => {
         {
             header: 'Dept ID',
             accessor: 'department_id',
+            sortable: true,
             filterable: true,
             getFilterValue: (row) => {
                 const opt = useWorkflowStore.getState().departmentsList.find(o => o.value === row.department_id);
@@ -283,6 +309,7 @@ const SettingsPage = () => {
         {
             header: 'Approvers',
             accessor: 'approver_count',
+            sortable: true,
             render: (val) => (
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
                     {val}
@@ -356,6 +383,7 @@ const SettingsPage = () => {
         {
             header: 'Amount Threshold',
             accessor: 'amount_threshold',
+            sortable: true,
             render: (val) => formatCurrency(val)
         },
         {
@@ -394,7 +422,31 @@ const SettingsPage = () => {
         const columns = activeTab === 'Vendor Based Workflow' ? vendorColumns : codificationColumns;
         const loading = activeTab === 'Vendor Based Workflow' ? vendorLoading : codificationLoading;
         const error = activeTab === 'Vendor Based Workflow' ? vendorError : codificationError;
-        const data = filteredData; // filteredData already handles activeTab internally
+        
+        let data = [...filteredData]; // Create a copy for sorting
+
+        // Apply Sorting
+        if (sortConfig.key) {
+            const col = columns.find(c => c.accessor === sortConfig.key);
+            data.sort((a, b) => {
+                let aVal = col?.getFilterValue ? col.getFilterValue(a) : a[sortConfig.key];
+                let bVal = col?.getFilterValue ? col.getFilterValue(b) : b[sortConfig.key];
+
+                // Handle nulls
+                if (aVal === null || aVal === undefined) return 1;
+                if (bVal === null || bVal === undefined) return -1;
+
+                // String comparison
+                if (typeof aVal === 'string') {
+                    return sortConfig.direction === 'asc' 
+                        ? aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' })
+                        : bVal.localeCompare(aVal, undefined, { numeric: true, sensitivity: 'base' });
+                }
+
+                // Number comparison
+                return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+            });
+        }
 
         if (error) {
             return (
@@ -429,6 +481,9 @@ const SettingsPage = () => {
                 itemsPerPage={itemsPerPage}
                 onPageChange={setCurrentPage}
                 onItemsPerPageChange={setItemsPerPage}
+                sortColumn={sortConfig.key}
+                sortDirection={sortConfig.direction}
+                onSort={handleSort}
                 maxHeight="calc(100vh - 280px)"
                 stickyHeader={true}
                 isClientSide={true}
