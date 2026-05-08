@@ -824,6 +824,9 @@ async def get_invoices(
                                 Invoice.status == InvoiceStatusEnum.REWORKED
                             ),
                             approver_subquery,
+                            # Block ONLY threshold approvers from seeing the invoice at lower
+                            # Finance Team levels.
+                            ~is_future_threshold_approver_subquery,
                             ~hide_condition
                         )
                     )
@@ -1117,7 +1120,11 @@ async def get_invoice_filter_options(
                             InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
                             or_(
                                 InvoiceAssignedApprover.approver_email.in_(target_emails),
-                                and_(InvoiceAssignedApprover.is_finance == True, is_finance_user == True)
+                                and_(
+                                    InvoiceAssignedApprover.is_finance == True, 
+                                    is_finance_user == True,
+                                    ~is_future_threshold_approver_fo_subquery
+                                )
                             )
                         )
                     )
