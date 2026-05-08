@@ -1,6 +1,6 @@
 import { EyeOutlined, LoadingOutlined, InboxOutlined } from "@ant-design/icons";
 import { Trash2 } from "lucide-react";
-import { formatCurrency } from "../../utils/formatters";
+import { formatCurrency, formatIST } from "../../utils/formatters";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
 const getStatusLabel = (value, level) => {
@@ -249,8 +249,8 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         header: "Action Time",
         accessor: "action_time",
         filterable: true,
-        getFilterValue: (row) => row?.updated_at ? new Date(row.updated_at).toLocaleString() : "",
-        render: (_, row) => row?.updated_at ? new Date(row.updated_at).toLocaleString() : "-",
+        getFilterValue: (row) => formatIST(row?.updated_at),
+        render: (_, row) => formatIST(row?.updated_at),
     },
     {
         header: "Workflow Users",
@@ -463,8 +463,8 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         header: "Approval Time",
         accessor: "approval_time",
         filterable: true,
-        getFilterValue: (row) => row?.updated_at ? new Date(row.updated_at).toLocaleString() : "",
-        render: (_, row) => row?.updated_at ? new Date(row.updated_at).toLocaleString() : "-",
+        getFilterValue: (row) => formatIST(row?.updated_at),
+        render: (_, row) => formatIST(row?.updated_at),
     },
     {
         header: "Workflow Users",

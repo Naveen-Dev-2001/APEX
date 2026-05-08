@@ -8,6 +8,7 @@ import { useInvoiceStore } from "../../../store/invoice.store";
 import { useWorkflowDataSync } from "../../hooks/useWorkflow";
 
 import { useMemo } from "react";
+import { formatIST } from "../../../utils/formatters";
 
 const getOrdinal = (n) => {
 
@@ -277,7 +278,7 @@ const WorkflowTab = () => {
 
             subtitle: getUserDisplayName(s.user),
 
-            time: s.timestamp ? new Date(s.timestamp + (s.timestamp.endsWith('Z') ? '' : 'Z')).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) + ' IST' : "",
+            time: formatIST(s.timestamp),
 
             comment: s.comment,
 

@@ -14,7 +14,7 @@ import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
 import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatIST } from '../../utils/formatters';
 import { getInvoiceFilterOptions } from '../../api/invoiceApi';
 import { getWorkflowUsers } from './invoiceColumns';
 
@@ -224,6 +224,12 @@ const ApprovalsPage = () => {
                     Waiting for Approval {row.current_approver_level ? `(Level ${row.current_approver_level})` : ''}
                 </div>
             )
+        },
+        {
+            header: "Action Time",
+            accessor: "updated_at",
+            sortable: true,
+            render: (val) => formatIST(val)
         },
         {
             header: "Approver",

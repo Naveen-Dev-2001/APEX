@@ -10,7 +10,7 @@ import ExportButton from '../../shared/components/ExportButton';
 import CustomButton from '../../shared/components/CustomButton';
 import RefreshButton from '../../shared/components/RefreshButton';
 import { useCommonStore } from '../../store/common.store';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatIST } from '../../utils/formatters';
 
 const ACCESSOR_TO_DB_FIELD = {
     vendor_name: "vendor_name",
@@ -182,22 +182,11 @@ const CodingPage = () => {
             valueGetter: (p) => p.data?.extracted_data?.amounts?.total_invoice_amount?.value || "0.00",
         },
         {
-            header: "Last Updated",
+            header: "Action Time",
             accessor: "processed_at",
             minWidth: 220,
             sortable: true,
-            render: (val, row) => {
-                const date = val || row.uploaded_at;
-                if (!date) return "N/A";
-                return new Date(date).toLocaleString('en-US', {
-                    month: '2-digit',
-                    day: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                }).replace(',', ' -');
-            }
+            render: (val, row) => formatIST(val || row.uploaded_at)
         },
         {
             header: "Updated By",

@@ -16,6 +16,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+from app.utils.date_utils import get_ist_now
 
 from sqlalchemy.orm import Session
 from sqlalchemy import asc
@@ -78,8 +79,8 @@ def _status_color(status: str):
 def _fmt_dt(dt: Optional[datetime]) -> str:
     if dt is None:
         return "—"
-    dt_ist = dt + timedelta(hours=5, minutes=30)
-    return dt_ist.strftime("%d %b %Y  %I:%M %p IST")
+    # Dates are already stored as IST
+    return dt.strftime("%d %b %Y  %I:%M %p IST")
 
 
 def _safe_str(val, default="—") -> str:
@@ -160,7 +161,7 @@ def _page_template(canvas, doc):
     canvas.drawString(18 * mm, page_h - 14 * mm, "Accounts Payable — Final Approval Report")
 
     canvas.setFont("Helvetica", 9)
-    dt_now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    dt_now_ist = get_ist_now()
     canvas.drawRightString(page_w - 18 * mm, page_h - 14 * mm,
                            f"Generated: {dt_now_ist.strftime('%d %b %Y  %I:%M %p IST')}")
 
@@ -550,7 +551,7 @@ def generate_approval_pdf(db: Session, invoice_id: int) -> str:
         [Paragraph("<b>Approved By</b>", signoff_style),
          Paragraph(", ".join(approved_emails) if approved_emails else "—", signoff_bold),
          Paragraph("<b>Report Date</b>", signoff_style),
-         Paragraph((datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%d %b %Y"), signoff_style)],
+         Paragraph(get_ist_now().strftime("%d %b %Y"), signoff_style)],
     ]
 
     so_tbl = Table(signoff_rows, colWidths=[3*cm, 6*cm, 3*cm, 6*cm])

@@ -10,6 +10,7 @@ from app.auth.jwt import verify_password, get_password_hash, create_access_token
 from app.services.email_service import email_service
 from app.services.otp_service import otp_service
 from datetime import datetime, timedelta
+from app.utils.date_utils import get_ist_now
 from app.config.settings import settings
 from dotenv import load_dotenv
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -110,7 +111,7 @@ async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Se
         "isCreatedByUser": True,
         "createdby": "self",
         "ispasswordchange": True,
-        "created_at": datetime.utcnow()
+        "created_at": get_ist_now()
     }
 
     new_user = user_repo.create(db, obj_in=new_user_data)

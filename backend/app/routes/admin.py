@@ -36,6 +36,8 @@ class UserCreate(BaseModel):
     status: str
     department: Optional[str] = None
 
+from app.utils.date_utils import get_ist_now
+
 @router.post("/", response_model=UserResponse)
 async def create_new_user(
     user_data: UserCreate,
@@ -62,7 +64,7 @@ async def create_new_user(
         "isCreatedByUser": False,
         "createdby": "admin",
         "ispasswordchange": False,
-        "created_at": datetime.utcnow()
+        "created_at": get_ist_now()
     }
     new_user = user_repo.create(db, obj_in=new_user_data)
     return new_user

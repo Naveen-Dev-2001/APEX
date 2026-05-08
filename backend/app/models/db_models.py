@@ -12,6 +12,7 @@ from sqlalchemy.orm import relationship, backref
 from sqlalchemy.dialects.mssql import NVARCHAR
 from datetime import datetime
 from app.database.database import Base
+from app.utils.date_utils import get_ist_now
 import enum
 
 
@@ -66,7 +67,7 @@ class User(Base):
     createdby = Column(String(100), nullable=False, default="self")
     ispasswordchange = Column(Boolean, nullable=False, default=True)
     email_notifications = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
 
     # Relationships
     invoices = relationship(
@@ -86,7 +87,7 @@ class OTPRecord(Base):
     is_verified = Column(Boolean, default=False)
     attempts = Column(Integer, default=0)
     expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
 
     __table_args__ = (
         Index('ix_otp_email_purpose', 'email', 'purpose'),
@@ -143,9 +144,9 @@ class Invoice(Base):
     # Metadata
     confidence_score = Column(String(50), nullable=True)
     uploaded_at = Column(DateTime, nullable=False,
-                         default=datetime.utcnow, index=True)
+                         default=get_ist_now, index=True)
     processed_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=get_ist_now, onupdate=get_ist_now)
 
     # Approval tracking
     required_approvers = Column(Integer, nullable=True)
@@ -187,7 +188,7 @@ class InvoiceStatusHistory(Base):
         "invoices.id", ondelete="CASCADE"), nullable=False, index=True)
     status = Column(String(50), nullable=False)
     user = Column(String(100), nullable=False)
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = Column(DateTime, nullable=False, default=get_ist_now)
     comment = Column(Text, nullable=True)
     approver_level = Column(Integer, nullable=True)
 
@@ -253,8 +254,8 @@ class Coding(Base):
     line_items = Column(Text, nullable=True)    # Store as JSON string
     entity = Column(String(100), ForeignKey(
         "entity_master.entity_id"), nullable=False, index=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
+    updated_at = Column(DateTime, nullable=True, onupdate=get_ist_now)
 
     # Relationships
     invoice = relationship("Invoice", back_populates="coding")
@@ -275,7 +276,7 @@ class AuditLog(Base):
     details = Column(Text, nullable=True)  # JSON stored as text
     sage_bill_number = Column(String(200), nullable=True)
     timestamp = Column(DateTime, nullable=False,
-                       default=datetime.utcnow, index=True)
+                       default=get_ist_now, index=True)
 
     # Relationships
     invoice = relationship("Invoice", back_populates="audit_logs")
@@ -299,7 +300,7 @@ class WorkflowStep(Base):
     step_type = Column(String(100), nullable=False)
     user = Column(String(100), nullable=False, index=True)
     status = Column(String(100), nullable=False)
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, nullable=False, default=get_ist_now, index=True)
     approver_number = Column(Integer, nullable=True, index=True)
     comment = Column(Text, nullable=True)
     entity = Column(String(100), ForeignKey(
@@ -324,8 +325,8 @@ class Currency(Base):
     name = Column(String(100), nullable=False, index=True)
     symbol = Column(String(10), nullable=True)
     exchange_rate = Column(Float, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
+    updated_at = Column(DateTime, nullable=True, onupdate=get_ist_now)
 
 
 # ==================== DELEGATION ====================
@@ -344,7 +345,7 @@ class Delegation(Base):
     substitute_approver = Column(String(200), nullable=False, index=True)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
     created_by = Column(String(100), nullable=True)
 
     __table_args__ = (
@@ -361,7 +362,7 @@ class GlobalSetting(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     setting_key = Column(String(100), unique=True, nullable=False, index=True)
     setting_value = Column(Text, nullable=False)  # JSON
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True, onupdate=get_ist_now)
 
 
 # ==================== APPROVER CONFIGURATIONS ====================
@@ -425,9 +426,9 @@ class EntityMaster(Base):
     zip_or_postal_code = Column(String(20), nullable=True)
     country_code = Column(String(10), nullable=True)
     gst_applicable = Column(Boolean, nullable=True, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
+    updated_at = Column(DateTime, default=get_ist_now,
+                        onupdate=get_ist_now)
 
 
 class VendorMaster(Base):
@@ -473,9 +474,9 @@ class VendorMaster(Base):
     status = Column(String(50), nullable=True)
     raw_data = Column(Text, nullable=True)  # Full JSON response
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
+    updated_at = Column(DateTime, default=get_ist_now,
+                        onupdate=get_ist_now)
 
 
 class TdsRate(Base):
@@ -489,7 +490,7 @@ class TdsRate(Base):
     nature_of_payment = Column(String(255), nullable=False)
     tds_rate = Column(DECIMAL(10, 4), nullable=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
 
 
 class GLMaster(Base):
@@ -514,10 +515,10 @@ class GLMaster(Base):
     gl_key = Column(String(100), index=True, nullable=True)
     status = Column(String(50), nullable=True, default="active")
     raw_data = Column(Text, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=get_ist_now,
+                        onupdate=get_ist_now)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
 
     # Relationships
 
@@ -537,10 +538,10 @@ class LOBMaster(Base):
     lob_key = Column(String(100), index=True, nullable=True)
     status = Column(String(50), nullable=True, default="active")
     raw_data = Column(Text, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=get_ist_now,
+                        onupdate=get_ist_now)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
 
 
 class DepartmentMaster(Base):
@@ -558,10 +559,10 @@ class DepartmentMaster(Base):
     dept_key = Column(String(100), index=True, nullable=True)
     status = Column(String(50), nullable=True, default="active")
     raw_data = Column(Text, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=get_ist_now,
+                        onupdate=get_ist_now)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
 
 
 class CustomerMaster(Base):
@@ -578,10 +579,10 @@ class CustomerMaster(Base):
     customer_key = Column(String(100), index=True, nullable=True)
     status = Column(String(50), nullable=True, default="active")
     raw_data = Column(Text, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=get_ist_now,
+                        onupdate=get_ist_now)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
 
 
 class ItemMaster(Base):
@@ -600,10 +601,10 @@ class ItemMaster(Base):
     item_key = Column(String(100), index=True, nullable=True)
     status = Column(String(50), nullable=True, default="active")
     raw_data = Column(Text, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=get_ist_now,
+                        onupdate=get_ist_now)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
 
 
 class InvoiceRegistry(Base):
@@ -616,7 +617,7 @@ class InvoiceRegistry(Base):
     entity = Column(String(100), nullable=False, index=True)
     invoice_id = Column(Integer, nullable=False)  # Reference to invoices.id
     uploaded_by = Column(String(100), nullable=False)
-    uploaded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    uploaded_at = Column(DateTime, nullable=False, default=get_ist_now)
 
     __table_args__ = (
         UniqueConstraint('vendor_id', 'invoice_number',
@@ -638,8 +639,8 @@ class VendorMetadata(Base):
     extracted_address_normalized = Column(
         String(1000), nullable=True, index=True)
     line_grouping = Column(String(10), nullable=True, default="No")  # Yes/No
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
+    updated_at = Column(DateTime, nullable=True, onupdate=get_ist_now)
     updated_by = Column(String(100), nullable=True)
 
     __table_args__ = (
@@ -669,8 +670,8 @@ class VendorWorkflow(Base):
     amount_threshold = Column(Float, default=0.0)
     threshold_approver = Column(Text, nullable=True)
     # is_parallel = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
+    updated_at = Column(DateTime, nullable=True, onupdate=get_ist_now)
     approver_flags = Column(Text, nullable=True)
     posting_approver = Column(String(255), nullable=True)
 
@@ -694,8 +695,8 @@ class CodificationWorkflow(Base):
     threshold_approver = Column(Text, nullable=True)
     posting_approver = Column(String, nullable=True)
     # is_parallel = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
+    updated_at = Column(DateTime, nullable=True, onupdate=get_ist_now)
     approver_flags = Column(Text, nullable=True)
 
 
@@ -714,9 +715,9 @@ class ExchangeRateMaster(Base):
     effective_date = Column(DateTime, nullable=True)
     status = Column(String(50), nullable=True, default="active")
     raw_data = Column(Text, nullable=True)  # Full JSON response
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
+    updated_at = Column(DateTime, default=get_ist_now,
+                        onupdate=get_ist_now)
 
 
 class CodingHistory(Base):
@@ -730,7 +731,7 @@ class CodingHistory(Base):
     normalized_description = Column(String(1000), nullable=False, index=True)
     embedding = Column(Text, nullable=True)  # Store JSON serialized embedding
     coding_json = Column(Text, nullable=True)  # Store JSON of GL, LOB, etc.
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=get_ist_now)
 
     __table_args__ = (
         Index('ix_coding_history_lookup', 'vendor_id',
@@ -749,7 +750,7 @@ class RawExtractionData(Base):
     raw_azure_response = Column(Text, nullable=True)
     llm_prompt = Column(Text, nullable=True)         # Prompt sent to LLM
     llm_raw_response = Column(Text, nullable=True)   # Raw response from LLM
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
 
     # Relationships
     invoice = relationship("Invoice", backref=backref(
@@ -836,7 +837,7 @@ class DeletedInvoice(Base):
 
     # ---- Deletion metadata ----
     deleted_at = Column(DateTime, nullable=False,
-                        default=datetime.utcnow, index=True)
+                        default=get_ist_now, index=True)
     deleted_by = Column(String(100), nullable=False)
 
     __table_args__ = (

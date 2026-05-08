@@ -24,6 +24,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from app.utils.date_utils import get_ist_now
 
 from app.auth.jwt import get_current_user
 from app.database.database import get_db
@@ -321,7 +322,7 @@ def _record_step(
         status=status,
         approver_number=approver_number,
         comment=comment,
-        timestamp=datetime.utcnow(),
+        timestamp=get_ist_now(),
         entity=entity
     )
     db.add(step)

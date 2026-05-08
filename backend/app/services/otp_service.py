@@ -7,6 +7,8 @@ from app.repository.repositories import otp_repo
 from app.config.settings import settings
 import logging
 
+from app.utils.date_utils import get_ist_now
+
 logger = logging.getLogger("app")
 
 class OTPService:
@@ -26,7 +28,7 @@ class OTPService:
         })
         
         otp_code = OTPService.generate_otp()
-        expires_at = datetime.utcnow() + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+        expires_at = get_ist_now() + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
         
         db_otp = OTPRecord(
             email=email,
@@ -50,7 +52,7 @@ class OTPService:
             },
             limit=1
         )
-        db_otp = otps[0] if otps and otps[0].expires_at > datetime.utcnow() else None
+        db_otp = otps[0] if otps and otps[0].expires_at > get_ist_now() else None
 
         if not db_otp:
             # Increment attempts for the record if found by code or just email/purpose
@@ -74,7 +76,7 @@ class OTPService:
     def is_verified(db: Session, email: str, purpose: str) -> bool:
         """Check if an email has recently verified an OTP for a specific purpose."""
         # Check for a verified record that isn't too old (e.g., verified in last 15 mins)
-        cutoff = datetime.utcnow() - timedelta(minutes=15)
+        cutoff = get_ist_now() - timedelta(minutes=15)
         # Using a direct query because the filter has a range (> cutoff) which get_multi doesn't handle yet
         # But we use the repository's model for consistency
         return db.query(otp_repo.model).filter(
