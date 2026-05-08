@@ -824,6 +824,9 @@ async def get_invoices(
                                 Invoice.status == InvoiceStatusEnum.REWORKED
                             ),
                             approver_subquery,
+                            # Block ONLY threshold approvers from seeing the invoice at lower
+                            # Finance Team levels.
+                            ~is_future_threshold_approver_subquery,
                             ~hide_condition
                         )
                     )
@@ -1117,7 +1120,11 @@ async def get_invoice_filter_options(
                             InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
                             or_(
                                 InvoiceAssignedApprover.approver_email.in_(target_emails),
-                                and_(InvoiceAssignedApprover.is_finance == True, is_finance_user == True)
+                                and_(
+                                    InvoiceAssignedApprover.is_finance == True, 
+                                    is_finance_user == True,
+                                    ~is_future_threshold_approver_fo_subquery
+                                )
                             )
                         )
                     )
@@ -3604,6 +3611,31 @@ async def delegate_invoice(
     
     if not replace_email or not assign_to_email:
         raise HTTPException(400, "Both replace_email and assign_to_email are required")
+
+    last_reset = db.query(func.max(WorkflowStep.timestamp)).filter(
+        WorkflowStep.invoice_id == invoice_id,
+        WorkflowStep.step_type.in_([StepType.REWORKED, StepType.RECALLED])
+    ).scalar()
+
+    acted_query = db.query(WorkflowStep).filter(
+        WorkflowStep.invoice_id == invoice_id,
+        WorkflowStep.step_type.in_([
+            StepType.LEVEL_APPROVED, StepType.APPROVED, StepType.REJECTED,
+            StepType.THRESHOLD_APPROVED, StepType.POSTING_APPROVED
+        ])
+    )
+    if last_reset:
+        acted_query = acted_query.filter(WorkflowStep.timestamp > last_reset)
+    
+    steps = acted_query.all()
+    acted_users = set(s.user.lower() for s in steps if s.user)
+    completed_levels = set(s.approver_number for s in steps if s.approver_number)
+
+    if replace_email in acted_users:
+        raise HTTPException(400, f"Approver {replace_email} has already acted on this invoice and cannot be replaced.")
+    
+    if level and level in completed_levels:
+        raise HTTPException(400, f"Approval level {level} is already completed.")
     
     # Update InvoiceAssignedApprover
     query = db.query(InvoiceAssignedApprover).filter(
