@@ -735,7 +735,7 @@ async def get_invoices(
                     is_future_threshold_approver_subquery = exists().where(
                         and_(
                             FutureApprover.invoice_id == Invoice.id,
-                            func.lower(FutureApprover.approver_email).in_(target_emails),
+                            FutureApprover.approver_email.in_(target_emails),
                             FutureApprover.sequence_order > Invoice.current_approver_level,
                             FutureApprover.sequence_order < max_level_sq,  # not the posting level
                             FutureApprover.is_finance == False  # dedicated threshold slot
@@ -748,15 +748,14 @@ async def get_invoices(
                             InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
                             or_(
                                 # 1. Specifically assigned (always allowed, includes delegates)
-                                func.lower(InvoiceAssignedApprover.approver_email).in_(target_emails),
+                                InvoiceAssignedApprover.approver_email.in_(target_emails),
                                 # 2. Finance pool (only allowed if not a future threshold approver)
                                 and_(
                                     InvoiceAssignedApprover.is_finance == True, 
-                                    is_finance_user == True
+                                    is_finance_user == True,
+                                    ~is_future_threshold_approver_subquery
                                 )
-                            ),
-                            # 3. GLOBAL BLOCK for future threshold assignments (Separation of Duties)
-                            ~is_future_threshold_approver_subquery
+                            )
                         )
                     )
                     
@@ -3605,8 +3604,7 @@ async def delegate_invoice(
     
     if not replace_email or not assign_to_email:
         raise HTTPException(400, "Both replace_email and assign_to_email are required")
-    
-    # 1. Re-verify eligibility (in case of concurrent approval)
+
     last_reset = db.query(func.max(WorkflowStep.timestamp)).filter(
         WorkflowStep.invoice_id == invoice_id,
         WorkflowStep.step_type.in_([StepType.REWORKED, StepType.RECALLED])
