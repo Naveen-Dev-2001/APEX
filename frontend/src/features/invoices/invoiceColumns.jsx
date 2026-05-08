@@ -187,7 +187,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         filterable: true,
     },
     {
-        header: "Invoice ID",
+        header: "Invoice Number",
         accessor: "invoice_number",
         sortable: true,
         filterable: true,

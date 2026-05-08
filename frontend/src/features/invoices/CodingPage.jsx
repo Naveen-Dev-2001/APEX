@@ -138,7 +138,7 @@ const CodingPage = () => {
             filterable: true,
         },
         {
-            header: "Invoice ID",
+            header: "Invoice Number",
             accessor: "invoice_number",
             minWidth: 150,
             sortable: true,

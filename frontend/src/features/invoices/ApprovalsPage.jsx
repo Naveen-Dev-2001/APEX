@@ -151,7 +151,7 @@ const ApprovalsPage = () => {
         confirm({
             title: 'Are you sure you want to delete this invoice?',
             icon: <ExclamationCircleOutlined />,
-            content: `Invoice ID: ${invoice.invoice_number}`,
+            content: `Invoice Number: ${invoice.invoice_number}`,
             okText: 'Yes, Delete',
             okType: 'danger',
             cancelText: 'Cancel',
@@ -189,7 +189,7 @@ const ApprovalsPage = () => {
             onClick: () => handleSort("vendor_name")
         },
         {
-            header: "Invoice ID",
+            header: "Invoice Number",
             accessor: "invoice_number",
             sortable: true,
             filterable: true,
