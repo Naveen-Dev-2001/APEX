@@ -478,16 +478,16 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         accessor: "entity",
         filterable: true,
     },
-    {
-        header: "Sage Bill Number",
-        accessor: "sage_bill_number",
-        filterable: true,
-        render: (val) => val || "-",
-    },
-    {
-        header: "Confidence Score",
-        accessor: "confidence_score",
-        render: (val) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : "-",
-    },
+    // {
+    //     header: "Sage Bill Number",
+    //     accessor: "sage_bill_number",
+    //     filterable: true,
+    //     render: (val) => val || "-",
+    // },
+    // {
+    //     header: "Confidence Score",
+    //     accessor: "confidence_score",
+    //     render: (val) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : "-",
+    // },
     actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete),
 ];
