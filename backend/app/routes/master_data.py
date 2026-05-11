@@ -514,6 +514,7 @@ async def get_sheet_data(
     page: int = 1,
     page_size: int = 1000,
     search: str = None,
+    filters: str = None,
     sort_by: str = None,
     sort_dir: str = 'asc',
     db: Session = Depends(get_db)
@@ -531,15 +532,24 @@ async def get_sheet_data(
         skip = (page - 1) * page_size
         search_fields = TAB_SEARCH_FIELDS.get(clean_id) or TAB_SEARCH_FIELDS.get(identifier)
         
+        repo_filters = {}
+        if filters:
+            try:
+                repo_filters = json.loads(filters)
+            except Exception as e:
+                logger.error(f"Error parsing filters: {e}")
+
         paginated_res = repo.get_paginated(
             db,
             skip=skip,
             limit=page_size,
+            filters=repo_filters,
             search=search,
             search_fields=search_fields,
             order_by=sort_by,
             descending=(sort_dir.lower() == 'desc')
         )
+
         rows = paginated_res["data"]
         total_count = paginated_res["total"]
     else:
@@ -600,6 +610,45 @@ async def get_sheet_data(
         "page": page,
         "page_size": page_size
     }
+
+
+@router.get("/sheet/{identifier}/filter-options")
+def get_master_filter_options(
+    identifier: str,
+    column: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Returns unique values for a specific column in a master data table.
+    Used by DataTable filter dropdowns.
+    """
+    model = TAB_MODEL_MAP.get(identifier)
+    if not model:
+        # Try without prefix
+        clean_id = identifier.replace("master_data_", "")
+        model = TAB_MODEL_MAP.get(clean_id)
+        
+    if not model:
+        raise HTTPException(404, "Table not found")
+
+    # Check if column exists in the model
+    if not hasattr(model, column):
+        # Maybe it's a snake_case issue? Model columns are usually snake_case.
+        # Frontend might pass camelCase or something else.
+        # But looking at TAB_MODEL_MAP and models, they match frontend accessors mostly.
+        raise HTTPException(400, f"Column '{column}' not found in {identifier}")
+
+    try:
+        query = db.query(getattr(model, column)).filter(getattr(model, column).isnot(None)).distinct()
+        results = query.all()
+        options = [r[0] for r in results]
+        
+        # Sort options for better UX
+        return sorted(options, key=lambda x: str(x))
+    except Exception as e:
+        logger.error(f"Error fetching filter options for {identifier}.{column}: {e}")
+        return []
+
 
 
 @router.get("/bulk-coding-data")

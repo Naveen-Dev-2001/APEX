@@ -8,6 +8,7 @@ const useMasterDataStore = create((set, get) => ({
     itemsPerPage: 15,
     sortColumn: '',
     sortDirection: 'asc',
+    columnFilters: {},
 
     // Loading / error state for Entity Master
     entityLoading: false,
@@ -176,10 +177,13 @@ const useMasterDataStore = create((set, get) => ({
             set({ sortColumn: column, sortDirection: 'asc' });
         }
     },
+    setColumnFilters: (filters) => set({ columnFilters: filters, currentPage: 1 }),
+
 
     // ─── Unified Fetcher: Handles all tabs with server-side pagination ──────
     fetchMasterData: async (tabName) => {
-        const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection } = get();
+        const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection, columnFilters } = get();
+
         const loadingKeyMap = {
             'Entity Master': 'entityLoading',
             'Vendor Master': 'vendorLoading',
@@ -225,13 +229,28 @@ const useMasterDataStore = create((set, get) => ({
 
         set({ [loadingKey]: true, [errorKey]: null });
         try {
+            // Transform columnFilters for backend
+            const backendFilters = {};
+            Object.entries(columnFilters).forEach(([accessor, value]) => {
+                if (!value) return;
+                if (value instanceof Set) {
+                    if (value.size > 0) backendFilters[accessor] = Array.from(value);
+                } else if (typeof value === 'object' && value.op) {
+                    backendFilters[accessor] = value;
+                } else {
+                    backendFilters[accessor] = value;
+                }
+            });
+
             const response = await fetcher({
                 page: currentPage,
                 page_size: itemsPerPage,
                 search: searchQuery,
+                filters: backendFilters,
                 sort_by: sortColumn,
                 sort_dir: sortDirection
             });
+
 
             // Backend returns { data: [], total: 0, ... }
             const rows = response.data || [];
