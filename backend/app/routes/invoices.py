@@ -214,6 +214,7 @@ invoice_processor = InvoiceProcessor()
 
 # Global dictionary to hold asyncio queues for each upload task (progress tracking)
 upload_progress_queues: Dict[str, asyncio.Queue] = {}
+cancelled_tasks = set()
 
 @router.get("/upload-progress/{task_id}")
 async def get_upload_progress(task_id: str):
@@ -234,6 +235,13 @@ async def get_upload_progress(task_id: str):
                 del upload_progress_queues[task_id]
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/cancel-upload/{task_id}")
+async def cancel_upload(task_id: str):
+    cancelled_tasks.add(task_id)
+    print(f"[Backend] Task {task_id} marked for cancellation")
+    return {"status": "cancelled", "task_id": task_id}
 
 
 @router.post("/check-duplicate")
@@ -358,6 +366,11 @@ async def upload_invoices(
 
 
 
+            # ---- CHECK CANCELLATION AFTER SAVE ----
+            if task_id in cancelled_tasks:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                return {"success": False, "filename": clean_name, "reason": "cancelled"}
 
             # ---- CREATE DB RECORD (INITIAL) ----
             new_invoice = Invoice(
@@ -390,12 +403,29 @@ async def upload_invoices(
             "invoice_id": invoice_id
             })
 
+            # ---- CHECK CANCELLATION AFTER DB RECORD ----
+            if task_id in cancelled_tasks:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                invoice_repo.remove(task_db, id=invoice_id)
+                task_db.commit()
+                return {"success": False, "filename": clean_name, "reason": "cancelled"}
+
             # ---- RUN EXTRACTION ----
             extract_start = time.time()
             print(f"[Backend] Starting full extraction for {invoice_id}")
             extraction = await invoice_processor.process_invoice_extraction(file_path)
             extract_time = time.time() - extract_start
             print(f"[Backend] Full extraction completed in {extract_time:.2f}s")
+
+            # ---- CHECK CANCELLATION AFTER EXTRACTION ----
+            if task_id in cancelled_tasks:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                invoice_repo.remove(task_db, id=invoice_id)
+                task_db.commit()
+                return {"success": False, "filename": clean_name, "reason": "cancelled"}
+
             await emit_progress("processing", f"[{index}/{total_files}] Extracting data...", progress=75)
 
             # Extract key values from Azure response
@@ -704,15 +734,30 @@ async def upload_invoices(
 
     # 🔁 Sequential Processing: process one invoice at a time
     total_files = len(files)
-    for idx, file in enumerate(files):
-        try:
-            res = await _process_single_file(file, idx + 1, total_files)
-            if res["success"]:
-                saved_invoices.append(res["data"])
-            else:
-                failed_uploads.append({"filename": res["filename"], "reason": res["reason"]})
-        except Exception as e:
-            failed_uploads.append({"filename": "unknown", "reason": f"System Error: {str(e)}"})
+    try:
+        for idx, file in enumerate(files):
+            # Check for cancellation before processing each file
+            if task_id in cancelled_tasks:
+                print(f"[Backend] Task {task_id} cancelled. Stopping at file {idx+1}/{total_files}")
+                # Note: We don't remove from cancelled_tasks here, we'll do it in finally
+                await emit_progress("error", f"Upload cancelled by user.", progress=0)
+                break
+
+            try:
+                res = await _process_single_file(file, idx + 1, total_files)
+                if res["success"]:
+                    saved_invoices.append(res["data"])
+                elif res.get("reason") == "cancelled":
+                    print(f"[Backend] File {idx+1} processing aborted due to cancellation")
+                    break
+                else:
+                    failed_uploads.append({"filename": res["filename"], "reason": res["reason"]})
+            except Exception as e:
+                failed_uploads.append({"filename": "unknown", "reason": f"System Error: {str(e)}"})
+    finally:
+        # Cleanup cancellation flag if it exists (in case it wasn't caught in the loop)
+        if task_id in cancelled_tasks:
+            cancelled_tasks.remove(task_id)
 
     await emit_progress("completed", f"Finished uploading {len(files)} files.")
 

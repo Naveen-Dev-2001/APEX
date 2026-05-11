@@ -25,12 +25,16 @@ export const getInvoiceFilterOptions = (column, filters = {}, tab = undefined) =
         }
     }).then(res => res.data);
 
-export const uploadInvoices = (formData, taskId, onUploadProgress) => {
+export const uploadInvoices = (formData, taskId, onUploadProgress, signal) => {
     return API.post(`/invoices/upload?task_id=${taskId}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress, // axios will call this with { loaded, total }
+        signal
     });
 };
+
+export const cancelUpload = (taskId) =>
+    API.post(`/invoices/cancel-upload/${taskId}`).then(res => res.data);
 
 export const deleteInvoice = (invoiceId) =>
     API.delete(`/invoices/${invoiceId}`).then(res => {
