@@ -218,12 +218,16 @@ const ApprovalsPage = () => {
             header: "Status",
             accessor: "status",
             filterable: true,
-            getFilterValue: (row) => "Waiting for Approval",
-            render: (val, row) => (
-                <div className="bg-orange-50 text-orange-500 px-3 py-1 rounded-full text-[12px] font-medium inline-block border border-orange-100">
-                    Waiting for Approval {row.current_approver_level ? `(Level ${row.current_approver_level})` : ''}
-                </div>
-            )
+            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
+            getFilterValue: (row) => row.status_label || "Waiting Approval",
+            render: (val, row) => {
+                const label = row.status_label || (row.current_approver_level ? `Waiting for Approval (Level ${row.current_approver_level})` : 'Waiting for Approval');
+                return (
+                    <div className="bg-orange-50 text-orange-500 px-3 py-1 rounded-full text-[12px] font-medium inline-block border border-orange-100">
+                        {label}
+                    </div>
+                );
+            }
         },
         {
             header: "Action Time",

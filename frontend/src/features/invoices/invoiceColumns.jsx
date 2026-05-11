@@ -3,7 +3,12 @@ import { Trash2 } from "lucide-react";
 import { formatCurrency, formatIST } from "../../utils/formatters";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
-const getStatusLabel = (value, level) => {
+const getStatusLabel = (value, level, row = null) => {
+    if (row?.status_label) return row.status_label;
+    if (typeof value === 'string' && (value.startsWith("Waiting for") || value.includes("(level"))) {
+        return value;
+    }
+
     const labelMap = {
         approved: "Approved",
         pending: "Pending",
@@ -20,13 +25,13 @@ const getStatusLabel = (value, level) => {
     let label = labelMap[value] ?? value;
 
     if (value === 'waiting_approval' && level) {
-        label = `${label} (Level ${level})`;
+        label = `Waiting for approver ${level}`;
     }
     return label;
 };
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
-const StatusBadge = ({ value, level }) => {
+const StatusBadge = ({ value, level, label }) => {
     const colorMap = {
         approved: "bg-green-100 text-green-700",
         pending: "bg-yellow-100 text-yellow-700",
@@ -41,11 +46,11 @@ const StatusBadge = ({ value, level }) => {
     };
 
     const cls = colorMap[value] ?? "bg-gray-100 text-gray-600";
-    const label = getStatusLabel(value, level);
+    const displayLabel = label ?? getStatusLabel(value, level);
 
     return (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${cls}`}>
-            {label ?? "-"}
+            {displayLabel ?? "-"}
         </span>
     );
 };
@@ -230,7 +235,7 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         sortable: true,
         filterable: true,
         filterRender: (val) => getStatusLabel(val),
-        render: (val, row) => <StatusBadge value={val} level={row?.current_approver_level} />,
+        render: (val, row) => <StatusBadge value={val} level={row?.current_approver_level} label={row?.status_label} />,
     },
     {
         header: "Next Action By",
@@ -444,7 +449,7 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
         sortable: true,
         filterable: true,
         filterRender: (val) => getStatusLabel(val),
-        render: (val, row) => <StatusBadge value={val} level={row?.current_approver_level} />,
+        render: (val, row) => <StatusBadge value={val} level={row?.current_approver_level} label={row?.status_label} />,
     },
     {
         header: "Next Action By",
