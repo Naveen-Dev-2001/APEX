@@ -28,9 +28,9 @@ export const masterDataService = {
     },
     
     /** Fetch unique values for a column to populate filter dropdowns */
-    async getFilterOptions(identifier, column) {
+    async getFilterOptions(identifier, column, search = '', limit = 10) {
         const res = await API.get(`/master/sheet/${identifier}/filter-options`, {
-            params: { column }
+            params: { column, search, limit }
         });
         return res.data;
     },

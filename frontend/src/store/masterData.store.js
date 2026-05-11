@@ -5,7 +5,7 @@ const useMasterDataStore = create((set, get) => ({
     activeTab: 'Entity Master',
     searchQuery: '',
     currentPage: 1,
-    itemsPerPage: 15,
+    itemsPerPage: 10,
     sortColumn: '',
     sortDirection: 'asc',
     columnFilters: {},
@@ -61,9 +61,9 @@ const useMasterDataStore = create((set, get) => ({
                 { header: 'State / Territory', accessor: 'state_or_territory', sortable: true, filterable: true },
                 { header: 'Zip / Postal Code', accessor: 'zip_or_postal_code', sortable: true, filterable: true },
                 { header: 'Country Code', accessor: 'country_code', sortable: true, filterable: true },
-                { 
-                    header: 'GST Applicable', 
-                    accessor: 'gst_applicable', 
+                {
+                    header: 'GST Applicable',
+                    accessor: 'gst_applicable',
                     sortable: true,
                     filterable: true
                 },
@@ -177,7 +177,10 @@ const useMasterDataStore = create((set, get) => ({
             set({ sortColumn: column, sortDirection: 'asc' });
         }
     },
-    setColumnFilters: (filters) => set({ columnFilters: filters, currentPage: 1 }),
+    setColumnFilters: (update) => set((state) => ({
+        columnFilters: typeof update === 'function' ? update(state.columnFilters) : update,
+        currentPage: 1
+    })),
 
 
     // ─── Unified Fetcher: Handles all tabs with server-side pagination ──────
@@ -944,14 +947,14 @@ const useMasterDataStore = create((set, get) => ({
         const { activeTab, searchQuery, masters, sortColumn, sortDirection } = get();
         const master = masters[activeTab];
         if (!master) return [];
-        
+
         let processed = [...master.data];
 
         // Sort & Filter (Server-side for everything now)
         // Except for Entity Master where we might want to map names, 
         // but even then, the backend should ideally handle it.
         // For now, let's just bypass client-side search/sort for all.
-        
+
         if (activeTab === 'Entity Master') {
             processed = processed.map(item => ({
                 ...item,

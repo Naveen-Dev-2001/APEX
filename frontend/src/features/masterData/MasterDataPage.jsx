@@ -261,7 +261,7 @@ const MasterDataPage = () => {
 
             const colWithFilter = {
                 ...col,
-                onGetOptions: col.filterable ? (accessor) => masterDataService.getFilterOptions(getIdentifier(activeTab), accessor) : undefined,
+                onGetOptions: col.filterable ? (accessor, search, limit) => masterDataService.getFilterOptions(getIdentifier(activeTab), accessor, search, limit) : undefined,
                 onClick: col.sortable ? () => setSort(col.accessor) : undefined
             };
 

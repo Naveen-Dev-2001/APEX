@@ -616,11 +616,14 @@ async def get_sheet_data(
 def get_master_filter_options(
     identifier: str,
     column: str,
+    search: str = None,
+    limit: int = 10,
     db: Session = Depends(get_db)
 ):
     """
     Returns unique values for a specific column in a master data table.
     Used by DataTable filter dropdowns.
+    Supports optional search and limit for better performance with large datasets.
     """
     model = TAB_MODEL_MAP.get(identifier)
     if not model:
@@ -633,13 +636,21 @@ def get_master_filter_options(
 
     # Check if column exists in the model
     if not hasattr(model, column):
-        # Maybe it's a snake_case issue? Model columns are usually snake_case.
-        # Frontend might pass camelCase or something else.
-        # But looking at TAB_MODEL_MAP and models, they match frontend accessors mostly.
         raise HTTPException(400, f"Column '{column}' not found in {identifier}")
 
     try:
-        query = db.query(getattr(model, column)).filter(getattr(model, column).isnot(None)).distinct()
+        col_attr = getattr(model, column)
+        query = db.query(col_attr).filter(col_attr.isnot(None))
+        
+        if search:
+            # Use ilike for case-insensitive search
+            query = query.filter(col_attr.ilike(f"%{search}%"))
+            
+        query = query.distinct()
+        
+        if limit:
+            query = query.limit(limit)
+            
         results = query.all()
         options = [r[0] for r in results]
         
