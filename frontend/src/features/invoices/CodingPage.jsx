@@ -201,25 +201,28 @@ const CodingPage = () => {
             minWidth: 160,
             sortable: true,
             filterable: true,
+            onGetOptions: (col) => getInvoiceFilterOptions(col, { coding_view: true }),
             render: (status, row) => {
-                const labelMap = {
-                    waiting_coding: "Waiting For Coding",
-                    waiting_approval: "Waiting approval",
-                    reworked: "Reworked",
-                };
-
                 const colorMap = {
                     waiting_coding: "bg-orange-100 text-orange-600",
                     waiting_approval: "bg-blue-100 text-blue-600",
                     reworked: "bg-purple-100 text-purple-600",
                 };
 
-                let label = labelMap[status] ?? status;
-                const colorClass = colorMap[status] ?? "bg-gray-100 text-gray-600";
-
-                if (status === 'waiting_approval' && row.current_approver_level) {
-                    label += ` (Level ${row.current_approver_level})`;
+                let label = row.status_label;
+                if (!label) {
+                    const labelMap = {
+                        waiting_coding: "Waiting For Coding",
+                        waiting_approval: "Waiting approval",
+                        reworked: "Reworked",
+                    };
+                    label = labelMap[status] ?? status;
+                    if (status === 'waiting_approval' && row.current_approver_level) {
+                        label += ` (Level ${row.current_approver_level})`;
+                    }
                 }
+
+                const colorClass = colorMap[status] ?? "bg-gray-100 text-gray-600";
 
                 return (
                     <div className={`px-3 py-1 rounded-full text-[12px] font-medium inline-block border border-current opacity-80 ${colorClass}`}>
@@ -227,7 +230,7 @@ const CodingPage = () => {
                     </div>
                 );
             },
-            getFilterValue: (row) => row.status ?? '',
+            getFilterValue: (row) => row.status_label || row.status || '',
             filterRender: (val) => {
                 const labelMap = {
                     waiting_coding: "Waiting For Coding",
