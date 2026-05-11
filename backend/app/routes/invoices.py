@@ -1953,29 +1953,17 @@ async def update_invoice_status(
             fresh_invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
             inv = fresh_invoice or invoice
             
-            # Extract logic (Improved extraction for dimensions)
-            hc = {}
-            if inv.coding and inv.coding.header_coding:
-                try:
-                    hc = json.loads(inv.coding.header_coding)
-                except:
-                    hc = {}
+            # 3. Extract finalized coding details (Capture at approval)
+            hc, line_items = _get_finalized_coding_data(inv)
             
-            # Extract from line items if not in header coding
-            if inv.coding and inv.coding.line_items:
-                try:
-                    line_items = json.loads(inv.coding.line_items)
-                    if line_items:
-                        first = line_items[0]
-                        if not hc.get("gl_code"): hc["gl_code"] = first.get("gl_code")
-                        if not hc.get("department"): hc["department"] = first.get("department") or first.get("department_id")
-                        if not hc.get("item"): hc["item"] = first.get("item") or first.get("item_id")
-                        if not hc.get("lob"): hc["lob"] = first.get("lob") or first.get("class")
-                except:
-                    line_items = []
-            else:
-                line_items = []
-            
+            # Synchronously update the coding record
+            if inv.coding:
+                inv.coding.header_coding = json.dumps(hc) if hc else None
+                inv.coding.line_items = json.dumps(line_items) if line_items else None
+                db.add(inv.coding)
+                db.flush()
+                logger.info(f"[SagePost] Finalized coding captured and saved for invoice {invoice_id}")
+
             # Resolve Sage Location ID from EntityMaster partition mapping
             entity_record = db.query(EntityMaster).filter(EntityMaster.entity_name == inv.entity).first()
             sage_location = entity_record.entity_id if entity_record else (hc.get("location") or hc.get("location_id"))
@@ -2097,26 +2085,16 @@ async def repost_to_sage(
         logger.error(f"[RepostSage] Error ensuring approval PDF: {pdf_err}", exc_info=True)
         # We can still try to post even if PDF generation fails, but it's better to have it
 
-    # 2. Extract coding details
-    hc = {}
-    if invoice.coding and invoice.coding.header_coding:
-        try:
-            hc = json.loads(invoice.coding.header_coding)
-        except:
-            hc = {}
+    # 2. Extract finalized coding details (Capture at approval)
+    hc, line_items = _get_finalized_coding_data(invoice)
     
-    line_items = []
-    if invoice.coding and invoice.coding.line_items:
-        try:
-            line_items = json.loads(invoice.coding.line_items)
-            if line_items and not hc.get("gl_code"):
-                first = line_items[0]
-                if not hc.get("gl_code"): hc["gl_code"] = first.get("gl_code")
-                if not hc.get("department"): hc["department"] = first.get("department") or first.get("department_id")
-                if not hc.get("item"): hc["item"] = first.get("item") or first.get("item_id")
-                if not hc.get("lob"): hc["lob"] = first.get("lob") or first.get("class")
-        except:
-            line_items = []
+    # Synchronously update the coding record
+    if invoice.coding:
+        invoice.coding.header_coding = json.dumps(hc) if hc else None
+        invoice.coding.line_items = json.dumps(line_items) if line_items else None
+        db.add(invoice.coding)
+        db.flush()
+        logger.info(f"[SageRepost] Finalized coding captured and saved for invoice {invoice_id}")
 
     # 3. Call Sage Posting Logic
     try:
@@ -3750,6 +3728,59 @@ async def delegate_invoice(
     
     db.commit()
     return {"success": True, "message": f"Successfully delegated approvals from {replace_email} to {assign_to_email}"}
+
+def _get_finalized_coding_data(invoice: Invoice):
+    """
+    Extracts the latest line items and header coding from extracted_data['lineItemsSnapshot'].
+    This ensures we capture the exact state seen by the approver in the UI.
+    """
+    extracted = {}
+    if invoice.extracted_data:
+        try:
+            extracted = json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else invoice.extracted_data
+        except:
+            pass
+    
+    snapshot = extracted.get("lineItemsSnapshot", [])
+    if snapshot:
+        # Convert snapshot (camelCase from UI) to snake_case for Sage/DB
+        final_line_items = []
+        for item in snapshot:
+            final_line_items.append({
+                "description": item.get("description", ""),
+                "qty": item.get("qty", 1),
+                "unit_price": item.get("unitPrice", 0),
+                "net_amount": item.get("netAmount", 0),
+                "gl_code": item.get("glCode", ""),
+                "lob": item.get("lob", ""),
+                "department": item.get("department", ""),
+                "customer": item.get("customer", ""),
+                "item": item.get("item", ""),
+                "location": item.get("location", ""),
+            })
+        
+        # Use existing header coding if available
+        hc = {}
+        if invoice.coding and invoice.coding.header_coding:
+             try: hc = json.loads(invoice.coding.header_coding) if isinstance(invoice.coding.header_coding, str) else invoice.coding.header_coding
+             except: pass
+        
+        logger.info(f"[Capture] Extracted {len(final_line_items)} items from snapshot for invoice {invoice.id}")
+        return hc, final_line_items
+
+    # Fallback to existing coding if no snapshot exists
+    hc = {}
+    li = []
+    if invoice.coding:
+        if invoice.coding.header_coding:
+            try: hc = json.loads(invoice.coding.header_coding) if isinstance(invoice.coding.header_coding, str) else invoice.coding.header_coding
+            except: pass
+        if invoice.coding.line_items:
+            try: li = json.loads(invoice.coding.line_items) if isinstance(invoice.coding.line_items, str) else invoice.coding.line_items
+            except: pass
+            
+    return hc, li
+
 
 @router.get("/{invoice_id}/generate-pdf-debug")
 async def generate_pdf_debug(invoice_id: int, db: Session = Depends(get_db)):
