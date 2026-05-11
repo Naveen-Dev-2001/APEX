@@ -400,6 +400,7 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
             footer={null}
             width={760}
             centered
+            maskClosable={false}
             closeIcon={null}
             styles={{ content: { padding: 0, borderRadius: 12, overflow: "hidden" } }}
         >

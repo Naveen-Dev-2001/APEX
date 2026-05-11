@@ -53,14 +53,10 @@ const LOBMasterModal = ({ mode, rowData, onClose, onSave }) => {
         onClose();
     };
 
-    const handleBackdrop = (e) => {
-        if (e.target === e.currentTarget) onClose();
-    };
 
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-[1px]"
-            onClick={handleBackdrop}
         >
             <div className="bg-white rounded-[12px] shadow-xl w-full max-w-[500px] mx-4 flex flex-col">
                 {/* Header */}

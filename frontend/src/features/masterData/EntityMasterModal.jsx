@@ -72,14 +72,10 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
     };
 
     // Close on backdrop click
-    const handleBackdrop = (e) => {
-        if (e.target === e.currentTarget) onClose();
-    };
 
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
-            onClick={handleBackdrop}
         >
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-[580px] mx-4 flex flex-col max-h-[90vh]">
                 {/* Header */}

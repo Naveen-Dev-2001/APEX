@@ -426,6 +426,7 @@ const Settings = () => {
                 cancelText="Cancel"
                 okButtonProps={{ danger: true, loading: deleteLoading }}
                 centered
+                maskClosable={false}
                 title={
                     <div className="flex items-center gap-2 text-red-500 p-3">
                         <Trash2 size={18} />

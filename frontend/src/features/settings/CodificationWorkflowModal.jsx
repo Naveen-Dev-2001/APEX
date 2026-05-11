@@ -167,9 +167,6 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose, onSuccess }) => {
         }
     };
 
-    const handleBackdrop = (e) => {
-        if (e.target === e.currentTarget) onClose();
-    };
 
     // Filter approvers to avoid selecting the same person twice and clean labels
     const getFilteredApprovers = (currentField) => {
@@ -201,7 +198,6 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose, onSuccess }) => {
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
-            onClick={handleBackdrop}
         >
             <div className="bg-white rounded-[12px] shadow-2xl w-full max-w-[650px] mx-4 flex flex-col max-h-[92vh]">
                 {/* Header */}
