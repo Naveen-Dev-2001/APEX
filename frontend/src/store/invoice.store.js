@@ -379,6 +379,7 @@ export const useInvoiceStore = create((set, get) => ({
                 taxAmt,
                 isSystemRow: isGst || isTds,
                 isNetAmountOverridden: false,
+                lineType: item.line_type?.value || "Expense",
                 glCode: item.gl_code?.value || "",
                 lob: item.lob?.value || "",
                 department: item.department?.value || "",

@@ -4,9 +4,9 @@ import {
     DownloadOutlined,
     UploadOutlined,
     CaretUpOutlined,
-    ExclamationCircleOutlined
+    DeleteOutlined
 } from "@ant-design/icons";
-import { Trash2 } from "lucide-react";
+// import { Trash2 } from "lucide-react";
 import { Modal } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
@@ -765,27 +765,17 @@ const CodingTab = ({ isActive = false }) => {
                                                 </td>
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDelete(row.id);
-                                                            }}
-                                                            className="text-gray-400 hover:text-red-500 transition-colors"
-                                                            style={{
-                                                                display: "inline-flex",
-                                                                alignItems: "center",
-                                                                justifyContent: "center",
-                                                                width: 28,
-                                                                height: 28,
-                                                                borderRadius: 6,
-                                                                border: "1px solid #e5e7eb",
-                                                                background: "#fafafa",
-                                                                cursor: "pointer",
-                                                                flexShrink: 0,
-                                                            }}
-                                                        >
-                                                            <Trash2 size={14} color="inherit" />
-                                                        </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDelete(row.id);
+                                                                }}
+                                                                className="flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 bg-white border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 shadow-sm"
+                                                                title="Delete line item"
+                                                                style={{ flexShrink: 0 }}
+                                                            >
+                                                                <DeleteOutlined style={{ fontSize: 16 }} />
+                                                            </button>
                                                     )}
                                                 </td>
                                             </tr>

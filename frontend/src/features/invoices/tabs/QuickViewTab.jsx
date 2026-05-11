@@ -14,8 +14,8 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import loadLineItemTable from "../../../utils/lineItemLogic";
 import * as XLSX from "xlsx";
-import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
-import { Trash2 } from "lucide-react";
+import { DownloadOutlined, UploadOutlined, DeleteOutlined } from "@ant-design/icons";
+// import { Trash2 } from "lucide-react";
 import { formatCurrency } from "../../../utils/formatters";
 
 dayjs.extend(customParseFormat);
@@ -795,7 +795,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                 : (
                                                     <FieldRenderer
                                                         field={field}
-                                                        storeValue={quickViewFormData?.[field.key] ?? ""}
+                                                        storeValue={
+                                                            field.key === "totalPayable" 
+                                                                ? totalAmountPayable 
+                                                                : (quickViewFormData?.[field.key] ?? "")
+                                                        }
                                                         onCommit={field.key === "vendorId" || field.key === "vendorName" ? handleVendorFieldCommit : handleCommit}
                                                         vendorOptions={(field.key === "vendorId" || field.key === "vendorName") ? vendorOptions : undefined}
                                                         filterVendors={filterVendors}
@@ -895,7 +899,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                         onClick={() => handleDeleteLineItem(row.id)}
                                                                         title="Delete line item"
                                                                     >
-                                                                        <Trash2 size={18} />
+                                                                        <DeleteOutlined style={{ fontSize: 18 }} />
                                                                     </span>
                                                                 )}
                                                             </td>

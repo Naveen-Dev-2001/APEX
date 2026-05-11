@@ -2313,7 +2313,7 @@ async def update_invoice(
     #     new_vendor_id = update_data["vendor_id"]
     #     requires_check = True
     # ---- Line grouping toggle when vendor changes ----
-    if "vendor_id" in update_data:
+    if "vendor_id" in update_data and update_data["vendor_id"] != invoice.vendor_id:
         from app.models.db_models import VendorMaster
         # Simplified vendor lookup for grouping logic
         vendor = db.query(VendorMaster).filter(VendorMaster.vendor_id == new_vendor_id).first()
