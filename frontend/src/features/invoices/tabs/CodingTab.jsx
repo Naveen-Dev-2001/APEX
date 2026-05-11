@@ -770,11 +770,11 @@ const CodingTab = ({ isActive = false }) => {
                                                                     e.stopPropagation();
                                                                     handleDelete(row.id);
                                                                 }}
-                                                                className="flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 bg-white border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 shadow-sm"
+                                                                className="flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 text-red-500 hover:text-red-700 hover:bg-red-50"
                                                                 title="Delete line item"
                                                                 style={{ flexShrink: 0 }}
                                                             >
-                                                                <DeleteOutlined style={{ fontSize: 16 }} />
+                                                                <DeleteOutlined style={{ fontSize: 18 }} />
                                                             </button>
                                                     )}
                                                 </td>
