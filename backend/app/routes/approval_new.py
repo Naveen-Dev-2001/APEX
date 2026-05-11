@@ -902,26 +902,12 @@ async def get_ui_status_from_frontend(
     is_finance = email in [f.lower() for f in finance_users]
  
     steps = _steps_for_invoice(db, invoice_id)
-    approval_types = [StepType.LEVEL_APPROVED, StepType.THRESHOLD_APPROVED,
-                      StepType.POSTING_APPROVED, StepType.APPROVED]
- 
+    # ── Filter steps to the current cycle (post-rework/recall) ──
+    steps_for_level_check = _get_current_cycle_steps(steps)
+
     mandatory = [a for a in assigned if a.get("type") == "mandatory"]
     threshold_entries = [a for a in assigned if a.get("type") == "threshold"]
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
- 
-    # ── If reworked, only count approval steps AFTER the last rework ──
-    if current_status == InvoiceStatus.REWORKED:
-        rework_steps = [s for s in steps if s.step_type == StepType.REWORKED]
-        last_rework_ts = max((s.timestamp for s in rework_steps), default=None)
-        if last_rework_ts:
-            steps_for_level_check = [
-                s for s in steps
-                if s.step_type not in approval_types or s.timestamp > last_rework_ts
-            ]
-        else:
-            steps_for_level_check = steps
-    else:
-        steps_for_level_check = steps
  
     approved_levels = _get_approved_levels(steps_for_level_check)
     threshold_done = _threshold_approved(steps_for_level_check)
