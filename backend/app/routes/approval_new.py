@@ -490,7 +490,7 @@ async def _finalize_and_post(db: Session, invoice: Invoice, current_user: UserRe
     db.commit()
 
     # 2. Trigger Sage Posting
-    sage_result = await _post_to_sage(invoice_id, entity)
+    sage_result = await _post_to_sage(invoice_id, entity, db)
 
     if sage_result["success"]:
         invoice = invoice_repo.get(db, invoice_id)
@@ -574,27 +574,25 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
         except Exception as pdf_err:
              logger.error(f"[SagePost] Error ensuring approval PDF: {pdf_err}", exc_info=True)
 
-        # 3. Extract coding details
-        hc = {}
-        if invoice.coding and invoice.coding.header_coding:
-            try:
-                hc = json.loads(invoice.coding.header_coding)
-            except:
-                hc = {}
+        # 3. Extract finalized coding details (Capture at approval)
+        hc, line_items = _get_finalized_coding_data(invoice)
         
-        line_items = []
-        if invoice.coding and invoice.coding.line_items:
-            try:
-                line_items = json.loads(invoice.coding.line_items)
-                # Robust extraction: if header fields are missing, try to get from first line item
-                if line_items and not hc.get("gl_code"):
-                    first = line_items[0]
-                    if not hc.get("gl_code"): hc["gl_code"] = first.get("gl_code")
-                    if not hc.get("department"): hc["department"] = first.get("department") or first.get("department_id")
-                    if not hc.get("item"): hc["item"] = first.get("item") or first.get("item_id")
-                    if not hc.get("lob"): hc["lob"] = first.get("lob") or first.get("class")
-            except:
-                line_items = []
+        # Synchronously update the coding record to ensure DB matches what we send to Sage
+        if invoice.coding:
+            from app.repository.repositories import coding_repo
+            invoice.coding.header_coding = json.dumps(hc) if hc else None
+            invoice.coding.line_items = json.dumps(line_items) if line_items else None
+            db.add(invoice.coding)
+            db.flush()
+            logger.info(f"[SagePost] Finalized coding captured and saved for invoice {invoice_id}")
+
+        # Robust extraction: if header fields are missing, try to get from first line item
+        if line_items and not hc.get("gl_code"):
+            first = line_items[0]
+            if not hc.get("gl_code"): hc["gl_code"] = first.get("gl_code")
+            if not hc.get("department"): hc["department"] = first.get("department") or first.get("department_id")
+            if not hc.get("item"): hc["item"] = first.get("item") or first.get("item_id")
+            if not hc.get("lob"): hc["lob"] = first.get("lob") or first.get("class")
 
         # 4. Resolve Sage Location ID from EntityMaster partition mapping
         entity_record = db.query(EntityMaster).filter(EntityMaster.entity_name == invoice.entity).first()
@@ -637,6 +635,59 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
             "message": str(exc),
             "sage_bill_number": None,
         }
+
+
+def _get_finalized_coding_data(invoice: Invoice):
+    """
+    Extracts the latest line items and header coding from extracted_data['lineItemsSnapshot'].
+    This ensures we capture the exact state seen by the approver in the UI.
+    """
+    extracted = {}
+    if invoice.extracted_data:
+        try:
+            extracted = json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else invoice.extracted_data
+        except:
+            pass
+    
+    snapshot = extracted.get("lineItemsSnapshot", [])
+    if snapshot:
+        # Convert snapshot (camelCase from UI) to snake_case for Sage/DB
+        final_line_items = []
+        for item in snapshot:
+            final_line_items.append({
+                "description": item.get("description", ""),
+                "qty": item.get("qty", 1),
+                "unit_price": item.get("unitPrice", 0),
+                "net_amount": item.get("netAmount", 0),
+                "gl_code": item.get("glCode", ""),
+                "lob": item.get("lob", ""),
+                "department": item.get("department", ""),
+                "customer": item.get("customer", ""),
+                "item": item.get("item", ""),
+                "location": item.get("location", ""),
+            })
+        
+        # Use existing header coding if available
+        hc = {}
+        if invoice.coding and invoice.coding.header_coding:
+             try: hc = json.loads(invoice.coding.header_coding) if isinstance(invoice.coding.header_coding, str) else invoice.coding.header_coding
+             except: pass
+        
+        logger.info(f"[Capture] Extracted {len(final_line_items)} items from snapshot for invoice {invoice.id}")
+        return hc, final_line_items
+
+    # Fallback to existing coding if no snapshot exists (should not happen if saved via new UI)
+    hc = {}
+    li = []
+    if invoice.coding:
+        if invoice.coding.header_coding:
+            try: hc = json.loads(invoice.coding.header_coding) if isinstance(invoice.coding.header_coding, str) else invoice.coding.header_coding
+            except: pass
+        if invoice.coding.line_items:
+            try: li = json.loads(invoice.coding.line_items) if isinstance(invoice.coding.line_items, str) else invoice.coding.line_items
+            except: pass
+            
+    return hc, li
 
 
 # ─────────────────────────────────────────────
