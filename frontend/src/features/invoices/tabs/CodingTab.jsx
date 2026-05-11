@@ -3,10 +3,9 @@ import {
     PlusOutlined,
     DownloadOutlined,
     UploadOutlined,
-    CaretUpOutlined,
-    DeleteOutlined
+    CaretUpOutlined
 } from "@ant-design/icons";
-// import { Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Modal } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
@@ -774,7 +773,7 @@ const CodingTab = ({ isActive = false }) => {
                                                                 title="Delete line item"
                                                                 style={{ flexShrink: 0 }}
                                                             >
-                                                                <DeleteOutlined style={{ fontSize: 18 }} />
+                                                                <Trash2 size={16} />
                                                             </button>
                                                     )}
                                                 </td>

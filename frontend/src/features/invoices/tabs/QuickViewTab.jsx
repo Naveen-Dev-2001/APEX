@@ -14,8 +14,8 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import loadLineItemTable from "../../../utils/lineItemLogic";
 import * as XLSX from "xlsx";
-import { DownloadOutlined, UploadOutlined, DeleteOutlined } from "@ant-design/icons";
-// import { Trash2 } from "lucide-react";
+import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
+import { Trash2 } from "lucide-react";
 import { formatCurrency } from "../../../utils/formatters";
 
 dayjs.extend(customParseFormat);
@@ -899,7 +899,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                         onClick={() => handleDeleteLineItem(row.id)}
                                                                         title="Delete line item"
                                                                     >
-                                                                        <DeleteOutlined style={{ fontSize: 18 }} />
+                                                                        <Trash2 size={16} />
                                                                     </span>
                                                                 )}
                                                             </td>
