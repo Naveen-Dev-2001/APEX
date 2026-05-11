@@ -30,6 +30,9 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: () => {
+    import('../main').then(({ queryClient }) => {
+      queryClient.clear();
+    });
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('refresh_token');
     sessionStorage.removeItem('user');
