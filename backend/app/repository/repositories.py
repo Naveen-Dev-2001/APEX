@@ -6,7 +6,7 @@ from app.models.db_models import (
     Currency, Delegation, GlobalSetting, ApproverAmount, ApproverGL, 
     ApproverNumber, ApproverDefault, VendorMetadata, VendorWorkflow, 
     CodificationWorkflow, CodingHistory, RawExtractionData, InvoiceRegistry,
-    InvoiceStatusHistory, InvoiceAssignedApprover, InvoiceApprovedBy
+    InvoiceStatusHistory, InvoiceAssignedApprover, InvoiceApprovedBy, DeletedInvoice
 )
 from pydantic import BaseModel
 from typing import Any
@@ -48,6 +48,7 @@ invoice_registry_repo = BaseRepository[InvoiceRegistry, Any, Any](InvoiceRegistr
 invoice_status_history_repo = BaseRepository[InvoiceStatusHistory, Any, Any](InvoiceStatusHistory)
 invoice_assigned_approver_repo = BaseRepository[InvoiceAssignedApprover, Any, Any](InvoiceAssignedApprover)
 invoice_approved_by_repo = BaseRepository[InvoiceApprovedBy, Any, Any](InvoiceApprovedBy)
+deleted_invoice_repo = BaseRepository[DeletedInvoice, Any, Any](DeletedInvoice)
 
 # Aliases for backward compatibility
 entity_repo = entity_master_repo

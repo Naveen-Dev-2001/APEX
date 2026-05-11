@@ -5,9 +5,10 @@ const useMasterDataStore = create((set, get) => ({
     activeTab: 'Entity Master',
     searchQuery: '',
     currentPage: 1,
-    itemsPerPage: 15,
+    itemsPerPage: 10,
     sortColumn: '',
     sortDirection: 'asc',
+    columnFilters: {},
 
     // Loading / error state for Entity Master
     entityLoading: false,
@@ -60,9 +61,9 @@ const useMasterDataStore = create((set, get) => ({
                 { header: 'State / Territory', accessor: 'state_or_territory', sortable: true, filterable: true },
                 { header: 'Zip / Postal Code', accessor: 'zip_or_postal_code', sortable: true, filterable: true },
                 { header: 'Country Code', accessor: 'country_code', sortable: true, filterable: true },
-                { 
-                    header: 'GST Applicable', 
-                    accessor: 'gst_applicable', 
+                {
+                    header: 'GST Applicable',
+                    accessor: 'gst_applicable',
                     sortable: true,
                     filterable: true
                 },
@@ -176,10 +177,16 @@ const useMasterDataStore = create((set, get) => ({
             set({ sortColumn: column, sortDirection: 'asc' });
         }
     },
+    setColumnFilters: (update) => set((state) => ({
+        columnFilters: typeof update === 'function' ? update(state.columnFilters) : update,
+        currentPage: 1
+    })),
+
 
     // ─── Unified Fetcher: Handles all tabs with server-side pagination ──────
     fetchMasterData: async (tabName) => {
-        const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection } = get();
+        const { currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection, columnFilters } = get();
+
         const loadingKeyMap = {
             'Entity Master': 'entityLoading',
             'Vendor Master': 'vendorLoading',
@@ -225,13 +232,28 @@ const useMasterDataStore = create((set, get) => ({
 
         set({ [loadingKey]: true, [errorKey]: null });
         try {
+            // Transform columnFilters for backend
+            const backendFilters = {};
+            Object.entries(columnFilters).forEach(([accessor, value]) => {
+                if (!value) return;
+                if (value instanceof Set) {
+                    if (value.size > 0) backendFilters[accessor] = Array.from(value);
+                } else if (typeof value === 'object' && value.op) {
+                    backendFilters[accessor] = value;
+                } else {
+                    backendFilters[accessor] = value;
+                }
+            });
+
             const response = await fetcher({
                 page: currentPage,
                 page_size: itemsPerPage,
                 search: searchQuery,
+                filters: backendFilters,
                 sort_by: sortColumn,
                 sort_dir: sortDirection
             });
+
 
             // Backend returns { data: [], total: 0, ... }
             const rows = response.data || [];
@@ -925,14 +947,14 @@ const useMasterDataStore = create((set, get) => ({
         const { activeTab, searchQuery, masters, sortColumn, sortDirection } = get();
         const master = masters[activeTab];
         if (!master) return [];
-        
+
         let processed = [...master.data];
 
         // Sort & Filter (Server-side for everything now)
         // Except for Entity Master where we might want to map names, 
         // but even then, the backend should ideally handle it.
         // For now, let's just bypass client-side search/sort for all.
-        
+
         if (activeTab === 'Entity Master') {
             processed = processed.map(item => ({
                 ...item,

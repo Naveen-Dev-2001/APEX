@@ -19,12 +19,23 @@ export const masterDataService = {
                 page: params.page || 1,
                 page_size: params.page_size || 100,
                 search: params.search || undefined,
+                filters: params.filters ? JSON.stringify(params.filters) : undefined,
                 sort_by: params.sort_by || undefined,
                 sort_dir: params.sort_dir || undefined
             }
         });
         return res.data;
     },
+    
+    /** Fetch unique values for a column to populate filter dropdowns */
+    async getFilterOptions(identifier, column, search = '', limit = 10) {
+        const res = await API.get(`/master/sheet/${identifier}/filter-options`, {
+            params: { column, search, limit }
+        });
+        return res.data;
+    },
+
+
 
     /** Fetch all entity master rows from DB */
     async getEntityMasterData(params = {}) {

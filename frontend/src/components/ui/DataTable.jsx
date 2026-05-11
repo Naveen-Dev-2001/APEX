@@ -47,6 +47,15 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
     // All unique values for this column
     const [allValues, setAllValues] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [debouncedSearch, setDebouncedSearch] = useState(search);
+
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search]);
 
     useEffect(() => {
         let isMounted = true;
@@ -69,7 +78,8 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
 
             setLoading(true);
             try {
-                const options = await col.onGetOptions(col.accessor);
+                // Pass debouncedSearch and limit 10 to onGetOptions
+                const options = await col.onGetOptions(col.accessor, debouncedSearch, 10);
                 if (isMounted) {
                     const sortedOptions = [...(options || [])].sort((a, b) => {
                         if (isNumber) {
@@ -90,14 +100,12 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
 
         fetchOptions();
         return () => { isMounted = false; };
-    }, [col, data]);
+    }, [col, data, debouncedSearch]);
 
-    // Values visible after searching
+    // Values visible after searching - since we search on server, we just use allValues
     const visibleValues = useMemo(() => {
-        if (!search.trim()) return allValues;
-        const q = search.toLowerCase();
-        return allValues.filter(v => String(v).toLowerCase().includes(q));
-    }, [allValues, search]);
+        return allValues;
+    }, [allValues]);
 
     // Close on outside click
     useEffect(() => {
@@ -155,7 +163,7 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                         style={{
                             flex: 1, padding: '12px', fontSize: 13, fontWeight: 600,
                             background: filterMode === 'list' ? '#fff' : 'transparent',
-                            border: 'none', 
+                            border: 'none',
                             borderBottom: filterMode === 'list' ? '2px solid #24A1DD' : '2px solid transparent',
                             color: filterMode === 'list' ? '#24A1DD' : '#6b7280',
                             cursor: 'pointer',
@@ -169,7 +177,7 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                         style={{
                             flex: 1, padding: '12px', fontSize: 13, fontWeight: 600,
                             background: filterMode === 'condition' ? '#fff' : 'transparent',
-                            border: 'none', 
+                            border: 'none',
                             borderBottom: filterMode === 'condition' ? '2px solid #24A1DD' : '2px solid transparent',
                             color: filterMode === 'condition' ? '#24A1DD' : '#6b7280',
                             cursor: 'pointer',
@@ -212,8 +220,8 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
                             {search && (
                                 <button
                                     onClick={() => setSearch('')}
-                                    style={{ 
-                                        background: 'none', border: 'none', cursor: 'pointer', 
+                                    style={{
+                                        background: 'none', border: 'none', cursor: 'pointer',
                                         color: '#9ca3af', padding: 0, fontSize: 14,
                                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}
@@ -402,32 +410,32 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
 };
 
 // ─── Main DataTable ───────────────────────────────────────────────────────────
-const DataTable = ({ 
-  columns, 
-  data, 
-  loading = false,
-  skeletonRows = 8,
-  totalItems, 
-  itemsPerPageOptions = [15, 30, 50, 100],
-  onPageChange,
-  onItemsPerPageChange,
-  currentPage = 1,
-  itemsPerPage = 15,
-  sortColumn,
-  sortDirection,
-  maxHeight,
-  stickyHeader = false,
-  enableColumnFilters = false,
-  columnFilters: externalColumnFilters,
-  onColumnFiltersChange: onExternalColumnFiltersChange,
-  onSort,
-  expandable = true,
-  renderExpandedRow,
-  isClientSide = false,
-  selectable = false,
-  selectedRows = [],
-  onSelectionChange,
-  transparent = false,
+const DataTable = ({
+    columns,
+    data,
+    loading = false,
+    skeletonRows = 8,
+    totalItems,
+    itemsPerPageOptions = [10, 15, 30, 50, 100],
+    onPageChange,
+    onItemsPerPageChange,
+    currentPage = 1,
+    itemsPerPage = 15,
+    sortColumn,
+    sortDirection,
+    maxHeight,
+    stickyHeader = false,
+    enableColumnFilters = false,
+    columnFilters: externalColumnFilters,
+    onColumnFiltersChange: onExternalColumnFiltersChange,
+    onSort,
+    expandable = true,
+    renderExpandedRow,
+    isClientSide = false,
+    selectable = false,
+    selectedRows = [],
+    onSelectionChange,
+    transparent = false,
 }) => {
     // ── Row Expansion state ──────────────────────────────────────────────────
     const [expandedRow, setExpandedRow] = useState(null);
@@ -444,13 +452,16 @@ const DataTable = ({
     // ── Filter state ──────────────────────────────────────────────────────────
     // columnFilters: { [accessor]: Set<string> }
     const [internalColumnFilters, setInternalColumnFilters] = useState({});
-    
+
     const columnFilters = externalColumnFilters !== undefined ? externalColumnFilters : internalColumnFilters;
 
     const setColumnFilters = useCallback((update) => {
         if (onExternalColumnFiltersChange) {
             if (typeof update === 'function') {
-                onExternalColumnFiltersChange(prev => update(prev || {}));
+                // If external handler supports functional updates, it will receive the function.
+                // If not, it will receive the next state value.
+                // Most of our stores now support functions, but to be safe we can also pass the value.
+                onExternalColumnFiltersChange(update);
             } else {
                 onExternalColumnFiltersChange(update);
             }
@@ -488,49 +499,50 @@ const DataTable = ({
 
     const handleFunnelClick = useCallback((e, col) => {
         e.stopPropagation();
-        if (openFilter?.accessor === col.accessor) {
+        const accessor = col.accessor;
+        if (openFilter?.accessor === accessor) {
             setOpenFilter(null);
             return;
         }
         const rect = e.currentTarget.getBoundingClientRect();
         setOpenFilter({
-            accessor: col.accessor,
+            accessor,
             col,
             anchorPos: { left: rect.left, bottom: rect.bottom },
         });
-    }, [openFilter]);
+    }, [openFilter?.accessor]);
 
     const applyFilter = useCallback((accessor, selected) => {
         setColumnFilters(prev => ({ ...prev, [accessor]: selected }));
         setOpenFilter(null);
-    }, []);
+    }, [setColumnFilters]);
 
     // ── Client-side filtering ─────────────────────────────────────────────────
     // Helper to filter data by a specific subset of filters
     const getFilteredDataCommon = useCallback((filters) => {
         // If server side filtering is enabled, we assume 'data' is already filtered
         if (onExternalColumnFiltersChange) return data;
-        
+
         return data.filter(row =>
             columns.every(col => {
                 if (!col.filterable) return true;
                 const selected = filters[col.accessor];
                 if (!selected) return true;
-                
+
                 if (selected instanceof Set) {
                     if (selected.size === 0) return true;
                     const val = getColFilterValue(col, row);
                     return selected.has(val);
-                    } else if (typeof selected === 'object' && selected.op) {
+                } else if (typeof selected === 'object' && selected.op) {
                     if (selected.op === 'between') {
                         const rowVal = getColFilterValue(col, row);
                         if (!rowVal || rowVal === '-') return false;
                         const rowDate = new Date(rowVal);
                         if (isNaN(rowDate.getTime())) return false;
-                        
+
                         // Normalize dates to midnight for fair comparison
                         rowDate.setHours(0, 0, 0, 0);
-                        
+
                         const [from, to] = selected.val;
                         if (from) {
                             const fromDate = new Date(from);
@@ -544,12 +556,12 @@ const DataTable = ({
                         }
                         return true;
                     }
-                    
+
                     if (selected.val === "" || selected.val === undefined) return true;
                     const rowVal = parseFloat(getColFilterValue(col, row));
                     const filterVal = parseFloat(selected.val);
                     if (isNaN(rowVal) || isNaN(filterVal)) return false;
-                    
+
                     switch (selected.op) {
                         case '=': return rowVal === filterVal;
                         case '>': return rowVal > filterVal;
@@ -626,272 +638,272 @@ const DataTable = ({
 
     return (
         <>
-        <div className={`w-full flex flex-col ${transparent ? 'bg-transparent' : 'bg-white rounded-md border border-gray-200 shadow-sm'} overflow-hidden`}>
-            <div 
-                className="w-full overflow-x-auto overflow-y-auto"
-                style={maxHeight ? { maxHeight } : {}}
-            >
-                <table className="w-full text-left text-[13px] text-gray-700 border-separate border-spacing-0">
-                    <thead className={`${stickyHeader ? 'sticky top-0 z-20' : ''} bg-[#1D71AB] text-white`}>
-                        <tr>
-                            {selectable && (
-                                <th className="px-4 py-3 w-10">
-                                    <div className="flex items-center justify-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={displayData.length > 0 && displayData.every(row => selectedRows.includes(row.id))}
-                                            onChange={(e) => {
-                                                if (onSelectionChange) {
-                                                    if (e.target.checked) {
-                                                        const newIds = displayData.map(row => row.id).filter(id => !selectedRows.includes(id));
-                                                        onSelectionChange([...selectedRows, ...newIds]);
-                                                    } else {
-                                                        const pageIds = displayData.map(row => row.id);
-                                                        onSelectionChange(selectedRows.filter(id => !pageIds.includes(id)));
+            <div className={`w-full flex flex-col ${transparent ? 'bg-transparent' : 'bg-white rounded-md border border-gray-200 shadow-sm'} overflow-hidden`}>
+                <div
+                    className="w-full overflow-x-auto overflow-y-auto"
+                    style={maxHeight ? { maxHeight } : {}}
+                >
+                    <table className="w-full text-left text-[13px] text-gray-700 border-separate border-spacing-0">
+                        <thead className={`${stickyHeader ? 'sticky top-0 z-20' : ''} bg-[#1D71AB] text-white`}>
+                            <tr>
+                                {selectable && (
+                                    <th className="px-4 py-3 w-10">
+                                        <div className="flex items-center justify-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={displayData.length > 0 && displayData.every(row => selectedRows.includes(row.id))}
+                                                onChange={(e) => {
+                                                    if (onSelectionChange) {
+                                                        if (e.target.checked) {
+                                                            const newIds = displayData.map(row => row.id).filter(id => !selectedRows.includes(id));
+                                                            onSelectionChange([...selectedRows, ...newIds]);
+                                                        } else {
+                                                            const pageIds = displayData.map(row => row.id);
+                                                            onSelectionChange(selectedRows.filter(id => !pageIds.includes(id)));
+                                                        }
+                                                    }
+                                                }}
+                                                className="w-4 h-4 cursor-pointer"
+                                            />
+                                        </div>
+                                    </th>
+                                )}
+                                {columns.map((col, idx) => {
+                                    const isSortedColumn = sortColumn === col.accessor;
+                                    const isLastColumn = idx === columns.length - 1;
+                                    const isSticky = isLastColumn && col.accessor === 'actions';
+                                    const filtered = enableColumnFilters && col.filterable && isColFiltered(col.accessor);
+                                    return (
+                                        <th
+                                            key={idx}
+                                            className={`px-4 py-3 font-medium whitespace-nowrap
+                                            ${col.sortable ? 'cursor-pointer select-none hover:bg-[#1a669a]' : ''}
+                                            ${isSticky ? 'sticky right-0 bg-[#1D71AB] z-30 shadow-[-12px_1px_12px_-8px_rgba(0,0,0,0.3)]' : ''}`}
+                                            onClick={() => {
+                                                if (col.sortable) {
+                                                    if (onSort) {
+                                                        const newDirection = (sortColumn === col.accessor && sortDirection === 'asc') ? 'desc' : 'asc';
+                                                        onSort(col.accessor, newDirection);
+                                                    } else if (col.onClick) {
+                                                        col.onClick();
                                                     }
                                                 }
                                             }}
-                                            className="w-4 h-4 cursor-pointer"
-                                        />
-                                    </div>
-                                </th>
-                            )}
-                            {columns.map((col, idx) => {
-                                const isSortedColumn = sortColumn === col.accessor;
-                                const isLastColumn = idx === columns.length - 1;
-                                const isSticky = isLastColumn && col.accessor === 'actions';
-                                const filtered = enableColumnFilters && col.filterable && isColFiltered(col.accessor);
-                                return (
-                                    <th 
-                                        key={idx} 
-                                        className={`px-4 py-3 font-medium whitespace-nowrap
-                                            ${col.sortable ? 'cursor-pointer select-none hover:bg-[#1a669a]' : ''}
-                                            ${isSticky ? 'sticky right-0 bg-[#1D71AB] z-30 shadow-[-12px_1px_12px_-8px_rgba(0,0,0,0.3)]' : ''}`}
-                                        onClick={() => {
-                                            if (col.sortable) {
-                                                if (onSort) {
-                                                    const newDirection = (sortColumn === col.accessor && sortDirection === 'asc') ? 'desc' : 'asc';
-                                                    onSort(col.accessor, newDirection);
-                                                } else if (col.onClick) {
-                                                    col.onClick();
-                                                }
-                                            }
-                                        }}
-                                    >
-                                        <div className="flex items-center justify-between w-full gap-1.5">
-                                            {/* Column label */}
-                                            <span>{col.header}</span>
+                                        >
+                                            <div className="flex items-center justify-between w-full gap-1.5">
+                                                {/* Column label */}
+                                                <span>{col.header}</span>
 
-                                            {/* Sort arrows + Filter icon grouped at the right end */}
-                                            <div className="flex items-center gap-1 ml-auto shrink-0">
-                                                {col.sortable && (
-                                                    <div className="flex flex-col text-[10px] leading-[6px] opacity-70">
-                                                        <span className={isSortedColumn && sortDirection === 'asc' ? 'text-white font-bold opacity-100' : 'opacity-40'}>▲</span>
-                                                        <span className={isSortedColumn && sortDirection === 'desc' ? 'text-white font-bold opacity-100' : 'opacity-40'}>▼</span>
-                                                    </div>
-                                                )}
+                                                {/* Sort arrows + Filter icon grouped at the right end */}
+                                                <div className="flex items-center gap-1 ml-auto shrink-0">
+                                                    {col.sortable && (
+                                                        <div className="flex flex-col text-[10px] leading-[6px] opacity-70">
+                                                            <span className={isSortedColumn && sortDirection === 'asc' ? 'text-white font-bold opacity-100' : 'opacity-40'}>▲</span>
+                                                            <span className={isSortedColumn && sortDirection === 'desc' ? 'text-white font-bold opacity-100' : 'opacity-40'}>▼</span>
+                                                        </div>
+                                                    )}
 
-                                                {enableColumnFilters && col.filterable && (
-                                                    <button
-                                                        onClick={(e) => handleFunnelClick(e, col)}
-                                                        title={`Filter by ${col.header}`}
-                                                        style={{
-                                                            background: filtered
-                                                                ? 'rgba(64,169,255,0.2)'
-                                                                : openFilter?.accessor === col.accessor
-                                                                    ? 'rgba(255,255,255,0.15)'
-                                                                    : 'transparent',
-                                                            border: filtered ? '1px solid rgba(64,169,255,0.6)' : '1px solid transparent',
-                                                            borderRadius: 4,
-                                                            cursor: 'pointer',
-                                                            padding: '2px 3px',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            transition: 'all 0.15s',
-                                                        }}
-                                                        onMouseEnter={e => {
-                                                            if (!filtered) e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                                                        }}
-                                                        onMouseLeave={e => {
-                                                            if (!filtered) e.currentTarget.style.background = openFilter?.accessor === col.accessor ? 'rgba(255,255,255,0.15)' : 'transparent';
-                                                        }}
-                                                    >
-                                                        <FunnelIcon active={filtered} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </th>
-                                );
-                            })}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {displayData.map((row, rowIdx) => {
-                            const isExpanded = expandedRow === rowIdx;
-                            return (
-                                <React.Fragment key={rowIdx}>
-                                    <tr 
-                                        className={`hover:bg-gray-50 transition-colors group ${expandable ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-gray-50' : ''}`}
-                                        onClick={(e) => {
-                                            // Don't expand if user clicked a button, anchor, or anything interactive
-                                            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) {
-                                                return;
-                                            }
-                                            if (expandable) toggleRow(rowIdx);
-                                        }}
-                                    >
-                                        {selectable && (
-                                            <td className="px-4 py-3.5 w-10" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center justify-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedRows.includes(row.id)}
-                                                        onChange={(e) => {
-                                                            if (onSelectionChange) {
-                                                                const newSelected = e.target.checked
-                                                                    ? [...selectedRows, row.id]
-                                                                    : selectedRows.filter(id => id !== row.id);
-                                                                onSelectionChange(newSelected);
-                                                            }
-                                                        }}
-                                                        className="w-4 h-4 cursor-pointer"
-                                                    />
+                                                    {enableColumnFilters && col.filterable && (
+                                                        <button
+                                                            onClick={(e) => handleFunnelClick(e, col)}
+                                                            title={`Filter by ${col.header}`}
+                                                            style={{
+                                                                background: filtered
+                                                                    ? 'rgba(64,169,255,0.2)'
+                                                                    : openFilter?.accessor === col.accessor
+                                                                        ? 'rgba(255,255,255,0.15)'
+                                                                        : 'transparent',
+                                                                border: filtered ? '1px solid rgba(64,169,255,0.6)' : '1px solid transparent',
+                                                                borderRadius: 4,
+                                                                cursor: 'pointer',
+                                                                padding: '2px 3px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                transition: 'all 0.15s',
+                                                            }}
+                                                            onMouseEnter={e => {
+                                                                if (!filtered) e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                                                            }}
+                                                            onMouseLeave={e => {
+                                                                if (!filtered) e.currentTarget.style.background = openFilter?.accessor === col.accessor ? 'rgba(255,255,255,0.15)' : 'transparent';
+                                                            }}
+                                                        >
+                                                            <FunnelIcon active={filtered} />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                            </td>
-                                        )}
-                                        {columns.map((col, colIdx) => {
-                                            const isLastColumn = colIdx === columns.length - 1;
-                                            const isSticky = isLastColumn && col.accessor === 'actions';
-                                            return (
-                                                <td 
-                                                    key={colIdx} 
-                                                    className={`px-4 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
+                                            </div>
+                                        </th>
+                                    );
+                                })}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {displayData.map((row, rowIdx) => {
+                                const isExpanded = expandedRow === rowIdx;
+                                return (
+                                    <React.Fragment key={rowIdx}>
+                                        <tr
+                                            className={`hover:bg-gray-50 transition-colors group ${expandable ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-gray-50' : ''}`}
+                                            onClick={(e) => {
+                                                // Don't expand if user clicked a button, anchor, or anything interactive
+                                                if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) {
+                                                    return;
+                                                }
+                                                if (expandable) toggleRow(rowIdx);
+                                            }}
+                                        >
+                                            {selectable && (
+                                                <td className="px-4 py-3.5 w-10" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedRows.includes(row.id)}
+                                                            onChange={(e) => {
+                                                                if (onSelectionChange) {
+                                                                    const newSelected = e.target.checked
+                                                                        ? [...selectedRows, row.id]
+                                                                        : selectedRows.filter(id => id !== row.id);
+                                                                    onSelectionChange(newSelected);
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                </td>
+                                            )}
+                                            {columns.map((col, colIdx) => {
+                                                const isLastColumn = colIdx === columns.length - 1;
+                                                const isSticky = isLastColumn && col.accessor === 'actions';
+                                                return (
+                                                    <td
+                                                        key={colIdx}
+                                                        className={`px-4 py-3.5 whitespace-nowrap border-r border-transparent last:border-none
                                                         ${isSticky ? 'sticky right-0 bg-white group-hover:bg-gray-50 z-10 shadow-[-12px_1px_12px_-8px_rgba(30,30,30,0.15)]' : ''}
                                                         ${isExpanded && isSticky ? 'bg-gray-50' : ''}`}
-                                                >
-                                                    {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                    {isExpanded && (
-                                        <tr>
-                                            <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0 bg-white border-none">
-                                                <div className="px-4 py-4 sm:px-8 sm:py-5 bg-[#fbfcfd] border-y border-gray-100 animate-slideDown overflow-hidden">
-                                                    <div className="sticky left-0 w-fit max-w-[calc(100vw-100px)] px-4">
-                                                        <div className="flex items-center gap-2 mb-4">
-                                                            <div className="w-1 h-4 bg-[#24A1DD] rounded-full"></div>
-                                                            <h3 className="text-xs font-bold text-gray-800 uppercase tracking-tight">
-                                                                Detailed View
-                                                            </h3>
-                                                        </div>
-                                                        
-                                                        {renderExpandedRow ? (
-                                                            renderExpandedRow(row, rowIdx)
-                                                        ) : (
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-4">
-                                                                {columns.filter(col => col.accessor !== 'actions').map((col, cIdx) => (
-                                                                    <div key={cIdx} className="flex flex-col gap-1.5 group/field">
-                                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest transition-colors group-hover/field:text-[#24A1DD]">
-                                                                            {col.header}
-                                                                        </span>
-                                                                        <div className="text-[14px] text-gray-700 font-medium leading-relaxed">
-                                                                            {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || (
-                                                                                <span className="text-gray-300">—</span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
+                                                    >
+                                                        {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || '-'}
+                                                    </td>
+                                                );
+                                            })}
                                         </tr>
-                                    )}
-                                </React.Fragment>
-                            );
-                        })}
-                        {filteredData.length === 0 && (
-                            <tr>
-                                <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-5 py-8 text-center text-gray-500">
-                                    {hasActiveFilters
-                                        ? 'No records match the current filters.'
-                                        : 'No data available'}
-                                </td>
-                            </tr>
+                                        {isExpanded && (
+                                            <tr>
+                                                <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0 bg-white border-none">
+                                                    <div className="px-4 py-4 sm:px-8 sm:py-5 bg-[#fbfcfd] border-y border-gray-100 animate-slideDown overflow-hidden">
+                                                        <div className="sticky left-0 w-fit max-w-[calc(100vw-100px)] px-4">
+                                                            <div className="flex items-center gap-2 mb-4">
+                                                                <div className="w-1 h-4 bg-[#24A1DD] rounded-full"></div>
+                                                                <h3 className="text-xs font-bold text-gray-800 uppercase tracking-tight">
+                                                                    Detailed View
+                                                                </h3>
+                                                            </div>
+
+                                                            {renderExpandedRow ? (
+                                                                renderExpandedRow(row, rowIdx)
+                                                            ) : (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-4">
+                                                                    {columns.filter(col => col.accessor !== 'actions').map((col, cIdx) => (
+                                                                        <div key={cIdx} className="flex flex-col gap-1.5 group/field">
+                                                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest transition-colors group-hover/field:text-[#24A1DD]">
+                                                                                {col.header}
+                                                                            </span>
+                                                                            <div className="text-[14px] text-gray-700 font-medium leading-relaxed">
+                                                                                {col.render ? col.render(row[col.accessor], row, rowIdx) : row[col.accessor] || (
+                                                                                    <span className="text-gray-300">—</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
+                            {filteredData.length === 0 && (
+                                <tr>
+                                    <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-5 py-8 text-center text-gray-500">
+                                        {hasActiveFilters
+                                            ? 'No records match the current filters.'
+                                            : 'No data available'}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* ── Pagination Footer ── */}
+                <div className="flex flex-col sm:flex-row items-center justify-between px-4 sm:px-5 py-3 border-t border-gray-200 bg-white z-10 gap-4 sm:gap-0">
+                    <div className="flex items-center justify-between sm:justify-start gap-4 w-full sm:w-auto text-[13px] text-gray-600">
+                        <div className="flex items-center gap-2">
+                            <span>Items:</span>
+                            <select
+                                className="border border-gray-300 rounded px-2 py-1 bg-white outline-none focus:border-blue-500 cursor-pointer text-gray-700"
+                                value={itemsPerPage}
+                                onChange={(e) => onItemsPerPageChange && onItemsPerPageChange(Number(e.target.value))}
+                            >
+                                {itemsPerPageOptions.map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <span>
+                            {hasActiveFilters ? `${filteredData.length} filtered / ` : ''}
+                            {startItem}-{endItem} of {effectiveTotalItems}
+                        </span>
+                        {hasActiveFilters && (
+                            <button
+                                onClick={() => setColumnFilters({})}
+                                style={{
+                                    fontSize: 12, color: '#24A1DD', background: 'none',
+                                    border: '1px solid #24A1DD', borderRadius: 4,
+                                    padding: '2px 8px', cursor: 'pointer',
+                                }}
+                            >
+                                Clear all filters
+                            </button>
                         )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* ── Pagination Footer ── */}
-            <div className="flex flex-col sm:flex-row items-center justify-between px-4 sm:px-5 py-3 border-t border-gray-200 bg-white z-10 gap-4 sm:gap-0">
-                <div className="flex items-center justify-between sm:justify-start gap-4 w-full sm:w-auto text-[13px] text-gray-600">
-                    <div className="flex items-center gap-2">
-                        <span>Items:</span>
-                        <select 
-                            className="border border-gray-300 rounded px-2 py-1 bg-white outline-none focus:border-blue-500 cursor-pointer text-gray-700"
-                            value={itemsPerPage}
-                            onChange={(e) => onItemsPerPageChange && onItemsPerPageChange(Number(e.target.value))}
-                        >
-                            {itemsPerPageOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
                     </div>
-                    <span>
-                        {hasActiveFilters ? `${filteredData.length} filtered / ` : ''}
-                        {startItem}-{endItem} of {effectiveTotalItems}
-                    </span>
-                    {hasActiveFilters && (
-                        <button
-                            onClick={() => setColumnFilters({})}
-                            style={{
-                                fontSize: 12, color: '#24A1DD', background: 'none',
-                                border: '1px solid #24A1DD', borderRadius: 4,
-                                padding: '2px 8px', cursor: 'pointer',
-                            }}
-                        >
-                            Clear all filters
-                        </button>
-                    )}
-                </div>
 
-                <div className="flex items-center justify-center gap-1 w-full sm:w-auto">
-                    {renderPaginationNumbers()}
-                    <button 
-                        onClick={() => handlePageClick(currentPage - 1)}
-                        disabled={currentPage === 1}
-                        className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed ml-1 sm:ml-2 font-bold"
-                    >
-                        &lt;
-                    </button>
-                    <button 
-                        onClick={() => handlePageClick(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                        className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
-                    >
-                        &gt;
-                    </button>
+                    <div className="flex items-center justify-center gap-1 w-full sm:w-auto">
+                        {renderPaginationNumbers()}
+                        <button
+                            onClick={() => handlePageClick(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed ml-1 sm:ml-2 font-bold"
+                        >
+                            &lt;
+                        </button>
+                        <button
+                            onClick={() => handlePageClick(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+                        >
+                            &gt;
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        {/* ── Filter Popover (portal-like, fixed positioning) ── */}
-        {openFilter && createPortal(
-            <FilterPopover
-                col={openFilter.col}
-                data={getDataForFilterPopover(openFilter.accessor)}
-                activeFilters={columnFilters[openFilter.accessor]}
-                anchorPos={openFilter.anchorPos}
-                onApply={(selected) => applyFilter(openFilter.accessor, selected)}
-                onClose={() => setOpenFilter(null)}
-            />,
-            document.body
-        )}
+            {/* ── Filter Popover (portal-like, fixed positioning) ── */}
+            {openFilter && createPortal(
+                <FilterPopover
+                    col={openFilter.col}
+                    data={getDataForFilterPopover(openFilter.accessor)}
+                    activeFilters={columnFilters[openFilter.accessor]}
+                    anchorPos={openFilter.anchorPos}
+                    onApply={(selected) => applyFilter(openFilter.accessor, selected)}
+                    onClose={() => setOpenFilter(null)}
+                />,
+                document.body
+            )}
         </>
     );
 };

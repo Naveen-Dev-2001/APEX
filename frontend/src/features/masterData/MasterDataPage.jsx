@@ -18,6 +18,7 @@ import ExchangeRateMasterModal from './ExchangeRateMasterModal';
 import CustomButton from '../../shared/components/CustomButton';
 
 import { useAuthStore } from '../../store/authStore';
+import { masterDataService } from '../../api/masterdataAPI';
 
 const MasterDataPage = () => {
     const user = useAuthStore((state) => state.user);
@@ -30,6 +31,7 @@ const MasterDataPage = () => {
         currentPage, setCurrentPage,
         itemsPerPage, setItemsPerPage,
         sortColumn, sortDirection, setSort,
+        columnFilters, setColumnFilters,
         masters, getFilteredData, fetchMasterData,
         entityLoading, entityError, uploadEntityMaster,
         vendorLoading, vendorError, uploadVendorMaster,
@@ -76,15 +78,13 @@ const MasterDataPage = () => {
     useEffect(() => {
         // Unified fetcher handles all tabs
         fetchMasterData(activeTab);
-    }, [activeTab, fetchMasterData, currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection]);
+    }, [activeTab, fetchMasterData, currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection, columnFilters]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
 
     const openEdit = (row, indexInPage) => {
         const absoluteIndex = (currentPage - 1) * itemsPerPage + indexInPage;
-        // If sorting or filtering is active, absolute index might be tricky.
-        // Best to find index in the original data array for the current master
         const masterData = masters[activeTab].data;
         const realIndex = masterData.findIndex(r => r.id === row.id);
 
@@ -196,7 +196,6 @@ const MasterDataPage = () => {
             confirmLabel: 'Delete',
             variant: 'danger',
             onConfirm: async () => {
-                // Restriction: Check for invoices only after confirmation
                 if (isEntityTab && row.invoice_count > 0) {
                     toast.error("You can't delete this entity because an invoice has already been created for it.");
                     return;
@@ -244,9 +243,31 @@ const MasterDataPage = () => {
     const columns = (currentMaster?.columns || [])
         .filter(col => !(isReadOnly && col.accessor === 'actions'))
         .map((col) => {
+            const getIdentifier = (tab) => {
+                const map = {
+                    'Entity Master': 'Entity_Master',
+                    'Vendor Master': 'Vendor_Master',
+                    'TDS Rates': 'TDS_Rates',
+                    'GL Master': 'GL',
+                    'LOB Master': 'LOB',
+                    'Department Master': 'Department',
+                    'Customer Master': 'Customer',
+                    'Item Master': 'Item',
+                    'Currency': 'Currency',
+                    'Exchange Rate Master': 'Exchange_Rate'
+                };
+                return map[tab] || tab;
+            };
+
+            const colWithFilter = {
+                ...col,
+                onGetOptions: col.filterable ? (accessor, search, limit) => masterDataService.getFilterOptions(getIdentifier(activeTab), accessor, search, limit) : undefined,
+                onClick: col.sortable ? () => setSort(col.accessor) : undefined
+            };
+
             if (col.accessor === 'gst_applicable') {
                 return {
-                    ...col,
+                    ...colWithFilter,
                     render: (val) => (
                         <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
                         ${val ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500'}`}>
@@ -257,7 +278,7 @@ const MasterDataPage = () => {
             }
             if (col.accessor === 'require_department' || col.accessor === 'require_location') {
                 return {
-                    ...col,
+                    ...colWithFilter,
                     render: (val) => (
                         <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium
                         ${val ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500'}`}>
@@ -283,14 +304,14 @@ const MasterDataPage = () => {
                         return (
                             <div className="flex items-center gap-4">
                                 <button
-                                    onClick={() => (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && openEdit(row, index)}
+                                    onClick={() => openEdit(row, index)}
                                     className="text-gray-500 hover:text-gray-700 transition-colors p-1"
                                     title="Edit"
                                 >
                                     <Pencil size={18} />
                                 </button>
                                 <button
-                                    onClick={() => !isDeleteDisabled && (isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) && handleDelete(row, index)}
+                                    onClick={() => !isDeleteDisabled && handleDelete(row, index)}
                                     disabled={isDeleteDisabled}
                                     className={`transition-colors p-1 ${isDeleteDisabled
                                         ? 'text-gray-300 cursor-not-allowed'
@@ -304,10 +325,7 @@ const MasterDataPage = () => {
                     },
                 };
             }
-            return {
-                ...col,
-                onClick: col.sortable ? () => setSort(col.accessor) : undefined
-            };
+            return colWithFilter;
         });
 
     // Vendor Upload View Component
@@ -336,7 +354,6 @@ const MasterDataPage = () => {
         const onUpload = async (file) => {
             try {
                 await uploadVendorMaster(file);
-                // Success - fetchVendorMasterData will be called by store
             } catch (err) {
                 toast.error('Upload failed: ' + (err.response?.data?.detail || err.message));
             }
@@ -389,23 +406,6 @@ const MasterDataPage = () => {
                             Select File
                         </button>
                         <span className="text-sm text-gray-400">Supported formats: .xls, .xlsx, .csv</span>
-                    </div>
-                </div>
-
-                <div className="mt-8 flex items-center gap-8">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[#24A1DD]" />
-                        <span className="text-xs font-medium text-gray-400 tracking-wider uppercase">1. Upload</span>
-                    </div>
-                    <div className="w-8 h-px bg-gray-200" />
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-gray-200" />
-                        <span className="text-xs font-medium text-gray-400 tracking-wider uppercase">2. Validate</span>
-                    </div>
-                    <div className="w-8 h-px bg-gray-200" />
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-gray-200" />
-                        <span className="text-xs font-medium text-gray-400 tracking-wider uppercase">3. Activate</span>
                     </div>
                 </div>
             </div>
@@ -487,14 +487,6 @@ const MasterDataPage = () => {
 
     return (
         <div className="p-6 flex flex-col gap-6 w-full bg-[#FBFBFB] min-h-screen">
-            {/* Header */}
-            {/* <div className="flex flex-col gap-1">
-                <h1 className="text-[28px] font-extrabold text-[#333333]">Master Data Management</h1>
-                <p className="text-sm text-gray-500">Manage your system reference data and configurations</p>
-            </div> */}
-
-            {/* Controls Row */}
-            {/* Tabs Row */}
             <div className="flex items-center gap-3">
                 <div className="flex bg-white border border-gray-200 rounded-[4px] overflow-hidden h-[36px] flex-shrink-0">
                     {tabs.map((tab, index) => (
@@ -514,10 +506,8 @@ const MasterDataPage = () => {
                 </div>
             </div>
 
-            {/* Actions Row */}
             <div className="flex items-center justify-end gap-3 flex-wrap">
                 <div className="flex items-center gap-3">
-                    {/* Search */}
                     <SearchInput
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -526,7 +516,6 @@ const MasterDataPage = () => {
                         placeholder="Search"
                     />
 
-                    {/* Hidden Input for Reupload */}
                     <input
                         type="file"
                         ref={reuploadInputRef}
@@ -535,7 +524,6 @@ const MasterDataPage = () => {
                         accept=".xls,.xlsx,.csv"
                     />
 
-                    {/* Actions */}
                     {!isCurrencyTab && !isReadOnly && (
                         <>
                             <button
@@ -569,7 +557,7 @@ const MasterDataPage = () => {
                         <div style={{ minWidth: 120 }}>
                             <CustomButton
                                 variant="primary"
-                                onClick={(isEntityTab || isVendorTab || isTDSTab || isGLTab || isLOBTab || isDepartmentTab || isCustomerTab || isItemTab || isCurrencyTab || isExchangeRateTab) ? openAdd : undefined}
+                                onClick={openAdd}
                                 className="!h-[36px]"
                             >
                                 <Plus size={16} />
@@ -580,10 +568,9 @@ const MasterDataPage = () => {
                 </div>
             </div>
 
-            {/* Table Area */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) || (currencyError && isCurrencyTab) || (exchangeRateError && isExchangeRateTab) ? (
-                    <div className="absolute inset-0 z-10 bg-white flex items-center justify-center p-6 text-center">
+                    <div className="flex items-center justify-center p-12 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
                                 <AlertCircle className="text-red-500" size={24} />
@@ -593,18 +580,7 @@ const MasterDataPage = () => {
                                 <p className="text-sm text-gray-500 mt-1">{entityError || vendorError || tdsError || glError || lobError || departmentError || customerError || itemError || currencyError || exchangeRateError}</p>
                             </div>
                             <button
-                                onClick={() => {
-                                    if (isEntityTab) fetchEntityMasterData();
-                                    else if (isVendorTab) fetchVendorMasterData();
-                                    else if (isTDSTab) fetchTDSRatesData();
-                                    else if (isGLTab) fetchGLMasterData();
-                                    else if (isLOBTab) fetchLOBMasterData();
-                                    else if (isDepartmentTab) fetchDepartmentMasterData();
-                                    else if (isCustomerTab) fetchCustomerMasterData();
-                                    else if (isItemTab) fetchItemMasterData();
-                                    else if (isCurrencyTab) fetchCurrencyData();
-                                    else if (isExchangeRateTab) fetchExchangeRateData();
-                                }}
+                                onClick={() => fetchMasterData(activeTab)}
                                 className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-all"
                             >
                                 Try Again
@@ -612,123 +588,62 @@ const MasterDataPage = () => {
                         </div>
                     </div>
                 ) : (
-                    <>
-                        {false ? (
-                            <VendorUploadView />
-                        ) : (
-                            <DataTable
-                                columns={columns}
-                                data={filteredData} // Now already paginated by backend
-                                loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : isCurrencyTab ? currencyLoading : exchangeRateLoading}
-                                skeletonRows={itemsPerPage}
-                                totalItems={masters[activeTab]?.total || 0}
-                                currentPage={currentPage}
-                                itemsPerPage={itemsPerPage}
-                                onPageChange={setCurrentPage}
-                                onItemsPerPageChange={setItemsPerPage}
-                                sortColumn={sortColumn}
-                                sortDirection={sortDirection}
-                                maxHeight="calc(100vh - 280px)"
-                                stickyHeader={true}
-                                enableColumnFilters={true}
-                                transparent={true}
-                            />
-                        )}
-                    </>
+                    <DataTable
+                        columns={columns}
+                        data={filteredData}
+                        loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : isCurrencyTab ? currencyLoading : exchangeRateLoading}
+                        skeletonRows={itemsPerPage}
+                        totalItems={masters[activeTab]?.total || 0}
+                        currentPage={currentPage}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onItemsPerPageChange={setItemsPerPage}
+                        sortColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={(col, dir) => {
+                            // The store's setSort only takes column and toggles dir.
+                            // We might need to update store to take dir too, or just call setSort.
+                            setSort(col);
+                        }}
+                        maxHeight="calc(100vh - 280px)"
+                        stickyHeader={true}
+                        enableColumnFilters={true}
+                        columnFilters={columnFilters}
+                        onColumnFiltersChange={setColumnFilters}
+                        transparent={true}
+                    />
                 )}
             </div>
 
-            {/* Entity Master Modal */}
             {modalState.open && isEntityTab && (
-                <EntityMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <EntityMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-
-            {/* Vendor Master Modal */}
             {modalState.open && isVendorTab && (
-                <VendorMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <VendorMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-
-            {/* TDS Rates Modal */}
             {modalState.open && isTDSTab && (
-                <TDSRatesModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <TDSRatesModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-            {/* GL Master Modal */}
             {modalState.open && isGLTab && (
-                <GLMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <GLMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-            {/* LOB Master Modal */}
             {modalState.open && isLOBTab && (
-                <LOBMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <LOBMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-            {/* Department Master Modal */}
             {modalState.open && isDepartmentTab && (
-                <DepartmentMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <DepartmentMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-            {/* Customer Master Modal */}
             {modalState.open && isCustomerTab && (
-                <CustomerMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <CustomerMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-            {/* Item Master Modal */}
             {modalState.open && isItemTab && (
-                <ItemMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <ItemMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-            {/* Currency Master Modal */}
             {modalState.open && isCurrencyTab && (
-                <CurrencyMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <CurrencyMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
-            {/* Exchange Rate Master Modal */}
             {modalState.open && isExchangeRateTab && (
-                <ExchangeRateMasterModal
-                    mode={modalState.mode}
-                    rowData={modalState.rowData}
-                    onClose={closeModal}
-                    onSave={handleSave}
-                />
+                <ExchangeRateMasterModal mode={modalState.mode} rowData={modalState.rowData} onClose={closeModal} onSave={handleSave} />
             )}
         </div>
     );
