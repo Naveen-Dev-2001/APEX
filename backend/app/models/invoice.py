@@ -26,6 +26,7 @@ class InvoiceBase(BaseModel):
     file_path: str
     uploaded_by: str
     status: InvoiceStatus = InvoiceStatus.WAITING_APPROVAL
+    status_label: Optional[str] = None
     status_history: Optional[List[StatusHistoryItem]] = []
     required_approvers: Optional[int] = None
     is_parallel: Optional[bool] = False

@@ -104,6 +104,110 @@ def _flatten_emails(items):
                 res.append(item.lower())
     return list(set(res)) # deduplicate and return
 
+def _apply_status_label_filters(status_vals, expressions, db):
+    """Transform human-readable status labels back to SQLAlchemy expressions."""
+    if not isinstance(status_vals, list):
+        status_vals = [status_vals]
+    
+    conditions = []
+    actual_statuses = []
+    
+    for val in status_vals:
+        val_str = str(val)
+        if val_str.startswith("Waiting for approver "):
+            try:
+                level_str = val_str.replace("Waiting for approver ", "").strip()
+                level = int(level_str)
+                
+                # Logic: Waiting for approver 1/2 always matches those levels (if not last)
+                # For levels 3+, it only matches if it's a finance level.
+                max_level_sq = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                    InvoiceAssignedApprover.invoice_id == Invoice.id
+                ).correlate(Invoice).scalar_subquery()
+                
+                is_threshold_sq = exists().where(
+                    and_(
+                        InvoiceAssignedApprover.invoice_id == Invoice.id,
+                        InvoiceAssignedApprover.sequence_order == level,
+                        InvoiceAssignedApprover.is_finance == False
+                    )
+                )
+                
+                if level in [1, 2]:
+                    # For levels 1 and 2, we don't care about the is_finance flag for the label
+                    conditions.append(
+                        and_(
+                            Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                            Invoice.current_approver_level == level,
+                            Invoice.current_approver_level != max_level_sq
+                        )
+                    )
+                else:
+                    # For levels 3+, only match if it's NOT a threshold level
+                    conditions.append(
+                        and_(
+                            Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                            Invoice.current_approver_level == level,
+                            Invoice.current_approver_level != max_level_sq,
+                            ~is_threshold_sq
+                        )
+                    )
+            except:
+                actual_statuses.append(val)
+        elif val_str == "Waiting for threshold approver":
+            max_level_sq = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                InvoiceAssignedApprover.invoice_id == Invoice.id
+            ).correlate(Invoice).scalar_subquery()
+            
+            is_threshold_sq = exists().where(
+                and_(
+                    InvoiceAssignedApprover.invoice_id == Invoice.id,
+                    InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
+                    InvoiceAssignedApprover.is_finance == False
+                )
+            )
+            
+            conditions.append(
+                and_(
+                    Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                    Invoice.current_approver_level != max_level_sq,
+                    Invoice.current_approver_level > 2, # Threshold label only for 3+
+                    is_threshold_sq
+                )
+            )
+        elif val_str == "Waiting for posting approver":
+            max_level_sq = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                InvoiceAssignedApprover.invoice_id == Invoice.id
+            ).correlate(Invoice).scalar_subquery()
+            
+            conditions.append(
+                and_(
+                    Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                    Invoice.current_approver_level == max_level_sq
+                )
+            )
+        else:
+            # Map back other labels if they were changed
+            reverse_map = {
+                "Posted to Sage": "sage_posted",
+                "Sage Post Failed": "sage_post_failed",
+                "Waiting For Coding": "waiting_coding",
+                "Reworked": "reworked",
+                "Archived": "archived",
+                "Approved": "approved",
+                "Rejected": "rejected",
+                "Processed": "processed",
+                "Pending": "pending"
+            }
+            mapped_val = reverse_map.get(val_str, val_str)
+            actual_statuses.append(mapped_val)
+            
+    if actual_statuses:
+        conditions.append(Invoice.status.in_(actual_statuses))
+        
+    if conditions:
+        expressions.append(or_(*conditions))
+
 router = APIRouter()
 invoice_processor = InvoiceProcessor()
 
@@ -852,40 +956,9 @@ async def get_invoices(
                 for k in to_delete:
                     del extra_filters[k]
 
-                # Special handling for status with levels: "waiting_approval (level 1)"
+                # Special handling for status with labels
                 if "status" in extra_filters:
-                    status_vals = extra_filters["status"]
-                    if not isinstance(status_vals, list):
-                        status_vals = [status_vals]
-                    
-                    actual_statuses = []
-                    level_filters = []
-                    
-                    for val in status_vals:
-                        if val and " (level " in str(val):
-                            try:
-                                parts = str(val).split(" (level ")
-                                status_part = parts[0]
-                                level_part = int(parts[1].rstrip(")"))
-                                level_filters.append((status_part, level_part))
-                            except:
-                                actual_statuses.append(val)
-                        else:
-                            actual_statuses.append(val)
-                    
-                    if level_filters:
-                        level_conditions = [
-                            and_(Invoice.status == s, Invoice.current_approver_level == l)
-                            for s, l in level_filters
-                        ]
-                        if actual_statuses:
-                            level_conditions.append(Invoice.status.in_(actual_statuses))
-                        
-                        expressions.append(or_(*level_conditions))
-                        del extra_filters["status"]
-                    elif actual_statuses:
-                        repo_filters["status"] = actual_statuses
-                        del extra_filters["status"]
+                    _apply_status_label_filters(extra_filters.pop("status"), expressions, db)
 
                 # Special handling for virtual column: next_approver
                 if "next_approver" in extra_filters:
@@ -1195,6 +1268,10 @@ async def get_invoice_filter_options(
                     )
                     del extra_filters["approvals_view"]
 
+                # Special handling for status labels in filter-options
+                if "status" in extra_filters:
+                    _apply_status_label_filters(extra_filters.pop("status"), expressions, db)
+
                 repo_filters.update(extra_filters)
         except Exception as e:
             print(f"Error parsing filters in filter-options: {e}")
@@ -1231,23 +1308,19 @@ async def get_invoice_filter_options(
         return sorted([o for o in options if o], key=lambda x: str(x))
 
     if column == "status":
-        query = db.query(Invoice.status, Invoice.current_approver_level)
+        query = db.query(Invoice)
         query = invoice_repo._apply_filters(query, repo_filters)
         for expr in expressions:
             query = query.filter(expr)
             
-        results = query.distinct().all()
+        invoices = query.options(joinedload(Invoice.assigned_approvers_list)).all()
         formatted_options = []
         seen = set()
-        for s, l in results:
-            # Use .value if it's an Enum member, otherwise use str()
-            status_val = s.value if hasattr(s, 'value') else str(s)
-            
-            if status_val == "waiting_approval" and l:
-                label = f"waiting_approval (level {l})"
-            else:
-                label = status_val
-            
+        
+        from app.database.db_utils import get_status_label
+        
+        for inv in invoices:
+            label = get_status_label(inv, db)
             if label and label not in seen:
                 formatted_options.append(label)
                 seen.add(label)

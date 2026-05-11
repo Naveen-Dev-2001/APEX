@@ -7,11 +7,77 @@ import json
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session, object_session
+from sqlalchemy import func
 from app.models.db_models import (
     Invoice, InvoiceStatusHistory, InvoiceApprovedBy, 
     InvoiceAssignedApprover, User, InvoiceStatusEnum
 )
 from app.repository.repositories import user_repo
+
+
+def get_status_label(invoice: Invoice, db: Session = None) -> str:
+    """Get human-readable status label for an invoice."""
+    status = invoice.status.value if hasattr(invoice.status, 'value') else str(invoice.status)
+    level = invoice.current_approver_level
+
+    if status != "waiting_approval":
+        label_map = {
+            "approved": "Approved",
+            "pending": "Pending",
+            "rejected": "Rejected",
+            "processed": "Processed",
+            "waiting_coding": "Waiting For Coding",
+            "sage_posted": "Posted to Sage",
+            "sage_post_failed": "Sage Post Failed",
+            "reworked": "Reworked",
+            "archived": "Archived",
+        }
+        return label_map.get(status, status)
+
+    # For waiting_approval, determine specific level label
+    if not db:
+        db = object_session(invoice)
+    
+    if not db:
+        return f"Waiting for approver {level}" if level else "Waiting for approval"
+
+    # Get max level and current level config
+    max_level = None
+    current_approver_config = None
+
+    if invoice.assigned_approvers_list:
+        # Use already loaded relationship for performance
+        max_level = max((a.sequence_order for a in invoice.assigned_approvers_list), default=None)
+        current_approver_config = next((a for a in invoice.assigned_approvers_list if a.sequence_order == level), None)
+    else:
+        # Fallback to DB query if relationship not loaded
+        if not db:
+            db = object_session(invoice)
+        
+        if db:
+            max_level = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                InvoiceAssignedApprover.invoice_id == invoice.id
+            ).scalar()
+            current_approver_config = db.query(InvoiceAssignedApprover).filter(
+                InvoiceAssignedApprover.invoice_id == invoice.id,
+                InvoiceAssignedApprover.sequence_order == level
+            ).first()
+
+    if max_level and level == max_level:
+        # The final level is always the posting level
+        return "Waiting for posting approver"
+
+    # Per user request: Level 1 and 2 always show as "Waiting for approver N"
+    # Even if they are technically threshold levels in the workflow.
+    if level in [1, 2]:
+        return f"Waiting for approver {level}"
+
+    if current_approver_config and not current_approver_config.is_finance:
+        # Threshold label for levels 3+ (if not finance)
+        return "Waiting for threshold approver"
+
+    # Default for Level 3+ finance levels
+    return f"Waiting for approver {level}"
 
 
 def serialize_json_field(data: Any) -> Optional[str]:
@@ -65,6 +131,7 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minima
         "updated_at": invoice.updated_at,
         "required_approvers": invoice.required_approvers,
         "current_approver_level": invoice.current_approver_level,
+        "status_label": get_status_label(invoice),
     }
     
     # Conditionally include JSON fields (avoid heavy parsing in list views)
