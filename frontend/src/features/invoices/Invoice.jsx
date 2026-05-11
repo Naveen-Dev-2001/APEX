@@ -13,7 +13,7 @@ import { getCondensedColumns, getFullColumns, VIEW_OPTIONS } from "./invoiceColu
 import { useInvoiceStore } from "../../store/invoice.store";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
-import { deleteInvoice, uploadInvoices, fetchEntityMaster, getInvoiceFilterOptions, archiveInvoice, bulkDeleteInvoices, bulkArchiveInvoices } from "../../api/invoiceApi";
+import { deleteInvoice, uploadInvoices, cancelUpload, fetchEntityMaster, getInvoiceFilterOptions, archiveInvoice, bulkDeleteInvoices, bulkArchiveInvoices } from "../../api/invoiceApi";
 import { Modal, Popconfirm } from "antd";
 import toast from "../../utils/toast";
 import API from "../../api/api";
@@ -55,6 +55,8 @@ const Invoice = () => {
     const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
     const [bulkActionLoading, setBulkActionLoading] = useState(false);
     const openPreviewTimerRef = useRef(null);
+    const uploadAbortControllerRef = useRef(null);
+    const currentTaskIdRef = useRef(null);
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -269,6 +271,11 @@ const Invoice = () => {
             setUploadLoading(true);
             setUploadProgress(0);
             const taskId = uuidv4();
+            currentTaskIdRef.current = taskId;
+            
+            const controller = new AbortController();
+            uploadAbortControllerRef.current = controller;
+
             const totalFiles = files.length;
             const formData = new FormData();
             files.forEach((f) => formData.append("files", f));
@@ -291,7 +298,7 @@ const Invoice = () => {
                     const percent = Math.round((progressEvent.loaded / progressEvent.total) * 50);
                     setUploadProgress(percent);
                 }
-            });
+            }, controller.signal);
             setUploadProgress(100);
             toast.success(`${response?.data?.count ?? files.length} file(s) processed successfully!`);
             await refetch();
@@ -299,13 +306,44 @@ const Invoice = () => {
             else setInvoiceSection(1);
             setIsModalOpen(false);
         } catch (error) {
+            if (error.name === 'CanceledError' || error.name === 'AbortError') {
+                console.log("Upload aborted by user");
+                return;
+            }
             toast.error(error?.response?.data?.detail || "Upload failed");
             setUploadProgress(0);
         } finally {
             if (eventSource) eventSource.close();
             setUploadLoading(false);
             setTimeout(() => setUploadProgress(0), 400);
+            uploadAbortControllerRef.current = null;
+            currentTaskIdRef.current = null;
         }
+    };
+
+    const handleCancelUpload = async () => {
+        if (uploadLoading) {
+            // 1. Abort the frontend request
+            if (uploadAbortControllerRef.current) {
+                uploadAbortControllerRef.current.abort();
+            }
+
+            // 2. Call the backend to stop processing
+            if (currentTaskIdRef.current) {
+                try {
+                    await cancelUpload(currentTaskIdRef.current);
+                } catch (e) {
+                    console.warn("Failed to notify backend of cancellation", e);
+                }
+            }
+
+            toast.info("Upload discarded");
+        }
+        
+        setIsModalOpen(false);
+        setInvoiceSection(1);
+        setUploadLoading(false);
+        setUploadProgress(0);
     };
 
     return (
@@ -545,7 +583,7 @@ const Invoice = () => {
                     )}
 
                     {(invoiceSection === 1 || isModalOpen) && pageTab === "in_progress" && (
-                        <AddInvoiceModal open={isModalOpen} onCancel={() => { setIsModalOpen(false); setInvoiceSection(1); }} onUpload={handleUpload} uploadProgress={uploadProgress} confirmLoading={uploadLoading} />
+                        <AddInvoiceModal open={isModalOpen} onCancel={handleCancelUpload} onUpload={handleUpload} uploadProgress={uploadProgress} confirmLoading={uploadLoading} />
                     )}
                 </>
             )}
