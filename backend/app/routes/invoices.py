@@ -30,9 +30,9 @@ from app.services.file_manager import init_upload_folders, move_invoice_file, fi
 init_upload_folders()
 from app.routes.approval_new import StepType
 
-from app.repository.repositories import (
     invoice_repo, workflow_step_repo, invoice_status_history_repo,
-    user_repo, entity_repo, vendor_metadata_repo, raw_extraction_repo
+    user_repo, entity_repo, vendor_metadata_repo, raw_extraction_repo,
+    deleted_invoice_repo
 )
 from app.database.db_utils import (
     invoice_to_dict, serialize_json_field, deserialize_json_field
@@ -1340,18 +1340,12 @@ async def get_invoice_filter_options(
 
     query = db.query(col_attr)
     
-    # Apply filters manually for simplicity if it's DeletedInvoice, or use repo for Invoice
+    # Apply filters using repository helper
     if target_model == Invoice:
         query = invoice_repo._apply_filters(query, repo_filters)
     else:
-        # Manual filter application for DeletedInvoice to avoid repo dependency issues
-        for field, value in repo_filters.items():
-            if hasattr(DeletedInvoice, field):
-                attr = getattr(DeletedInvoice, field)
-                if isinstance(value, list):
-                    query = query.filter(attr.in_(value))
-                else:
-                    query = query.filter(attr == value)
+        query = deleted_invoice_repo._apply_filters(query, repo_filters)
+
 
     for expr in expressions:
         query = query.filter(expr)
@@ -3343,8 +3337,8 @@ async def list_deleted_invoices(
         try:
             extra_filters = json.loads(filters)
             if isinstance(extra_filters, dict):
-                to_delete = []
-                for k, v in extra_filters.items():
+                # Apply date casting for date fields if needed by _apply_filters
+                for k, v in list(extra_filters.items()):
                     col_attr = getattr(DeletedInvoice, k, None)
                     if col_attr is not None and hasattr(col_attr, "type"):
                         from sqlalchemy import Date, DateTime, cast
@@ -3353,21 +3347,15 @@ async def list_deleted_invoices(
                             try:
                                 parsed_dates = [datetime.strptime(str(x), "%m-%d-%Y").date() for x in vals]
                                 query = query.filter(cast(col_attr, Date).in_(parsed_dates))
-                                to_delete.append(k)
+                                del extra_filters[k]
                             except:
                                 pass
-                for k in to_delete:
-                    del extra_filters[k]
-                # Basic filters (equality or in_)
-                for field, value in extra_filters.items():
-                    if hasattr(DeletedInvoice, field):
-                        attr = getattr(DeletedInvoice, field)
-                        if isinstance(value, list):
-                            query = query.filter(attr.in_(value))
-                        else:
-                            query = query.filter(attr == value)
+                
+                # Apply remaining filters using repo helper for robustness (between, ops, etc)
+                query = deleted_invoice_repo._apply_filters(query, extra_filters)
         except Exception as e:
             print(f"Error parsing filters in list_deleted_invoices: {e}")
+
 
     # Dynamic sorting
     if hasattr(DeletedInvoice, sort_by):

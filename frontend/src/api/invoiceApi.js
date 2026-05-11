@@ -132,8 +132,10 @@ export const fetchDeletedInvoices = (params = {}) =>
             invoice_number: params.invoice_number || undefined,
             sort_by: params.sort_by || "deleted_at",
             sort_dir: params.sort_dir || "desc",
+            filters: params.filters ? JSON.stringify(params.filters) : undefined,
         }
     }).then(res => res.data);
+
 
 export const fetchDeletedInvoiceById = (archiveId) =>
     API.get(`/invoices/deleted/${archiveId}`).then(res => res.data);
