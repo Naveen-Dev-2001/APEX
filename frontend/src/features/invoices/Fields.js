@@ -9,7 +9,7 @@ export const QUICK_VIEW_CONFIG = [
             { key: "referenceNumber", label: "Reference Number", type: "input", editable: true, required: true },
             { key: "invoiceDate", label: "Invoice Date", type: "date", editable: true, required: true },
             { key: "dueDate", label: "Due Date", type: "date", editable: true, required: true },
-            { key: "postingDate", label: "Posting Date", type: "date", editable: true },
+            { key: "postingDate", label: "Posting Date", type: "date", editable: true, required: true },
             { key: "paymentTerms", label: "Payment Terms", type: "input", editable: true },
             {
                 key: "invoiceCurrency", label: "Invoice Currency", type: "dropdown", editable: true
