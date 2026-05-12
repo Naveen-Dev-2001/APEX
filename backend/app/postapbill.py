@@ -16,9 +16,9 @@ TOKEN_URL = f"{BASE_URL}/oauth2/token"
 
 CLIENT_ID = "3f83ee41b095ea8e5659.app.sage.com"
 CLIENT_SECRET = "e49424e23f3df286f49e1f052e897ea944e3dce1"
-USERNAME = "Apex@consolidatedanalytics-sandbox|201"
+USERNAME = "Apex@consolidatedanalytics-sandbox"
 
-LOCATION_ID = "201"
+LOCATION_ID = "" # Default fallback
 ATTACHMENT_FOLDER_KEY = "55"
 
 
@@ -56,13 +56,18 @@ def post_ap_bill(
     """
     try:
         # ── 1. Authenticate ──────────────────────────────────────────────────
-        access_token = _get_access_token()
+        access_token = _get_access_token(location)
+            
         auth_headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "locationid": LOCATION_ID,
         }
+        if location:
+            auth_headers["locationid"] = location
+        
+        logger.info(f"[PostAPBill] Sage Auth Headers: {auth_headers}")
+        logger.info(f"[PostAPBill] Posting invoice {invoice.id} to location: '{location or 'Top Level'}'")
         logger.info(f"[PostAPBill] Authenticated with Sage Intacct for invoice {invoice.id}")
 
         # ── 2. Create attachment record ──────────────────────────────────────
@@ -123,12 +128,16 @@ def post_ap_bill(
 # PRIVATE HELPERS
 # --------------------------------------------------
 
-def _get_access_token() -> str:
+def _get_access_token(location=None) -> str:
+    token_username = USERNAME
+    if location:
+        token_username = f"{USERNAME}|{location}"
+        
     token_payload = {
         "grant_type": "client_credentials",
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
-        "username": USERNAME,
+        "username": token_username,
     }
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     resp = requests.post(TOKEN_URL, json=token_payload, headers=headers, timeout=30)
@@ -268,14 +277,14 @@ def _create_ap_bill(
                 line_amt_str = "0"
 
             # 3. Dimensions for this line (fallback to header if missing)
-            line_loc = _extract_id(item_data.get("location") or item_data.get("location_id") or location or LOCATION_ID)
+            line_loc = _extract_id(item_data.get("location") or item_data.get("location_id") or (location if location is not None else LOCATION_ID))
             line_dept = _extract_id(item_data.get("department") or item_data.get("department_id") or dept)
             line_item_dim = _extract_id(item_data.get("item") or item_data.get("item_id") or item)
             line_class = _extract_id(item_data.get("lob") or item_data.get("class") or item_data.get("class_id") or class_lob)
             line_memo = item_data.get("description") or description
 
             line_dims = {
-                "location": {"id": line_loc} if line_loc else {"id": LOCATION_ID},
+                "location": {"id": line_loc} if line_loc else None,
                 "department": {"id": line_dept} if line_dept else None,
                 "vendor": {"id": str(vendor_dim)} if vendor_dim else None,
                 "item": {"id": line_item_dim} if line_item_dim else None,
@@ -296,7 +305,7 @@ def _create_ap_bill(
         if gl_account_clean.lower() in ["none", "null", ""]: gl_account_clean = "50010"
 
         header_dims = {
-            "location": {"id": _extract_id(location)} if location else {"id": LOCATION_ID},
+            "location": {"id": _extract_id(location)} if location else None,
             "department": {"id": _extract_id(dept)} if dept else None,
             "vendor": {"id": str(vendor_dim)} if vendor_dim else None,
             "item": {"id": _extract_id(item)} if item else None,

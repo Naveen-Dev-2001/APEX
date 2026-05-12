@@ -594,9 +594,10 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
             if not hc.get("item"): hc["item"] = first.get("item") or first.get("item_id")
             if not hc.get("lob"): hc["lob"] = first.get("lob") or first.get("class")
 
-        # 4. Resolve Sage Location ID from EntityMaster partition mapping
-        entity_record = db.query(EntityMaster).filter(EntityMaster.entity_name == invoice.entity).first()
-        sage_location = entity_record.entity_id if entity_record else (hc.get("location") or hc.get("location_id"))
+        # 4. Resolve Sage Location ID dynamically
+        # Mapping: DEFAULT/None -> "" (Top Level), otherwise use entity ID
+        raw_entity = str(invoice.entity).strip() if invoice.entity else ""
+        sage_location = raw_entity if raw_entity.upper() != "DEFAULT" else ""
 
         # 5. Call Sage Posting Logic
         post_result = post_ap_bill(
