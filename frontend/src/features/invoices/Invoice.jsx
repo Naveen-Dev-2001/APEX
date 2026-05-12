@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CustomInput from "../../shared/components/CustomInput";
-import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined, ReloadOutlined, InboxOutlined, CloseOutlined } from "@ant-design/icons";
-import { Trash2 } from "lucide-react";
+import { SearchOutlined, CloseCircleOutlined, ExclamationCircleOutlined, ReloadOutlined, InboxOutlined, CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 import Dropdown from "../../components/ui/Dropdown";
 import CustomButton from "../../shared/components/CustomButton";
 import RefreshButton from "../../shared/components/RefreshButton";
@@ -342,12 +341,12 @@ const Invoice = () => {
         
         setIsModalOpen(false);
         setInvoiceSection(1);
-        setUploadLoading(false);
+                setUploadLoading(false);
         setUploadProgress(0);
     };
 
     return (
-        <>
+        <div className="h-full flex flex-col overflow-hidden">
             {modalContextHolder}
             {invoiceSection === 1 && (
                 <>
@@ -491,11 +490,11 @@ const Invoice = () => {
                                                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
                                                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                                                 >
-                                                    <Trash2 size={16} /> Bulk Delete
+                                                    <DeleteOutlined /> Bulk Delete
                                                 </button>
                                             </Popconfirm>
                                         )}
-                                        {pageTab === 'posted_stage' && ["scanner", "coder"].includes(userRole) && (
+                                        {pageTab === 'in_progress' && ["scanner", "coder"].includes(userRole) && (
                                             <Popconfirm
                                                 title="Archive Invoices"
                                                 description={`Are you sure you want to archive ${selectedInvoiceIds.length} invoices?`}
@@ -551,7 +550,7 @@ const Invoice = () => {
                                 </div>
                             )}
 
-                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4">
+                            <div className="flex-1 min-h-0 bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4 overflow-hidden">
                                 {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
                                     <DataTable 
                                         columns={columnDefs} 
@@ -579,7 +578,9 @@ const Invoice = () => {
                             </div>
                         </>
                     ) : (
-                        <ArchivedInvoicesTab key={`${entityMaster?.entity_id}-${refreshKey}`} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} userRole={userRole} view={view} />
+                        <div className="flex-1 min-h-0 overflow-auto">
+                            <ArchivedInvoicesTab key={`${entityMaster?.entity_id}-${refreshKey}`} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} userRole={userRole} view={view} />
+                        </div>
                     )}
 
                     {(invoiceSection === 1 || isModalOpen) && pageTab === "in_progress" && (
@@ -590,7 +591,7 @@ const Invoice = () => {
             {invoiceSection === 2 && <ViewInvoicePage />}
             <AlertModal isOpen={deleteModalState.isOpen} onClose={() => setDeleteModalState({ isOpen: false, data: null, loading: false })} onConfirm={confirmDelete} title="Delete Invoice?" message="Are you sure you want to delete this invoice?" confirmText="Delete Permanently" cancelText="Discard" type="danger" loading={deleteModalState.loading} confirmBtnVariant="primary" />
             <AlertModal isOpen={archiveModalState.isOpen} onClose={() => setArchiveModalState({ isOpen: false, data: null, loading: false })} onConfirm={confirmArchive} title="Archive Invoice?" message="Are you sure you want to archive this invoice?" confirmText="Archive" cancelText="Cancel" type="info" loading={archiveModalState.loading} confirmBtnVariant="primary" />
-        </>
+        </div>
     );
 };
 
