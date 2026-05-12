@@ -486,7 +486,7 @@ const MasterDataPage = () => {
     };
 
     return (
-        <div className="p-6 flex flex-col gap-6 w-full bg-[#FBFBFB] min-h-screen">
+        <div className="p-6 pb-12 flex flex-col gap-6 w-full bg-[#FBFBFB]">
             <div className="flex items-center gap-3">
                 <div className="flex bg-white border border-gray-200 rounded-[4px] overflow-hidden h-[36px] flex-shrink-0">
                     {tabs.map((tab, index) => (
@@ -605,7 +605,7 @@ const MasterDataPage = () => {
                             // We might need to update store to take dir too, or just call setSort.
                             setSort(col);
                         }}
-                        maxHeight="calc(100vh - 280px)"
+                        maxHeight="calc(100vh - 350px)"
                         stickyHeader={true}
                         enableColumnFilters={true}
                         columnFilters={columnFilters}

@@ -565,7 +565,7 @@ const Invoice = () => {
                                         sortColumn={sortColumn} 
                                         sortDirection={sortDirection} 
                                         onSort={(col, dir) => setSort(col, dir)} 
-                                        maxHeight="calc(100vh - 320px)" 
+                                        maxHeight="calc(100vh - 350px)" 
                                         stickyHeader={true} 
                                         enableColumnFilters={true} 
                                         columnFilters={columnFilters} 
