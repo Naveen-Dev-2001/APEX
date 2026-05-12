@@ -2010,9 +2010,10 @@ async def update_invoice_status(
                 db.flush()
                 logger.info(f"[SagePost] Finalized coding captured and saved for invoice {invoice_id}")
 
-            # Resolve Sage Location ID from EntityMaster partition mapping
-            entity_record = db.query(EntityMaster).filter(EntityMaster.entity_name == inv.entity).first()
-            sage_location = entity_record.entity_id if entity_record else (hc.get("location") or hc.get("location_id"))
+            # Resolve Sage Location ID dynamically
+            # Mapping: DEFAULT/None -> "" (Top Level), otherwise use entity ID
+            raw_entity = str(inv.entity).strip() if inv.entity else ""
+            sage_location = raw_entity if raw_entity.upper() != "DEFAULT" else ""
 
             # Compute the intended bill number upfront (matches what postapbill.py sends to Sage)
             intended_bill_no = f"{inv.invoice_number}-{inv.id}"
@@ -2146,9 +2147,10 @@ async def repost_to_sage(
     try:
         from app.postapbill import post_ap_bill
         
-        # Resolve Sage Location ID from EntityMaster partition mapping
-        entity_record = db.query(EntityMaster).filter(EntityMaster.entity_name == invoice.entity).first()
-        sage_location = entity_record.entity_id if entity_record else (hc.get("location") or hc.get("location_id"))
+        # Resolve Sage Location ID dynamically
+        # Mapping: DEFAULT/None -> "" (Top Level), otherwise use entity ID
+        raw_entity = str(invoice.entity).strip() if invoice.entity else ""
+        sage_location = raw_entity if raw_entity.upper() != "DEFAULT" else ""
 
         # Compute the intended bill number upfront
         intended_bill_no = f"{invoice.invoice_number}-{invoice.id}"
