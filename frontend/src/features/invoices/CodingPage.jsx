@@ -358,7 +358,7 @@ const CodingPage = () => {
     };
 
     return (
-        <div className="p-6 bg-[#f8fafc] min-h-screen pt-[5px]">
+        <div className="p-6 pb-12 bg-[#f8fafc] pt-[5px]">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-4">
                     <h2 className="text-xl font-extrabold"></h2>
@@ -397,7 +397,7 @@ const CodingPage = () => {
                     sortColumn={sortColumn}
                     sortDirection={sortDirection}
                     onSort={handleSort}
-                    maxHeight="calc(100vh - 250px)"
+                    maxHeight="calc(100vh - 350px)"
                     stickyHeader={true}
                     enableColumnFilters={true}
                     columnFilters={columnFilters}

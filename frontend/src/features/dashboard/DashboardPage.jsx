@@ -97,7 +97,7 @@ const DashboardPage = React.memo(() => {
     // ─── Render ──────────────────────────────────────────────────────────────────
 
     return (
-        <div className="bg-[#F7F7F7] p-2 space-y-4 overflow-y-auto h-[calc(90vh-5px)]">
+        <div className="bg-[#F7F7F7] p-2 space-y-4">
             {/* Header Area */}
             {/* <div className="flex flex-col gap-1 px-2">
                 <h1 className="text-2xl font-extrabold text-[#333333]">Dashboard</h1>

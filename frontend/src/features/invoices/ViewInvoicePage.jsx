@@ -17,15 +17,14 @@ const ViewInvoicePage = () => {
     }, []);
 
     return (
-        <div className="h-screen flex flex-col bg-[#F7F7F7]">
-
+        <div className="h-full flex flex-col bg-[#F7F7F7]">
             {/* Fixed Top Bar */}
             <div className="flex-shrink-0 bg-white border-b border-[#E0E0E0]">
                 <InvoiceTopBar isPdfVisible={sizes[0] > 10} onTogglePdf={togglePdf} />
             </div>
 
             {/* Split Layout - takes remaining space */}
-            <div className="relative flex-1 min-h-0 mb-12">
+            <div className="relative flex-1 min-h-0">
                 <Split
                     className="flex h-full"
                     sizes={sizes}

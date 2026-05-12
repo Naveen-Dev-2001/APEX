@@ -335,7 +335,7 @@ const ApprovalsPage = () => {
     ];
 
     return (
-        <div className="p-0 bg-[#f8fafc] min-h-screen">
+        <div className="p-0 pb-12 bg-[#f8fafc]">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px", background: "#F7F7F7", borderBottom: "1px solid #E5E7EB", flexWrap: "wrap", gap: "12px" }}>
                 <div style={{ display: "flex", border: "1px solid #D9D9D9", borderRadius: "4px", overflow: "hidden", background: "#FFFFFF", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
                     {[
@@ -407,7 +407,7 @@ const ApprovalsPage = () => {
                             onSort={handleSort}
                             sortColumn={sortColumn}
                             sortDirection={sortDirection}
-                            maxHeight="calc(100vh - 250px)"
+                            maxHeight="calc(100vh - 350px)"
                             stickyHeader={true}
                             enableColumnFilters={true}
                         />
