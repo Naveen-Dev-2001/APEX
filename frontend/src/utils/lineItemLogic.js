@@ -104,13 +104,10 @@ const addSystemRows = (rows, formData, entityMaster) => {
     //  TDS (only if applicable)
     const isTdsApplicable = formData?.tds_applicability;
     const tdsRate = Number(formData?.tds_percentage || 0);
-    const totalInvoiceAmount = rows.reduce(
-        (sum, r) => sum + Number(r.netAmount || 0),
-        0
-    );
+    const totalInvoiceAmount = Number(formData?.totalInvoiceAmount || 0);
 
     if (isTdsApplicable) {
-        const tdsValue = roundTo2(-Math.abs((tdsRate / 100) * totalInvoiceAmount));
+        const tdsValue = roundTo2(-Math.abs((tdsRate) * totalInvoiceAmount));
 
         const tdsRow = {
             id: "tds-row",
