@@ -162,6 +162,7 @@ export const useSaveInvoice = () => {
                 reference_number: { ...activeInvoiceData.extracted_data?.invoice_details?.reference_number, value: f.referenceNumber },
                 invoice_date: { ...activeInvoiceData.extracted_data?.invoice_details?.invoice_date, value: f.invoiceDate },
                 due_date: { ...activeInvoiceData.extracted_data?.invoice_details?.due_date, value: f.dueDate },
+                posting_date: { ...activeInvoiceData.extracted_data?.invoice_details?.posting_date, value: f.postingDate },
                 currency: { ...activeInvoiceData.extracted_data?.invoice_details?.currency, value: f.invoiceCurrency },
                 type: { ...activeInvoiceData.extracted_data?.invoice_details?.type, value: f.invoiceType },
                 po_number: { ...activeInvoiceData.extracted_data?.invoice_details?.po_number, value: f.poNumber },
@@ -216,6 +217,7 @@ export const useSaveInvoice = () => {
             invoice_number: f.invoiceNumber,
             exchange_rate: f.exchangeRate || activeInvoiceData.exchange_rate,
             extracted_data: updatedExtractedData,
+            posting_date: f.postingDate,
             last_updated_at: activeInvoiceData.updated_at
         };
 
@@ -246,6 +248,7 @@ export const useSaveInvoice = () => {
                 amount_due: finalPayload.extracted_data?.amounts?.amount_due?.value,
                 invoice_date: finalPayload.extracted_data?.invoice_details?.invoice_date?.value,
                 due_date: finalPayload.extracted_data?.invoice_details?.due_date?.value,
+                posting_date: finalPayload.extracted_data?.invoice_details?.posting_date?.value,
                 last_updated_at: finalPayload.last_updated_at,
                 ...extraFields // Merge extra fields (like status) into the final object
             };

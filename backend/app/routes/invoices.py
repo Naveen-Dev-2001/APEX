@@ -381,6 +381,7 @@ async def upload_invoices(
                 status=InvoiceStatusEnum.PROCESSED,
                 entity=entity,
                 uploaded_at=get_ist_now(),
+                posting_date=get_ist_now().date(),
                 extracted_data=serialize_json_field({}),
                 processing_steps=serialize_json_field([]),
             )
@@ -2492,11 +2493,14 @@ async def update_invoice(
         # --- Date Columns Sync ---
         inv_dt = extracted_data.get("invoice_details", {}).get("invoice_date", {}).get("value")
         due_dt = extracted_data.get("invoice_details", {}).get("due_date", {}).get("value")
+        posting_dt = extracted_data.get("invoice_details", {}).get("posting_date", {}).get("value")
         
         if inv_dt is not None:
             update_data["invoice_date"] = parse_date_safely(inv_dt)
         if due_dt is not None:
             update_data["due_date"] = parse_date_safely(due_dt)
+        if posting_dt is not None:
+            update_data["posting_date"] = parse_date_safely(posting_dt)
             
         # --- Amount Columns Sync ---
         total_amt = extracted_data.get("amounts", {}).get("total_invoice_amount", {}).get("value")
@@ -2587,7 +2591,7 @@ async def update_invoice(
     update_fields = [
         "vendor_id", "vendor_name", "invoice_number", "reference_number", "status", 
         "exchange_rate", "confidence_score", "total_amount", 
-        "amount_due", "invoice_date", "due_date"
+        "amount_due", "invoice_date", "due_date", "posting_date"
     ]
     
     # Process potentially raw strings for financial and date fields
@@ -2595,7 +2599,7 @@ async def update_invoice(
         if field in update_data:
             update_data[field] = remove_currency_format(update_data[field])
             
-    for field in ["invoice_date", "due_date"]:
+    for field in ["invoice_date", "due_date", "posting_date"]:
         if field in update_data:
             update_data[field] = parse_date_safely(update_data[field])
 

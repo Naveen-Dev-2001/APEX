@@ -128,6 +128,7 @@ class Invoice(Base):
     amount_due = Column(DECIMAL(18, 2), nullable=True, index=True)
     invoice_date = Column(Date, nullable=True, index=True)
     due_date = Column(Date, nullable=True, index=True)
+    posting_date = Column(Date, nullable=True, index=True)
 
     # JSON fields (stored as NVARCHAR(MAX))
     extracted_data = Column(Text, nullable=True)  # JSON

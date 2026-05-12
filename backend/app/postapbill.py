@@ -214,7 +214,8 @@ def _create_ap_bill(
     # --------------------------------------------------
     from dateutil.parser import parse
     current_date = datetime.utcnow()
-    posting_date_str = current_date.strftime("%Y-%m-%d")
+    posting_date = invoice.posting_date if invoice.posting_date else (invoice.uploaded_at if invoice.uploaded_at else current_date)
+    posting_date_str = posting_date.strftime("%Y-%m-%d")
     base_date = invoice.uploaded_at if invoice.uploaded_at else current_date
     due_date = base_date + timedelta(days=30)
     

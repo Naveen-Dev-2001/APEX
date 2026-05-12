@@ -298,6 +298,7 @@ export const useInvoiceStore = create((set, get) => ({
             referenceNumber: data.extracted_data?.invoice_details?.reference_number?.value ?? "",
             invoiceDate: data.extracted_data?.invoice_details?.invoice_date?.value ?? "",
             dueDate: data.extracted_data?.invoice_details?.due_date?.value ?? "",
+            postingDate: data.posting_date ?? "",
             paymentTerms: data.extracted_data?.invoice_details?.payment_terms?.value ?? "",
             invoiceCurrency: data.extracted_data?.invoice_details?.currency?.value ?? "",
             exchangeRate: data.exchange_rate ?? "",
