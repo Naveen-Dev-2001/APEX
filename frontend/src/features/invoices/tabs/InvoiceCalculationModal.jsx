@@ -41,7 +41,7 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
         ["Amount Paid", formatCurrency(amountPaid)],
         ["Shipping / Handling / Fees", formatCurrency(shipping)],
         ["Surcharges", formatCurrency(surcharges)],
-        ["TDS Rate (from Vendor)", `${tdsRate.toFixed(2)}%`],
+        ["TDS Rate (from Vendor)", `${(tdsRate * 100).toFixed(2)}%`],
     ];
 
     return (

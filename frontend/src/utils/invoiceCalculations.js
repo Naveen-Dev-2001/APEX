@@ -29,6 +29,11 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
     const lineItemsForCalculations = (lineItems && lineItems.length > 0 ? lineItems : originalLineItems) || [];
 
     const calculatedSubtotal = lineItemsForCalculations.reduce((sum, item) => {
+        // Skip system rows (GST, TDS) added by the frontend
+        if (item.isSystemRow || item.type === "GST" || item.type === "TDS") {
+            return sum;
+        }
+
         const desc = (extractValue(item.description) || item.description?.value || '').toString().trim();
         const lowDesc = desc.toLowerCase();
 
@@ -76,7 +81,7 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
 
     // Note: The calculation modal uses tdsRate directly. If tdsRate is 2 (for 2%), 
     // it's treated as 2.0 unless corrected. Keeping consistency with modal logic for now.
-    const tdsDeduction = -Math.abs((tdsRate) * lineItemsSubtotal);
+    const tdsDeduction = -Math.abs((tdsRate) * (lineItemsSubtotal + totalTax));
 
     const invoiceTotal_calc1 = parseFloat((lineItemsSubtotal + totalTax).toFixed(2));
     const invoiceTotal_calc2 = parseFloat((extractedSubtotal + totalTax).toFixed(2));
@@ -91,7 +96,7 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
         { value: invoiceTotal_calc3, name: "Heuristic 3: Total Reconciliation" }
     ];
 
-    const match = calculations.find(c => Math.abs(extractionValue - c.value) < 0.01);
+    const match = calculations.find(c => Math.abs(extractionValue - c.value) < 1.0);
     const hasMismatch = match === undefined && extractionValue > 0;
 
     return {
