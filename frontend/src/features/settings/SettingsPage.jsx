@@ -484,7 +484,7 @@ const SettingsPage = () => {
                 sortColumn={sortConfig.key}
                 sortDirection={sortConfig.direction}
                 onSort={handleSort}
-                maxHeight="calc(100vh - 280px)"
+                maxHeight="calc(100vh - 320px)"
                 stickyHeader={true}
                 isClientSide={true}
                 enableColumnFilters={true}

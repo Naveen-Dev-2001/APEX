@@ -550,31 +550,35 @@ const Invoice = () => {
                                 </div>
                             )}
 
-                            <div className="flex-1 min-h-0 bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4 overflow-hidden">
-                                {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
-                                    <DataTable 
-                                        columns={columnDefs} 
-                                        data={invoices ?? []} 
-                                        loading={isLoading} 
-                                        totalItems={total} 
-                                        currentPage={(skip / limit) + 1} 
-                                        itemsPerPage={limit} 
-                                        onPageChange={(page) => setSkip((page - 1) * limit)} 
-                                        onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} 
-                                        sortColumn={sortColumn} 
-                                        sortDirection={sortDirection} 
-                                        onSort={(col, dir) => setSort(col, dir)} 
-                                        maxHeight="calc(100vh - 350px)" 
-                                        stickyHeader={true} 
-                                        enableColumnFilters={true} 
-                                        columnFilters={columnFilters} 
-                                        onColumnFiltersChange={setColumnFilters} 
-                                        selectable={(pageTab === 'in_progress' || pageTab === 'posted_stage') && ["scanner", "coder"].includes(userRole)} 
-                                        selectedRows={selectedInvoiceIds} 
-                                        onSelectionChange={setSelectedInvoiceIds} 
-                                        transparent={true}
-                                    />
-                                )}
+                            <div className="flex-1 min-h-0 overflow-auto">
+                                <div style={{ padding: "0 16px 24px" }}>
+                                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4">
+                                        {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
+                                            <DataTable 
+                                                columns={columnDefs} 
+                                                data={invoices ?? []} 
+                                                loading={isLoading} 
+                                                totalItems={total} 
+                                                currentPage={(skip / limit) + 1} 
+                                                itemsPerPage={limit} 
+                                                onPageChange={(page) => setSkip((page - 1) * limit)} 
+                                                onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} 
+                                                sortColumn={sortColumn} 
+                                                sortDirection={sortDirection} 
+                                                onSort={(col, dir) => setSort(col, dir)} 
+                                                maxHeight="calc(100vh - 320px)" 
+                                                stickyHeader={true} 
+                                                enableColumnFilters={true} 
+                                                columnFilters={columnFilters} 
+                                                onColumnFiltersChange={setColumnFilters} 
+                                                selectable={(pageTab === 'in_progress' || pageTab === 'posted_stage') && ["scanner", "coder"].includes(userRole)} 
+                                                selectedRows={selectedInvoiceIds} 
+                                                onSelectionChange={setSelectedInvoiceIds} 
+                                                transparent={true}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </>
                     ) : (

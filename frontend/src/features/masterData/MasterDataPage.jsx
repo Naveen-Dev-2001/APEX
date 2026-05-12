@@ -605,7 +605,7 @@ const MasterDataPage = () => {
                             // We might need to update store to take dir too, or just call setSort.
                             setSort(col);
                         }}
-                        maxHeight="calc(100vh - 350px)"
+                        maxHeight="calc(100vh - 320px)"
                         stickyHeader={true}
                         enableColumnFilters={true}
                         columnFilters={columnFilters}
