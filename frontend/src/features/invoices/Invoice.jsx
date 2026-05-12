@@ -494,36 +494,7 @@ const Invoice = () => {
                                                 </button>
                                             </Popconfirm>
                                         )}
-                                        {pageTab === 'in_progress' && ["scanner", "coder"].includes(userRole) && (
-                                            <Popconfirm
-                                                title="Archive Invoices"
-                                                description={`Are you sure you want to archive ${selectedInvoiceIds.length} invoices?`}
-                                                onConfirm={handleBulkArchive}
-                                                okText="Archive"
-                                                cancelText="Cancel"
-                                                okButtonProps={{ loading: bulkActionLoading }}
-                                            >
-                                                <button style={{
-                                                    background: "#52C41A",
-                                                    border: "none",
-                                                    color: "white",
-                                                    padding: "8px 20px",
-                                                    borderRadius: "50px",
-                                                    fontSize: "14px",
-                                                    fontWeight: 600,
-                                                    cursor: "pointer",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: "8px",
-                                                    transition: "all 0.2s"
-                                                }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-                                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                                                >
-                                                    <InboxOutlined /> Bulk Archive
-                                                </button>
-                                            </Popconfirm>
-                                        )}
+
 
                                         <button
                                             onClick={() => setSelectedInvoiceIds([])}
