@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import { useInvoiceStore } from './invoice.store';
+
 export const useAuthStore = create((set) => ({
   token: sessionStorage.getItem('access_token') || null,
   refreshToken: sessionStorage.getItem('refresh_token') || null,
@@ -30,15 +32,12 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: () => {
-    import('../main').then(({ queryClient }) => {
-      queryClient.clear();
-    });
-    sessionStorage.removeItem('access_token');
-    sessionStorage.removeItem('refresh_token');
-    sessionStorage.removeItem('user');
-    sessionStorage.removeItem('active_role');
-    sessionStorage.removeItem('selected_entity');
-    set({ token: null, user: null, refreshToken: null });
+    sessionStorage.clear();
+    
+    // Only reset invoice store to clear current processing state
+    useInvoiceStore.getState().resetInvoiceStore();
+
+    set({ token: null, user: null, refreshToken: null, activeRole: null });
   },
 
   updateUser: (updatedUser) => {
