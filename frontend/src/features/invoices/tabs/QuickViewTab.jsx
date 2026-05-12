@@ -13,6 +13,7 @@ import InvoiceCalculationModal from "./InvoiceCalculationModal";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import loadLineItemTable from "../../../utils/lineItemLogic";
+import { getInvoiceHeuristics } from "../../../utils/invoiceCalculations";
 import * as XLSX from "xlsx";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { Trash2 } from "lucide-react";
@@ -607,8 +608,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             (sum, row) => sum + (Number(row.netAmount) || 0),
             0
         );
-        const totalAmountPayable =
-            regularItemsSum + (Number(gstRow?.netAmount) || 0) + (Number(tdsRow?.netAmount) || 0);
+        const totalAmountPayable = roundTo2(
+            regularItemsSum + (Number(gstRow?.netAmount) || 0) + (Number(tdsRow?.netAmount) || 0)
+        );
 
         return { regularItemsSum, totalAmountPayable };
     }, [lineItems]);
@@ -620,15 +622,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
 
     // ── Amount Mismatch Warning ──────────────────────────────────────────────
     const isAmountMismatch = useMemo(() => {
-        const parseCurrency = (val) => {
-            if (!val && val !== 0) return 0;
-            const strVal = val.toString().replace(/[^0-9.-]+/g, "");
-            return parseFloat(strVal) || 0;
-        };
-        const totalAmount = parseCurrency(quickViewFormData?.totalAmount);
-        // Compare with the calculated total amount payable from line items
-        return Math.abs(totalAmount - totalAmountPayable) > 0.01;
-    }, [quickViewFormData?.totalAmount, totalAmountPayable]);
+        const { hasMismatch } = getInvoiceHeuristics(quickViewFormData, lineItems);
+        return hasMismatch;
+    }, [quickViewFormData, lineItems]);
 
     // Label for the GST system row
     const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
@@ -796,8 +792,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                     <FieldRenderer
                                                         field={field}
                                                         storeValue={
-                                                            field.key === "totalPayable" 
-                                                                ? totalAmountPayable 
+                                                            field.key === "totalPayable"
+                                                                ? totalAmountPayable
                                                                 : (quickViewFormData?.[field.key] ?? "")
                                                         }
                                                         onCommit={field.key === "vendorId" || field.key === "vendorName" ? handleVendorFieldCommit : handleCommit}
@@ -960,9 +956,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                         defaultActiveKey={[section.section]}
                         className="bg-white rounded-md border border-gray-200 shadow-sm"
                         style={{ marginBottom: "16px" }}
-                        items={[{ 
-                            key: section.section, 
-                            label: section.section, 
+                        items={[{
+                            key: section.section,
+                            label: section.section,
                             children: content,
                             extra: section.section === "Line Items" ? headerButtons : null
                         }]}

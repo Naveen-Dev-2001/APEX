@@ -14,6 +14,7 @@ import { Modal } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import DelegateModal from "./DelegateModal";
 import { QUICK_VIEW_CONFIG } from "./Fields";
+import { getInvoiceHeuristics } from "../../utils/invoiceCalculations";
 
 
 
@@ -133,6 +134,11 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             setUiStatusReady(true);
         }
     }, [viewInvoiceId, workflowData]);
+
+    const isAmountMismatch = useMemo(() => {
+        const { hasMismatch } = getInvoiceHeuristics(quickViewFormData, lineItems);
+        return hasMismatch;
+    }, [quickViewFormData, lineItems]);
 
     useEffect(() => {
         if (!workflowData) return;
@@ -505,7 +511,11 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                             <CustomButton
                                                 variant="success"
                                                 height="h-[34px]"
-                                                disabled={isDuplicate || !!actionLoading}
+                                                disabled={
+                                                    isDuplicate ||
+                                                    !!actionLoading ||
+                                                    (currentStatus === "waiting_coding" && isAmountMismatch)
+                                                }
                                                 onClick={
                                                     currentStatus === "waiting_coding"
                                                         ? handleSendToApproval
