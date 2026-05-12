@@ -169,7 +169,7 @@ const UserManagementTab = ({ onEdit }) => {
                 onItemsPerPageChange={setItemsPerPage}
                 sortColumn={sortColumn}
                 sortDirection={sortDirection}
-                maxHeight="calc(100vh - 280px)"
+                maxHeight="calc(100vh - 320px)"
                 stickyHeader={true}
                 enableColumnFilters={true}
                 transparent={true}

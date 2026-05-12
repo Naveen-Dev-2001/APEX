@@ -407,7 +407,7 @@ const ApprovalsPage = () => {
                             onSort={handleSort}
                             sortColumn={sortColumn}
                             sortDirection={sortDirection}
-                            maxHeight="calc(100vh - 250px)"
+                            maxHeight="calc(100vh - 320px)"
                             stickyHeader={true}
                             enableColumnFilters={true}
                         />
