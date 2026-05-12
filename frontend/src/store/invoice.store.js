@@ -438,4 +438,15 @@ export const useInvoiceStore = create((set, get) => ({
                 ? itemsOrUpdater(state.lineItems)
                 : itemsOrUpdater,
         })),
+
+    resetInvoiceStore: () => set({
+        invoiceSection: 1,
+        isModalOpen: false,
+        viewInvoiceId: null,
+        fileName: "",
+        invoiceActiveTab: "Quick View",
+        quickViewFormData: {},
+        lineItems: [],
+        activeInvoiceData: null,
+    }),
 }));
