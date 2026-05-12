@@ -146,14 +146,14 @@ export const useInvoiceStore = create((set, get) => ({
         const existingTdsRow = lineItems.find(i => i.type === "TDS");
 
         const entityMaster = get().entityMaster;
-        const gstLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
+        const isGstApplicable = entityMaster?.gst_applicable === true;
 
         if (isModified) {
             // Preserve saved system rows exactly as-is
-            const gstRow = existingGstRow ?? {
+            const gstRow = existingGstRow ?? (isGstApplicable ? {
                 id: "gst-row",
                 type: "GST",
-                description: gstLabel,
+                description: "Total GST",
                 qty: 1,
                 unitPrice: 0,
                 discount: 0,
@@ -161,8 +161,9 @@ export const useInvoiceStore = create((set, get) => ({
                 taxAmt: 0,
                 isSystemRow: true,
                 isNetAmountOverridden: false,
-            };
-            const systemRows = [gstRow, ...(existingTdsRow ? [existingTdsRow] : [])];
+            } : null);
+
+            const systemRows = [...(gstRow ? [gstRow] : []), ...(existingTdsRow ? [existingTdsRow] : [])];
             return [...regularItems, ...systemRows];
         }
 
@@ -175,10 +176,10 @@ export const useInvoiceStore = create((set, get) => ({
         const tdsValue = roundTo2(-Math.abs(tdsRate * totalInvoiceAmount));
         const isTdsApplicable = formData?.tdsApplicability === "Yes";
 
-        const gstRow = {
+        const gstRow = isGstApplicable ? {
             id: "gst-row",
             type: "GST",
-            description: gstLabel,
+            description: "Total GST",
             qty: 1,
             unitPrice: gstValue,
             discount: 0,
@@ -186,7 +187,7 @@ export const useInvoiceStore = create((set, get) => ({
             taxAmt: 0,
             isSystemRow: true,
             isNetAmountOverridden: false,
-        };
+        } : null;
 
         const tdsRow = {
             id: "tds-row",
@@ -201,7 +202,7 @@ export const useInvoiceStore = create((set, get) => ({
             isNetAmountOverridden: false,
         };
 
-        const systemRows = [gstRow, ...(isTdsApplicable ? [tdsRow] : [])];
+        const systemRows = [...(gstRow ? [gstRow] : []), ...(isTdsApplicable ? [tdsRow] : [])];
         return [...regularItems, ...systemRows];
     },
 
@@ -357,37 +358,44 @@ export const useInvoiceStore = create((set, get) => ({
             lineGrouping: (currentVendorId === data.vendor_id) ? (currentFormData.lineGrouping || "") : "",
         };
 
+        const isGstApplicable = state.entityMaster?.gst_applicable === true;
+
         const items = data?.extracted_data?.Items?.value || [];
-        const mappedItems = items.map((item, index) => {
-            const desc = item.description?.value || "";
-            const netAmount = Number(item.amount?.value) || 0;
-            const qty = Number(item.qty?.value) || 1;
-            const unitPrice = Number(item.unit_price?.value) || 0;
-            const discount = Number(item.discount?.value) || 0;
-            const taxAmt = Number(item.tax_amount?.value) || 0;
+        const mappedItems = items
+            .map((item, index) => {
+                const desc = item.description?.value || "";
+                const netAmount = Number(item.amount?.value) || 0;
+                const qty = Number(item.qty?.value) || 1;
+                const unitPrice = Number(item.unit_price?.value) || 0;
+                const discount = Number(item.discount?.value) || 0;
+                const taxAmt = Number(item.tax_amount?.value) || 0;
 
-            const isGst = desc === "Total GST" || desc === "Total Tax";
-            const isTds = desc === "TDS Deduction";
+                const isGst = desc === "Total GST" || desc === "Total Tax";
+                const isTds = desc === "TDS Deduction";
 
-            return {
-                id: isGst ? "gst-row" : isTds ? "tds-row" : index + 1,
-                type: isGst ? "GST" : isTds ? "TDS" : undefined,
-                description: desc,
-                qty,
-                unitPrice: isGst || isTds ? netAmount : unitPrice,
-                discount,
-                netAmount,
-                taxAmt,
-                isSystemRow: isGst || isTds,
-                isNetAmountOverridden: false,
-                lineType: item.line_type?.value || "Expense",
-                glCode: item.gl_code?.value || "",
-                lob: item.lob?.value || "",
-                department: item.department?.value || "",
-                customer: item.customer?.value || "",
-                item: item.item?.value || "",
-            };
-        });
+                return {
+                    id: isGst ? "gst-row" : isTds ? "tds-row" : index + 1,
+                    type: isGst ? "GST" : isTds ? "TDS" : undefined,
+                    description: desc,
+                    qty,
+                    unitPrice: isGst || isTds ? netAmount : unitPrice,
+                    discount,
+                    netAmount,
+                    taxAmt,
+                    isSystemRow: isGst || isTds,
+                    isNetAmountOverridden: false,
+                    lineType: item.line_type?.value || "Expense",
+                    glCode: item.gl_code?.value || "",
+                    lob: item.lob?.value || "",
+                    department: item.department?.value || "",
+                    customer: item.customer?.value || "",
+                    item: item.item?.value || "",
+                };
+            })
+            .filter(item => {
+                if (item.type === "GST" && !isGstApplicable) return false;
+                return true;
+            });
 
         const originalItems = data?.extracted_data?.OriginalItems?.value || [];
         const mappedOriginalItems = originalItems.length

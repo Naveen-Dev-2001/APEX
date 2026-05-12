@@ -78,29 +78,32 @@ const addSystemRows = (rows, formData, entityMaster) => {
     let result = [...rows];
 
     //  GST
-    const gstValue = Number(formData?.totalTaxAmount || 0);
-    const gstLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
+    const isGstApplicable = entityMaster?.gst_applicable === true;
+    if (isGstApplicable) {
+        const gstValue = Number(formData?.totalTaxAmount || 0);
+        const gstLabel = "Total GST";
 
-    const gstRow = {
-        id: "gst-row",
-        type: "GST",
-        description: gstLabel,
-        qty: 1,
-        unitPrice: gstValue,
-        discount: 0,
-        netAmount: gstValue,
-        taxAmt: 0,
-        isSystemRow: true,
+        const gstRow = {
+            id: "gst-row",
+            type: "GST",
+            description: gstLabel,
+            qty: 1,
+            unitPrice: gstValue,
+            discount: 0,
+            netAmount: gstValue,
+            taxAmt: 0,
+            isSystemRow: true,
 
-        lineType: "",
-        glCode: "",
-        lob: "",
-        department: "",
-        customer: "",
-        item: "",
-    };
+            lineType: "",
+            glCode: "",
+            lob: "",
+            department: "",
+            customer: "",
+            item: "",
+        };
 
-    result.push(gstRow);
+        result.push(gstRow);
+    }
     //  TDS (only if applicable)
     const isTdsApplicable = formData?.tds_applicability;
     const tdsRate = Number(formData?.tds_percentage || 0);
