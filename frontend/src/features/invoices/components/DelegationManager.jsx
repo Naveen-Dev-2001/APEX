@@ -309,8 +309,9 @@ const DelegationManager = ({ isAdmin = false, onUpdate, loading: pageLoading = f
                     onItemsPerPageChange={setItemsPerPage}
                     sortColumn={sortColumn}
                     sortDirection={sortDirection}
-                    maxHeight="calc(100vh - 420px)"
+                    maxHeight="calc(100vh - 320px)"
                     stickyHeader={true}
+                    transparent={true}
                 />
             </div>
         </div>

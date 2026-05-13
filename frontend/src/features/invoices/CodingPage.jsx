@@ -397,7 +397,7 @@ const CodingPage = () => {
                     sortColumn={sortColumn}
                     sortDirection={sortDirection}
                     onSort={handleSort}
-                    maxHeight="calc(100vh - 350px)"
+                    maxHeight="calc(100vh - 320px)"
                     stickyHeader={true}
                     enableColumnFilters={true}
                     columnFilters={columnFilters}
