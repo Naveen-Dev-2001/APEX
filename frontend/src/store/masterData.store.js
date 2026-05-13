@@ -146,6 +146,7 @@ const useMasterDataStore = create((set, get) => ({
             columns: [
                 { header: 'Currency Code', accessor: 'code', sortable: true, filterable: true },
                 { header: 'Currency Name', accessor: 'name', sortable: true, filterable: true },
+                { header: 'Symbol', accessor: 'symbol', sortable: true, filterable: true },
                 { header: 'Actions', accessor: 'actions', sortable: false },
             ],
             data: [],
