@@ -366,14 +366,6 @@ def get_coding_suggestions(db: Session, vendor_name: str, extracted_items: List[
         #  BUSINESS RULE OVERRIDES (PRIORITY BASED)
         # =========================================================
 
-        #  1. TDS → override GL code if vendor is TDS applicable
-        if is_tds and vendor_tds_eligible:
-            item.gl_code = "TDS_INPUT"
-
-        #  2. GST Eligible → override GL code if vendor is GST eligible
-        elif is_gst_eligible and vendor_gst_eligible:
-            item.gl_code = "GST_INPUT"
-
         #  3. GST Ineligible (Implicit) → Already handled by history block above
 
         #  If no rule + no match → stays empty (manual input)
