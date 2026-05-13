@@ -324,7 +324,7 @@ class Currency(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     code = Column(String(10), unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False, index=True)
-    symbol = Column(String(10), nullable=True)
+    symbol = Column(NVARCHAR(10), nullable=True)
     exchange_rate = Column(Float, nullable=True)
     created_at = Column(DateTime, nullable=False, default=get_ist_now)
     updated_at = Column(DateTime, nullable=True, onupdate=get_ist_now)
