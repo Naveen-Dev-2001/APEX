@@ -47,7 +47,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         selectedVendorId,
         navigationOrigin,
         setNavigationOrigin,
-        setIsPreviewLoading
+        setIsPreviewLoading,
+        entityMaster,
     } = useInvoiceStore();
 
     const { handleSave } = useSaveInvoice();
@@ -157,7 +158,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                 if (!field.required) continue;
 
                 // Check if visible
-                if (field.visible && !field.visible(quickViewFormData)) continue;
+                if (field.visible && !field.visible(quickViewFormData, entityMaster)) continue;
 
                 const value = quickViewFormData?.[field.key];
                 if (value === undefined || value === null || String(value).trim() === "") {

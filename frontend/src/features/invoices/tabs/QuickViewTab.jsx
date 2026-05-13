@@ -665,10 +665,13 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [activeInvoiceData, userRole, user?.email]);
 
     const filteredSections = useMemo(() => {
-        return QUICK_VIEW_CONFIG.filter(section => (showOnlyHeader
-            ? section.section === "Header"
-            : (isAllFields || !section.showInAllFields)));
-    }, [isAllFields, showOnlyHeader]);
+        return QUICK_VIEW_CONFIG.filter(section => {
+            if (section.visible && !section.visible(quickViewFormData, entityMaster)) return false;
+            return (showOnlyHeader
+                ? section.section === "Header"
+                : (isAllFields || !section.showInAllFields));
+        });
+    }, [isAllFields, showOnlyHeader, quickViewFormData, entityMaster]);
 
     const handleExportExcel = useCallback(() => {
         const dataToExport = (lineItems || [])
@@ -782,7 +785,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                     .filter(field => {
                                         if (!isAllFields && field.showInAllFields) return false;
                                         if (!field.visible) return true;
-                                        return field.visible(quickViewFormData);
+                                        return field.visible(quickViewFormData, entityMaster);
                                     })
                                     .map(field => (
                                         <div key={field.key} className="flex flex-col justify-start">

@@ -22,10 +22,10 @@ export const QUICK_VIEW_CONFIG = [
             { key: "totalAmount", label: "Total Amount", type: "input", editable: true, required: true },
             { key: "totalPayable", label: "Total Payable", type: "input", editable: true, required: true },
             { key: "memo", label: "Memo", type: "input", editable: true },
-            { key: "gstEligibility", label: "GST Eligibility", type: "input", editable: true },
-            { key: "tdsApplicability", label: "TDS Applicability", type: "input", editable: true },
-            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true },
-            { key: "tdsSection", label: "TDS Section", type: "input", editable: true },
+            { key: "gstEligibility", label: "GST Eligibility", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false },
+            { key: "tdsApplicability", label: "TDS Applicability", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false },
+            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false },
+            { key: "tdsSection", label: "TDS Section", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false },
             { key: "lineGrouping", label: "Line Grouping", type: "input", editable: true },
             // AllFields only ↓
             { key: "amountPaid", label: "Amount Paid", type: "input", editable: true, showInAllFields: true },
@@ -71,6 +71,7 @@ export const QUICK_VIEW_CONFIG = [
         section: "Taxes",
         type: "form",
         showInAllFields: true,
+        visible: (f, ent) => ent?.gst_applicable !== false,
         fields: [
             { key: "totalTaxAmount", label: "Total Tax Amount", type: "input", editable: true },
             { key: "cgst", label: "CGST", type: "input", editable: true },
