@@ -194,6 +194,7 @@ export const useSaveInvoice = () => {
                 tds_rate: { ...activeInvoiceData.extracted_data?.amounts?.tds_rate, value: f.tdsRate },
                 tds_section: { ...activeInvoiceData.extracted_data?.amounts?.tds_section, value: f.tdsSection },
                 tds_deduction: { ...activeInvoiceData.extracted_data?.amounts?.tds_deduction, value: tdsDeductionValue },
+                total_amount_payable: { ...activeInvoiceData.extracted_data?.amounts?.total_amount_payable, value: f.totalPayable },
             },
 
             additional_info: {

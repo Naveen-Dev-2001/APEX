@@ -197,8 +197,10 @@ def _create_ap_bill(
     total_amount = "0"
     try:
         from app.services.pdf_service import _extract_total
-        extracted_str = invoice.extracted_data
-        pdf_amt_str = _extract_total(extracted_str)
+        extracted_data_obj = _json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else (invoice.extracted_data or {})
+        
+        # Prefer total_amount_payable
+        pdf_amt_str = extracted_data_obj.get("amounts", {}).get("total_amount_payable", {}).get("value")
 
         if pdf_amt_str and pdf_amt_str != "—":
             clean_amt = str(pdf_amt_str).replace(",", "").replace("$", "").replace("€", "").replace("£", "").strip()
