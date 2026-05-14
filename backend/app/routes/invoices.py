@@ -3000,6 +3000,36 @@ async def delete_invoice(
 
     try:
         # ------------------------------------------------------------------
+        # 0. Record deletion in status and workflow BEFORE snapshotting
+        # ------------------------------------------------------------------
+        invoice.status = InvoiceStatusEnum.DELETED
+        
+        # Add to history
+        history_item = InvoiceStatusHistory(
+            invoice_id=invoice_id,
+            status=InvoiceStatusEnum.DELETED,
+            user=current_user.username,
+            timestamp=get_ist_now(),
+            comment="Invoice deleted by user"
+        )
+        db.add(history_item)
+        
+        # Add to workflow
+        workflow_step = WorkflowStep(
+            invoice_id=invoice_id,
+            step_name="Deleted",
+            step_type=WorkflowStepTypeEnum.DELETED,
+            user=current_user.username,
+            status="completed",
+            timestamp=get_ist_now(),
+            entity=invoice.entity
+        )
+        db.add(workflow_step)
+        
+        db.flush()
+        db.refresh(invoice)
+
+        # ------------------------------------------------------------------
         # 1. Snapshot child-table rows as JSON
         # ------------------------------------------------------------------
         def _row_to_dict(row):
@@ -3192,7 +3222,40 @@ async def bulk_delete_invoices(
                 results["failed"].append({"id": inv_id, "reason": "Invoice not found"})
                 continue
             
+            # ------------------------------------------------------------------
+            # 0. Record deletion in status and workflow BEFORE snapshotting
+            # ------------------------------------------------------------------
+            invoice.status = InvoiceStatusEnum.DELETED
+            
+            # Add to history
+            history_item = InvoiceStatusHistory(
+                invoice_id=inv_id,
+                status=InvoiceStatusEnum.DELETED,
+                user=current_user.username,
+                timestamp=get_ist_now(),
+                comment="Invoice deleted by user (Bulk)"
+            )
+            db.add(history_item)
+            
+            # Add to workflow
+            workflow_step = WorkflowStep(
+                invoice_id=inv_id,
+                step_name="Deleted",
+                step_type=WorkflowStepTypeEnum.DELETED,
+                user=current_user.username,
+                status="completed",
+                timestamp=get_ist_now(),
+                entity=invoice.entity
+            )
+            db.add(workflow_step)
+            
+            db.flush()
+            db.refresh(invoice)
+
             # (Reusing logic from delete_invoice)
+            # ------------------------------------------------------------------
+            # 1. Snapshot child-table rows as JSON
+            # ------------------------------------------------------------------
             def _row_to_dict(row):
                 result = {}
                 for col in row.__table__.columns:

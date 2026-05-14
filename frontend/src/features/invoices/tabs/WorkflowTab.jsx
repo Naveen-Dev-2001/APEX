@@ -140,6 +140,20 @@ const getStatusConfig = (status) => {
 
             };
 
+        case "deleted":
+            return {
+                titleColor: "text-[#ED5565]",
+                subtitleColor: "text-gray-600",
+                timeColor: "text-gray-400",
+                icon: (
+                    <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#ED5565]">
+                        <CloseOutlined className="!text-white text-[10px] font-black" />
+                    </div>
+                ),
+                lineColor: "bg-[#ED5565]",
+                lineStyle: "solid",
+                defaultSubtitle: "Invoice Deleted"
+            };
         case "queued":
 
         case "upcoming":
@@ -292,7 +306,7 @@ const WorkflowTab = () => {
 
     // Part 2: Pending and Future Stages (if not finished)
 
-    const isFinished = ["sage_posted", "rejected"].includes(renderStatus);
+    const isFinished = ["sage_posted", "rejected", "deleted"].includes(renderStatus);
 
     if (!isFinished) {
 
