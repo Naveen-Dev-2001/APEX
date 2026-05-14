@@ -9,10 +9,12 @@ class InvoiceStatus(str, Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
     PROCESSED = "processed"
+    UPLOADING = "uploading"
     REWORKED = "reworked"
     SAGE_POSTED = "sage_posted"
     SAGE_POST_FAILED = "sage_post_failed"
     ARCHIVED = "archived"
+    DELETED = "deleted"
 
 class StatusHistoryItem(BaseModel):
     status: InvoiceStatus

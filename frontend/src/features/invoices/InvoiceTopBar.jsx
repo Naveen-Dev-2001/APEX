@@ -180,6 +180,12 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         try {
             const saveRes = await handleSave({}, vendor);
 
+            // If the data save failed (returned null), handleSave already showed
+            // an error toast — bail out here to avoid a second cascading error.
+            if (!saveRes) {
+                return;
+            }
+
             const payload = await saveInvoice(viewInvoiceId, {
                 status: "waiting_coding",
                 last_updated_at: saveRes?.updated_at || activeInvoiceData?.updated_at
@@ -240,6 +246,13 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         setActionLoading("sendToApproval");
         try {
             const saveRes = await handleSave({}, vendor);
+
+            // If the data save failed (returned null), handleSave already showed
+            // an error toast — bail out here to avoid a second cascading error.
+            if (!saveRes) {
+                return;
+            }
+
             const payload = await saveInvoice(viewInvoiceId, {
                 status: "waiting_approval",
                 last_updated_at: saveRes?.updated_at || activeInvoiceData?.updated_at
@@ -264,8 +277,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
 
     const handleSaveInvoice = async () => {
-        if (!validateRequiredFields()) return;
-
+        // Save always persists the draft — no mandatory-field validation here.
+        // Validation is only enforced on "Send to Coding" / "Send to Approval".
         const extraFields = {};
         if (currentStatus === "reworked") {
             extraFields.status = "waiting_approval";
