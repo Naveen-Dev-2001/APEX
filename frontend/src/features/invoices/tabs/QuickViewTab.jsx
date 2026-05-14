@@ -26,7 +26,7 @@ const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
-const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, isAmountMismatch, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading, onSearch, searchLoading }) => {
+const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, isAmountMismatch, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading, onSearch, searchLoading, options: dynamicOptions, loading: dynamicLoading, onOpenChange: dynamicOnOpenChange }) => {
     const [localValue, setLocalValue] = useState(storeValue ?? "");
     const debounceRef = useRef(null);
 
@@ -91,9 +91,10 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
                     />
                 );
             case "dropdown": {
-                let options = field.options || [];
-                let loading = false;
-                let onDropdownVisibleChange = undefined;
+                let options = dynamicOptions || field.options || [];
+                let loading = dynamicLoading || false;
+                let onDropdownVisibleChange = dynamicOnOpenChange;
+
                 if (field.key === "invoiceCurrency") {
                     options = currencyOptions;
                     loading = currencyLoading;
@@ -228,6 +229,27 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const fileInputRef = useRef(null);
     const [currencyOptions, setCurrencyOptions] = useState([]);
     const [currencyLoading, setCurrencyLoading] = useState(false);
+    const [tdsOptions, setTdsOptions] = useState([]);
+    const [tdsLoading, setTdsLoading] = useState(false);
+
+    const fetchTDSOptions = useCallback(async () => {
+        setTdsLoading(true);
+        try {
+            const res = await masterDataService.getTDSRatesData({ page_size: 1000 });
+            const data = res.data || [];
+            const options = data.map(t => ({
+                label: `${t.section || t.section_code} - ${t.nature_of_payment}`,
+                value: t.section || t.section_code,
+                rate: t.tds_rate || t.percentage
+            }));
+            setTdsOptions(options);
+        } catch (err) {
+            console.error("Failed to fetch TDS options:", err);
+        } finally {
+            setTdsLoading(false);
+        }
+    }, []);
+
     const fetchCurrencyOptions = useCallback(async () => {
         setCurrencyLoading(true);
         try {
@@ -252,6 +274,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const duplicateMessage = useInvoiceStore(s => s.duplicateMessage);
     const lineItems = useInvoiceStore(s => s.lineItems);
     const setLineItems = useInvoiceStore(s => s.setLineItems);
+
+    // ── Vendor Logic (Optimized for 35k+ vendors) ──────────────────────────
+    const { vendor } = useVendorDetailSync(selectedVendorId);
 
     // ── Exchange Rate Auto-Fetch Logic ──────────────────────────────────────────
     const rateCache = useRef({}); // { 'CURRENCY_DATE': rate }
@@ -300,11 +325,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
 
     const handleCommit = useCallback((key, value) => {
         if (key === "invoiceDate") {
-            // Get current form data and vendor info
+            // Get current form data
             const state = useInvoiceStore.getState();
             const prev = state.quickViewFormData;
-            const vendor = state.vendor || {};
-            // Helper functions (copied from above)
+
+            // Helper functions
             const parseDateFlexible = (dateStr) => {
                 if (!dateStr) return null;
                 const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
@@ -321,25 +346,67 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 return match ? parseInt(match[0], 10) : null;
             };
             const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
-                // Always recalculate due date on invoiceDate change
                 const baseDate = parseDateFlexible(invoiceDate);
                 if (!baseDate) return "";
-                const invoiceDays = extractDays(prev?.paymentTerms);
+                const invoiceDays = extractDays(invoicePayTerms);
                 if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
-                const vendorDays = extractDays(vendor?.pay_terms);
+                const vendorDays = extractDays(vendorPayTerms);
                 if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
                 return "";
             };
             const newDueDate = getDueDate(null, value, prev?.paymentTerms, vendor?.pay_terms);
             setQuickViewField("invoiceDate", value);
             setQuickViewField("dueDate", newDueDate);
+        } else if (key === "tdsSection") {
+            const selectedTds = tdsOptions.find(opt => opt.value === value);
+            if (selectedTds) {
+                // If the selected section matches the vendor's default, use the vendor's specific rate
+                // otherwise use the default rate from the TDS master list.
+                const rate = (value === vendor?.tds_section_code) ? vendor.tds_percentage : selectedTds.rate;
+
+                setQuickViewField("tdsSection", value);
+                setQuickViewField("tdsRate", rate);
+                setQuickViewField("tds_percentage", rate);
+            } else {
+                setQuickViewField("tdsSection", value);
+            }
         } else {
             setQuickViewField(key, value);
         }
-    }, [setQuickViewField]);
 
-    // ── Vendor Logic (Optimized for 35k+ vendors) ──────────────────────────
-    const { vendor } = useVendorDetailSync(selectedVendorId);
+        // ── Trigger Recalculation if specific fields change ───────────────────
+        const triggerFields = ["gstEligibility", "tdsApplicability", "tdsRate", "tdsSection", "lineGrouping", "totalTaxAmount"];
+        if (triggerFields.includes(key)) {
+            const state = useInvoiceStore.getState();
+            // Start with current store state
+            const updatedFormData = { ...state.quickViewFormData, [key]: value };
+
+            // Ensure booleans and numbers are correctly typed for the calculation logic
+            updatedFormData.tds_applicability = (updatedFormData.tdsApplicability === "Yes");
+            updatedFormData.tds_percentage = parseFloat(updatedFormData.tdsRate || 0);
+            updatedFormData.gst_eligibility = (updatedFormData.gstEligibility === "Eligible");
+
+            // When section changes, also patch in the derived rate
+            if (key === "tdsSection") {
+                const selectedTds = tdsOptions.find(opt => opt.value === value);
+                if (selectedTds) {
+                    const rate = (value === vendor?.tds_section_code) ? vendor.tds_percentage : selectedTds.rate;
+                    updatedFormData.tdsRate = rate;
+                    updatedFormData.tds_percentage = parseFloat(rate || 0);
+                }
+            }
+
+            const result = loadLineItemTable({
+                activeInvoiceData: state.activeInvoiceData,
+                quickViewFormData: updatedFormData,
+                vendor: vendor,
+                isVendorChanged: false,
+                entityMaster: state.entityMaster
+            });
+            if (result) setLineItems(result);
+        }
+    }, [setQuickViewField, tdsOptions, setLineItems, vendor]);
+
     const [searchedVendors, setSearchedVendors] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const searchTimeoutRef = useRef(null);
@@ -451,19 +518,38 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             extractedPayTerms,
             vendor?.pay_terms
         );
+        // When the invoice is already saved AND the vendor hasn't changed,
+        // preserve the user's saved overrides — don't overwrite with vendor master.
+        const isSavedInvoice = !!prev?.isModified;
+        const useVendorDefaults = isVendorChanged || !isSavedInvoice;
+
         const updatedFormData = {
             ...prev,
-            gstEligibility: vendor?.gst_eligibility ? "Eligible" : "Ineligible",
-            lineGrouping: vendor?.line_grouping ? "Yes" : "No",
+            // Only apply vendor defaults for GST/TDS/Grouping when appropriate
+            gstEligibility: useVendorDefaults
+                ? (vendor?.gst_eligibility ? "Eligible" : "Ineligible")
+                : (prev?.gstEligibility || (vendor?.gst_eligibility ? "Eligible" : "Ineligible")),
+            lineGrouping: useVendorDefaults
+                ? (vendor?.line_grouping ? "Yes" : "No")
+                : (prev?.lineGrouping || (vendor?.line_grouping ? "Yes" : "No")),
+            tdsApplicability: useVendorDefaults
+                ? (vendor?.tds_applicability ? "Yes" : "No")
+                : (prev?.tdsApplicability || (vendor?.tds_applicability ? "Yes" : "No")),
+            tdsRate: useVendorDefaults
+                ? (vendor?.tds_percentage ?? 0)
+                : (prev?.tdsRate ?? vendor?.tds_percentage ?? 0),
+            tdsSection: useVendorDefaults
+                ? (vendor?.tds_section_code ?? "NA")
+                : (prev?.tdsSection || vendor?.tds_section_code || "NA"),
+            // Always sync payment terms and due date
             paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || "",
             dueDate: computedDueDate,
-            gst_eligibility: vendor?.gst_eligibility,
-            tdsApplicability: vendor?.tds_applicability ? "Yes" : "No",
-            tdsRate: vendor?.tds_percentage ?? 0,
-            tdsSection: vendor?.tds_section_code ?? "NA",
-            // map these so addSystemRows can read them:
-            tds_applicability: vendor?.tds_applicability,
-            tds_percentage: vendor?.tds_percentage ?? 0,
+            // Keep internal flags in sync
+            gst_eligibility: useVendorDefaults ? vendor?.gst_eligibility : prev?.gst_eligibility,
+            tds_applicability: useVendorDefaults ? vendor?.tds_applicability : prev?.tds_applicability,
+            tds_percentage: useVendorDefaults
+                ? (vendor?.tds_percentage ?? 0)
+                : (prev?.tds_percentage ?? vendor?.tds_percentage ?? 0),
             totalTaxAmount: prev?.totalTaxAmount,
         };
 
@@ -534,10 +620,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                         updated.netAmount = numVal;
                     }
                 }
-
                 return updated;
             })
         );
+        // Sync to original items for persistence across grouping toggles
+        useInvoiceStore.getState().syncFieldToOriginals(id, key, value);
     }, [setLineItems]);
 
     const handleDeleteLineItem = useCallback((id) => {
@@ -799,6 +886,19 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                 ? totalAmountPayable
                                                                 : (quickViewFormData?.[field.key] ?? "")
                                                         }
+                                                        currencyOptions={currencyOptions}
+                                                        fetchCurrencyOptions={fetchCurrencyOptions}
+                                                        currencyLoading={currencyLoading}
+                                                        // Inject TDS options dynamically
+                                                        {...(field.key === "tdsSection" ? {
+                                                            options: tdsOptions,
+                                                            loading: tdsLoading,
+                                                            onOpenChange: (open) => {
+                                                                if (open && tdsOptions.length === 0 && !tdsLoading) {
+                                                                    fetchTDSOptions();
+                                                                }
+                                                            }
+                                                        } : {})}
                                                         onCommit={field.key === "vendorId" || field.key === "vendorName" ? handleVendorFieldCommit : handleCommit}
                                                         vendorOptions={(field.key === "vendorId" || field.key === "vendorName") ? vendorOptions : undefined}
                                                         filterVendors={filterVendors}
@@ -809,9 +909,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                         duplicateMessage={duplicateMessage}
                                                         isAmountMismatch={isAmountMismatch}
                                                         forceDisabled={isViewOnly}
-                                                        currencyOptions={field.key === "invoiceCurrency" ? currencyOptions : undefined}
-                                                        fetchCurrencyOptions={fetchCurrencyOptions}
-                                                        currencyLoading={currencyLoading}
                                                         onSearch={field.key === "vendorId" || field.key === "vendorName" ? handleVendorSearch : undefined}
                                                         searchLoading={isSearching}
                                                     />

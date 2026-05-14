@@ -67,7 +67,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     // ── Parallel fetch: vendor + workflow + coding suggestions fire together ──
     // This warms the React Query cache so downstream hooks (useWorkflowDataSync,
     // useVendorDetailSync in QuickViewTab) return data instantly.
-    const { workflowData } = useInvoicePreviewData({
+    const { workflowData, vendor } = useInvoicePreviewData({
         invoiceId: viewInvoiceId,
         vendorId: selectedVendorId,
         workflowParams,
@@ -178,7 +178,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         setActionLoading("sendToCoding");
 
         try {
-            const saveRes = await handleSave();
+            const saveRes = await handleSave({}, vendor);
 
             const payload = await saveInvoice(viewInvoiceId, {
                 status: "waiting_coding",
@@ -239,7 +239,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
         setActionLoading("sendToApproval");
         try {
-            const saveRes = await handleSave();
+            const saveRes = await handleSave({}, vendor);
             const payload = await saveInvoice(viewInvoiceId, {
                 status: "waiting_approval",
                 last_updated_at: saveRes?.updated_at || activeInvoiceData?.updated_at
@@ -274,7 +274,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         setActionLoading("saving");
         setIsPreviewLoading(true);
         try {
-            const response = await handleSave(extraFields);
+            const response = await handleSave(extraFields, vendor);
             if (response) {
                 toast.success("Invoice Saved Successfully!");
                 await queryClient.invalidateQueries(["invoices"]);
@@ -332,7 +332,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     const executeAction = async (action, commentText = "") => {
         if (editingEnabled) {
             try {
-                const saveResponse = await handleSave();
+                const saveResponse = await handleSave({}, vendor);
                 if (!saveResponse) {
                     toast.error("Failed to save changes before action.");
                     return;

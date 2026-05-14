@@ -3,6 +3,7 @@ import { saveInvoice } from "../../api/invoiceApi";
 import { useInvoiceStore } from "../../store/invoice.store";
 import { useCallback } from "react";
 import toast from '../../utils/toast';
+import { masterDataService } from "../../api/masterdataAPI";
 
 export const useSaveInvoice = () => {
     const {
@@ -111,6 +112,12 @@ export const useSaveInvoice = () => {
                     value: Number(item.taxAmt) || 0,
                     source: "user"
                 },
+                gl_code: { value: item.glCode || "", source: "user" },
+                lob: { value: item.lob || "", source: "user" },
+                department: { value: item.department || "", source: "user" },
+                customer: { value: item.customer || "", source: "user" },
+                item: { value: item.item || "", source: "user" },
+                line_type: { value: item.lineType || "Expense", source: "user" },
             };
         });
 
@@ -195,6 +202,9 @@ export const useSaveInvoice = () => {
                 tds_section: { ...activeInvoiceData.extracted_data?.amounts?.tds_section, value: f.tdsSection },
                 tds_deduction: { ...activeInvoiceData.extracted_data?.amounts?.tds_deduction, value: tdsDeductionValue },
                 total_amount_payable: { ...activeInvoiceData.extracted_data?.amounts?.total_amount_payable, value: f.totalPayable },
+                // Persist user overrides so they survive reload
+                line_grouping: { value: f.lineGrouping ?? "" },
+                gst_eligibility: { value: f.gstEligibility ?? "" },
             },
 
             additional_info: {
@@ -225,9 +235,51 @@ export const useSaveInvoice = () => {
         return payload;
     }, [quickViewFormData, lineItems, activeInvoiceData]);
 
-    const handleSave = useCallback(async (extraFields = {}) => {
+    const handleSave = useCallback(async (extraFields = {}, currentVendor = null) => {
         try {
             const payload = buildPayload();
+
+            // ── Normalize vendor data (API returns an array) ──────────────────
+            const normalizedVendor = Array.isArray(currentVendor) ? currentVendor[0] : currentVendor;
+
+            // ── Update Vendor Master if data changed ──────────────────────────
+            // (e.g. TDS settings or Line Grouping changed from master defaults)
+            if (normalizedVendor && normalizedVendor.id) {
+                const f = quickViewFormData;
+                const v = normalizedVendor;
+
+                const hasTdsChanged =
+                    (f.tdsApplicability === "Yes") !== !!v.tds_applicability ||
+                    parseFloat(f.tdsRate || 0) !== parseFloat(v.tds_percentage || 0) ||
+                    f.tdsSection !== (v.tds_section_code || "NA");
+
+                const hasGroupingChanged =
+                    (f.lineGrouping === "Yes") !== !!v.line_grouping ||
+                    (f.gstEligibility === "Eligible") !== !!v.gst_eligibility;
+
+                if (hasTdsChanged || hasGroupingChanged) {
+                    console.log(`Updating vendor master defaults for ${v.vendor_id}...`, {
+                        tds: f.tdsSection,
+                        rate: f.tdsRate,
+                        grouping: f.lineGrouping
+                    });
+                    
+                    const updatedVendor = {
+                        ...v,
+                        tds_applicability: f.tdsApplicability === "Yes",
+                        tds_percentage: parseFloat(f.tdsRate || 0),
+                        tds_section_code: f.tdsSection,
+                        line_grouping: f.lineGrouping === "Yes",
+                        gst_eligibility: f.gstEligibility === "Eligible"
+                    };
+
+                    masterDataService.editVendorRow(undefined, updatedVendor)
+                        .then(() => console.log("Vendor master updated successfully."))
+                        .catch(err => console.error("Failed to update vendor master:", err));
+                }
+            } else if (normalizedVendor) {
+                console.warn("Cannot update vendor master: currentVendor object missing 'id' property.", normalizedVendor);
+            }
 
             // Apply any extra field overrides (e.g. status)
             const finalPayload = {

@@ -350,12 +350,17 @@ export const useInvoiceStore = create((set, get) => ({
             qrOrIrn: data.extracted_data?.additional_info?.qr_code_irn?.value ?? "",
             companyRegistrationNumber: data.extracted_data?.additional_info?.company_registration_number?.value ?? "",
 
-            // Preserve derived fields if vendor is the same
-            gstEligibility: (currentVendorId === data.vendor_id) ? (currentFormData.gstEligibility || "") : "",
+            // Restore user overrides saved in extracted_data; fall back to currentFormData only for same-vendor loads
+            gstEligibility:
+                data.extracted_data?.amounts?.gst_eligibility?.value ||
+                ((currentVendorId === data.vendor_id) ? (currentFormData.gstEligibility || "") : ""),
             tdsApplicability: data.extracted_data?.amounts?.tds_applicability?.value ?? "",
             tdsRate: data.extracted_data?.amounts?.tds_rate?.value ?? "",
+            tds_percentage: parseFloat(data.extracted_data?.amounts?.tds_rate?.value || 0),
             tdsSection: data.extracted_data?.amounts?.tds_section?.value ?? "",
-            lineGrouping: (currentVendorId === data.vendor_id) ? (currentFormData.lineGrouping || "") : "",
+            lineGrouping:
+                data.extracted_data?.amounts?.line_grouping?.value ||
+                ((currentVendorId === data.vendor_id) ? (currentFormData.lineGrouping || "") : ""),
         };
 
         const isGstApplicable = state.entityMaster?.gst_applicable === true;
@@ -408,6 +413,12 @@ export const useInvoiceStore = create((set, get) => ({
                 netAmount: Number(item.amount?.value) || 0,
                 taxAmt: Number(item.tax_amount?.value) || 0,
                 isNetAmountOverridden: false,
+                glCode: item.gl_code?.value || "",
+                lob: item.lob?.value || "",
+                department: item.department?.value || "",
+                customer: item.customer?.value || "",
+                item: item.item?.value || "",
+                lineType: item.line_type?.value || "Expense",
             }))
             : mappedItems.filter(i => !i.isSystemRow);
 
@@ -442,11 +453,28 @@ export const useInvoiceStore = create((set, get) => ({
 
     lineItems: [],
     setLineItems: (itemsOrUpdater) =>
-        set((state) => ({
-            lineItems: typeof itemsOrUpdater === "function"
+        set((state) => {
+            const nextLineItems = typeof itemsOrUpdater === "function"
                 ? itemsOrUpdater(state.lineItems)
-                : itemsOrUpdater,
-        })),
+                : itemsOrUpdater;
+
+            return { lineItems: nextLineItems };
+        }),
+
+    // Helper to sync a single field change from a visible row to the underlying original rows
+    syncFieldToOriginals: (rowId, key, value) =>
+        set((state) => {
+            const isGrouped = state.quickViewFormData?.lineGrouping === "Yes";
+            const updatedOriginals = state.originalLineItems.map(orig => {
+                // If grouped, any edit to the (only) row applies to ALL originals
+                // If not grouped, we match by ID
+                if (isGrouped || orig.id === rowId) {
+                    return { ...orig, [key]: value };
+                }
+                return orig;
+            });
+            return { originalLineItems: updatedOriginals };
+        }),
 
     resetInvoiceStore: () => set({
         invoiceSection: 1,

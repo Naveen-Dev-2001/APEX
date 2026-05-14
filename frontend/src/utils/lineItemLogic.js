@@ -105,8 +105,8 @@ const addSystemRows = (rows, formData, entityMaster) => {
         result.push(gstRow);
     }
     //  TDS (only if applicable)
-    const isTdsApplicable = formData?.tds_applicability;
-    const tdsRate = Number(formData?.tds_percentage || 0);
+    const isTdsApplicable = formData?.tds_applicability || formData?.tdsApplicability === "Yes";
+    const tdsRate = Number(formData?.tds_percentage || formData?.tdsRate || 0);
     const totalInvoiceAmount = Number(formData?.totalInvoiceAmount || 0);
 
     if (isTdsApplicable) {
@@ -140,55 +140,77 @@ const loadLineItemTable = (props) => {
     const { activeInvoiceData, quickViewFormData, vendor, isVendorChanged, entityMaster } = props;
 
     const isSaved = activeInvoiceData?.extracted_data?.isModified || false;
+    const isLineGroupingEnabled = quickViewFormData?.lineGrouping === "Yes";
 
     let baseItems = [];
-    //  CASE 1: Saved + NO vendor change → return snapshot
-    if (isSaved && !isVendorChanged) {
-        const snapshot = activeInvoiceData?.extracted_data?.lineItemsSnapshot;
-        if (snapshot?.length) {
-            // Map snake_case from backend snapshot to camelCase for frontend components
-            return snapshot.map((item, index) => ({
-                ...item,
-                id: item.id || `snap-${index}`,
-                qty: item.qty ?? item.quantity ?? 0,
-                unitPrice: item.unitPrice ?? item.unit_price ?? 0,
-                netAmount: item.netAmount ?? item.net_amount ?? 0,
-                lineType: item.lineType ?? item.line_type ?? "Expense",
-                glCode: item.glCode ?? item.gl_code ?? "",
-                lob: item.lob ?? "",
-                department: item.department ?? "",
-                customer: item.customer ?? "",
-                item: item.item ?? "",
-                discount: item.discount ?? 0,
-                taxAmt: item.taxAmt ?? 0
-            }));
-        }
-    }
 
-    //  CASE 2: Saved + vendor changed → recompute
-    if (isSaved && isVendorChanged) {
-        const snapshot = activeInvoiceData?.extracted_data?.OriginalItems?.value;
-        baseItems = normalizeItems(snapshot).map(row => ({
-            ...row,
-            netAmount: calculateNetAmount(row)
-        }));
-    }
-
-    //  CASE 3: Not saved → normal flow
+    //  CASE 1: Not saved → normal flow from extracted Items
     if (!isSaved) {
         const extracted_items = activeInvoiceData?.extracted_data?.Items?.value || [];
-
         baseItems = normalizeItems(extracted_items).map(row => ({
             ...row,
             netAmount: calculateNetAmount(row)
         }));
     }
+    //  CASE 2: Saved + vendor changed → MUST recompute from OriginalItems
+    else if (isVendorChanged) {
+        const originals = activeInvoiceData?.extracted_data?.OriginalItems?.value || [];
+        baseItems = normalizeItems(originals).map(row => ({
+            ...row,
+            netAmount: calculateNetAmount(row)
+        }));
+    }
+    //  CASE 3: Saved + NO vendor change
+    else {
+        const snapshot = activeInvoiceData?.extracted_data?.lineItemsSnapshot || [];
+        const originals = activeInvoiceData?.extracted_data?.OriginalItems?.value || [];
 
-    //  ALWAYS apply derived logic
-    let processedRows =
-        vendor?.line_grouping
-            ? mergeIntoFirstRow(baseItems)
-            : baseItems;
+        // If user wants grouping, we MUST use OriginalItems because the snapshot might be already grouped or partially modified.
+        if (isLineGroupingEnabled) {
+            baseItems = normalizeItems(originals).map(row => ({
+                ...row,
+                netAmount: calculateNetAmount(row)
+            }));
+        } else {
+            // If user does NOT want grouping:
+            // Check if the snapshot is currently grouped (only 1 non-system row) while originals has many.
+            // If so, we MUST use originals to "un-group".
+            const nonSystemSnapshot = snapshot.filter(item => !item.isSystemRow);
+            const isSnapshotGrouped = nonSystemSnapshot.length === 1 && originals.length > 1;
+
+            if (isSnapshotGrouped) {
+                baseItems = normalizeItems(originals).map(row => ({
+                    ...row,
+                    netAmount: calculateNetAmount(row)
+                }));
+            } else {
+                // Snapshot is already un-grouped or it's the only data we have.
+                // Map snake_case to camelCase and filter out system rows.
+                baseItems = snapshot
+                    .filter(item => !item.isSystemRow)
+                    .map((item, index) => ({
+                        ...item,
+                        id: item.id || `snap-${index}`,
+                        qty: item.qty ?? item.quantity ?? 0,
+                        unitPrice: item.unitPrice ?? item.unit_price ?? 0,
+                        netAmount: item.netAmount ?? item.net_amount ?? 0,
+                        lineType: item.lineType ?? item.line_type ?? "Expense",
+                        glCode: item.glCode ?? item.gl_code ?? "",
+                        lob: item.lob ?? "",
+                        department: item.department ?? "",
+                        customer: item.customer ?? "",
+                        item: item.item ?? "",
+                        discount: item.discount ?? 0,
+                        taxAmt: item.taxAmt ?? 0
+                    }));
+            }
+        }
+    }
+
+    //  ALWAYS apply derived logic (Grouping + System Rows)
+    let processedRows = isLineGroupingEnabled
+        ? mergeIntoFirstRow(baseItems)
+        : baseItems;
 
     const finalData = addSystemRows(processedRows, quickViewFormData, entityMaster);
 

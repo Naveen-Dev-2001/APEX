@@ -300,7 +300,7 @@ const CodingTab = ({ isActive = false }) => {
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [collapsed, setCollapsed] = useState(false);
-    
+
     const [loadMasterData, setLoadMasterData] = useState(false);
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
@@ -472,6 +472,15 @@ const CodingTab = ({ isActive = false }) => {
                 return applyCalculation(item, key, value);
             })
         );
+
+        // Sync to original items for persistence across grouping toggles
+        if (isBulk) {
+            currentSelectedIds.forEach(selectedId => {
+                useInvoiceStore.getState().syncFieldToOriginals(selectedId, key, value);
+            });
+        } else {
+            useInvoiceStore.getState().syncFieldToOriginals(id, key, value);
+        }
     }, [setLineItems]);
 
     // ── handleDelete ──────────────────────────────────────────────────────────
@@ -567,7 +576,7 @@ const CodingTab = ({ isActive = false }) => {
                         )}
                     </div>
                     <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                        <button 
+                        <button
                             onClick={handleExportExcel}
                             className="flex items-center justify-center gap-1.5 w-[120px] py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
                         >
@@ -708,73 +717,73 @@ const CodingTab = ({ isActive = false }) => {
                                                     <EditableCell disabled={isViewOnly} value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="number" />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell 
-                                                        disabled={isViewOnly} 
-                                                        value={row.glCode} 
-                                                        onChange={(v) => handleUpdate(row.id, "glCode", v)} 
-                                                        options={gl.options} 
-                                                        isLoading={gl.loading} 
-                                                        onSearch={gl.handleSearch} 
+                                                    <DropdownCell
+                                                        disabled={isViewOnly}
+                                                        value={row.glCode}
+                                                        onChange={(v) => handleUpdate(row.id, "glCode", v)}
+                                                        options={gl.options}
+                                                        isLoading={gl.loading}
+                                                        onSearch={gl.handleSearch}
                                                         onOpen={gl.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell 
-                                                        disabled={isViewOnly} 
-                                                        value={row.lob} 
-                                                        onChange={(v) => handleUpdate(row.id, "lob", v)} 
-                                                        options={lob.options} 
-                                                        isLoading={lob.loading} 
-                                                        onSearch={lob.handleSearch} 
+                                                    <DropdownCell
+                                                        disabled={isViewOnly}
+                                                        value={row.lob}
+                                                        onChange={(v) => handleUpdate(row.id, "lob", v)}
+                                                        options={lob.options}
+                                                        isLoading={lob.loading}
+                                                        onSearch={lob.handleSearch}
                                                         onOpen={lob.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell 
-                                                        disabled={isViewOnly} 
-                                                        value={row.department} 
-                                                        onChange={(v) => handleUpdate(row.id, "department", v)} 
-                                                        options={dept.options} 
-                                                        isLoading={dept.loading} 
-                                                        onSearch={dept.handleSearch} 
+                                                    <DropdownCell
+                                                        disabled={isViewOnly}
+                                                        value={row.department}
+                                                        onChange={(v) => handleUpdate(row.id, "department", v)}
+                                                        options={dept.options}
+                                                        isLoading={dept.loading}
+                                                        onSearch={dept.handleSearch}
                                                         onOpen={dept.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell 
-                                                        disabled={isViewOnly} 
-                                                        value={row.customer} 
-                                                        onChange={(v) => handleUpdate(row.id, "customer", v)} 
-                                                        options={customer.options} 
-                                                        isLoading={customer.loading} 
-                                                        onSearch={customer.handleSearch} 
+                                                    <DropdownCell
+                                                        disabled={isViewOnly}
+                                                        value={row.customer}
+                                                        onChange={(v) => handleUpdate(row.id, "customer", v)}
+                                                        options={customer.options}
+                                                        isLoading={customer.loading}
+                                                        onSearch={customer.handleSearch}
                                                         onOpen={customer.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100">
-                                                    <DropdownCell 
-                                                        disabled={isViewOnly} 
-                                                        value={row.item} 
-                                                        onChange={(v) => handleUpdate(row.id, "item", v)} 
-                                                        options={item.options} 
-                                                        isLoading={item.loading} 
-                                                        onSearch={item.handleSearch} 
+                                                    <DropdownCell
+                                                        disabled={isViewOnly}
+                                                        value={row.item}
+                                                        onChange={(v) => handleUpdate(row.id, "item", v)}
+                                                        options={item.options}
+                                                        isLoading={item.loading}
+                                                        onSearch={item.handleSearch}
                                                         onOpen={item.onDropdownOpen}
                                                     />
                                                 </td>
                                                 <td className="p-2 text-center" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDelete(row.id);
-                                                                }}
-                                                                className="flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                                title="Delete line item"
-                                                                style={{ flexShrink: 0 }}
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDelete(row.id);
+                                                            }}
+                                                            className="flex items-center justify-center w-8 h-8 rounded-md transition-all duration-200 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                            title="Delete line item"
+                                                            style={{ flexShrink: 0 }}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     )}
                                                 </td>
                                             </tr>

@@ -22,11 +22,35 @@ export const QUICK_VIEW_CONFIG = [
             { key: "totalAmount", label: "Total Amount", type: "input", editable: true, required: true },
             { key: "totalPayable", label: "Total Payable", type: "input", editable: true, required: true },
             { key: "memo", label: "Memo", type: "input", editable: true },
-            { key: "gstEligibility", label: "GST Eligibility", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false },
-            { key: "tdsApplicability", label: "TDS Applicability", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false },
-            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false },
-            { key: "tdsSection", label: "TDS Section", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false },
-            { key: "lineGrouping", label: "Line Grouping", type: "input", editable: true },
+            {
+                key: "gstEligibility", label: "GST Eligibility", type: "dropdown", editable: true,
+                options: [
+                    { label: "Eligible", value: "Eligible" },
+                    { label: "Ineligible", value: "Ineligible" }
+                ],
+                visible: (f, ent) => ent?.gst_applicable !== false
+            },
+            {
+                key: "tdsApplicability", label: "TDS Applicability", type: "dropdown", editable: true,
+                options: [
+                    { label: "Yes", value: "Yes" },
+                    { label: "No", value: "No" }
+                ],
+                visible: (f, ent) => ent?.gst_applicable !== false
+            },
+            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false && f.tdsApplicability === "Yes" },
+            {
+                key: "tdsSection", label: "TDS Section", type: "dropdown", editable: true,
+                visible: (f, ent) => ent?.gst_applicable !== false && f.tdsApplicability === "Yes"
+                // options will be injected dynamically
+            },
+            {
+                key: "lineGrouping", label: "Line Grouping", type: "dropdown", editable: true,
+                options: [
+                    { label: "Yes", value: "Yes" },
+                    { label: "No", value: "No" }
+                ]
+            },
             // AllFields only ↓
             { key: "amountPaid", label: "Amount Paid", type: "input", editable: true, showInAllFields: true },
             { key: "invoiceType", label: "Invoice Type", type: "input", editable: true, showInAllFields: true },
