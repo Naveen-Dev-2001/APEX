@@ -26,8 +26,8 @@ const GLSummaryTab = ({ isActive = false }) => {
         const groups = {};
         lineItems.forEach(item => {
             const rawCode = (item.glCode || "").trim();
-            const code = rawCode || "Uncoded";
-            
+            const code = rawCode || "";
+
             if (!groups[code]) {
                 groups[code] = {
                     code,
