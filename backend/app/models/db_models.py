@@ -24,6 +24,7 @@ class InvoiceStatusEnum(str, enum.Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
     PROCESSED = "processed"
+    UPLOADING = "uploading"
     REWORKED = "reworked"
     SAGE_POSTED = "sage_posted"
     SAGE_POST_FAILED = "sage_post_failed"
