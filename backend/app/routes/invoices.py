@@ -378,7 +378,7 @@ async def upload_invoices(
                 original_filename=clean_name,
                 file_path=file_path,
                 uploaded_by=current_user.username,
-                status=InvoiceStatusEnum.PROCESSED,
+                status=InvoiceStatusEnum.UPLOADING,
                 entity=entity,
                 uploaded_at=get_ist_now(),
                 posting_date=get_ist_now().date(),
@@ -388,7 +388,7 @@ async def upload_invoices(
             
             # Initial Status History
             history_item = InvoiceStatusHistory(
-                status=InvoiceStatusEnum.PROCESSED,
+                status=InvoiceStatusEnum.UPLOADING,
                 user=current_user.username,
                 timestamp=get_ist_now()
             )
@@ -415,7 +415,10 @@ async def upload_invoices(
             # ---- RUN EXTRACTION ----
             extract_start = time.time()
             print(f"[Backend] Starting full extraction for {invoice_id}")
-            extraction = await invoice_processor.process_invoice_extraction(file_path)
+            extraction = await invoice_processor.process_invoice_extraction(
+                file_path, 
+                is_cancelled_callback=lambda: task_id in cancelled_tasks
+            )
             extract_time = time.time() - extract_start
             print(f"[Backend] Full extraction completed in {extract_time:.2f}s")
 
@@ -699,13 +702,43 @@ async def upload_invoices(
                 "invoice_id": invoice_id,
                 "total_time_sec": total_time
             })
+            # ---- FINAL CANCELLATION CHECK & STATUS TRANSITION ----
+            if task_id in cancelled_tasks:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                invoice_repo.remove(task_db, id=invoice_id)
+                task_db.commit()
+                return {"success": False, "filename": clean_name, "reason": "cancelled"}
+
+            # Update final status
+            new_invoice.status = InvoiceStatusEnum.PROCESSED
+            # Update History for Processed
+            processed_history = InvoiceStatusHistory(
+                status=InvoiceStatusEnum.PROCESSED,
+                user=current_user.username,
+                timestamp=get_ist_now()
+            )
+            new_invoice.status_history.append(processed_history)
+            task_db.commit()
+
             await emit_progress("processing", f"[{index}/{total_files}] Completed processing {clean_name}!", progress=100)
 
             return {"success": True, "data": invoice_to_dict(new_invoice)}
 
         except Exception as e:
+            if str(e) == "cancelled" or task_id in cancelled_tasks:
+                print(f"[Backend] File {index} processing aborted due to cancellation")
+                if file_path and os.path.exists(file_path):
+                    try: os.remove(file_path)
+                    except: pass
+                if 'invoice_id' in locals():
+                    invoice_repo.remove(task_db, id=invoice_id)
+                    task_db.commit()
+                return {"success": False, "filename": clean_name, "reason": "cancelled"}
+
             # ❌ FAILURE LOGGER (ADD HERE)
             print(f"[Backend] ERROR in _process_single_file for {clean_name}: {str(e)}")
+            import traceback
             traceback.print_exc()
             
             if file_path and os.path.exists(file_path):
@@ -823,7 +856,8 @@ async def get_invoices(
         # Default view: Exclude Posted and Archived
         expressions.append(and_(
             Invoice.status != InvoiceStatusEnum.SAGE_POSTED,
-            Invoice.status != InvoiceStatusEnum.ARCHIVED
+            Invoice.status != InvoiceStatusEnum.ARCHIVED,
+            Invoice.status != InvoiceStatusEnum.UPLOADING
         ))
 
     # Parse JSON filters if provided

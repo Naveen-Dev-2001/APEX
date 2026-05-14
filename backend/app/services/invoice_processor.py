@@ -38,12 +38,13 @@ class InvoiceProcessor:
             "original_filename": file.filename
         }
 
-    async def process_invoice_extraction(self, file_path: str) -> Dict[str, Any]:
+    async def process_invoice_extraction(self, file_path: str, is_cancelled_callback=None) -> Dict[str, Any]:
         """Process invoice using your existing extraction pipeline"""
         try:
             result = await self.orchestrator.process_invoice(
                 file_path, 
-                output_dir=str(self.output_dir)
+                output_dir=str(self.output_dir),
+                is_cancelled_callback=is_cancelled_callback
             )
             return result
         except Exception as e:

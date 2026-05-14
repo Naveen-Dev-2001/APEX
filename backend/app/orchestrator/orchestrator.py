@@ -7,7 +7,7 @@ class InvoiceOrchestrator:
     def __init__(self):
         self.extraction_agent = InvoiceExtractionAgent()
 
-    async def process_invoice(self, file_path: str, output_dir: str = "output") -> Dict[str, Any]:
+    async def process_invoice(self, file_path: str, output_dir: str = "output", is_cancelled_callback=None) -> Dict[str, Any]:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Invoice file not found: {file_path}")
 
@@ -18,6 +18,12 @@ class InvoiceOrchestrator:
         try:
             import time
             total_start = time.time()
+
+            # Helper to check cancellation
+            def check_cancel():
+                if is_cancelled_callback and is_cancelled_callback():
+                    raise Exception("cancelled")
+
             # Use the extraction agent directly
             initial_state: InvoiceState = InvoiceState(
                 file_path=file_path,
@@ -32,20 +38,32 @@ class InvoiceOrchestrator:
                 processing_steps=[]
             )
 
-            # Run extraction steps concurrently where possible or sequentially if dependent
+            # Check before starting
+            check_cancel()
+
+            # Step 1: Azure Extraction
             import time
             step_start = time.time()
-            state = await self.extraction_agent.extract_with_azure_doc_intel(initial_state)
+            state = await self.extraction_agent.extract_with_azure_doc_intel(initial_state, is_cancelled_callback=is_cancelled_callback)
             print(f"[Orchestrator] Azure extraction step completed in {time.time() - step_start:.2f}s")
             
+            # Check after Azure
+            check_cancel()
+
+            # Step 2: LLM Enhancement
             step_start = time.time()
-            state = await self.extraction_agent.enhance_with_llm(state)
+            state = await self.extraction_agent.enhance_with_llm(state, is_cancelled_callback=is_cancelled_callback)
             print(f"[Orchestrator] LLM enhancement step completed in {time.time() - step_start:.2f}s")
             
+            # Check after LLM
+            check_cancel()
+
+            # Step 3: Validation
             step_start = time.time()
             state = self.extraction_agent.validate_data(state)
             print(f"[Orchestrator] Data validation step completed in {time.time() - step_start:.2f}s")
             
+            # Step 4: Final Output
             step_start = time.time()
             state = self.extraction_agent.generate_final_output(state)
             print(f"[Orchestrator] Final output generation step completed in {time.time() - step_start:.2f}s")

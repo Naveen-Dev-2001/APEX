@@ -246,7 +246,8 @@ const AddInvoiceModal = ({
                                             e.stopPropagation();
                                             handleDelete(file);
                                         }}
-                                        className="text-[#F87171] hover:text-red-600"
+                                        disabled={confirmLoading}
+                                        className="text-[#F87171] hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
                                         <Trash2 size={14} />
                                     </button>

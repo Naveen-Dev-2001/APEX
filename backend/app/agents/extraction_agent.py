@@ -52,7 +52,7 @@ class InvoiceExtractionAgent:
             print(f"Failed to initialize Azure clients: {e}")
             raise
 
-    async def extract_with_azure_doc_intel(self, state: InvoiceState) -> InvoiceState:
+    async def extract_with_azure_doc_intel(self, state: InvoiceState, is_cancelled_callback=None) -> InvoiceState:
         try:
             import time
             start_time = time.time()
@@ -66,6 +66,11 @@ class InvoiceExtractionAgent:
                     "prebuilt-invoice",
                     AnalyzeDocumentRequest(bytes_source=document.read())
                 )
+                
+                # Check cancellation before waiting for poller result
+                if is_cancelled_callback and is_cancelled_callback():
+                    raise Exception("cancelled")
+                    
                 result: AnalyzeResult = await poller.result()
             
             duration = time.time() - start_time
@@ -400,7 +405,7 @@ class InvoiceExtractionAgent:
             "spans": spans if spans else None
         }
 
-    async def enhance_with_llm(self, state: InvoiceState) -> InvoiceState:
+    async def enhance_with_llm(self, state: InvoiceState, is_cancelled_callback=None) -> InvoiceState:
         try:
             import time
             start_time = time.time()
@@ -412,6 +417,10 @@ class InvoiceExtractionAgent:
             prompt = self._create_header_enhancement_prompt(azure_data, raw_content)
             state["llm_prompt"] = prompt
             
+            # Check cancellation before calling LLM
+            if is_cancelled_callback and is_cancelled_callback():
+                raise Exception("cancelled")
+                
             enhanced_headers, raw_llm_response = await self._call_llm_for_enhancement(prompt)
             state["llm_raw_response"] = raw_llm_response
 
