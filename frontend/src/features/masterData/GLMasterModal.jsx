@@ -14,10 +14,10 @@ const EMPTY_FORM = {
     internal_rate: '',
 };
 
-const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', type = 'text' }) => (
+const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', type = 'text', required = false, error = '' }) => (
     <div className="flex flex-col gap-1.5">
         <label htmlFor={id} className="text-[14px] font-medium text-[#333333]">
-            {label}
+            {label} {required && <span className="text-red-500">*</span>}
         </label>
         <input
             id={id}
@@ -26,16 +26,18 @@ const FormField = ({ label, id, value, onChange, readOnly = false, placeholder =
             onChange={onChange}
             readOnly={readOnly}
             placeholder={placeholder}
-            className={`h-[38px] px-3 border border-[#D9D9D9] rounded-[6px] text-[14px] text-[#333333] outline-none
-                focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20 transition-all bg-white
+            className={`h-[38px] px-3 border rounded-[6px] text-[14px] text-[#333333] outline-none transition-all bg-white
+                ${error ? 'border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-[#D9D9D9] focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20'}
                 ${readOnly ? 'bg-[#F5F5F5] cursor-not-allowed text-gray-400' : ''}`}
         />
+        {error && <span className="text-[11px] text-red-500 mt-0.5">{error}</span>}
     </div>
 );
 
 const GLMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         if (isEdit && rowData) {
@@ -54,13 +56,26 @@ const GLMasterModal = ({ mode, rowData, onClose, onSave }) => {
         } else {
             setForm(EMPTY_FORM);
         }
+        setErrors({});
     }, [isEdit, rowData]);
 
     const handleChange = (field) => (e) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
     };
 
     const handleSave = () => {
+        const newErrors = {};
+        if (!form.account_number) newErrors.account_number = 'Account Number is required';
+        if (!form.title) newErrors.title = 'Title is required';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+
         // Helper to convert text input to boolean safely
         const toBool = (val) => {
             if (val === true || val === false) return val;
@@ -108,12 +123,16 @@ const GLMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             id="account_number"
                             value={form.account_number}
                             onChange={handleChange('account_number')}
+                            required
+                            error={errors.account_number}
                         />
                         <FormField
                             label="Title"
                             id="title"
                             value={form.title}
                             onChange={handleChange('title')}
+                            required
+                            error={errors.title}
                         />
                         
                         <FormField

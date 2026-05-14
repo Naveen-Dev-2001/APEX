@@ -8,10 +8,10 @@ const EMPTY_FORM = {
     tds_rate: '',
 };
 
-const FormField = ({ label, id, value, onChange, placeholder = '', type = "text" }) => (
+const FormField = ({ label, id, value, onChange, placeholder = '', type = "text", required = false, error = '' }) => (
     <div className="flex flex-col gap-1">
         <label htmlFor={id} className="text-[13px] font-medium text-[#333333]">
-            {label}
+            {label} {required && <span className="text-red-500">*</span>}
         </label>
         <input
             id={id}
@@ -19,14 +19,17 @@ const FormField = ({ label, id, value, onChange, placeholder = '', type = "text"
             value={value || ''}
             onChange={onChange}
             placeholder={placeholder}
-            className="h-[36px] px-3 border border-[#D9D9D9] rounded-[4px] text-[13px] text-[#333333] outline-none focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20 transition-all bg-white"
+            className={`h-[36px] px-3 border rounded-[4px] text-[13px] text-[#333333] outline-none transition-all bg-white
+                ${error ? 'border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-[#D9D9D9] focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20'}`}
         />
+        {error && <span className="text-[11px] text-red-500 mt-0.5">{error}</span>}
     </div>
 );
 
 const TDSRatesModal = ({ mode, rowData, onClose, onSave }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         if (isEdit && rowData) {
@@ -39,12 +42,27 @@ const TDSRatesModal = ({ mode, rowData, onClose, onSave }) => {
         } else {
             setForm(EMPTY_FORM);
         }
+        setErrors({});
     }, [isEdit, rowData]);
 
-    const handleChange = (field) => (e) =>
+    const handleChange = (field) => (e) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
+    };
 
     const handleSave = () => {
+        const newErrors = {};
+        if (!form.section) newErrors.section = 'Section is required';
+        if (!form.nature_of_payment) newErrors.nature_of_payment = 'Nature of Payment is required';
+        if (form.tds_rate === '' || form.tds_rate === null) newErrors.tds_rate = 'TDS Rate is required';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+
         onSave(form);
         onClose();
     };
@@ -76,6 +94,8 @@ const TDSRatesModal = ({ mode, rowData, onClose, onSave }) => {
                         value={form.section}
                         onChange={handleChange('section')}
                         placeholder="e.g. 194C"
+                        required
+                        error={errors.section}
                     />
                     <FormField
                         label="Nature of Payment"
@@ -83,6 +103,8 @@ const TDSRatesModal = ({ mode, rowData, onClose, onSave }) => {
                         value={form.nature_of_payment}
                         onChange={handleChange('nature_of_payment')}
                         placeholder="e.g. Contractor (Others)"
+                        required
+                        error={errors.nature_of_payment}
                     />
                     <FormField
                         label="TDS Rate"
@@ -91,6 +113,8 @@ const TDSRatesModal = ({ mode, rowData, onClose, onSave }) => {
                         value={form.tds_rate}
                         onChange={handleChange('tds_rate')}
                         placeholder="e.g. 0.02"
+                        required
+                        error={errors.tds_rate}
                     />
                 </div>
 

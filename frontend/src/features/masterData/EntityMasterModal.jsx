@@ -16,10 +16,10 @@ const EMPTY_FORM = {
     gst_applicable: false,
 };
 
-const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '' }) => (
+const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', required = false, error = '' }) => (
     <div className="flex flex-col gap-1">
         <label htmlFor={id} className="text-[13px] font-medium text-[#333333]">
-            {label}
+            {label} {required && <span className="text-red-500">*</span>}
         </label>
         <input
             id={id}
@@ -28,16 +28,18 @@ const FormField = ({ label, id, value, onChange, readOnly = false, placeholder =
             onChange={onChange}
             readOnly={readOnly}
             placeholder={placeholder}
-            className={`h-[36px] px-3 border border-[#D9D9D9] rounded-[4px] text-[13px] text-[#333333] outline-none
-                focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20 transition-all bg-white
+            className={`h-[36px] px-3 border rounded-[4px] text-[13px] text-[#333333] outline-none transition-all bg-white
+                ${error ? 'border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-[#D9D9D9] focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20'}
                 ${readOnly ? 'bg-[#F5F5F5] cursor-not-allowed text-gray-400' : ''}`}
         />
+        {error && <span className="text-[11px] text-red-500 mt-0.5">{error}</span>}
     </div>
 );
 
 const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         if (isEdit && rowData) {
@@ -58,15 +60,29 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
         } else {
             setForm(EMPTY_FORM);
         }
+        setErrors({});
     }, [isEdit, rowData]);
 
-    const handleChange = (field) => (e) =>
+    const handleChange = (field) => (e) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
+    };
 
     const handleGstChange = (val) =>
         setForm((prev) => ({ ...prev, gst_applicable: val }));
 
     const handleSave = () => {
+        const newErrors = {};
+        if (!form.entity_id) newErrors.entity_id = 'Entity Id is required';
+        if (!form.entity_name) newErrors.entity_name = 'Entity Name is required';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+
         onSave(form);
         onClose();
     };
@@ -107,6 +123,8 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                                         value={form.entity_id}
                                         onChange={handleChange('entity_id')}
                                         readOnly={isFieldReadOnly}
+                                        required
+                                        error={errors.entity_id}
                                     />
                                     <FormField
                                         label="Entity Name"
@@ -114,6 +132,8 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
                                         value={form.entity_name}
                                         onChange={handleChange('entity_name')}
                                         readOnly={isFieldReadOnly}
+                                        required
+                                        error={errors.entity_name}
                                     />
                                 </div>
                             </>

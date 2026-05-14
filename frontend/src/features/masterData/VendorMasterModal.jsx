@@ -31,10 +31,10 @@ const EMPTY_FORM = {
     entity_id: '',
 };
 
-const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '' }) => (
+const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', required = false, error = '' }) => (
     <div className="flex flex-col gap-1 w-full">
         <label htmlFor={id} className="text-[13px] font-medium text-[#666666]">
-            {label}
+            {label} {required && <span className="text-red-500">*</span>}
         </label>
         <input
             id={id}
@@ -43,10 +43,11 @@ const FormField = ({ label, id, value, onChange, readOnly = false, placeholder =
             onChange={onChange}
             readOnly={readOnly}
             placeholder={placeholder}
-            className={`h-[38px] px-3 border border-[#D9D9D9] rounded-[4px] text-[13px] text-[#333333] outline-none
-                focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20 transition-all bg-white
+            className={`h-[38px] px-3 border rounded-[4px] text-[13px] text-[#333333] outline-none transition-all bg-white
+                ${error ? 'border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-[#D9D9D9] focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20'}
                 ${readOnly ? 'bg-[#F5F5F5] cursor-not-allowed text-gray-400' : ''}`}
         />
+        {error && <span className="text-[11px] text-red-500 mt-0.5">{error}</span>}
     </div>
 );
 
@@ -98,6 +99,7 @@ const CustomDropdown = ({ label, value, options, onChange, disabled = false }) =
 const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
+    const [errors, setErrors] = useState({});
     const { masters, fetchTDSRatesData } = useMasterDataStore();
 
     // Ensure TDS Rates are loaded regardless of active tab
@@ -142,10 +144,15 @@ const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
         } else {
             setForm(EMPTY_FORM);
         }
+        setErrors({});
     }, [isEdit, rowData]);
 
-    const handleChange = (field) => (e) =>
+    const handleChange = (field) => (e) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
+    };
 
     const handleToggle = (field) => (val) => {
         setForm((prev) => {
@@ -176,6 +183,15 @@ const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
     };
 
     const handleSave = () => {
+        const newErrors = {};
+        if (!form.vendor_id) newErrors.vendor_id = 'Vendor Id is required';
+        if (!form.vendor_name) newErrors.vendor_name = 'Vendor Name is required';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+
         onSave(form);
         onClose();
     };
@@ -208,12 +224,16 @@ const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             id="vendor_id"
                             value={form.vendor_id}
                             onChange={handleChange('vendor_id')}
+                            required
+                            error={errors.vendor_id}
                         />
                         <FormField
                             label="Vendor Name"
                             id="vendor_name"
                             value={form.vendor_name}
                             onChange={handleChange('vendor_name')}
+                            required
+                            error={errors.vendor_name}
                         />
                     </div>
 
