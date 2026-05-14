@@ -40,6 +40,7 @@ class WorkflowStepTypeEnum(str, enum.Enum):
     APPROVER_4 = "approver_4"
     SAGE_POSTED = "sage_posted"
     DELETED = "deleted"
+    ARCHIVED = "archived"
 
 
 class WorkflowStepStatusEnum(str, enum.Enum):

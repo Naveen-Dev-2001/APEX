@@ -3177,6 +3177,18 @@ async def archive_invoice(
             comment="Invoiced archived by user"
         )
         db.add(history_item)
+
+        # Add to workflow
+        workflow_step = WorkflowStep(
+            invoice_id=invoice_id,
+            step_name="Archived",
+            step_type=WorkflowStepTypeEnum.ARCHIVED,
+            user=current_user.username,
+            status="completed",
+            timestamp=get_ist_now(),
+            entity=invoice.entity
+        )
+        db.add(workflow_step)
         
         # [AUDIT] Log Archive
         await audit_service.log_action(
@@ -3376,6 +3388,18 @@ async def bulk_archive_invoices(
                 comment="Invoiced archived by user (Bulk)"
             )
             db.add(history_item)
+
+            # Add to workflow
+            workflow_step = WorkflowStep(
+                invoice_id=inv_id,
+                step_name="Archived",
+                step_type=WorkflowStepTypeEnum.ARCHIVED,
+                user=current_user.username,
+                status="completed",
+                timestamp=get_ist_now(),
+                entity=invoice.entity
+            )
+            db.add(workflow_step)
             
             # [AUDIT] Log Archive
             await audit_service.log_action(
