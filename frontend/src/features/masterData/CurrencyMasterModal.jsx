@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import CustomButton from '../../shared/components/CustomButton';
 
 const EMPTY_FORM = {
     id: null,
@@ -8,7 +9,7 @@ const EMPTY_FORM = {
     symbol: '',
 };
 
-const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', type = 'text', required = false }) => (
+const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', type = 'text', required = false, error = '' }) => (
     <div className="flex flex-col gap-1.5 w-full">
         <label htmlFor={id} className="text-[14px] font-medium text-[#333333]">
             {required && <span className="text-red-500 mr-1">*</span>}
@@ -21,16 +22,18 @@ const FormField = ({ label, id, value, onChange, readOnly = false, placeholder =
             onChange={onChange}
             readOnly={readOnly}
             placeholder={placeholder}
-            className={`h-[38px] px-3 border border-[#D9D9D9] rounded-[6px] text-[14px] text-[#333333] outline-none
-                focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20 transition-all bg-white
+            className={`h-[38px] px-3 border rounded-[6px] text-[14px] text-[#333333] outline-none transition-all bg-white
+                ${error ? 'border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-[#D9D9D9] focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20'}
                 ${readOnly ? 'bg-[#F5F5F5] cursor-not-allowed text-gray-400' : ''}`}
         />
+        {error && <span className="text-[11px] text-red-500 mt-0.5">{error}</span>}
     </div>
 );
 
 const CurrencyMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         if (isEdit && rowData) {
@@ -43,16 +46,27 @@ const CurrencyMasterModal = ({ mode, rowData, onClose, onSave }) => {
         } else {
             setForm(EMPTY_FORM);
         }
+        setErrors({});
     }, [isEdit, rowData]);
 
     const handleChange = (field) => (e) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
     };
 
     const handleSave = () => {
-        if (!form.code || !form.name || !form.symbol) {
-            return; // Basic validation
+        const newErrors = {};
+        if (!form.code) newErrors.code = 'Currency Code is required';
+        if (!form.name) newErrors.name = 'Currency Name is required';
+        if (!form.symbol) newErrors.symbol = 'Symbol is required';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
         }
+
         onSave(form);
         onClose();
     };
@@ -85,6 +99,7 @@ const CurrencyMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             value={form.code}
                             onChange={handleChange('code')}
                             required
+                            error={errors.code}
                         />
                         <FormField
                             label="Currency Name"
@@ -92,6 +107,7 @@ const CurrencyMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             value={form.name}
                             onChange={handleChange('name')}
                             required
+                            error={errors.name}
                         />
                         <FormField
                             label="Symbol"
@@ -99,26 +115,31 @@ const CurrencyMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             value={form.symbol}
                             onChange={handleChange('symbol')}
                             required
+                            error={errors.symbol}
                         />
                     </div>
                 </div>
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 rounded-b-[12px]">
-                    <button
-                        onClick={onClose}
-                        className="px-6 h-[40px] text-[14px] font-medium text-gray-600 border border-gray-300 rounded-[6px] hover:bg-gray-50 transition-all font-sans"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={!form.code || !form.name || !form.symbol}
-                        className={`px-8 h-[40px] text-[14px] font-medium text-white bg-[#1D94FF] rounded-[6px] hover:bg-[#1578d0] transition-all shadow-sm font-sans
-                            ${(!form.code || !form.name || !form.symbol) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        Save
-                    </button>
+                    <div className="w-[100px]">
+                        <CustomButton
+                            variant="outline"
+                            onClick={onClose}
+                            className="!h-[36px]"
+                        >
+                            Cancel
+                        </CustomButton>
+                    </div>
+                    <div className="w-[120px]">
+                        <CustomButton
+                            variant="primary"
+                            onClick={handleSave}
+                            className="!h-[36px]"
+                        >
+                            Save
+                        </CustomButton>
+                    </div>
                 </div>
             </div>
         </div>

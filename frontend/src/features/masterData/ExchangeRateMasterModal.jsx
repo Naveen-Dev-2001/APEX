@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import CustomButton from '../../shared/components/CustomButton';
 
 const EMPTY_FORM = {
     id: null,
@@ -12,7 +13,7 @@ const EMPTY_FORM = {
     status: 'active',
 };
 
-const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', type = 'text', required = false }) => (
+const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', type = 'text', required = false, error = '' }) => (
     <div className="flex flex-col gap-1.5 w-full">
         <label htmlFor={id} className="text-[14px] font-medium text-[#333333]">
             {required && <span className="text-red-500 mr-1">*</span>}
@@ -25,16 +26,18 @@ const FormField = ({ label, id, value, onChange, readOnly = false, placeholder =
             onChange={onChange}
             readOnly={readOnly}
             placeholder={placeholder}
-            className={`h-[38px] px-3 border border-[#D9D9D9] rounded-[6px] text-[14px] text-[#333333] outline-none
-                focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20 transition-all bg-white
+            className={`h-[38px] px-3 border rounded-[6px] text-[14px] text-[#333333] outline-none transition-all bg-white
+                ${error ? 'border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-[#D9D9D9] focus:border-[#1D71AB] focus:ring-1 focus:ring-[#1D71AB]/20'}
                 ${readOnly ? 'bg-[#F5F5F5] cursor-not-allowed text-gray-400' : ''}`}
         />
+        {error && <span className="text-[11px] text-red-500 mt-0.5">{error}</span>}
     </div>
 );
 
 const ExchangeRateMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const isEdit = mode === 'edit';
     const [form, setForm] = useState(EMPTY_FORM);
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         if (isEdit && rowData) {
@@ -51,16 +54,27 @@ const ExchangeRateMasterModal = ({ mode, rowData, onClose, onSave }) => {
         } else {
             setForm(EMPTY_FORM);
         }
+        setErrors({});
     }, [isEdit, rowData]);
 
     const handleChange = (field) => (e) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
     };
 
     const handleSave = () => {
-        if (!form.base_currency || !form.target_currency || !form.exchange_rate) {
+        const newErrors = {};
+        if (!form.base_currency) newErrors.base_currency = 'Base Currency is required';
+        if (!form.target_currency) newErrors.target_currency = 'Target Currency is required';
+        if (!form.exchange_rate) newErrors.exchange_rate = 'Exchange Rate is required';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
+
         onSave(form);
         onClose();
     };
@@ -94,6 +108,7 @@ const ExchangeRateMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             onChange={handleChange('base_currency')}
                             placeholder="e.g. USD"
                             required
+                            error={errors.base_currency}
                         />
                         <FormField
                             label="Target Currency"
@@ -102,6 +117,7 @@ const ExchangeRateMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             onChange={handleChange('target_currency')}
                             placeholder="e.g. INR"
                             required
+                            error={errors.target_currency}
                         />
                     </div>
                     
@@ -113,6 +129,7 @@ const ExchangeRateMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             value={form.exchange_rate}
                             onChange={handleChange('exchange_rate')}
                             required
+                            error={errors.exchange_rate}
                         />
                         <FormField
                             label="Effective Date"
@@ -151,20 +168,24 @@ const ExchangeRateMasterModal = ({ mode, rowData, onClose, onSave }) => {
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 rounded-b-[12px]">
-                    <button
-                        onClick={onClose}
-                        className="px-6 h-[40px] text-[14px] font-medium text-gray-600 border border-gray-300 rounded-[6px] hover:bg-gray-50 transition-all"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={!form.base_currency || !form.target_currency || !form.exchange_rate}
-                        className={`px-8 h-[40px] text-[14px] font-medium text-white bg-[#1D94FF] rounded-[6px] hover:bg-[#1578d0] transition-all shadow-sm
-                            ${(!form.base_currency || !form.target_currency || !form.exchange_rate) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        Save
-                    </button>
+                    <div className="w-[100px]">
+                        <CustomButton
+                            variant="outline"
+                            onClick={onClose}
+                            className="!h-[36px]"
+                        >
+                            Cancel
+                        </CustomButton>
+                    </div>
+                    <div className="w-[120px]">
+                        <CustomButton
+                            variant="primary"
+                            onClick={handleSave}
+                            className="!h-[36px]"
+                        >
+                            Save
+                        </CustomButton>
+                    </div>
                 </div>
             </div>
         </div>

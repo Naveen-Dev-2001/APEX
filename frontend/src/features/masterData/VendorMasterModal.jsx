@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
+import CustomButton from '../../shared/components/CustomButton';
 import useMasterDataStore from '../../store/masterData.store';
 
 const EMPTY_FORM = {
@@ -434,19 +435,25 @@ const VendorMasterModal = ({ mode, rowData, onClose, onSave }) => {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 mt-auto">
-                    <button
-                        onClick={onClose}
-                        className="px-6 h-[40px] text-[14px] font-medium text-gray-600 border border-gray-200 rounded-[6px] hover:bg-gray-50 transition-all font-inter"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className="px-8 h-[40px] text-[14px] font-medium text-white bg-[#24A1DD] rounded-[6px] hover:bg-[#1D71AB] transition-all shadow-sm font-inter"
-                    >
-                        Save
-                    </button>
+                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 rounded-b-[12px]">
+                    <div className="w-[100px]">
+                        <CustomButton
+                            variant="outline"
+                            onClick={onClose}
+                            className="!h-[36px]"
+                        >
+                            Cancel
+                        </CustomButton>
+                    </div>
+                    <div className="w-[120px]">
+                        <CustomButton
+                            variant="primary"
+                            onClick={handleSave}
+                            className="!h-[36px]"
+                        >
+                            Save
+                        </CustomButton>
+                    </div>
                 </div>
             </div>
         </div>

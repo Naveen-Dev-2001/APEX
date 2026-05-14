@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
+import CustomButton from '../../shared/components/CustomButton';
 
 const EMPTY_FORM = {
     id: null,
@@ -247,18 +248,24 @@ const EntityMasterModal = ({ mode, rowData, onClose, onSave }) => {
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
-                    <button
-                        onClick={onClose}
-                        className="px-5 h-[36px] text-[13px] font-medium text-gray-600 border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className="px-5 h-[36px] text-[13px] font-medium text-white bg-[#1D71AB] rounded-[4px] hover:bg-[#155a8a] transition-all shadow-sm"
-                    >
-                        Save
-                    </button>
+                    <div className="w-[100px]">
+                        <CustomButton
+                            variant="outline"
+                            onClick={onClose}
+                            className="!h-[36px]"
+                        >
+                            Cancel
+                        </CustomButton>
+                    </div>
+                    <div className="w-[120px]">
+                        <CustomButton
+                            variant="primary"
+                            onClick={handleSave}
+                            className="!h-[36px]"
+                        >
+                            Save
+                        </CustomButton>
+                    </div>
                 </div>
             </div>
         </div>

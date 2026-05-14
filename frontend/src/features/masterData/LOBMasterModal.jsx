@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import CustomButton from '../../shared/components/CustomButton';
 
 const EMPTY_FORM = {
     id: null,
@@ -119,18 +120,24 @@ const LOBMasterModal = ({ mode, rowData, onClose, onSave }) => {
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 rounded-b-[12px]">
-                    <button
-                        onClick={onClose}
-                        className="px-6 h-[40px] text-[14px] font-medium text-gray-600 border border-gray-300 rounded-[6px] hover:bg-gray-50 transition-all font-sans"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className="px-8 h-[40px] text-[14px] font-medium text-white bg-[#1D94FF] rounded-[6px] hover:bg-[#1578d0] transition-all shadow-sm font-sans"
-                    >
-                        Save
-                    </button>
+                    <div className="w-[100px]">
+                        <CustomButton
+                            variant="outline"
+                            onClick={onClose}
+                            className="!h-[36px]"
+                        >
+                            Cancel
+                        </CustomButton>
+                    </div>
+                    <div className="w-[120px]">
+                        <CustomButton
+                            variant="primary"
+                            onClick={handleSave}
+                            className="!h-[36px]"
+                        >
+                            Save
+                        </CustomButton>
+                    </div>
                 </div>
             </div>
         </div>
