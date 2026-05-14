@@ -28,6 +28,7 @@ class InvoiceStatusEnum(str, enum.Enum):
     SAGE_POSTED = "sage_posted"
     SAGE_POST_FAILED = "sage_post_failed"
     ARCHIVED = "archived"
+    DELETED = "deleted"
 
 
 class WorkflowStepTypeEnum(str, enum.Enum):
@@ -38,6 +39,8 @@ class WorkflowStepTypeEnum(str, enum.Enum):
     APPROVER_3 = "approver_3"
     APPROVER_4 = "approver_4"
     SAGE_POSTED = "sage_posted"
+    DELETED = "deleted"
+    ARCHIVED = "archived"
 
 
 class WorkflowStepStatusEnum(str, enum.Enum):

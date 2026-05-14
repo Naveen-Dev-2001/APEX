@@ -20,6 +20,7 @@ const getStatusLabel = (value, level, row = null) => {
         sage_post_failed: "Sage Post Failed",
         reworked: "Reworked",
         archived: "Archived",
+        deleted: "Deleted",
     };
 
     let label = labelMap[value] ?? value;
@@ -43,6 +44,7 @@ const StatusBadge = ({ value, level, label }) => {
         sage_post_failed: "bg-red-100 text-red-700",
         reworked: "bg-rose-100 text-rose-700",
         archived: "bg-indigo-100 text-indigo-700",
+        deleted: "bg-cyan-100 text-cyan-700",
     };
 
     const cls = colorMap[value] ?? "bg-gray-100 text-gray-600";
