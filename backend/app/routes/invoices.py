@@ -25,7 +25,7 @@ from app.models.db_models import (
     Invoice, WorkflowStep, WorkflowStepTypeEnum, 
     WorkflowStepStatusEnum, InvoiceStatusEnum, InvoiceStatusHistory,
     VendorMetadata, RawExtractionData, User, EntityMaster, InvoiceAssignedApprover,
-    DeletedInvoice, Delegation
+    DeletedInvoice, Delegation, AuditLog
 )
 from app.services.file_manager import init_upload_folders, move_invoice_file, find_file_in_any_folder, get_folder_path
 init_upload_folders()
@@ -3074,11 +3074,22 @@ async def delete_invoice(
         db.refresh(invoice)
 
         # ------------------------------------------------------------------
+        # Add to audit logs
+        await audit_service.log_action(
+            db=db,
+            invoice_id=invoice_id,
+            action=AuditAction.DELETED,
+            user=current_user.username,
+            entity=invoice.entity,
+            details={"action": "deleted", "comment": "Invoice deleted by user"}
+        )
+
         # 1. Snapshot child-table rows as JSON
         # ------------------------------------------------------------------
         def _row_to_dict(row):
             """Serialize a SQLAlchemy row to a plain dict (primitive values only)."""
             result = {}
+            if not row: return result
             for col in row.__table__.columns:
                 val = getattr(row, col.name)
                 if isinstance(val, datetime):
@@ -3103,8 +3114,11 @@ async def delete_invoice(
         coding_snapshot = json.dumps(
             _row_to_dict(invoice.coding) if invoice.coding else None
         )
+        
+        # Explicitly query all audit logs (including the one just added) for the snapshot
+        all_logs = db.query(AuditLog).filter(AuditLog.invoice_id == invoice_id).order_by(AuditLog.timestamp.asc()).all()
         audit_logs_snapshot = json.dumps(
-            [_row_to_dict(al) for al in (invoice.audit_logs or [])]
+            [_row_to_dict(al) for al in all_logs]
         )
 
         # ------------------------------------------------------------------
@@ -3308,12 +3322,23 @@ async def bulk_delete_invoices(
             db.flush()
             db.refresh(invoice)
 
+            # Add to audit logs
+            await audit_service.log_action(
+                db=db,
+                invoice_id=inv_id,
+                action=AuditAction.DELETED,
+                user=current_user.username,
+                entity=invoice.entity,
+                details={"action": "deleted", "comment": "Invoice deleted by user (Bulk)", "bulk": True}
+            )
+
             # (Reusing logic from delete_invoice)
             # ------------------------------------------------------------------
             # 1. Snapshot child-table rows as JSON
             # ------------------------------------------------------------------
             def _row_to_dict(row):
                 result = {}
+                if not row: return result
                 for col in row.__table__.columns:
                     val = getattr(row, col.name)
                     if isinstance(val, datetime):
@@ -3328,7 +3353,10 @@ async def bulk_delete_invoices(
             approved_by_snapshot = json.dumps([_row_to_dict(a) for a in (invoice.approved_by_list or [])])
             assigned_approvers_snapshot = json.dumps([_row_to_dict(a) for a in (invoice.assigned_approvers_list or [])])
             coding_snapshot = json.dumps(_row_to_dict(invoice.coding) if invoice.coding else None)
-            audit_logs_snapshot = json.dumps([_row_to_dict(al) for al in (invoice.audit_logs or [])])
+            
+            # Explicitly query all audit logs for the snapshot
+            all_logs = db.query(AuditLog).filter(AuditLog.invoice_id == inv_id).order_by(AuditLog.timestamp.asc()).all()
+            audit_logs_snapshot = json.dumps([_row_to_dict(al) for al in all_logs])
 
             deleted_record = DeletedInvoice(
                 original_invoice_id=invoice.id,

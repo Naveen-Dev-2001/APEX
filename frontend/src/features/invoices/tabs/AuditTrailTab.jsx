@@ -32,7 +32,8 @@ const EVENT_CONFIG = {
     recalled: { iconBg: "#F59E0B", labelBg: "#FEF3C7", labelColor: "#92400E", lineBg: "#14C9B1", icon: <UndoOutlined className="text-[12px] text-white" /> },
     sage_posted: { iconBg: "#10B981", labelBg: "#D1FAE5", labelColor: "#065F46", lineBg: "#14C9B1", icon: <CloudUploadOutlined className="text-[12px] text-white" /> },
     sage_failed: { iconBg: "#EF4444", labelBg: "#FEE2E2", labelColor: "#991B1B", lineBg: "#14C9B1", icon: <ExclamationCircleOutlined className="text-[12px] text-white" /> },
-    sage_reposted: { iconBg: "#f379e4ff", labelBg: "#E1F5EE", labelColor: "#0F6E56", lineBg: "#14C9B1", icon: <CloudUploadOutlined className="text-[12px] text-white" /> }
+    sage_reposted: { iconBg: "#f379e4ff", labelBg: "#E1F5EE", labelColor: "#0F6E56", lineBg: "#14C9B1", icon: <CloudUploadOutlined className="text-[12px] text-white" /> },
+    deleted: { iconBg: "#EF4444", labelBg: "#FEE2E2", labelColor: "#991B1B", lineBg: "#14C9B1", icon: <CloseOutlined className="text-[12px] text-white" /> }
 };
 
 const ARROW_ICON = (
@@ -57,6 +58,7 @@ const mapActionToUIKey = (action) => {
     if (actionLower.includes("posted")) return "sage_posted";
     if (actionLower.includes("failure") || actionLower.includes("failed")) return "sage_failed";
     if (actionLower.includes("reposted")) return "sage_reposted";
+    if (actionLower.includes("deleted")) return "deleted";
     return "updated";
 };
 
@@ -68,8 +70,13 @@ const AuditItem = memo(({ item, isLast }) => {
     const config = EVENT_CONFIG[uiKey] || EVENT_CONFIG.updated;
 
     const details = useMemo(() => {
-        if (!item.details || typeof item.details !== "object") return [];
-        return Object.entries(item.details).map(([key, val]) => {
+        let rawDetails = item.details;
+        if (typeof rawDetails === "string" && rawDetails.trim().startsWith("{")) {
+            try { rawDetails = JSON.parse(rawDetails); } catch (e) { return []; }
+        }
+        if (!rawDetails || typeof rawDetails !== "object") return [];
+
+        return Object.entries(rawDetails).map(([key, val]) => {
             if (val && typeof val === "object" && "old" in val && "new" in val) {
                 return { key, label: key, oldValue: val.old, newValue: val.new };
             }
