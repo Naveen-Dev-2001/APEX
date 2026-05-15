@@ -12,7 +12,6 @@ export const usePdfHighlights = ({
     getPageCached,
     setPage,
     autoFit,
-    autoFitWidth,
     renderPage
 }) => {
     const highlightRef = useRef(null);
@@ -188,12 +187,7 @@ export const usePdfHighlights = ({
         if (!targetPage || targetPage === page) return;
 
         setPage(targetPage);
-        if (autoFit) {
-            autoFitWidth(pdfObj, targetPage, rotation);
-        } else {
-            renderPage(pdfObj, targetPage, scale, rotation);
-        }
-    }, [highlightedRegions, pdfObj, page, rotation, autoFit, autoFitWidth, renderPage, scale, setPage]);
+    }, [highlightedRegions, pdfObj, page, setPage]);
 
     /* ---------------- Lifecycle: Highlight Draw & Scroll ---------------- */
     useEffect(() => {

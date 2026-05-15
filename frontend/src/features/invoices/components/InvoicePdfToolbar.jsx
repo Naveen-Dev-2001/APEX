@@ -21,7 +21,6 @@ const InvoicePdfToolbar = ({
     zoom,
     autoFit,
     setAutoFit,
-    autoFitWidth,
     fitToPage,
     resetView,
     pdfObj,
@@ -85,7 +84,7 @@ const InvoicePdfToolbar = ({
                             size="small"
                             type={autoFit ? "primary" : "text"}
                             icon={<ColumnWidthOutlined />}
-                            onClick={() => { setAutoFit(true); autoFitWidth(pdfObj, page, rotation); }}
+                            onClick={() => setAutoFit(true)}
                         />
                     </Tooltip>
                     <Tooltip title="Fit to Page">

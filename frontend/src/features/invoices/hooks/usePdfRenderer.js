@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { pdfjs } from "react-pdf";
 
-// Specific Worker for PDF.js direct rendering
+// Use CDN worker since pdfjs-dist is not hoisted in node_modules
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export const usePdfRenderer = (pdfBlob) => {
@@ -96,30 +96,6 @@ export const usePdfRenderer = (pdfBlob) => {
         }
     }, [getPageCached, getViewport, rotation]);
 
-    /* ---------------- Logic: Auto-Fit Width ---------------- */
-    const autoFitWidth = useCallback(async (pdf, pageNum, rotationVal = rotation) => {
-        if (!pdf || !viewerRef.current) return;
-
-        try {
-            const pageObj = await getPageCached(pdf, pageNum);
-            if (!pageObj) return;
-            const viewport = getViewport(pageObj, 1, rotationVal);
-
-            const width = viewerRef.current.clientWidth - 32;
-            const newScale = width / viewport.width;
-
-            setScale(newScale);
-            await renderPage(pdf, pageNum, newScale, rotationVal);
-
-            if (!firstAutoFitDoneRef.current) {
-                firstAutoFitDoneRef.current = true;
-                viewerRef.current.scrollTop = 0;
-            }
-        } catch (err) {
-            console.error("AutoFit Error:", err);
-        }
-    }, [rotation, getPageCached, getViewport, renderPage]);
-
     /* ---------------- Measure Container (ResizeObserver) ---------------- */
     useEffect(() => {
         if (!viewerRef.current) return;
@@ -189,8 +165,6 @@ export const usePdfRenderer = (pdfBlob) => {
                 setPage(1);
                 setRotation(0);
                 setAutoFit(true);
-
-                await autoFitWidth(pdf, 1, 0);
             } catch (err) {
                 console.error("Failed to initialize PDF:", err);
                 initializedRef.current = false;
@@ -200,7 +174,7 @@ export const usePdfRenderer = (pdfBlob) => {
         return () => {
             cancelled = true;
         };
-    }, [pdfBlob, containerWidth, autoFitWidth]);
+    }, [pdfBlob, containerWidth]);
 
     useEffect(() => {
         const cachedPages = pageCacheRef.current;
@@ -217,40 +191,66 @@ export const usePdfRenderer = (pdfBlob) => {
         };
     }, []);
 
-    /* ---------------- Lifecycle: Refit on Resize ---------------- */
+    /* ---------------- Lifecycle: Centralized Render Trigger ---------------- */
     useEffect(() => {
-        if (!pdfObj || !autoFit || !firstAutoFitDoneRef.current) return;
-        autoFitWidth(pdfObj, page, rotation);
-    }, [containerWidth, pdfObj, autoFit, page, rotation, autoFitWidth]);
+        if (!pdfObj) return;
+
+        let cancelled = false;
+
+        const doRender = async () => {
+            try {
+                let currentScale = scale;
+
+                if (autoFit && viewerRef.current) {
+                    const pageObj = await getPageCached(pdfObj, page);
+                    if (!pageObj || cancelled) return;
+                    
+                    const viewport = getViewport(pageObj, 1, rotation);
+                    const width = viewerRef.current.clientWidth - 32;
+                    currentScale = width / viewport.width;
+
+                    if (Math.abs(scale - currentScale) > 0.001) {
+                        setScale(currentScale);
+                        // Changing scale triggers a re-render and re-runs this effect
+                        return;
+                    }
+                }
+
+                await renderPage(pdfObj, page, currentScale, rotation);
+
+                if (!firstAutoFitDoneRef.current && autoFit) {
+                    firstAutoFitDoneRef.current = true;
+                    if (viewerRef.current) viewerRef.current.scrollTop = 0;
+                }
+            } catch (err) {
+                if (err.name !== "RenderingCancelledException") {
+                    console.error("Render trigger error:", err);
+                }
+            }
+        };
+
+        doRender();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [pdfObj, page, scale, rotation, autoFit, containerWidth, getViewport, getPageCached, renderPage]);
 
     /* ---------------- Controls ---------------- */
     const changePage = useCallback((d) => {
         const next = page + d;
         if (!pdfObj || next < 1 || next > pdfObj.numPages) return;
         setPage(next);
-        if (autoFit) {
-            autoFitWidth(pdfObj, next, rotation);
-        } else {
-            renderPage(pdfObj, next, scale, rotation);
-        }
-    }, [page, pdfObj, autoFit, autoFitWidth, renderPage, rotation, scale]);
+    }, [page, pdfObj]);
 
     const zoom = useCallback((d) => {
         setAutoFit(false);
-        const s = Math.max(0.3, scale + d);
-        setScale(s);
-        renderPage(pdfObj, page, s, rotation);
-    }, [page, pdfObj, renderPage, rotation, scale]);
+        setScale(s => Math.max(0.3, s + d));
+    }, []);
 
     const rotate = useCallback((d) => {
-        const r = (rotation + d + 360) % 360;
-        setRotation(r);
-        if (autoFit) {
-            autoFitWidth(pdfObj, page, r);
-        } else {
-            renderPage(pdfObj, page, scale, r);
-        }
-    }, [page, pdfObj, autoFit, autoFitWidth, renderPage, rotation, scale]);
+        setRotation(r => (r + d + 360) % 360);
+    }, []);
 
     const fitToPage = useCallback(async () => {
         if (!pdfObj || !viewerRef.current) return;
@@ -260,15 +260,13 @@ export const usePdfRenderer = (pdfBlob) => {
         const s = h / viewport.height;
         setAutoFit(false);
         setScale(s);
-        renderPage(pdfObj, page, s, rotation);
-    }, [page, pdfObj, getViewport, renderPage, rotation]);
+    }, [page, pdfObj, getViewport, rotation]);
 
     const resetView = useCallback(() => {
         if (!pdfObj) return;
         setRotation(0);
         setAutoFit(true);
-        autoFitWidth(pdfObj, page, 0);
-    }, [page, pdfObj, autoFitWidth]);
+    }, [pdfObj]);
 
     return {
         pdfObj,
@@ -282,7 +280,6 @@ export const usePdfRenderer = (pdfBlob) => {
         viewerRef,
         canvasRef,
         renderPage,
-        autoFitWidth,
         changePage,
         zoom,
         rotate,

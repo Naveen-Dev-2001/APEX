@@ -28,14 +28,12 @@ const InvoicePdfViewer = () => {
         isRendering,
         viewerRef,
         canvasRef,
-        autoFitWidth,
         changePage,
         zoom,
         rotate,
         fitToPage,
         resetView,
         getViewport,
-        renderPage,
         getPageCached,
         scale
     } = usePdfRenderer(pdfBlob);
@@ -55,8 +53,6 @@ const InvoicePdfViewer = () => {
         getViewport,
         setPage,
         autoFit,
-        autoFitWidth,
-        renderPage,
         getPageCached
     });
 
@@ -72,7 +68,6 @@ const InvoicePdfViewer = () => {
                 zoom={zoom}
                 autoFit={autoFit}
                 setAutoFit={setAutoFit}
-                autoFitWidth={autoFitWidth}
                 fitToPage={fitToPage}
                 resetView={resetView}
                 pdfObj={pdfObj}
