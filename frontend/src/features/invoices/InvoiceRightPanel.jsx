@@ -3,6 +3,7 @@ import CustomTabs from "./CustomTabs";
 import { lazy, Suspense, useState, useEffect } from "react";
 import React from "react";
 import { Skeleton } from "antd";
+import InfiniteScroll from "react-infinite-scroll-component";
 
 const QuickViewTab = React.memo(lazy(() => import("./tabs/QuickViewTab")));
 const GLSummaryTab = React.memo(lazy(() => import("./tabs/GLSummaryTab")));
@@ -24,15 +25,26 @@ const TabContent = React.memo(({ tabName, isActive }) => {
     const Component = TAB_COMPONENTS[tabName];
     if (!Component) return null;
 
+    const scrollableId = `scrollable-${tabName.replace(/\s+/g, '-')}`;
+
     return (
         <div
+            id={scrollableId}
             className="h-full overflow-y-auto"
             style={{ display: isActive ? 'block' : 'none' }}
         >
-            <Suspense fallback={<div className="p-4"><Skeleton active paragraph={{ rows: 12 }} /></div>}>
-                {/* Pass isActive so heavy tabs (e.g. CodingTab) can defer data fetching */}
-                <Component isActive={isActive} />
-            </Suspense>
+            <InfiniteScroll
+                dataLength={1} // Placeholder since tabs currently load all data at once
+                next={() => { }}
+                hasMore={false}
+                loader={<div className="p-4"><Skeleton active paragraph={{ rows: 1 }} /></div>}
+                scrollableTarget={scrollableId}
+            >
+                <Suspense fallback={<div className="p-4"><Skeleton active paragraph={{ rows: 12 }} /></div>}>
+                    {/* Pass isActive so heavy tabs (e.g. CodingTab) can defer data fetching */}
+                    <Component isActive={isActive} />
+                </Suspense>
+            </InfiniteScroll>
         </div>
     );
 });
