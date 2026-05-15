@@ -377,13 +377,16 @@ const LineItemsTable = () => {
             </div>
 
             <Modal
-                title="Invoice Workflow"
+                title={<div className="text-center font-bold text-[#2F5D7C] text-[16px]">Invoice Workflow</div>}
                 open={isWorkflowModalOpen}
                 onCancel={() => setIsWorkflowModalOpen(false)}
                 footer={null}
                 width={600}
                 centered
-                styles={{ body: { padding: 0 } }}
+                styles={{ 
+                    header: { padding: '20px 24px', borderBottom: '1px solid #f0f0f0', margin: 0, textAlign: 'center' }, 
+                    body: { padding: 0 } 
+                }}
             >
                 <div className="max-h-[70vh] overflow-y-auto">
                     <WorkflowTab />

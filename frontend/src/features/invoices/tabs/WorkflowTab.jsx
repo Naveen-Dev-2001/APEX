@@ -1,5 +1,5 @@
 
-import { CheckOutlined, ExclamationOutlined, ClockCircleOutlined, UserOutlined, CloseOutlined, RollbackOutlined } from "@ant-design/icons";
+import { CheckOutlined, ExclamationOutlined, ClockCircleOutlined, UserOutlined, CloseOutlined, RollbackOutlined, InboxOutlined } from "@ant-design/icons";
 
 import { Tag } from "antd";
 
@@ -23,123 +23,64 @@ const getOrdinal = (n) => {
 
 
 const getStatusConfig = (status) => {
-
     switch (status?.toLowerCase()) {
-
         case "completed":
-
         case "sage_posted":
-
         case "approved":
-
             return {
-
                 titleColor: "text-[#1AB394]",
-
                 subtitleColor: "text-gray-600",
-
                 timeColor: "text-gray-400",
-
                 icon: (
-
                     <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#1AB394]">
-
                         <CheckOutlined className="!text-white text-[10px] font-black" />
-
                     </div>
-
                 ),
-
                 lineColor: "bg-[#1AB394]",
-
                 lineStyle: "solid"
-
             };
-
         case "pending":
-
             return {
-
                 titleColor: "text-[#8A6D3B]",
-
                 subtitleColor: "text-gray-600",
-
                 timeColor: "text-gray-400",
-
                 icon: (
-
                     <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#F8AC59]">
-
                         <ExclamationOutlined className="!text-white text-[12px] font-black" />
-
                     </div>
-
                 ),
-
                 lineColor: "bg-gray-200",
-
                 lineStyle: "dashed",
-
                 defaultSubtitle: "Awaiting Review"
-
             };
-
         case "rejected":
-
             return {
-
                 titleColor: "text-[#ED5565]",
-
                 subtitleColor: "text-gray-600",
-
                 timeColor: "text-gray-400",
-
                 icon: (
-
                     <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#ED5565]">
-
                         <CloseOutlined className="!text-white text-[10px] font-black" />
-
                     </div>
-
                 ),
-
                 lineColor: "bg-gray-200",
-
                 lineStyle: "dashed",
-
                 defaultSubtitle: "Rejected"
-
             };
-
         case "reworked":
-
             return {
-
                 titleColor: "text-[#F8AC59]",
-
                 subtitleColor: "text-gray-600",
-
                 timeColor: "text-gray-400",
-
                 icon: (
-
                     <div className="w-6 h-6 flex items-center justify-center rounded-full bg-[#F8AC59]">
-
                         <RollbackOutlined className="!text-white text-[10px] font-black" />
-
                     </div>
-
                 ),
-
                 lineColor: "bg-gray-200",
-
                 lineStyle: "dashed",
-
                 defaultSubtitle: "Sent for Rework"
-
             };
-
         case "deleted":
             return {
                 titleColor: "text-[#ED5565]",
@@ -169,35 +110,20 @@ const getStatusConfig = (status) => {
                 defaultSubtitle: "Invoice Archived"
             };
         case "queued":
-
         case "upcoming":
-
         default:
-
             return {
-
                 titleColor: "text-gray-500",
-
                 subtitleColor: "text-gray-400",
-
                 timeColor: "text-gray-300",
-
                 icon: (
-
                     <div className="w-6 h-6 border-2 border-gray-200 rounded-full bg-white" />
-
                 ),
-
                 lineColor: "bg-gray-200",
-
                 lineStyle: "dashed",
-
                 defaultSubtitle: "In Queue"
-
             };
-
     }
-
 };
 
 
@@ -237,12 +163,12 @@ const WorkflowTab = () => {
 
     const workflowData = useMemo(() => {
         if (!isArchived) return liveWorkflowData;
-        
+
         return {
             steps: activeInvoiceData?.workflow_steps || [],
             assigned_approvers: activeInvoiceData?.assigned_approvers || [],
             current_approver_level: activeInvoiceData?.current_approver_level || 1,
-            delegations: {}, 
+            delegations: {},
             user_names: activeInvoiceData?.user_names || {},
             workflow_type: activeInvoiceData?.workflow_type || "archived",
             required_approvers: activeInvoiceData?.required_approvers || (activeInvoiceData?.assigned_approvers?.length || 0)
@@ -433,101 +359,53 @@ const WorkflowTab = () => {
 
 
     return (
-
         <div className="bg-white p-10 overflow-y-auto max-h-full font-sans">
-
             {steps.map((item, index) => {
-
                 const config = getStatusConfig(item.status);
-
                 const isLast = index === steps.length - 1;
 
-
-
                 return (
-
                     <div key={index} className="flex gap-6 relative items-stretch">
-
                         <div className="flex flex-col items-center">
-
                             <div className="z-10 bg-white py-1">
-
                                 {config.icon}
-
                             </div>
-
                             {!isLast && (
-
                                 <div
-
                                     className={`w-[2px] flex-1 ${config.lineStyle === 'dashed' ? 'border-l-2 border-dashed border-gray-200' : config.lineColor}`}
-
                                     style={{ minHeight: "20px" }}
-
                                 />
-
                             )}
-
                         </div>
 
-
-
-                        <div className="pb-5 flex-1 flex flex-col justify-start">
-
+                        <div className="pb-5 pt-1 flex-1 flex flex-col justify-start">
                             <div className={`text-[13px] font-normal tracking-wide ${config.titleColor}`}>
-
                                 {item.title}
-
                             </div>
-
-
 
                             <div className="mt-1 flex flex-col gap-1">
-
                                 <div className="flex items-baseline gap-3">
-
                                     <span className={`text-[12px] font-normal ${config.subtitleColor}`}>
-
                                         {item.subtitle || config.defaultSubtitle}
-
                                     </span>
-
                                     {item.time && (
-
                                         <span className={`text-[12px] font-normal ${config.timeColor}`}>
-
                                             {item.time}
-
                                         </span>
-
                                     )}
-
                                 </div>
-
                                 {item.comment && (
-
                                     <div className={`mt-1 text-[11px] italic text-gray-500 bg-gray-50 p-2 rounded border-l-2 ${item.status === 'rejected' ? 'border-[#ED5565]' : (item.status === 'reworked' ? 'border-[#F8AC59]' : 'border-[#1AB394]')} max-w-md shadow-sm`}>
-
                                         "{item.comment}"
-
                                     </div>
-
                                 )}
-
                             </div>
-
                         </div>
-
                     </div>
-
                 );
-
             })}
-
         </div>
-
     );
-
 };
 
 
