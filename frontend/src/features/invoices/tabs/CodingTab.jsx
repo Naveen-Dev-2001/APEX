@@ -8,7 +8,7 @@ import {
 } from "@ant-design/icons";
 import WorkflowTab from "./WorkflowTab";
 import { Trash2 } from "lucide-react";
-import { Modal } from "antd";
+import { Modal, Tooltip } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
 import * as XLSX from "xlsx";
@@ -607,14 +607,16 @@ const CodingTab = ({ isActive = false }) => {
                                 />
                             </>
                         )}
-                        <InfoCircleOutlined
-                            className="text-blue-500 cursor-pointer hover:text-blue-600 transition-colors ml-1"
-                            style={{ fontSize: 16 }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsWorkflowModalOpen(true);
-                            }}
-                        />
+                        <Tooltip title="View Workflow">
+                            <InfoCircleOutlined
+                                className="text-blue-500 cursor-pointer hover:text-blue-600 transition-colors ml-1"
+                                style={{ fontSize: 16 }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsWorkflowModalOpen(true);
+                                }}
+                            />
+                        </Tooltip>
                     </div>
 
                 </div>
