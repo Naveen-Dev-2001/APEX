@@ -108,9 +108,15 @@ const CodificationWorkflowModal = ({ mode, rowData, onClose, onSuccess }) => {
             }
         }
 
-        if (form.enableThreshold === 'Yes' && (!form.threshold_approver || !form.amount_threshold)) {
-            toast.error('Please fill threshold approver and amount');
-            return;
+        if (form.enableThreshold === 'Yes') {
+            if (!form.amount_threshold || parseFloat(form.amount_threshold) <= 0) {
+                toast.error('Threshold amount must be greater than 0');
+                return;
+            }
+            if (!form.threshold_approver || form.threshold_approver.length === 0) {
+                toast.error('Please select at least one threshold approver');
+                return;
+            }
         }
 
         const payload = {

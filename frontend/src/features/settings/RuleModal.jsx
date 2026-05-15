@@ -261,8 +261,12 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
             }
         }
         if (form.thresholdEnabled) {
-            if (!form.thresholdAmount) return "Amount Threshold is required";
-            if (!form.thresholdApprover || form.thresholdApprover.length === 0) return "Threshold Approver is required";
+            if (!form.thresholdAmount || Number(form.thresholdAmount) <= 0) {
+                return "Amount Threshold must be greater than 0";
+            }
+            if (!form.thresholdApprover || form.thresholdApprover.length === 0) {
+                return "Threshold Approver is required";
+            }
         }
         if (!form.postingApprover || form.postingApprover.length === 0) return "Posting Approver is required";
         return null;
