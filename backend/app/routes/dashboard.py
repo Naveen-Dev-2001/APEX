@@ -94,38 +94,40 @@ def summary(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
+    # Total Invoices includes Sage Posted and Archived, but excludes Deleted
     invoices = invoice_repo.get_multi(
         db, 
         filters={"entity": entity}, 
-        expressions=[Invoice.status.notin_(EXCLUDED_STATUSES)],
+        expressions=[Invoice.status != InvoiceStatusEnum.DELETED],
         limit=10000
     )
     
     total_overdue = 0.0
     waiting = 0
     rejected_count = 0
-    
-    # Fetch sage_posted count separately because it's in EXCLUDED_STATUSES
-    sage_posted = invoice_repo.count(db, filters={"entity": entity, "status": InvoiceStatusEnum.SAGE_POSTED})
+    sage_posted_count = 0
     
     now = datetime.utcnow()
     
     for inv in invoices:
-        # Status counts (for UI cards)
         status = inv.status.value if hasattr(inv.status, "value") else str(inv.status)
-        if status == "waiting_approval":
+        
+        # Track counts for all invoices fetched
+        if status == InvoiceStatusEnum.WAITING_APPROVAL.value:
             waiting += 1
-        elif status == "rejected":
+        elif status == InvoiceStatusEnum.REJECTED.value:
             rejected_count += 1
+        elif status == InvoiceStatusEnum.SAGE_POSTED.value:
+            sage_posted_count += 1
             
-        # Calculation Exclusion: Exclude terminal statuses from the SUMS
-        if status in [InvoiceStatusEnum.DELETED, 
-                     InvoiceStatusEnum.SAGE_POSTED, InvoiceStatusEnum.ARCHIVED]:
+        # Total Overdue excludes Sage Posted, Archived, and Deleted
+        if status in [InvoiceStatusEnum.DELETED.value, 
+                     InvoiceStatusEnum.SAGE_POSTED.value, 
+                     InvoiceStatusEnum.ARCHIVED.value]:
             continue
             
         # Overdue calculation
         amt = float(inv.total_amount) if inv.total_amount is not None else 0.0
-        
         if amt == 0.0:
             data = get_extracted_data_json(inv)
             amt = to_float(safe_get(data, "amounts", "total_invoice_amount"))
@@ -142,8 +144,8 @@ def summary(
     
     return {
         "total_invoices": len(invoices),
-        "total_due": total_overdue, # Mapped to "Total Overdue" card in UI
-        "sage_posted": sage_posted,
+        "total_due": total_overdue,
+        "sage_posted": sage_posted_count,
         "waiting_approval": waiting,
         "rejected": rejected_count
     }
