@@ -20,6 +20,7 @@ from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
 from app.models.user import UserResponse
 from app.utils.date_utils import get_ist_now
+from app.utils.currency_utils import remove_currency_format
 
 # AI helpers
 from app.ai.normalizer import normalize_description, normalize_vendor
@@ -35,13 +36,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 def safe_float(value) -> float:
-    if value is None: return 0.0
-    if isinstance(value, (int, float)): return float(value)
-    if isinstance(value, str):
-        cleaned = value.replace("$", "").replace(",", "").strip()
-        try: return float(cleaned)
-        except: return 0.0
-    return 0.0
+    result = remove_currency_format(value)
+    return result if result is not None else 0.0
 
 def get_vendor_name(invoice: Any) -> Optional[str]:
     if invoice.vendor_name: return invoice.vendor_name

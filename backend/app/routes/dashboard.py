@@ -3,9 +3,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 import json
 from enum import Enum
+import re
 
 from app.database.database import get_db
-from app.models.db_models import Invoice
+from app.models.db_models import Invoice, InvoiceStatusEnum
 from app.repository.repositories import invoice_repo
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
@@ -13,11 +14,17 @@ from app.models.user import UserResponse
 
 router = APIRouter(tags=["Dashboard"])
 
+EXCLUDED_STATUSES = [
+    InvoiceStatusEnum.DELETED,
+    InvoiceStatusEnum.SAGE_POSTED,
+    InvoiceStatusEnum.ARCHIVED
+]
+
 def to_float(value):
     """Safely convert value to float"""
     if not value:
         return 0.0
-    value = str(value).strip().replace("$", "").replace(",", "")
+    value = re.sub(r"[^\d.-]", "", value)
     if value.startswith("(") and value.endswith(")"):
         value = "-" + value[1:-1]
     try:
@@ -31,6 +38,9 @@ def parse_date(date_str):
         return None
     if isinstance(date_str, datetime):
         return date_str
+    if hasattr(date_str, "year") and hasattr(date_str, "month") and hasattr(date_str, "day"):
+        # Handles datetime.date objects
+        return datetime(date_str.year, date_str.month, date_str.day)
     if "/" in date_str:
         try:
             m, d, y = date_str.split("/")
@@ -84,31 +94,58 @@ def summary(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
+    invoices = invoice_repo.get_multi(
+        db, 
+        filters={"entity": entity}, 
+        expressions=[Invoice.status.notin_(EXCLUDED_STATUSES)],
+        limit=10000
+    )
     
-    total_due = 0.0
+    total_overdue = 0.0
     approved = 0
     waiting = 0
-    rejected = 0
+    rejected_count = 0
+    
+    now = datetime.utcnow()
     
     for inv in invoices:
-        data = get_extracted_data_json(inv)
-        total_due += to_float(safe_get(data, "amounts", "total_invoice_amount"))
-        
+        # Status counts (for UI cards)
         status = inv.status.value if hasattr(inv.status, "value") else str(inv.status)
         if status == "approved":
             approved += 1
         elif status == "waiting_approval":
             waiting += 1
         elif status == "rejected":
-            rejected += 1
+            rejected_count += 1
+            
+        # Calculation Exclusion: Exclude terminal statuses from the SUMS
+        if status in [InvoiceStatusEnum.DELETED, 
+                     InvoiceStatusEnum.SAGE_POSTED, InvoiceStatusEnum.ARCHIVED]:
+            continue
+            
+        # Overdue calculation
+        amt = float(inv.total_amount) if inv.total_amount is not None else 0.0
+        
+        if amt == 0.0:
+            data = get_extracted_data_json(inv)
+            amt = to_float(safe_get(data, "amounts", "total_invoice_amount"))
+        
+        due_date = inv.due_date
+        if due_date is None:
+            data = get_extracted_data_json(inv)
+            due_date = parse_date(safe_get(data, "invoice_details", "due_date"))
+        else:
+            due_date = parse_date(due_date)
+            
+        if due_date is None or due_date < now:
+            total_overdue += amt
     
     return {
         "total_invoices": len(invoices),
-        "total_due": total_due,
+        "total_due": total_overdue, # Mapped to "Total Overdue" card in UI
         "approved": approved,
         "waiting_approval": waiting,
-        "rejected": rejected
+        "rejected": rejected_count
     }
 
 @router.get("/aging")
@@ -117,16 +154,33 @@ def aging(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
+    invoices = invoice_repo.get_multi(
+        db, 
+        filters={"entity": entity}, 
+        expressions=[Invoice.status.notin_(EXCLUDED_STATUSES)],
+        limit=10000
+    )
     buckets = {"0_30": 0, "31_60": 0, "61_90": 0, "91_120": 0, "120_plus": 0}
     
     for inv in invoices:
-        data = get_extracted_data_json(inv)
-        due = safe_get(data, "invoice_details", "due_date")
-        days = aging_days(due)
-        amt = to_float(safe_get(data, "amounts", "total_invoice_amount"))
+        status = inv.status.value if hasattr(inv.status, "value") else str(inv.status)
+        if status in [InvoiceStatusEnum.DELETED, 
+                     InvoiceStatusEnum.SAGE_POSTED, InvoiceStatusEnum.ARCHIVED]:
+            continue
+
+        amt = float(inv.total_amount) if inv.total_amount is not None else 0.0
+        due_date = inv.due_date
         
-        if days is None:
+        if amt == 0.0 or due_date is None:
+            data = get_extracted_data_json(inv)
+            if amt == 0.0:
+                amt = to_float(safe_get(data, "amounts", "total_invoice_amount"))
+            if due_date is None:
+                due_date = safe_get(data, "invoice_details", "due_date")
+        
+        days = aging_days(due_date)
+        
+        if days is None or days < 0:
             continue
         if days <= 30:
             buckets["0_30"] += amt
@@ -147,7 +201,12 @@ def status_breakdown(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
+    invoices = invoice_repo.get_multi(
+        db, 
+        filters={"entity": entity}, 
+        expressions=[Invoice.status.notin_(EXCLUDED_STATUSES)],
+        limit=10000
+    )
     
     counts = {
         "processed": 0,
@@ -171,7 +230,12 @@ def vendors(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
+    invoices = invoice_repo.get_multi(
+        db, 
+        filters={"entity": entity}, 
+        expressions=[Invoice.status.notin_(EXCLUDED_STATUSES)],
+        limit=10000
+    )
     
     vendor_count = {}
     vendor_amount = {}
@@ -195,7 +259,12 @@ def top_vendors(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
+    invoices = invoice_repo.get_multi(
+        db, 
+        filters={"entity": entity}, 
+        expressions=[Invoice.status.notin_(EXCLUDED_STATUSES)],
+        limit=10000
+    )
     
     totals = {}
     counts = {}
@@ -221,7 +290,12 @@ def payments(
     current_user: UserResponse = Depends(get_current_user),
     entity: str = Depends(get_current_entity)
 ):
-    invoices = invoice_repo.get_multi(db, filters={"entity": entity}, limit=10000)
+    invoices = invoice_repo.get_multi(
+        db, 
+        filters={"entity": entity}, 
+        expressions=[Invoice.status.notin_(EXCLUDED_STATUSES)],
+        limit=10000
+    )
     
     total = 0.0
     paid = 0.0
