@@ -1425,7 +1425,13 @@ async def get_invoice_filter_options(
 
     col_attr = getattr(target_model, column)
 
-    query = db.query(col_attr)
+    # For amount and date columns, we might need to fallback to extracted_data for historical records
+    use_fallback = column in ["total_amount", "amount_due", "invoice_date", "due_date"]
+    
+    if use_fallback:
+        query = db.query(col_attr, target_model.extracted_data)
+    else:
+        query = db.query(col_attr)
     
     # Apply filters using repository helper
     if target_model == Invoice:
@@ -1433,11 +1439,13 @@ async def get_invoice_filter_options(
     else:
         query = deleted_invoice_repo._apply_filters(query, repo_filters)
 
-
     for expr in expressions:
         query = query.filter(expr)
         
-    results = query.filter(col_attr != None).distinct().all()
+    if not use_fallback:
+        query = query.filter(col_attr != None).distinct()
+    
+    results = query.all()
     
     # Flatten result list (SQLAlchemy returns tuples)
     # Normalize numeric types to handle precision issues (e.g., 100.0 vs 100.00)
@@ -1445,6 +1453,30 @@ async def get_invoice_filter_options(
     seen_raw = set()
     for r in results:
         val = r[0]
+        ext_json = r[1] if use_fallback else None
+        
+        # Fallback logic for historical records with NULL columns
+        if val is None and ext_json:
+            try:
+                data = json.loads(ext_json) if isinstance(ext_json, str) else ext_json
+                if data:
+                    if column == "total_amount":
+                        val = data.get("amounts", {}).get("total_invoice_amount", {}).get("value")
+                    elif column == "amount_due":
+                        val = data.get("amounts", {}).get("amount_due", {}).get("value")
+                    elif column == "invoice_date":
+                        val = data.get("invoice_details", {}).get("invoice_date", {}).get("value")
+                    elif column == "due_date":
+                        val = data.get("invoice_details", {}).get("due_date", {}).get("value")
+                    
+                    if val:
+                        if column in ["total_amount", "amount_due"]:
+                            val = remove_currency_format(val)
+                        else:
+                            val = parse_date_safely(val)
+            except:
+                pass
+
         if val is None or str(val).strip() == "":
             continue
         
@@ -3145,6 +3177,10 @@ async def delete_invoice(
             azure_vendor_address=invoice.azure_vendor_address,
             line_grouping=invoice.line_grouping,
             exchange_rate=invoice.exchange_rate,
+            total_amount=invoice.total_amount,
+            amount_due=invoice.amount_due,
+            invoice_date=invoice.invoice_date,
+            due_date=invoice.due_date,
             sage_bill_number=invoice.sage_bill_number,
             extracted_data=invoice.extracted_data,
             vendor_details=invoice.vendor_details,
@@ -3379,6 +3415,10 @@ async def bulk_delete_invoices(
                 azure_vendor_address=invoice.azure_vendor_address,
                 line_grouping=invoice.line_grouping,
                 exchange_rate=invoice.exchange_rate,
+                total_amount=invoice.total_amount,
+                amount_due=invoice.amount_due,
+                invoice_date=invoice.invoice_date,
+                due_date=invoice.due_date,
                 sage_bill_number=invoice.sage_bill_number,
                 extracted_data=invoice.extracted_data,
                 vendor_details=invoice.vendor_details,
