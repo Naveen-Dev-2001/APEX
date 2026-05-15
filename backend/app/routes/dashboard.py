@@ -102,18 +102,18 @@ def summary(
     )
     
     total_overdue = 0.0
-    approved = 0
     waiting = 0
     rejected_count = 0
+    
+    # Fetch sage_posted count separately because it's in EXCLUDED_STATUSES
+    sage_posted = invoice_repo.count(db, filters={"entity": entity, "status": InvoiceStatusEnum.SAGE_POSTED})
     
     now = datetime.utcnow()
     
     for inv in invoices:
         # Status counts (for UI cards)
         status = inv.status.value if hasattr(inv.status, "value") else str(inv.status)
-        if status == "approved":
-            approved += 1
-        elif status == "waiting_approval":
+        if status == "waiting_approval":
             waiting += 1
         elif status == "rejected":
             rejected_count += 1
@@ -143,7 +143,7 @@ def summary(
     return {
         "total_invoices": len(invoices),
         "total_due": total_overdue, # Mapped to "Total Overdue" card in UI
-        "approved": approved,
+        "sage_posted": sage_posted,
         "waiting_approval": waiting,
         "rejected": rejected_count
     }
