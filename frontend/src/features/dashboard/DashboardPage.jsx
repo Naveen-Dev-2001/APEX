@@ -37,6 +37,11 @@ const DashboardPage = React.memo(() => {
             approved: "Approved",
             rejected: "Rejected",
             reworked: "Reworked",
+            uploading: "Uploading",
+            sage_posted: "Sage Posted",
+            sage_post_failed: "Sage Post Failed",
+            archived: "Archived",
+            deleted: "Deleted",
         };
         const entries = Object.entries(data).filter(([, value]) => value > 0);
         const labels = entries.map(([key]) => labelMap[key] || key);

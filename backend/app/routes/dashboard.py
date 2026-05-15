@@ -204,18 +204,10 @@ def status_breakdown(
     invoices = invoice_repo.get_multi(
         db, 
         filters={"entity": entity}, 
-        expressions=[Invoice.status.notin_(EXCLUDED_STATUSES)],
         limit=10000
     )
     
-    counts = {
-        "processed": 0,
-        "waiting_coding": 0,
-        "waiting_approval": 0,
-        "approved": 0,
-        "rejected": 0,
-        "reworked": 0,
-    }
+    counts = {status.value: 0 for status in InvoiceStatusEnum}
     
     for inv in invoices:
         status = inv.status.value if hasattr(inv.status, "value") else str(inv.status)
