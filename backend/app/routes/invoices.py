@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, BackgroundTasks
+from app.utils.currency_utils import remove_currency_format
 import logging
 from fastapi.responses import FileResponse
 from typing import List
@@ -51,18 +52,6 @@ from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
 from dateutil import parser
 from app.utils.date_utils import get_ist_now
-
-def remove_currency_format(value):
-    if not value or value == "" or value == "N/A":
-        return None
-    try:
-        # Remove commas and $ symbols
-        clean_val = str(value).replace(',', '').replace('$', '').strip()
-        if not clean_val:
-            return None
-        return float(clean_val)
-    except (ValueError, TypeError):
-        return None
 
 def parse_date_safely(value):
     if not value or value == "" or value == "N/A":
@@ -609,6 +598,18 @@ async def upload_invoices(
             
             new_invoice.total_amount = remove_currency_format(total_val)
             new_invoice.amount_due = remove_currency_format(due_val)
+
+            # Sanitize amounts in extracted_data for consistency
+            if isinstance(extracted_data, dict) and "amounts" in extracted_data:
+                for amt_key in ["total_invoice_amount", "total_amount_payable", "amount_due", "total_tax_amount", "total_service_tax_amount"]:
+                    if amt_key in extracted_data["amounts"]:
+                        val_obj = extracted_data["amounts"][amt_key]
+                        if isinstance(val_obj, dict) and "value" in val_obj:
+                            clean_val = remove_currency_format(val_obj["value"])
+                            if clean_val is not None:
+                                val_obj["value"] = str(clean_val)
+            
+            new_invoice.extracted_data = serialize_json_field(extracted_data)
 
             # Populate date columns for filtering/sorting
             invoice_dt_val = invoice_details.get("invoice_date", {}).get("value")
@@ -2537,15 +2538,24 @@ async def update_invoice(
             update_data["due_date"] = parse_date_safely(due_dt)
         if posting_dt is not None:
             update_data["posting_date"] = parse_date_safely(posting_dt)
-            
         # --- Amount Columns Sync ---
         total_amt = extracted_data.get("amounts", {}).get("total_invoice_amount", {}).get("value")
         amt_due = extracted_data.get("amounts", {}).get("amount_due", {}).get("value")
-        
+
         if total_amt is not None:
             update_data["total_amount"] = remove_currency_format(total_amt)
         if amt_due is not None:
             update_data["amount_due"] = remove_currency_format(amt_due)
+
+        # Sanitize amounts in extracted_data as well
+        if isinstance(extracted_data, dict) and "amounts" in extracted_data:
+            for amt_key in ["total_invoice_amount", "total_amount_payable", "amount_due", "total_tax_amount", "total_service_tax_amount"]:
+                if amt_key in extracted_data["amounts"]:
+                    val_obj = extracted_data["amounts"][amt_key]
+                    if isinstance(val_obj, dict) and "value" in val_obj:
+                        clean_val = remove_currency_format(val_obj["value"])
+                        if clean_val is not None:
+                            val_obj["value"] = str(clean_val)
 
         update_data["extracted_data"] = extracted_data # Keep as dict for now
 

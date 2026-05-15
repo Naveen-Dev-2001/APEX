@@ -37,6 +37,11 @@ const DashboardPage = React.memo(() => {
             approved: "Approved",
             rejected: "Rejected",
             reworked: "Reworked",
+            uploading: "Uploading",
+            sage_posted: "Sage Posted",
+            sage_post_failed: "Sage Post Failed",
+            archived: "Archived",
+            deleted: "Deleted",
         };
         const entries = Object.entries(data).filter(([, value]) => value > 0);
         const labels = entries.map(([key]) => labelMap[key] || key);
@@ -55,7 +60,7 @@ const DashboardPage = React.memo(() => {
 
     const mapTopVendors = useCallback((data = []) => {
         const x = data.map(({ vendor }) => vendor.replace(/\s+/g, " ").trim());
-        const y = data.map(({ total }) => total || 0);
+        const y = data.map(({ count }) => count || 0);
         const yMax = y.length ? Math.ceil(Math.max(...y) * 1.2) : 10;
         return { x, y, yMax };
     }, []);
@@ -124,7 +129,7 @@ const DashboardPage = React.memo(() => {
                             title="Total Overdue"
                             value={formatCurrency(summary?.total_due || 0)}
                         />
-                        <Card icon={icons.approved} title="Approved" value={summary?.approved} />
+                        <Card icon={icons.approved} title="Posted to Sage" value={summary?.sage_posted} />
                         <Card icon={icons.pending} title="Pending Approval" value={summary?.waiting_approval} />
                     </>
                 )}
