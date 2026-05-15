@@ -3,8 +3,10 @@ import {
     PlusOutlined,
     DownloadOutlined,
     UploadOutlined,
-    CaretUpOutlined
+    CaretUpOutlined,
+    InfoCircleOutlined
 } from "@ant-design/icons";
+import WorkflowTab from "./WorkflowTab";
 import { Trash2 } from "lucide-react";
 import { Modal } from "antd";
 import { useInvoiceStore } from "../../../store/invoice.store";
@@ -194,6 +196,7 @@ const applyCalculation = (item, key, value) => {
 const CodingTab = ({ isActive = false }) => {
     const { lineItems, setLineItems, viewInvoiceId, selectedVendorId, activeInvoiceData, entityMaster } = useInvoiceStore();
     const [modal, modalContextHolder] = Modal.useModal();
+    const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
     const fileInputRef = useRef(null);
 
     const handleExportExcel = useCallback(() => {
@@ -604,7 +607,26 @@ const CodingTab = ({ isActive = false }) => {
                                 />
                             </>
                         )}
+                        <InfoCircleOutlined
+                            className="text-blue-500 cursor-pointer hover:text-blue-600 transition-colors ml-1"
+                            style={{ fontSize: 16 }}
+                            onClick={() => setIsWorkflowModalOpen(true)}
+                        />
                     </div>
+
+                    <Modal
+                        title="Invoice Workflow"
+                        open={isWorkflowModalOpen}
+                        onCancel={() => setIsWorkflowModalOpen(false)}
+                        footer={null}
+                        width={600}
+                        centered
+                        styles={{ body: { padding: 0 } }}
+                    >
+                        <div className="max-h-[70vh] overflow-y-auto">
+                            <WorkflowTab />
+                        </div>
+                    </Modal>
 
                 </div>
 

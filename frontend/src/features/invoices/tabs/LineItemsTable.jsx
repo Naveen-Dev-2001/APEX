@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { PlusOutlined, DownloadOutlined, UploadOutlined, CaretUpOutlined, CaretDownOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { PlusOutlined, DownloadOutlined, UploadOutlined, CaretUpOutlined, CaretDownOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { Trash2 } from "lucide-react";
 import { Modal } from "antd";
+import WorkflowTab from "./WorkflowTab";
 import ReusableDataTable from '../../../shared/components/ReusableDataTable' // adjust path
 import { formatCurrency } from '../../../utils/formatters'
 
@@ -46,7 +47,7 @@ const NumberCell = ({ value, onChange, prefix }) => (
     <div className="flex items-center border border-gray-200 rounded overflow-hidden bg-white focus-within:border-blue-400">
         {prefix && (
             <span className="px-2 text-[13px] text-gray-500 border-r border-gray-200 bg-gray-50">
-                {prefix} 
+                {prefix}
             </span>
         )}
         <input
@@ -72,6 +73,7 @@ const SelectCell = ({ value, onChange, options }) => (
 
 const LineItemsTable = () => {
     const [modal, modalContextHolder] = Modal.useModal();
+    const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
     const [rows, setRows] = useState([
         { id: 1, description: "Innova - 56 trip", lineType: "Expense", quantity: 0, unitPrice: 0, netAmount: 0, glCode: "", lob: "", department: "", customer: "", item: "" },
         { id: 2, description: "Small car - (11am&12", lineType: "Expense", quantity: 0, unitPrice: 0, netAmount: 0, glCode: "", lob: "", department: "", customer: "", item: "" },
@@ -361,8 +363,27 @@ const LineItemsTable = () => {
                         <UploadOutlined style={{ fontSize: 13 }} />
                         Import from Excel
                     </button>
+                    <InfoCircleOutlined
+                        className="text-blue-500 cursor-pointer hover:text-blue-600 transition-colors"
+                        style={{ fontSize: 16 }}
+                        onClick={() => setIsWorkflowModalOpen(true)}
+                    />
                 </div>
             </div>
+
+            <Modal
+                title="Invoice Workflow"
+                open={isWorkflowModalOpen}
+                onCancel={() => setIsWorkflowModalOpen(false)}
+                footer={null}
+                width={600}
+                centered
+                styles={{ body: { padding: 0 } }}
+            >
+                <div className="max-h-[70vh] overflow-y-auto">
+                    <WorkflowTab />
+                </div>
+            </Modal>
 
             {/* ── Table ── */}
             <ReusableDataTable
