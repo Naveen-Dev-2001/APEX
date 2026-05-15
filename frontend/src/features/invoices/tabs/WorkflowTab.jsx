@@ -359,7 +359,7 @@ const WorkflowTab = () => {
 
 
     return (
-        <div className="bg-white p-10 overflow-y-auto max-h-full font-sans">
+        <div className="bg-white p-10 font-sans">
             {steps.map((item, index) => {
                 const config = getStatusConfig(item.status);
                 const isLast = index === steps.length - 1;

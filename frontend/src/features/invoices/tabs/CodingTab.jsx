@@ -633,7 +633,7 @@ const CodingTab = ({ isActive = false }) => {
                         body: { padding: 0 } 
                     }}
                 >
-                    <div className="max-h-[70vh] overflow-y-auto">
+                    <div className="w-full">
                         <WorkflowTab />
                     </div>
                 </Modal>
