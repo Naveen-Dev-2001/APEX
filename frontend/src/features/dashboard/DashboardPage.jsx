@@ -60,7 +60,7 @@ const DashboardPage = React.memo(() => {
 
     const mapTopVendors = useCallback((data = []) => {
         const x = data.map(({ vendor }) => vendor.replace(/\s+/g, " ").trim());
-        const y = data.map(({ total }) => total || 0);
+        const y = data.map(({ count }) => count || 0);
         const yMax = y.length ? Math.ceil(Math.max(...y) * 1.2) : 10;
         return { x, y, yMax };
     }, []);

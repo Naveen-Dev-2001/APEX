@@ -240,9 +240,22 @@ def vendors(
         vendor_count[vendor] = vendor_count.get(vendor, 0) + 1
         vendor_amount[vendor] = vendor_amount.get(vendor, 0) + amt
     
+    # Sort and limit to top 10
+    by_count = sorted(
+        [{"vendor": v, "count": c} for v, c in vendor_count.items()],
+        key=lambda x: x["count"],
+        reverse=True
+    )[:10]
+    
+    by_amount = sorted(
+        [{"vendor": v, "amount": a} for v, a in vendor_amount.items()],
+        key=lambda x: x["amount"],
+        reverse=True
+    )[:10]
+    
     return {
-        "by_count": [{"vendor": v, "count": c} for v, c in vendor_count.items()],
-        "by_amount": [{"vendor": v, "amount": a} for v, a in vendor_amount.items()],
+        "by_count": by_count,
+        "by_amount": by_amount,
     }
 
 @router.get("/top_vendors")
@@ -269,11 +282,12 @@ def top_vendors(
         totals[vendor] = totals.get(vendor, 0) + amt
         counts[vendor] = counts.get(vendor, 0) + 1
     
-    sorted_vendors = sorted(totals.items(), key=lambda x: x[1], reverse=True)
+    # User Request: top vendors : highest number of invoices processed
+    sorted_vendors = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:10]
     
     return [
-        {"vendor": vendor, "total": total, "count": counts[vendor]}
-        for vendor, total in sorted_vendors
+        {"vendor": vendor, "total": totals[vendor], "count": count}
+        for vendor, count in sorted_vendors
     ]
 
 @router.get("/payments")
