@@ -578,10 +578,10 @@ const CodingTab = ({ isActive = false }) => {
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-2 flex-nowrap" onClick={e => e.stopPropagation()}>
                         <button
                             onClick={handleExportExcel}
-                            className="flex items-center justify-center gap-1.5 w-[120px] py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
+                            className="flex items-center justify-center gap-1.5 w-[120px] py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm whitespace-nowrap"
                         >
                             <DownloadOutlined style={{ fontSize: 12 }} /> Export
                         </button>
@@ -589,7 +589,7 @@ const CodingTab = ({ isActive = false }) => {
                             <>
                                 <button
                                     onClick={() => fileInputRef.current.click()}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors text-[12px] font-medium shadow-sm whitespace-nowrap"
                                 >
                                     <UploadOutlined style={{ fontSize: 12 }} /> Import from Excel
                                 </button>
@@ -610,25 +610,28 @@ const CodingTab = ({ isActive = false }) => {
                         <InfoCircleOutlined
                             className="text-blue-500 cursor-pointer hover:text-blue-600 transition-colors ml-1"
                             style={{ fontSize: 16 }}
-                            onClick={() => setIsWorkflowModalOpen(true)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsWorkflowModalOpen(true);
+                            }}
                         />
                     </div>
 
-                    <Modal
-                        title="Invoice Workflow"
-                        open={isWorkflowModalOpen}
-                        onCancel={() => setIsWorkflowModalOpen(false)}
-                        footer={null}
-                        width={600}
-                        centered
-                        styles={{ body: { padding: 0 } }}
-                    >
-                        <div className="max-h-[70vh] overflow-y-auto">
-                            <WorkflowTab />
-                        </div>
-                    </Modal>
-
                 </div>
+
+                <Modal
+                    title="Invoice Workflow"
+                    open={isWorkflowModalOpen}
+                    onCancel={() => setIsWorkflowModalOpen(false)}
+                    footer={null}
+                    width={600}
+                    centered
+                    styles={{ body: { padding: 0 } }}
+                >
+                    <div className="max-h-[70vh] overflow-y-auto">
+                        <WorkflowTab />
+                    </div>
+                </Modal>
 
                 {/* ── Collapsible body: table + add button ────────────────── */}
                 {!collapsed && (
@@ -707,18 +710,18 @@ const CodingTab = ({ isActive = false }) => {
                                                 className={`transition-colors group ${isSelected ? "bg-blue-50/60 hover:bg-blue-50/80" : "hover:bg-blue-50/30"}`}
                                             >
                                                 {/* Checkbox hidden for system rows */}
-                                                <td className="p-2 text-center border-r border-gray-100" style={stickyCheckbox(isSelected ? "#dbeafe" : "#ffffff")}>
+                                                <td className="p-2 text-center border-r border-gray-100 whitespace-nowrap" style={stickyCheckbox(isSelected ? "#dbeafe" : "#ffffff")}>
                                                     <Checkbox
                                                         checked={isSelected}
                                                         onChange={() => toggleSelectRow(row.id)}
                                                         disabled={isViewOnly}
                                                     />
                                                 </td>
-                                                <td className="p-2 text-center text-[13px] text-gray-500 border-r border-gray-100" style={stickySNo(isSelected ? "#dbeafe" : "#ffffff")}>
+                                                <td className="p-2 text-center text-[13px] text-gray-500 border-r border-gray-100 whitespace-nowrap" style={stickySNo(isSelected ? "#dbeafe" : "#ffffff")}>
                                                     {index + 1}
                                                 </td>
 
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <EditableCell
                                                         disabled={isViewOnly || isSystem}
                                                         value={isSystem && row.type === "GST" ? rowLabel : row.description}
@@ -726,19 +729,19 @@ const CodingTab = ({ isActive = false }) => {
                                                         placeholder="Description"
                                                     />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <DropdownCell disabled={isViewOnly} value={row.lineType} onChange={(v) => handleUpdate(row.id, "lineType", v)} options={LINE_TYPE_OPTIONS} filterOption={filterOption} />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <EditableCell disabled={isViewOnly} value={row.qty} onChange={(v) => handleUpdate(row.id, "qty", v)} type="number" />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <EditableCell disabled={isViewOnly} value={row.unitPrice} onChange={(v) => handleUpdate(row.id, "unitPrice", v)} type="number" />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <EditableCell disabled={isViewOnly} value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="number" />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <DropdownCell
                                                         disabled={isViewOnly}
                                                         value={row.glCode}
@@ -749,7 +752,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         onOpen={gl.onDropdownOpen}
                                                     />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <DropdownCell
                                                         disabled={isViewOnly}
                                                         value={row.lob}
@@ -760,7 +763,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         onOpen={lob.onDropdownOpen}
                                                     />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <DropdownCell
                                                         disabled={isViewOnly}
                                                         value={row.department}
@@ -771,7 +774,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         onOpen={dept.onDropdownOpen}
                                                     />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <DropdownCell
                                                         disabled={isViewOnly}
                                                         value={row.customer}
@@ -782,7 +785,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         onOpen={customer.onDropdownOpen}
                                                     />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100">
+                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <DropdownCell
                                                         disabled={isViewOnly}
                                                         value={row.item}
@@ -793,7 +796,7 @@ const CodingTab = ({ isActive = false }) => {
                                                         onOpen={item.onDropdownOpen}
                                                     />
                                                 </td>
-                                                <td className="p-2 text-center" style={{ overflow: "visible" }}>
+                                                <td className="p-2 text-center whitespace-nowrap" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (
                                                         <button
                                                             onClick={(e) => {

@@ -354,19 +354,22 @@ const LineItemsTable = () => {
                     <CaretUpOutlined className="text-gray-500 text-[11px]" />
                     Line Items
                 </div>
-                <div className="flex items-center gap-2">
-                    <button className="flex items-center justify-center gap-1.5 w-[120px] py-1.5 text-[13px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors">
+                <div className="flex items-center gap-2 flex-nowrap">
+                    <button className="flex items-center justify-center gap-1.5 w-[120px] py-1.5 text-[13px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors whitespace-nowrap">
                         <DownloadOutlined style={{ fontSize: 13 }} />
                         Export
                     </button>
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-gray-300 rounded hover:bg-gray-50 text-gray-600 transition-colors whitespace-nowrap">
                         <UploadOutlined style={{ fontSize: 13 }} />
                         Import from Excel
                     </button>
                     <InfoCircleOutlined
-                        className="text-blue-500 cursor-pointer hover:text-blue-600 transition-colors"
+                        className="text-blue-500 cursor-pointer hover:text-blue-600 transition-colors ml-1"
                         style={{ fontSize: 16 }}
-                        onClick={() => setIsWorkflowModalOpen(true)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsWorkflowModalOpen(true);
+                        }}
                     />
                 </div>
             </div>
