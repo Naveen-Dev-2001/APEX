@@ -1055,15 +1055,18 @@ async def get_invoices(
                         if not val: continue
                         if val == "Finance Team":
                             conditions.append(
-                                and_(
-                                    Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
-                                    exists().where(
-                                        and_(
-                                            InvoiceAssignedApprover.invoice_id == Invoice.id,
-                                            InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
-                                            InvoiceAssignedApprover.is_finance == True
+                                or_(
+                                    and_(
+                                        Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                        exists().where(
+                                            and_(
+                                                InvoiceAssignedApprover.invoice_id == Invoice.id,
+                                                InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
+                                                InvoiceAssignedApprover.is_finance == True
+                                            )
                                         )
-                                    )
+                                    ),
+                                    Invoice.status.in_([InvoiceStatusEnum.WAITING_CODING, InvoiceStatusEnum.PROCESSED])
                                 )
                             )
                         elif val == "Completed":
@@ -1382,6 +1385,8 @@ async def get_invoice_filter_options(
                     else:
                         name = user_map.get(a.approver_email.lower()) or a.approver_email.split("@")[0]
                         options.add(name)
+            elif inv.status in [InvoiceStatusEnum.WAITING_CODING, InvoiceStatusEnum.PROCESSED]:
+                options.add("Finance Team")
             elif inv.status in [InvoiceStatusEnum.SAGE_POSTED, InvoiceStatusEnum.APPROVED]:
                 options.add("Completed")
             elif inv.status == InvoiceStatusEnum.REJECTED:
