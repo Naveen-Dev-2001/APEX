@@ -230,6 +230,15 @@ async def update_vendor_workflow(
     if not existing:
         raise HTTPException(404, "Workflow not found")
 
+    # Check for duplicate vendor_id under same entity
+    existing_duplicate_list = vendor_workflow_repo.get_multi(
+        db,
+        filters={"vendor_id": workflow.vendor_id, "entity": entity}
+    )
+    if any(e.id != workflow_id for e in existing_duplicate_list):
+        raise HTTPException(
+            400, f"Workflow already exists for vendor '{workflow.vendor_id}'")
+
     try:
         update_data = {
             "vendor_id": workflow.vendor_id,
@@ -414,8 +423,26 @@ async def update_codification_workflow(
     if not existing or existing.entity != entity:
         raise HTTPException(404, "Workflow not found")
 
-    if not existing:
-        raise HTTPException(404, "Workflow not found")
+    # Check for duplicate lob + department_id under same entity
+    existing_duplicate_list = codification_workflow_repo.get_multi(
+        db,
+        filters={
+            "lob": workflow.lob,
+            "department_id": workflow.department_id,
+            "entity": entity
+        }
+    )
+    if any(e.id != workflow_id for e in existing_duplicate_list):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "DUPLICATE_WORKFLOW",
+                "message": f"Workflow already exists for LOB '{workflow.lob}' and Department '{workflow.department_id}'",
+                "field": "lob_department",
+                "lob": workflow.lob,
+                "department_id": workflow.department_id
+            }
+        )
 
     try:
         update_data = {
