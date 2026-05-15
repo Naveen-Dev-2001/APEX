@@ -681,7 +681,8 @@ async def sso_exchange(
             "role": user.role if user.role else "User",
             "status": user.status if user.status else "active",
             "is_first_time_user": getattr(user, "is_first_time_user", False),
-            "username": user.username
+            "username": user.username,
+            "email_notifications": getattr(user, 'email_notifications', True)
         }
 
     except HTTPException:

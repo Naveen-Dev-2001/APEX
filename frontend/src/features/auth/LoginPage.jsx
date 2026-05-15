@@ -47,7 +47,8 @@ const LoginPage = () => {
                     username: response.data.username || null,
                     email: response.data.email || null,
                     role: response.data.role || null,
-                    department: response.data.department || null
+                    department: response.data.department || null,
+                    email_notifications: response.data.email_notifications !== undefined ? response.data.email_notifications : true
                 };
                 setAuth(response.data.access_token, userObj, response.data.refresh_token);
 

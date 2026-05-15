@@ -39,6 +39,7 @@ export default function SSOCallback() {
                     email: res.email || null,
                     role: res.role || null,
                     department: res.department || null,
+                    email_notifications: res.email_notifications !== undefined ? res.email_notifications : true,
                 };
                 setAuth(res.access_token, userObj, res.refresh_token);
 
