@@ -1,6 +1,8 @@
 import { useInvoiceStore } from "../../store/invoice.store";
 import { useInvoicePdf } from "../hooks/useInvoicePdf";
 import { Spin } from "antd";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 
 // Custom Hooks
 import { usePdfRenderer } from "./hooks/usePdfRenderer";
@@ -13,9 +15,28 @@ import PdfPlaceholder from "./components/PdfPlaceholder";
 
 const InvoicePdfViewer = () => {
     const { fileName, viewInvoiceId, highlightedField, activeInvoiceData } = useInvoiceStore();
+    const queryClient = useQueryClient();
+    const [canLoadPdf, setCanLoadPdf] = useState(false);
+
+    // Reset when invoice changes
+    useEffect(() => {
+        setCanLoadPdf(false);
+    }, [viewInvoiceId]);
+
+    const isPreviewFetching = useIsFetching({ queryKey: ["invoice-preview", viewInvoiceId] });
+
+    useEffect(() => {
+        if (isPreviewFetching === 0) {
+            const queries = queryClient.getQueryCache().findAll({ queryKey: ["invoice-preview", viewInvoiceId] });
+            const isSettled = queries.length > 0 && queries.some(q => q.state.status === "success" || q.state.status === "error");
+            if (isSettled) {
+                setCanLoadPdf(true);
+            }
+        }
+    }, [isPreviewFetching, viewInvoiceId, queryClient]);
 
     // Data Hooks
-    const { data: pdfBlob, isLoading: isPdfLoading } = useInvoicePdf(viewInvoiceId);
+    const { data: pdfBlob, isLoading: isPdfLoading } = useInvoicePdf(viewInvoiceId, canLoadPdf);
     
     // PDF Rendering Hook
     const {
@@ -80,11 +101,11 @@ const InvoicePdfViewer = () => {
                 id="pdf-container"
                 className="flex-1 overflow-auto flex justify-center items-start relative scrollbar-thin scrollbar-thumb-gray-400"
             >
-                {(isPdfLoading || isRendering) && (
+                {(!canLoadPdf || isPdfLoading || isRendering) && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FDFDFD]/80 z-50 backdrop-blur-sm">
                         <Spin size="large" />
                         <span className="mt-4 text-[12px] font-bold text-[#101828] tracking-widest uppercase animate-pulse">
-                            {isRendering ? "RENDERING PAGE..." : "FETCHING DOCUMENT..."}
+                            {!canLoadPdf ? "WAITING FOR DATA..." : isRendering ? "RENDERING PAGE..." : "FETCHING DOCUMENT..."}
                         </span>
                     </div>
                 )}
@@ -101,7 +122,7 @@ const InvoicePdfViewer = () => {
                         />
                     </div>
                 ) : (
-                    <PdfPlaceholder isPdfLoading={isPdfLoading} />
+                    <PdfPlaceholder isPdfLoading={isPdfLoading || !canLoadPdf} />
                 )}
             </div>
         </div>
