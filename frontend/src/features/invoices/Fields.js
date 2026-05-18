@@ -28,7 +28,7 @@ export const QUICK_VIEW_CONFIG = [
                     { label: "Eligible", value: "Eligible" },
                     { label: "Ineligible", value: "Ineligible" }
                 ],
-                visible: (f, ent) => ent?.gst_applicable !== false
+                visible: (f, ent) => ent?.gst_applicable === true
             },
             {
                 key: "tdsApplicability", label: "TDS Applicability", type: "dropdown", editable: true,
@@ -36,12 +36,12 @@ export const QUICK_VIEW_CONFIG = [
                     { label: "Yes", value: "Yes" },
                     { label: "No", value: "No" }
                 ],
-                visible: (f, ent) => ent?.gst_applicable !== false
+                visible: (f, ent) => ent?.gst_applicable === true
             },
-            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable !== false && f.tdsApplicability === "Yes" },
+            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable === true && f.tdsApplicability === "Yes" },
             {
                 key: "tdsSection", label: "TDS Section", type: "dropdown", editable: true,
-                visible: (f, ent) => ent?.gst_applicable !== false && f.tdsApplicability === "Yes"
+                visible: (f, ent) => ent?.gst_applicable === true && f.tdsApplicability === "Yes"
                 // options will be injected dynamically
             },
             {
@@ -95,7 +95,7 @@ export const QUICK_VIEW_CONFIG = [
         section: "Taxes",
         type: "form",
         showInAllFields: true,
-        visible: (f, ent) => ent?.gst_applicable !== false,
+        visible: (f, ent) => ent?.gst_applicable === true,
         fields: [
             { key: "totalTaxAmount", label: "Total Tax Amount", type: "input", editable: true },
             { key: "cgst", label: "CGST", type: "input", editable: true },

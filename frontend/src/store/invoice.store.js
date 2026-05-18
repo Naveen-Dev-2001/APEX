@@ -149,7 +149,7 @@ export const useInvoiceStore = create((set, get) => ({
         const isGstApplicable = entityMaster?.gst_applicable === true;
 
         if (isModified) {
-            // Preserve saved system rows exactly as-is
+            // Preserve saved system rows exactly as-is if GST is applicable
             const gstRow = existingGstRow ?? (isGstApplicable ? {
                 id: "gst-row",
                 type: "GST",
@@ -163,7 +163,10 @@ export const useInvoiceStore = create((set, get) => ({
                 isNetAmountOverridden: false,
             } : null);
 
-            const systemRows = [...(gstRow ? [gstRow] : []), ...(existingTdsRow ? [existingTdsRow] : [])];
+            const systemRows = [
+                ...(isGstApplicable && gstRow ? [gstRow] : []),
+                ...(isGstApplicable && existingTdsRow ? [existingTdsRow] : [])
+            ];
             return [...regularItems, ...systemRows];
         }
 
@@ -174,7 +177,7 @@ export const useInvoiceStore = create((set, get) => ({
             formData?.totalInvoiceAmount || formData?.total_invoice_amount || 0
         );
         const tdsValue = roundTo2(-Math.abs(tdsRate * totalInvoiceAmount));
-        const isTdsApplicable = formData?.tdsApplicability === "Yes";
+        const isTdsApplicable = isGstApplicable && formData?.tdsApplicability === "Yes";
 
         const gstRow = isGstApplicable ? {
             id: "gst-row",
@@ -398,7 +401,7 @@ export const useInvoiceStore = create((set, get) => ({
                 };
             })
             .filter(item => {
-                if (item.type === "GST" && !isGstApplicable) return false;
+                if ((item.type === "GST" || item.type === "TDS") && !isGstApplicable) return false;
                 return true;
             });
 
