@@ -357,6 +357,17 @@ const CodingPage = () => {
         setCurrentPage(1);
     };
 
+    const handleFetchAllForExport = async () => {
+        const response = await getInvoices({
+            skip: 0,
+            limit: -1,
+            sort_by: ACCESSOR_TO_DB_FIELD[sortColumn] || sortColumn,
+            sort_dir: sortDirection,
+            filters: backendFilters
+        });
+        return response.data || [];
+    };
+
     return (
         <div className="p-6 pb-12 bg-[#f8fafc] pt-[5px]">
             <div className="flex justify-between items-center mb-4">
@@ -377,6 +388,7 @@ const CodingPage = () => {
                     <div className="w-[120px]">
                         <ExportButton
                             data={invoices}
+                            fetchData={handleFetchAllForExport}
                             columns={columns}
                             fileName="CodingQueue.xlsx"
                         />

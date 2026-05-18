@@ -35,6 +35,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 app.include_router(sso_router, tags=["sso-authentication"])
+app.include_router(invoices.public_router, prefix="/invoices", tags=["invoices"])
 app.include_router(invoices.router, prefix="/invoices",
                    tags=["invoices"], dependencies=[Depends(get_current_user)])
 app.include_router(coding.router, prefix="/coding",

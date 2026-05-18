@@ -22,13 +22,18 @@ EXCLUDED_STATUSES = [
 
 def to_float(value):
     """Safely convert value to float"""
-    if not value:
+    if value is None:
         return 0.0
-    value = re.sub(r"[^\d.-]", "", value)
-    if value.startswith("(") and value.endswith(")"):
-        value = "-" + value[1:-1]
-    try:
+    if isinstance(value, (int, float)):
         return float(value)
+    value_str = str(value).strip()
+    if not value_str:
+        return 0.0
+    try:
+        value_str = re.sub(r"[^\d.-]", "", value_str)
+        if value_str.startswith("(") and value_str.endswith(")"):
+            value_str = "-" + value_str[1:-1]
+        return float(value_str)
     except:
         return 0.0
 

@@ -16,6 +16,13 @@ export const usePdfRenderer = (pdfBlob) => {
     const rafMeasureRef = useRef(null);
     const initializedRef = useRef(false);
     const firstAutoFitDoneRef = useRef(false);
+    const prevPdfBlobRef = useRef(null);
+
+    // Reset initialization tracking when the PDF blob changes
+    if (pdfBlob !== prevPdfBlobRef.current) {
+        prevPdfBlobRef.current = pdfBlob;
+        initializedRef.current = false;
+    }
 
     // State
     const [pdfObj, setPdfObj] = useState(null);

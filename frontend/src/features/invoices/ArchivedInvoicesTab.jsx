@@ -19,7 +19,7 @@ const ACCESSOR_TO_DB_FIELD = {
     deleted_by: "deleted_by",
 };
 
-const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch, userRole, view = "condensed" }) => {
+const ArchivedInvoicesTab = ({ onView, onDataChange, onParamsChange, externalSearch, userRole, view = "condensed" }) => {
     const [records, setRecords]       = useState([]);
     const [total, setTotal]           = useState(0);
     const [isLoading, setIsLoading]   = useState(false);
@@ -97,6 +97,18 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, externalSearch, userRole, v
     useEffect(() => {
         setSkip(0);
     }, [columnFilters]);
+
+    // Expose current parameters to parent for full-record export
+    useEffect(() => {
+        if (onParamsChange) {
+            onParamsChange({
+                invoice_number: search || undefined,
+                sort_by: sortColumn,
+                sort_dir: sortDirection,
+                filters: backendFilters
+            });
+        }
+    }, [search, sortColumn, sortDirection, backendFilters, onParamsChange]);
 
     const handlePageChange = (page) => {
         setSkip((page - 1) * limit);
