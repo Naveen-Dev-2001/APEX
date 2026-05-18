@@ -40,6 +40,16 @@ const DelegationsTab = () => {
         }))
     ];
 
+    const fromApproverOptions = approverOptions.filter(opt => {
+        if (!opt.value) return true;
+        return opt.value.toLowerCase() !== form.substitute_approver?.toLowerCase();
+    });
+
+    const substituteApproverOptions = approverOptions.filter(opt => {
+        if (!opt.value) return true;
+        return opt.value.toLowerCase() !== form.original_approver?.toLowerCase();
+    });
+
     const handleAdd = async () => {
         if (!form.original_approver || !form.substitute_approver || !form.start_date || !form.end_date) {
             toast.warning('Please fill all required fields');
@@ -173,7 +183,7 @@ const DelegationsTab = () => {
                     <Dropdown
                         label="* From Approver"
                         value={form.original_approver}
-                        options={approverOptions}
+                        options={fromApproverOptions}
                         onChange={(val) => setForm({ ...form, original_approver: val })}
                     />
                 </div>
@@ -181,7 +191,7 @@ const DelegationsTab = () => {
                     <Dropdown
                         label="* To Substitute"
                         value={form.substitute_approver}
-                        options={approverOptions}
+                        options={substituteApproverOptions}
                         onChange={(val) => setForm({ ...form, substitute_approver: val })}
                     />
                 </div>

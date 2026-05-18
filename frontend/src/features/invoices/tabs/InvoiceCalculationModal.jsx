@@ -146,7 +146,7 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                                 <>
                                     <span></span>
                                     <span>
-                                        Mismatch detected: The extracted amount does not match any heuristic calculation.
+                                        Mismatch detected: The extracted amount does not match the Line Items + Tax calculation.
                                     </span>
                                 </>
                             ) : (

@@ -178,7 +178,10 @@ const loadLineItemTable = (props) => {
             const nonSystemSnapshot = snapshot.filter(item => !item.isSystemRow);
             const isSnapshotGrouped = nonSystemSnapshot.length === 1 && originals.length > 1;
 
-            if (isSnapshotGrouped) {
+            const hasUserModifiedSnapshot =
+                snapshot.length !== originals.length;
+
+            if (isSnapshotGrouped && !hasUserModifiedSnapshot) {
                 baseItems = normalizeItems(originals).map(row => ({
                     ...row,
                     netAmount: calculateNetAmount(row)

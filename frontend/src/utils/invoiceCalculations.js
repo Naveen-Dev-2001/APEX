@@ -100,7 +100,9 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
         { value: invoiceTotal_calc3, name: "Heuristic 3: Total Reconciliation" }
     ];
 
-    const match = calculations.find(c => Math.abs(extractionValue - c.value) < 1.0);
+    const match = Math.abs(extractionValue - invoiceTotal_calc1) < 1.0
+        ? { value: invoiceTotal_calc1, name: "Heuristic 1: Line Items + Tax" }
+        : undefined;
     const hasMismatch = match === undefined && extractionValue > 0;
 
     return {

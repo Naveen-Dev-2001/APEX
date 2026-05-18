@@ -211,17 +211,29 @@ const WorkflowTab = () => {
 
 
         // Format titles for approver stages
+        let isThreshold = s.step_type === "threshold_approved";
+        let isPosting = s.step_type === "posting_approved";
 
         if (s.approver_number) {
+            const stage = assignedApprovers[s.approver_number - 1];
+            const liveStage = liveWorkflowData?.assigned_approvers?.[s.approver_number - 1];
+            if (stage?.type === "threshold" || liveStage?.type === "threshold") isThreshold = true;
+            if (stage?.type === "posting" || liveStage?.type === "posting") isPosting = true;
+        }
 
+        if (isThreshold) {
+            title = "Threshold Approver Completed";
+            if (s.step_type === "reworked") title = "Threshold Approver Reworked";
+            if (s.step_type === "rejected") title = "Threshold Approver Rejected";
+        } else if (isPosting) {
+            title = "Posting Approver Completed";
+            if (s.step_type === "reworked") title = "Posting Approver Reworked";
+            if (s.step_type === "rejected") title = "Posting Approver Rejected";
+        } else if (s.approver_number) {
             const ord = getOrdinal(s.approver_number);
-
-            if (s.step_type === "level_approved") title = `${ord} Approver Completed`;
-
+            if (s.step_type === "level_approved" || s.step_type === "approved") title = `${ord} Approver Completed`;
             else if (s.step_type === "reworked") title = `${ord} Approver Reworked`;
-
             else if (s.step_type === "rejected") title = `${ord} Approver Rejected`;
-
         }
 
 

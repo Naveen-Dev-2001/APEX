@@ -168,12 +168,31 @@ def get_required_approver_count(
                 # Sort levels and format as list of dicts
                 assigned_approvers = [levels[s] for s in sorted(levels.keys())]
                 
+                # Restore threshold/posting types from breakdown
+                breakdown_data = {}
+                if hasattr(invoice_data, "approver_breakdown") and invoice_data.approver_breakdown:
+                    try:
+                        breakdown_data = json.loads(invoice_data.approver_breakdown) if isinstance(invoice_data.approver_breakdown, str) else invoice_data.approver_breakdown
+                    except:
+                        pass
+                
+                has_posting = breakdown_data.get("has_posting_approver", False)
+                has_threshold = breakdown_data.get("has_threshold_approver", False)
+                
+                if assigned_approvers:
+                    if has_posting:
+                        assigned_approvers[-1]["type"] = "posting"
+                    if has_threshold:
+                        idx = len(assigned_approvers) - (2 if has_posting else 1)
+                        if idx >= 0:
+                            assigned_approvers[idx]["type"] = "threshold"
+                
             if assigned_approvers:
                 return {
                     "required": invoice_data.required_approvers,
                     "assigned_approvers": assigned_approvers,
                     "workflow_type": getattr(invoice_data, "workflow_type", "persisted"),
-                    "breakdown": {} 
+                    "breakdown": breakdown_data 
                 }
 
     assigned_approvers = []
@@ -269,10 +288,12 @@ def get_required_approver_count(
                 })
             is_parallel = getattr(v_workflow, 'is_parallel', False)
             
+            has_threshold_approver = False
             if getattr(v_workflow, 'is_threshold_enabled', False):
                 threshold = float(v_workflow.amount_threshold) if v_workflow.amount_threshold is not None else 0.0
                 if amount is not None and amount >= threshold and v_workflow.threshold_approver:
                     assigned_approvers.append({"emails": parse_approvers(v_workflow.threshold_approver), "type": "threshold"})
+                    has_threshold_approver = True
 
             # Posting Approver
             has_posting_approver = False
@@ -351,10 +372,12 @@ def get_required_approver_count(
                         })
                     is_parallel = getattr(cod_workflow, 'is_parallel', False)
                     
+                    has_threshold_approver = False
                     if getattr(cod_workflow, 'is_threshold_enabled', False):
                         threshold = float(cod_workflow.amount_threshold) if cod_workflow.amount_threshold is not None else 0.0
                         if amount is not None and amount >= threshold and cod_workflow.threshold_approver:
                             assigned_approvers.append({"emails": parse_approvers(cod_workflow.threshold_approver), "type": "threshold"})
+                            has_threshold_approver = True
 
                     # Posting Approver
                     has_posting_approver = False
@@ -445,7 +468,8 @@ def get_required_approver_count(
             "type": workflow_type, 
             "vendor_eligible": vendor_eligible, 
             "is_parallel": is_parallel,
-            "has_posting_approver": has_posting_approver if 'has_posting_approver' in locals() else False
+            "has_posting_approver": has_posting_approver if 'has_posting_approver' in locals() else False,
+            "has_threshold_approver": has_threshold_approver if 'has_threshold_approver' in locals() else False
         }
     }
 
@@ -485,7 +509,7 @@ async def get_workflow_history(
     # config params, because that bypasses the snapshot guard and returns current workflow
     # config values instead of the locked-in approvers.
     invoice_status_str = invoice.status.value if hasattr(invoice.status, "value") else str(invoice.status)
-    snapshot_statuses = {"waiting_approval", "reworked"}
+    snapshot_statuses = {"waiting_approval", "reworked", "sage_post_failed", "approved", "sage_posted", "rejected"}
     snapshot_approvers_list = getattr(invoice, "assigned_approvers_list", None) or []
 
     if invoice_status_str in snapshot_statuses and snapshot_approvers_list:
@@ -502,11 +526,29 @@ async def get_workflow_history(
                 }
             levels[seq]["emails"].append(a.approver_email)
         locked_approvers = [levels[s] for s in sorted(levels.keys())]
+        
+        # Restore threshold/posting types from breakdown
+        breakdown_data = {}
+        if invoice.approver_breakdown:
+            try: breakdown_data = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+            except: pass
+        
+        has_posting = breakdown_data.get("has_posting_approver", False)
+        has_threshold = breakdown_data.get("has_threshold_approver", False)
+        
+        if locked_approvers:
+            if has_posting:
+                locked_approvers[-1]["type"] = "posting"
+            if has_threshold:
+                idx = len(locked_approvers) - (2 if has_posting else 1)
+                if idx >= 0:
+                    locked_approvers[idx]["type"] = "threshold"
+
         requirement_data = {
             "required": invoice.required_approvers or len(locked_approvers),
             "assigned_approvers": locked_approvers,
             "workflow_type": "persisted",
-            "breakdown": {},
+            "breakdown": breakdown_data,
         }
     else:
         # Invoice is not yet submitted (or is in a terminal state) —
