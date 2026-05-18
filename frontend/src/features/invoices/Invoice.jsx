@@ -268,7 +268,7 @@ const Invoice = () => {
         let eventSource = null;
         try {
             setUploadLoading(true);
-            setUploadProgress(0);
+            setUploadProgress(25);
             const taskId = uuidv4();
             currentTaskIdRef.current = taskId;
             
@@ -280,21 +280,31 @@ const Invoice = () => {
             files.forEach((f) => formData.append("files", f));
             const progressUrl = `${API.defaults.baseURL}/invoices/upload-progress/${taskId}`;
             eventSource = new EventSource(progressUrl);
-            let completedFiles = 0;
             eventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.progress !== undefined) {
-                        if (data.progress >= 100) completedFiles += 1;
-                        const processingRatio = (completedFiles + data.progress / 100) / totalFiles;
-                        const mapped = 50 + Math.round(processingRatio * 49);
-                        setUploadProgress(Math.min(mapped, 99));
+                    if (data.message && data.progress !== undefined) {
+                        const match = data.message.match(/^\[(\d+)\/(\d+)\]/);
+                        if (match) {
+                            const currentIdx = parseInt(match[1], 10);
+                            const total = parseInt(match[2], 10);
+                            const completed = currentIdx - 1;
+                            const processingRatio = (completed + data.progress / 100) / total;
+                            const mapped = 50 + Math.round(processingRatio * 49);
+                            setUploadProgress(Math.min(mapped, 99));
+                        } else {
+                            const percent = 50 + Math.round((data.progress / 100) * 49);
+                            setUploadProgress(Math.min(percent, 99));
+                        }
+                    } else if (data.progress !== undefined) {
+                        const percent = 50 + Math.round((data.progress / 100) * 49);
+                        setUploadProgress(Math.min(percent, 99));
                     }
                 } catch (e) { console.warn("SSE parse error", e); }
             };
             const response = await uploadInvoices(formData, taskId, (progressEvent) => {
                 if (progressEvent.total) {
-                    const percent = Math.round((progressEvent.loaded / progressEvent.total) * 50);
+                    const percent = 25 + Math.round((progressEvent.loaded / progressEvent.total) * 25);
                     setUploadProgress(percent);
                 }
             }, controller.signal);

@@ -199,13 +199,14 @@ def _apply_status_label_filters(status_vals, expressions, db):
         expressions.append(or_(*conditions))
 
 router = APIRouter()
+public_router = APIRouter()
 invoice_processor = InvoiceProcessor()
 
 # Global dictionary to hold asyncio queues for each upload task (progress tracking)
 upload_progress_queues: Dict[str, asyncio.Queue] = {}
 cancelled_tasks = set()
 
-@router.get("/upload-progress/{task_id}")
+@public_router.get("/upload-progress/{task_id}")
 async def get_upload_progress(task_id: str):
     async def event_stream():
         if task_id not in upload_progress_queues:
