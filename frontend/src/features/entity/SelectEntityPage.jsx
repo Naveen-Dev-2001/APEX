@@ -20,7 +20,7 @@ const SelectEntityPage = () => {
 
 
   const { masters, fetchEntityMasterData, entityLoading } = useMasterDataStore();
-  
+
   // Get entities from store and format them
   const entityData = masters['Entity Master']?.data || [];
   const entities = entityData.map((entity, index) => {
@@ -54,6 +54,31 @@ const SelectEntityPage = () => {
   );
   const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false);
 
+  // Dynamic dropdown max-height calculations based on remaining screen space
+  const roleButtonRef = useRef(null);
+  const entityButtonRef = useRef(null);
+  const [maxRoleDropdownHeight, setMaxRoleDropdownHeight] = useState('240px');
+  const [maxEntityDropdownHeight, setMaxEntityDropdownHeight] = useState('240px');
+
+  useEffect(() => {
+    const calculateHeights = () => {
+      if (isRoleSelectOpen && roleButtonRef.current) {
+        const rect = roleButtonRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom - 24; // 24px safe margin from bottom
+        setMaxRoleDropdownHeight(`${Math.max(120, spaceBelow)}px`);
+      }
+      if (isSelectOpen && entityButtonRef.current) {
+        const rect = entityButtonRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom - 24; // 24px safe margin from bottom
+        setMaxEntityDropdownHeight(`${Math.max(120, spaceBelow)}px`);
+      }
+    };
+
+    calculateHeights();
+    window.addEventListener('resize', calculateHeights);
+    return () => window.removeEventListener('resize', calculateHeights);
+  }, [isRoleSelectOpen, isSelectOpen]);
+
 
 
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
@@ -66,7 +91,7 @@ const SelectEntityPage = () => {
   const handleSelectEntity = (entity) => {
     setSelectedEntity(entity.displayName);
     setIsSelectOpen(false);
-    
+
     // Store active role context without mutating the primary user object
     setActiveRole(activeRole);
 
@@ -74,16 +99,16 @@ const SelectEntityPage = () => {
     setEntity(entity.entityId || entity.name);
     sessionStorage.setItem('selected_entity', entity.entityId || entity.name); // entity_id for DB FK
     sessionStorage.setItem('selected_entity_name', entity.displayName);         // Display name for UI
-    
+
     let targetRoute = "/dashboard";
     const roleForRouting = activeRole.toLowerCase();
-    
+
     if (roleForRouting === 'scanner') {
-        targetRoute = "/invoices";
+      targetRoute = "/invoices";
     } else if (roleForRouting === 'coder') {
-        targetRoute = "/coding";
+      targetRoute = "/coding";
     } else if (roleForRouting === 'approver') {
-        targetRoute = "/approvals";
+      targetRoute = "/approvals";
     }
 
     navigate(targetRoute);
@@ -166,6 +191,7 @@ const SelectEntityPage = () => {
             <div className="relative w-full text-left mt-6">
               <label className="text-[12px] text-gray-500 mb-1 block font-medium">Login As</label>
               <button
+                ref={roleButtonRef}
                 type="button"
                 className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#f8f9fa] border border-gray-200 hover:bg-gray-50 active:bg-gray-100 text-gray-700 font-medium transition-all focus:outline-none"
                 onClick={() => setIsRoleSelectOpen(!isRoleSelectOpen)}
@@ -182,7 +208,10 @@ const SelectEntityPage = () => {
               </button>
 
               {isRoleSelectOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-[60] max-h-60 overflow-y-auto">
+                <div 
+                  className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-[60] overflow-y-auto"
+                  style={{ maxHeight: maxRoleDropdownHeight }}
+                >
                   <ul className="py-1">
                     {userRoles.map((role) => (
                       <li key={role}>
@@ -206,6 +235,7 @@ const SelectEntityPage = () => {
           <div className="relative w-full text-left mt-6">
             <label className="text-[12px] text-gray-500 mb-1 block font-medium">Select Entity</label>
             <button
+              ref={entityButtonRef}
               type="button"
               className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#1e9bd8] hover:opacity-85 active:opacity-75 text-white font-medium transition-all focus:outline-none"
               onClick={() => setIsSelectOpen(!isSelectOpen)}
@@ -222,7 +252,10 @@ const SelectEntityPage = () => {
             </button>
 
             {isSelectOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+              <div 
+                className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 overflow-y-auto"
+                style={{ maxHeight: maxEntityDropdownHeight }}
+              >
                 <ul className="py-1">
                   {entities.map((entity) => (
                     <li key={entity.id}>
