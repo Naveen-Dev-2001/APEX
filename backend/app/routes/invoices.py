@@ -3805,7 +3805,25 @@ async def get_deleted_invoice(
             seq = a.get("sequence_order", 0)
             if seq not in grouped: grouped[seq] = []
             grouped[seq].append(a.get("approver_email"))
-        res["assigned_approvers"] = [grouped[seq] for seq in sorted(grouped.keys())]
+        
+        breakdown_data = _safe_json(record.approver_breakdown) or {}
+        has_posting = breakdown_data.get("has_posting_approver", False)
+        has_threshold = breakdown_data.get("has_threshold_approver", False)
+        
+        assigned_list = []
+        sorted_keys = sorted(grouped.keys())
+        for seq in sorted_keys:
+            assigned_list.append({"emails": grouped[seq], "type": "mandatory"})
+            
+        if assigned_list:
+            if has_posting:
+                assigned_list[-1]["type"] = "posting"
+            if has_threshold:
+                idx = len(assigned_list) - (2 if has_posting else 1)
+                if idx >= 0:
+                    assigned_list[idx]["type"] = "threshold"
+                    
+        res["assigned_approvers"] = assigned_list
     else:
         res["assigned_approvers"] = []
 
