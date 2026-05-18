@@ -1,3 +1,5 @@
+import { useInvoiceStore } from "../store/invoice.store";
+
 const extractValue = (v) => v?.value !== undefined ? v.value : v;
 
 const parseCurrencyValue = (val) => {
@@ -61,7 +63,9 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
 
     // TDS Logic
     let tdsRate = parseFloat(quickViewFormData?.tdsRate || 0);
-    const isGstApplicable = totalTax > 0;
+    const entityMaster = useInvoiceStore.getState().entityMaster;
+    const isEntityGstApplicable = entityMaster?.gst_applicable !== false;
+    const isGstApplicable = isEntityGstApplicable && totalTax > 0;
 
     if (selectedVendorDetails) {
         const tdsApplicabilityVal = findVal(selectedVendorDetails, [
@@ -81,7 +85,7 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
 
     // Note: The calculation modal uses tdsRate directly. If tdsRate is 2 (for 2%), 
     // it's treated as 2.0 unless corrected. Keeping consistency with modal logic for now.
-    const tdsDeduction = -Math.abs((tdsRate) * (lineItemsSubtotal + totalTax));
+    const tdsDeduction = isEntityGstApplicable ? -Math.abs((tdsRate) * (lineItemsSubtotal + totalTax)) : 0;
 
     const invoiceTotal_calc1 = parseFloat((lineItemsSubtotal + totalTax).toFixed(2));
     const invoiceTotal_calc2 = parseFloat((extractedSubtotal + totalTax).toFixed(2));

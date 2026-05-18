@@ -122,9 +122,11 @@ export const useSaveInvoice = () => {
         });
 
         // ── Derived TDS deduction amount ──────────────────────────────────────
+        const entityMaster = useInvoiceStore.getState().entityMaster;
+        const isEntityGstApplicable = entityMaster?.gst_applicable !== false;
         const tdsRate = parseFloat(f.tdsRate || 0);
         const totalInvoiceAmount = parseFloat(f.totalInvoiceAmount || f.total_invoice_amount || 0);
-        const tdsDeductionValue = -Math.abs(tdsRate * totalInvoiceAmount);
+        const tdsDeductionValue = isEntityGstApplicable ? -Math.abs(tdsRate * totalInvoiceAmount) : 0;
 
         // ── Reverse-map flat quickViewFormData → extracted_data shape ─────────
         const updatedExtractedData = {
