@@ -375,7 +375,10 @@ const CodingTab = ({ isActive = false }) => {
     const allSelected = selectableRows.length > 0 && selectedIds.size === selectableRows.length;
     const someSelected = selectedIds.size > 0 && !allSelected;
 
+    const userInteractedRef = useRef(false);
+
     const toggleSelectAll = useCallback(() => {
+        userInteractedRef.current = true;
         if (allSelected) {
             setSelectedIds(new Set());
         } else {
@@ -385,6 +388,7 @@ const CodingTab = ({ isActive = false }) => {
     }, [allSelected, selectableRows]);
 
     const toggleSelectRow = useCallback((id) => {
+        userInteractedRef.current = true;
         setSelectedIds((prev) => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
@@ -393,13 +397,24 @@ const CodingTab = ({ isActive = false }) => {
         });
     }, []);
 
+    const autoSelectRef = useRef(null);
+
     useEffect(() => {
-        const rowIds = new Set(rows.map((r) => r.id));
-        setSelectedIds((prev) => {
-            const next = new Set([...prev].filter((id) => rowIds.has(id)));
-            return next.size === prev.size ? prev : next;
-        });
-    }, [rows]);
+        if (viewInvoiceId !== autoSelectRef.current) {
+            autoSelectRef.current = viewInvoiceId;
+            userInteractedRef.current = false;
+        }
+
+        if (!userInteractedRef.current && rows.length > 0) {
+            setSelectedIds(new Set(rows.map(r => r.id)));
+        } else {
+            const rowIds = new Set(rows.map((r) => r.id));
+            setSelectedIds((prev) => {
+                const next = new Set([...prev].filter((id) => rowIds.has(id)));
+                return next.size === prev.size ? prev : next;
+            });
+        }
+    }, [rows, viewInvoiceId]);
 
     const initialGlValues = useMemo(
         () => Array.from(new Set((rows || []).map((r) => r.glCode).filter(Boolean))),
