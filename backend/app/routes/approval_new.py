@@ -2103,25 +2103,26 @@ async def repost_to_sage(
     # Attempt repost
     sage_result = await _post_to_sage(invoice_id, entity, db)
 
-    error_msg = sage_result.get("message", "")
-    is_duplicate = "already exists" in error_msg.lower()
+    if sage_result["success"]:
+        # The bill number sent to Sage is always invoice.invoice_number.
+        # It must NEVER change on repost — use invoice_number as the
+        # single source of truth regardless of what Sage echoes back.
+        resolved_bill_number = invoice.invoice_number
 
-    if sage_result["success"] or is_duplicate:
-        if is_duplicate:
-            logger.info(f"Posted to sage successfully")
-            if not invoice.sage_bill_number:
-                invoice.sage_bill_number = invoice.invoice_number
+        logger.info(
+            f"[SageRepost] Successfully reposted invoice {invoice_id} to Sage. "
+            f"Bill number: {resolved_bill_number}"
+        )
 
+        invoice.sage_bill_number = resolved_bill_number
         _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
-        if sage_result.get("sage_bill_number"):
-            invoice.sage_bill_number = sage_result.get("sage_bill_number")
         _record_step(
             db,
             invoice_id,
             step_name="Reposted to Sage — Success",
             step_type=StepType.POSTED,
             user_email=email,
-            comment=f"Sage Bill Number: {sage_result.get('sage_bill_number')}",
+            comment=f"Sage Bill Number: {resolved_bill_number}",
             entity=entity,
         )
         await audit_service.log_action(
@@ -2130,16 +2131,18 @@ async def repost_to_sage(
             action="Sage Reposted",
             user=current_user.username,
             entity=entity,
-            details={"sage_bill_number": invoice.sage_bill_number},
-            sage_bill_number=invoice.sage_bill_number
+            details={"sage_bill_number": resolved_bill_number},
+            sage_bill_number=resolved_bill_number
         )
         db.commit()
-        msg = "Invoice successfully reposted to Sage." if not is_duplicate else "Invoice successfully reposted to Sage."
+        # Always return the resolved bill number to the frontend — never None
+        final_sage_result = dict(sage_result)
+        final_sage_result["sage_bill_number"] = resolved_bill_number
         return ActionResponse(
             success=True,
-            message=msg,
+            message="Invoice successfully reposted to Sage.",
             new_status=InvoiceStatus.SAGE_POSTED,
-            sage_post_result=sage_result,
+            sage_post_result=final_sage_result,
         )
     else:
         _record_step(
@@ -2205,7 +2208,7 @@ async def recall_invoice(
             detail="Recall is only available before Level 1 approval has been completed."
         )
 
-    # Action: Reset to waiting_coding
+    # Action: Reset to waiting_coding  
     _update_invoice_status(db, invoice, InvoiceStatus.WAITING_CODING)
 
     # Record the action

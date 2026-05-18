@@ -79,9 +79,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     const hasAssignedApprovers = workflowData?.assigned_approvers?.length > 0;
     const isWorkflowMissing = isWaitingCoding && !hasAssignedApprovers;
 
-    // ── Editing toggle — purely local, no API call needed ─────────────────
-    // Clicking "Enable Editing" just flips this and updates activeInvoiceData
-    // so QuickViewTab's isViewOnly useMemo immediately returns false.
+    // ── Editing toggle — flips local state + notifies the server ───────────
+    // Approvers can enable editing, save, and repeat as many times as needed.
     const [editingEnabled, setEditingEnabled] = useState(false);
 
     const handleEnableEditing = async () => {
@@ -89,17 +88,23 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             await workflowActionsAPI.enableEditing(viewInvoiceId, {
                 last_updated_at: activeInvoiceData?.updated_at
             });
-            setEditingEnabled(true);
-            setActiveInvoiceData({
-                ...activeInvoiceData,
-                is_editing_enabled: true,
-                editing_enabled_by: user?.email,
-            });
-            toast.success("Editing enabled. Make your changes and save.");
         } catch (err) {
-            console.error("Enable editing error:", err);
-            toast.error("Failed to enable editing on server. Please try again.");
+            // 409 means the backend already recorded a prior enable-editing call.
+            // We still unlock locally so the approver can continue editing.
+            const status = err?.response?.status;
+            if (status !== 409) {
+                console.error("Enable editing error:", err);
+                toast.error("Failed to enable editing on server. Please try again.");
+                return;
+            }
         }
+        setEditingEnabled(true);
+        setActiveInvoiceData({
+            ...activeInvoiceData,
+            is_editing_enabled: true,
+            editing_enabled_by: user?.email,
+        });
+        toast.success("Editing enabled. Make your changes and save.");
     };
 
     // ── Approver UI state ──────────────────────────────────────────────────
@@ -292,6 +297,24 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                 toast.success("Invoice Saved Successfully!");
                 await queryClient.invalidateQueries(["invoices"]);
                 await queryClient.invalidateQueries(["invoice-preview", viewInvoiceId]);
+
+                // ── Lock fields back to read-only after save ────────────────────
+                // Resetting editingEnabled hides the Save button and re-shows
+                // "Enable Editing" so the approver can make further edits.
+                // IMPORTANT: read from getState() — NOT the stale closure value
+                // of activeInvoiceData. handleSave already wrote a fresh
+                // updated_at into the store; spreading the closure value would
+                // overwrite it with an old timestamp and cause a conflict error
+                // on the next save attempt.
+                if (editingEnabled) {
+                    setEditingEnabled(false);
+                    const latestData = useInvoiceStore.getState().activeInvoiceData;
+                    setActiveInvoiceData({
+                        ...latestData,
+                        is_editing_enabled: false,
+                        editing_enabled_by: null,
+                    });
+                }
 
                 if (currentStatus === "reworked") {
                     await fetchUIStatus();
@@ -614,7 +637,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                                 {busy("refreshing") ? "Refreshing..." : "Refresh"}
                                             </button>
 
-                                            {/* Enable Editing — no API, flips local state only */}
+                                            {/* Enable Editing — always available when not in active edit session */}
                                             {!editingEnabled && (
                                                 <button
                                                     onClick={handleEnableEditing}
