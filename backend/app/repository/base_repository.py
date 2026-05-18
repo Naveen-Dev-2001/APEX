@@ -107,13 +107,16 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             query = query.order_by(self.model.id)
 
         # Offset & Limit
-        data = query.offset(skip).limit(limit).all()
+        if limit == -1:
+            data = query.all()
+        else:
+            data = query.offset(skip).limit(limit).all()
 
         return {
             "data": data,
             "total": total,
             "page": (skip // limit) + 1 if limit > 0 else 1,
-            "page_size": limit
+            "page_size": total if limit == -1 else limit
         }
 
     def create(self, db: Session, *, obj_in: Union[CreateSchemaType, Dict[str, Any]]) -> ModelType:

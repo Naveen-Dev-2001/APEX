@@ -3545,7 +3545,7 @@ async def list_deleted_invoices(
     vendor_id: Optional[str] = Query(None, description="Filter by vendor ID"),
     invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(50),
     sort_by: str = Query("deleted_at", description="Field to sort by"),
     sort_dir: str = Query("desc", description="Sort direction (asc/desc)"),
     filters: Optional[str] = Query(None, description="JSON string of filters"),
@@ -3632,7 +3632,10 @@ async def list_deleted_invoices(
             query = query.filter(DeletedInvoice.id == -1)
 
     total = query.count()
-    records = query.offset(skip).limit(limit).all()
+    if limit == -1:
+        records = query.all()
+    else:
+        records = query.offset(skip).limit(limit).all()
 
     def _serialize(r: DeletedInvoice):
         # Parse JSON fields safely

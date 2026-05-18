@@ -36,12 +36,69 @@ const ApprovalsPage = () => {
     const [sortDirection, setSortDirection] = useState('desc');
     const [activeTab, setActiveTab] = useState('1'); // 1: Unapproved Invoices, 2: Change Approver
 
+    const transformInvoices = (invoiceData, safeDelegations, approverData) => {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        const active = safeDelegations.filter(d => {
+            const start = new Date(d.start_date);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(d.end_date);
+            end.setHours(0, 0, 0, 0);
+
+            return d.substitute_approver?.toLowerCase() === user?.email?.toLowerCase() &&
+                now.getTime() >= start.getTime() && now.getTime() <= end.getTime();
+        }).map(d => d.original_approver?.toLowerCase());
+
+        // Helper to get emails from a stage (handles string OR object formats OR plain array)
+        const getStageEmails = (stage) => {
+            if (!stage) return [];
+            if (stage?.emails != null) {
+                if (Array.isArray(stage.emails)) return stage.emails.map(e => String(e).toLowerCase());
+                if (typeof stage.emails === 'string') return [stage.emails.toLowerCase()];
+            }
+            if (Array.isArray(stage)) return stage.map(e => String(e).toLowerCase());
+            if (typeof stage === 'string') return [stage.toLowerCase()];
+            return [];
+        };
+
+        const getUsernameByEmail = (email, approversList) => {
+            const found = (approversList || []).find(a => a.value?.toLowerCase() === email?.toLowerCase());
+            if (found) {
+                return found.label.split(' (')[0];
+            }
+            return email;
+        };
+
+        return invoiceData.map(inv => {
+            const currentLevel = inv.current_approver_level || 1;
+            const stage = inv.assigned_approvers?.[currentLevel - 1];
+            const isFinanceLevel = stage?.is_finance === true;
+            const stageEmails = getStageEmails(stage);
+
+            const approverLabel = isFinanceLevel
+                ? 'Finance Team'
+                : stageEmails.length > 0
+                    ? stageEmails.map(email => getUsernameByEmail(email, approverData)).join(", ")
+                    : 'Pending';
+
+            const isDelegated = !isFinanceLevel && stageEmails.some(e => active.includes(e));
+
+            return {
+                ...inv,
+                vendor_name: inv.vendor_name || inv.extracted_data?.vendor_info?.name?.value || "N/A",
+                invoice_number: inv.invoice_number || inv.extracted_data?.invoice_details?.invoice_number?.value || "N/A",
+                total_amount: inv.extracted_data?.amounts?.total_invoice_amount?.value || "0.00",
+                approver_name: approverLabel + (isDelegated ? ' (Delegated)' : '')
+            };
+        });
+    };
+
     const fetchData = async () => {
         setLoading(true);
         try {
             const skip = (currentPage - 1) * itemsPerPage;
 
-            // Fetch invoices, delegations, and approvers in parallel
             const [invoiceRes, delegationData, approverData] = await Promise.all([
                 getUnapprovedInvoices({
                     skip,
@@ -56,75 +113,24 @@ const ApprovalsPage = () => {
             const invoiceData = invoiceRes?.data || [];
             setTotalItems(invoiceRes?.total || 0);
 
+            const safeDelegations = Array.isArray(delegationData?.data) ? delegationData.data : (Array.isArray(delegationData) ? delegationData : []);
+            
             const now = new Date();
             now.setHours(0, 0, 0, 0);
-
-            // Filter active delegations where the current user is the substitute
-            const safeDelegations = Array.isArray(delegationData?.data) ? delegationData.data : (Array.isArray(delegationData) ? delegationData : []);
-
             const active = safeDelegations.filter(d => {
                 const start = new Date(d.start_date);
                 start.setHours(0, 0, 0, 0);
                 const end = new Date(d.end_date);
                 end.setHours(0, 0, 0, 0);
 
-                return d.substitute_approver.toLowerCase() === user?.email?.toLowerCase() &&
+                return d.substitute_approver?.toLowerCase() === user?.email?.toLowerCase() &&
                     now.getTime() >= start.getTime() && now.getTime() <= end.getTime();
-            }).map(d => d.original_approver.toLowerCase());
+            }).map(d => d.original_approver?.toLowerCase());
 
             setActiveDelegations(active);
             setApprovers(approverData);
 
-            // Helper to get emails from a stage (handles string OR object formats OR plain array)
-            const getStageEmails = (stage) => {
-                if (!stage) return [];
-                // New format: { emails: [...], is_finance: bool }
-                if (stage?.emails != null) {
-                    if (Array.isArray(stage.emails)) return stage.emails.map(e => String(e).toLowerCase());
-                    if (typeof stage.emails === 'string') return [stage.emails.toLowerCase()];
-                }
-                // Plain array of email strings (legacy)
-                if (Array.isArray(stage)) return stage.map(e => String(e).toLowerCase());
-                // Single email string
-                if (typeof stage === 'string') return [stage.toLowerCase()];
-                return [];
-            };
-
-            const getUsernameByEmail = (email, approversList) => {
-                const found = (approversList || []).find(a => a.value?.toLowerCase() === email?.toLowerCase());
-                if (found) {
-                    // Label format is "Username (email)", extract Username
-                    return found.label.split(' (')[0];
-                }
-                return email;
-            };
-
-            // Transform invoices
-            const transformed = invoiceData.map(inv => {
-                const currentLevel = inv.current_approver_level || 1;
-                const stage = inv.assigned_approvers?.[currentLevel - 1];
-                const isFinanceLevel = stage?.is_finance === true;
-                const stageEmails = getStageEmails(stage);
-
-                // For finance-team levels show "Finance Team" instead of individual emails
-                const approverLabel = isFinanceLevel
-                    ? 'Finance Team'
-                    : stageEmails.length > 0
-                        ? stageEmails.map(email => getUsernameByEmail(email, approverData)).join(", ")
-                        : 'Pending';
-
-                // Active delegation check for the label
-                const isDelegated = !isFinanceLevel && stageEmails.some(e => active.includes(e));
-
-                return {
-                    ...inv,
-                    vendor_name: inv.vendor_name || inv.extracted_data?.vendor_info?.name?.value || "N/A",
-                    invoice_number: inv.invoice_number || inv.extracted_data?.invoice_details?.invoice_number?.value || "N/A",
-                    total_amount: inv.extracted_data?.amounts?.total_invoice_amount?.value || "0.00",
-                    approver_name: approverLabel + (isDelegated ? ' (Delegated)' : '')
-                };
-            });
-
+            const transformed = transformInvoices(invoiceData, safeDelegations, approverData);
             setInvoices(transformed);
         } catch (error) {
             console.error('Error fetching approval data:', error);
@@ -132,6 +138,23 @@ const ApprovalsPage = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleFetchAllForExport = async () => {
+        const [invoiceRes, delegationData, approverData] = await Promise.all([
+            getUnapprovedInvoices({
+                skip: 0,
+                limit: -1,
+                sort_by: sortColumn,
+                sort_dir: sortDirection
+            }),
+            getDelegations(),
+            getApprovers()
+        ]);
+
+        const invoiceData = invoiceRes?.data || [];
+        const safeDelegations = Array.isArray(delegationData?.data) ? delegationData.data : (Array.isArray(delegationData) ? delegationData : []);
+        return transformInvoices(invoiceData, safeDelegations, approverData);
     };
 
     const entity = useCommonStore((state) => state.entity);
@@ -382,6 +405,7 @@ const ApprovalsPage = () => {
                     <div className="w-[120px]">
                         <ExportButton
                             data={invoices}
+                            fetchData={handleFetchAllForExport}
                             columns={columnDefs}
                             fileName="Approvals.xlsx"
                         />

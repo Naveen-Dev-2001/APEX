@@ -12,7 +12,7 @@ import { getCondensedColumns, getFullColumns, VIEW_OPTIONS } from "./invoiceColu
 import { useInvoiceStore } from "../../store/invoice.store";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
-import { deleteInvoice, uploadInvoices, cancelUpload, fetchEntityMaster, getInvoiceFilterOptions, archiveInvoice, bulkDeleteInvoices, bulkArchiveInvoices } from "../../api/invoiceApi";
+import { getInvoices, fetchDeletedInvoices, deleteInvoice, uploadInvoices, cancelUpload, fetchEntityMaster, getInvoiceFilterOptions, archiveInvoice, bulkDeleteInvoices, bulkArchiveInvoices } from "../../api/invoiceApi";
 import { Modal, Popconfirm } from "antd";
 import toast from "../../utils/toast";
 import API from "../../api/api";
@@ -49,6 +49,7 @@ const Invoice = () => {
     const [columnFilters, setColumnFilters] = useState({});
     const [pageTab, setPageTab] = useState("in_progress"); // in_progress | delete | posted_stage | archive
     const [archivedRecords, setArchivedRecords] = useState([]);
+    const [deletedParams, setDeletedParams] = useState(null);
     const [openingInvoiceId, setOpeningInvoiceId] = useState(null);
     const [refreshKey, setRefreshKey] = useState(0);
     const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
@@ -355,6 +356,34 @@ const Invoice = () => {
         setUploadProgress(0);
     };
 
+    const handleFetchAllForExport = async () => {
+        if (pageTab === 'delete') {
+            const params = deletedParams || {
+                invoice_number: searchQuery || undefined,
+                sort_by: "deleted_at",
+                sort_dir: "desc",
+                filters: {}
+            };
+            const response = await fetchDeletedInvoices({
+                ...params,
+                skip: 0,
+                limit: -1
+            });
+            return response.data || [];
+        } else {
+            const response = await getInvoices({
+                skip: 0,
+                limit: -1,
+                search: searchQuery,
+                filters: backendFilters,
+                sort_by: sortColumn,
+                sort_dir: sortDirection,
+                tab: (pageTab === "in_progress") ? undefined : pageTab
+            });
+            return response.data || [];
+        }
+    };
+
     return (
         <div className="h-full flex flex-col overflow-hidden">
             {modalContextHolder}
@@ -390,6 +419,7 @@ const Invoice = () => {
                             <div style={{ flexShrink: 0 }}>
                                 <ExportButton
                                     data={pageTab === 'delete' ? archivedRecords : invoices}
+                                    fetchData={handleFetchAllForExport}
                                     columns={columnDefs}
                                     fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`}
                                     className="!w-auto !h-10 px-4"
@@ -564,7 +594,7 @@ const Invoice = () => {
                         </>
                     ) : (
                         <div className="flex-1 min-h-0 overflow-auto">
-                            <ArchivedInvoicesTab key={`${entityMaster?.entity_id}-${refreshKey}`} onView={handleView} onDataChange={setArchivedRecords} externalSearch={searchQuery} userRole={userRole} view={view} />
+                            <ArchivedInvoicesTab key={`${entityMaster?.entity_id}-${refreshKey}`} onView={handleView} onDataChange={setArchivedRecords} onParamsChange={setDeletedParams} externalSearch={searchQuery} userRole={userRole} view={view} />
                         </div>
                     )}
 

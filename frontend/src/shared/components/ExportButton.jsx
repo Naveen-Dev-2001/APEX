@@ -17,6 +17,7 @@ import toast from '../../utils/toast';
  */
 const ExportButton = ({ 
     data, 
+    fetchData,
     columns, 
     fileName = "export.xlsx", 
     className = "", 
@@ -26,13 +27,19 @@ const ExportButton = ({
     const [isExporting, setIsExporting] = useState(false);
 
     const handleExport = async () => {
-        if (!data || data.length === 0) {
-            toast.error("No data available to export.");
-            return;
-        }
-
         setIsExporting(true);
         try {
+            let exportData = data;
+            if (fetchData) {
+                exportData = await fetchData();
+            }
+
+            if (!exportData || exportData.length === 0) {
+                toast.error("No data available to export.");
+                setIsExporting(false);
+                return;
+            }
+
             // Generate dynamic filename with timestamp: invoice_YYYY-MM-DD_HH-mm-ss
             const timestamp = dayjs().format('YYYY-MM-DD_HH-mm-ss');
             const baseName = fileName.includes('.') ? fileName.split('.').slice(0, -1).join('.') : fileName;
@@ -40,7 +47,7 @@ const ExportButton = ({
 
             // Small timeout to allow UI to show loading state if data is large
             setTimeout(() => {
-                exportToExcel(data, columns, finalFileName);
+                exportToExcel(exportData, columns, finalFileName);
                 setIsExporting(false);
                 toast.success(`Export records successfully!`);
             }, 100);
