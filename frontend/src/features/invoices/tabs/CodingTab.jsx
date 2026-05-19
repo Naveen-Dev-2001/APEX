@@ -314,6 +314,19 @@ const CodingTab = ({ isActive = false }) => {
         }
     }, [isActive, loadMasterData]);
 
+    // ── Reactive Store Synchronization ───────────────────────────────────────
+    // Ensures that when the Coding tab becomes active, it forces a store-level
+    // reconciliation from activeInvoiceData to prevent any stale data rendering
+    // after navigating away from other tabs (like Quick View).
+    useEffect(() => {
+        if (isActive) {
+            const currentData = useInvoiceStore.getState().activeInvoiceData;
+            if (currentData) {
+                useInvoiceStore.getState().setInvoiceData(currentData);
+            }
+        }
+    }, [isActive]);
+
     // ── Suggestions Logic ────────────────────────────────────────────────────
     // Check cache first (pre-seeded by useInvoicePreviewData parallel fetch).
     // Only fall back to a direct API call if cache is empty to avoid duplicate requests.
