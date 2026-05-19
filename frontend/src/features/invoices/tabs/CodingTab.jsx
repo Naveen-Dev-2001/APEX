@@ -182,15 +182,23 @@ const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
 const applyCalculation = (item, key, value) => {
     let updated = { ...item, [key]: value };
-    if (key === "netAmount") {
-        updated.isNetAmountOverridden = true;
-        updated.netAmount = roundTo2(parseFloat(value) || 0);
-    } else if (["qty", "unitPrice", "discount"].includes(key)) {
-        updated.isNetAmountOverridden = false;
-        const qty = parseFloat(updated.qty) || 0;
-        const price = parseFloat(updated.unitPrice) || 0;
-        const discount = parseFloat(updated.discount) || 0;
-        updated.netAmount = roundTo2(qty * price - discount);
+    if (!item.isSystemRow) {
+        if (key === "netAmount") {
+            updated.isNetAmountOverridden = true;
+            updated.netAmount = roundTo2(parseFloat(value) || 0);
+        } else if (["qty", "unitPrice", "discount"].includes(key)) {
+            updated.isNetAmountOverridden = false;
+            const qty = parseFloat(updated.qty) || 0;
+            const price = parseFloat(updated.unitPrice) || 0;
+            const discount = parseFloat(updated.discount) || 0;
+            updated.netAmount = roundTo2(qty * price - discount);
+        }
+    } else {
+        if (key === "unitPrice" || key === "netAmount") {
+            const numVal = roundTo2(parseFloat(value) || 0);
+            updated.unitPrice = numVal;
+            updated.netAmount = numVal;
+        }
     }
     return updated;
 };
@@ -275,7 +283,24 @@ const CodingTab = ({ isActive = false }) => {
             setLineItems(prev => {
                 const systemRows = prev.filter(r => r.isSystemRow);
                 const regularRows = prev.filter(r => !r.isSystemRow);
-                return [...regularRows, ...newItems, ...systemRows];
+                const updatedRegular = [...regularRows, ...newItems];
+                const sumTax = updatedRegular.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
+
+                // Update quickViewFormData in store
+                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+
+                const updatedSystem = systemRows.map(item => {
+                    if (item.type === "GST") {
+                        return {
+                            ...item,
+                            unitPrice: sumTax,
+                            netAmount: sumTax
+                        };
+                    }
+                    return item;
+                });
+
+                return [...updatedRegular, ...updatedSystem];
             });
         };
         reader.readAsArrayBuffer(file);
@@ -484,16 +509,44 @@ const CodingTab = ({ isActive = false }) => {
         const currentSelectedIds = selectedIdsRef.current;
         const isBulk = currentSelectedIds.has(id) && currentSelectedIds.size > 1;
 
-        setLineItems(prev =>
-            prev.map(item => {
+        setLineItems(prev => {
+            const updatedItems = prev.map(item => {
                 const isEditedRow = item.id === id;
                 const isOtherSelectedRow = isBulk && currentSelectedIds.has(item.id);
 
                 if (!isEditedRow && !isOtherSelectedRow) return item;
 
-                return applyCalculation(item, key, value);
-            })
-        );
+                let updated = applyCalculation(item, key, value);
+
+                if (updated.isSystemRow && updated.type === "GST" && (key === "unitPrice" || key === "netAmount")) {
+                    useInvoiceStore.getState().setQuickViewField("totalTaxAmount", updated.netAmount);
+                }
+
+                return updated;
+            });
+
+            if (key === "taxAmt") {
+                const regularItems = updatedItems.filter(item => !item.isSystemRow);
+                const sumTax = regularItems.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
+
+                // Update quickViewFormData in store
+                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+
+                // Update the GST/Total Tax row in updatedItems
+                return updatedItems.map(item => {
+                    if (item.isSystemRow && item.type === "GST") {
+                        return {
+                            ...item,
+                            unitPrice: sumTax,
+                            netAmount: sumTax
+                        };
+                    }
+                    return item;
+                });
+            }
+
+            return updatedItems;
+        });
 
         // Sync to original items for persistence across grouping toggles
         if (isBulk) {
@@ -513,7 +566,26 @@ const CodingTab = ({ isActive = false }) => {
 
     const confirmDelete = useCallback(() => {
         if (itemToDelete) {
-            setLineItems(prev => prev.filter(item => item.id !== itemToDelete));
+            setLineItems(prev => {
+                const filtered = prev.filter(item => item.id !== itemToDelete);
+                const regularItems = filtered.filter(item => !item.isSystemRow);
+                const sumTax = regularItems.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
+
+                // Update quickViewFormData in store
+                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+
+                // Update the GST/Total Tax row in filtered
+                return filtered.map(item => {
+                    if (item.isSystemRow && item.type === "GST") {
+                        return {
+                            ...item,
+                            unitPrice: sumTax,
+                            netAmount: sumTax
+                        };
+                    }
+                    return item;
+                });
+            });
             setDeleteModalVisible(false);
             setItemToDelete(null);
         }

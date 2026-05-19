@@ -585,8 +585,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [setQuickViewField, setSelectedVendorId]);
 
     const handleUpdateLineItem = useCallback((id, key, value) => {
-        setLineItems(prev =>
-            prev.map(item => {
+        setLineItems(prev => {
+            const updatedItems = prev.map(item => {
                 if (item.id !== id) return item;
 
                 // Keep value as-is (string) — don't cast to Number here.
@@ -618,17 +618,62 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                         const numVal = roundTo2(parseFloat(value) || 0);
                         updated.unitPrice = numVal;
                         updated.netAmount = numVal;
+
+                        if (updated.type === "GST") {
+                            useInvoiceStore.getState().setQuickViewField("totalTaxAmount", numVal);
+                        }
                     }
                 }
                 return updated;
-            })
-        );
+            });
+
+            if (key === "taxAmt") {
+                const regularItems = updatedItems.filter(item => !item.isSystemRow);
+                const sumTax = regularItems.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
+
+                // Update quickViewFormData in store
+                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+
+                // Update the GST/Total Tax row in updatedItems
+                return updatedItems.map(item => {
+                    if (item.isSystemRow && item.type === "GST") {
+                        return {
+                            ...item,
+                            unitPrice: sumTax,
+                            netAmount: sumTax
+                        };
+                    }
+                    return item;
+                });
+            }
+
+            return updatedItems;
+        });
         // Sync to original items for persistence across grouping toggles
         useInvoiceStore.getState().syncFieldToOriginals(id, key, value);
     }, [setLineItems]);
 
     const handleDeleteLineItem = useCallback((id) => {
-        setLineItems(prev => prev.filter(item => item.id !== id));
+        setLineItems(prev => {
+            const filtered = prev.filter(item => item.id !== id);
+            const regularItems = filtered.filter(item => !item.isSystemRow);
+            const sumTax = regularItems.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
+
+            // Update quickViewFormData in store
+            useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+
+            // Update the GST/Total Tax row in filtered
+            return filtered.map(item => {
+                if (item.isSystemRow && item.type === "GST") {
+                    return {
+                        ...item,
+                        unitPrice: sumTax,
+                        netAmount: sumTax
+                    };
+                }
+                return item;
+            });
+        });
     }, [setLineItems]);
 
     const handleHoverField = useCallback((key) => {
@@ -705,7 +750,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     // added by pricilla
     useEffect(() => {
         setQuickViewField("totalPayable", Number(totalAmountPayable).toFixed(2));
-    }, [totalAmountPayable]);
+    }, [totalAmountPayable, setQuickViewField]);
 
     // ── Amount Mismatch Warning ──────────────────────────────────────────────
     const isAmountMismatch = useMemo(() => {
@@ -819,7 +864,24 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             setLineItems(prev => {
                 const systemRows = prev.filter(r => r.isSystemRow);
                 const regularRows = prev.filter(r => !r.isSystemRow);
-                return [...regularRows, ...newItems, ...systemRows];
+                const updatedRegular = [...regularRows, ...newItems];
+                const sumTax = updatedRegular.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
+
+                // Update quickViewFormData in store
+                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+
+                const updatedSystem = systemRows.map(item => {
+                    if (item.type === "GST") {
+                        return {
+                            ...item,
+                            unitPrice: sumTax,
+                            netAmount: sumTax
+                        };
+                    }
+                    return item;
+                });
+
+                return [...updatedRegular, ...updatedSystem];
             });
         };
         reader.readAsArrayBuffer(file);
