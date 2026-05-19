@@ -669,7 +669,7 @@ const CodingTab = ({ isActive = false }) => {
                     }}
                 >
                     <div className="w-full">
-                        <WorkflowTab />
+                        <WorkflowTab hideEditButton />
                     </div>
                 </Modal>
 

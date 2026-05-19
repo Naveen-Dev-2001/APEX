@@ -129,7 +129,7 @@ const getStatusConfig = (status) => {
 
 
 
-const WorkflowTab = () => {
+const WorkflowTab = ({ hideEditButton = false }) => {
 
     const { viewInvoiceId, activeInvoiceData, lineItems, selectedVendorId } = useInvoiceStore();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -373,7 +373,7 @@ const WorkflowTab = () => {
 
 
 
-    const showEditButton = renderStatus === "waiting_coding" && !isArchived;
+    const showEditButton = renderStatus === "waiting_coding" && !isArchived && !hideEditButton;
 
     return (
         <div className="bg-white p-10 font-sans relative">
