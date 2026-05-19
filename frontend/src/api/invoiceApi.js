@@ -158,3 +158,6 @@ export const getDelegationInfo = (invoiceId) =>
 
 export const delegateInvoice = (invoiceId, payload) =>
     API.post(`/invoices/${invoiceId}/delegate`, payload).then(res => res.data);
+
+export const saveCustomInvoiceWorkflow = (invoiceId, payload) =>
+    API.put(`/workflow/custom/${invoiceId}`, payload).then(res => res.data);

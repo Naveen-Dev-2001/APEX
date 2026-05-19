@@ -147,16 +147,24 @@ def get_required_approver_count(
     """
     # 0. Check persisted values
     if not force_vendor_name and not force_vendor_id and invoice_data:
-        if hasattr(invoice_data, "required_approvers") and invoice_data.required_approvers is not None:
-            # We need to map relationship models to strings for the response
-            if hasattr(invoice_data, "assigned_approvers_list") and invoice_data.assigned_approvers_list:
+        req_approvers = getattr(invoice_data, "required_approvers", None)
+        if req_approvers is None and isinstance(invoice_data, dict):
+            req_approvers = invoice_data.get("required_approvers")
+            
+        if req_approvers is not None:
+            assigned_approvers_list = getattr(invoice_data, "assigned_approvers_list", None)
+            if assigned_approvers_list is None and isinstance(invoice_data, dict):
+                from app.models.db_models import InvoiceAssignedApprover
+                inv_id = invoice_data.get("id") or invoice_id
+                if inv_id:
+                    assigned_approvers_list = db.query(InvoiceAssignedApprover).filter(InvoiceAssignedApprover.invoice_id == inv_id).all()
+            
+            if assigned_approvers_list:
                 # Group by sequence_order to recreate the levels
                 levels = {}
-                for a in invoice_data.assigned_approvers_list:
+                for a in assigned_approvers_list:
                     seq = a.sequence_order
                     if seq not in levels:
-                        # Reconstruct the level dict
-                        # Note: We assume 'mandatory' as default type for now
                         levels[seq] = {
                             "emails": [], 
                             "is_finance": getattr(a, "is_finance", False), 
@@ -170,14 +178,17 @@ def get_required_approver_count(
                 
                 # Restore threshold/posting types from breakdown
                 breakdown_data = {}
-                if hasattr(invoice_data, "approver_breakdown") and invoice_data.approver_breakdown:
+                app_breakdown = getattr(invoice_data, "approver_breakdown", None)
+                if app_breakdown is None and isinstance(invoice_data, dict):
+                    app_breakdown = invoice_data.get("approver_breakdown")
+                if app_breakdown:
                     try:
-                        breakdown_data = json.loads(invoice_data.approver_breakdown) if isinstance(invoice_data.approver_breakdown, str) else invoice_data.approver_breakdown
+                        breakdown_data = json.loads(app_breakdown) if isinstance(app_breakdown, str) else app_breakdown
                     except:
                         pass
                 
-                has_posting = breakdown_data.get("has_posting_approver", False)
-                has_threshold = breakdown_data.get("has_threshold_approver", False)
+                has_posting = breakdown_data.get("has_posting_approver", False) if isinstance(breakdown_data, dict) else False
+                has_threshold = breakdown_data.get("has_threshold_approver", False) if isinstance(breakdown_data, dict) else False
                 
                 if assigned_approvers:
                     if has_posting:
@@ -186,12 +197,11 @@ def get_required_approver_count(
                         idx = len(assigned_approvers) - (2 if has_posting else 1)
                         if idx >= 0:
                             assigned_approvers[idx]["type"] = "threshold"
-                
-            if assigned_approvers:
+                            
                 return {
-                    "required": invoice_data.required_approvers,
+                    "required": req_approvers,
                     "assigned_approvers": assigned_approvers,
-                    "workflow_type": getattr(invoice_data, "workflow_type", "persisted"),
+                    "workflow_type": "persisted",
                     "breakdown": breakdown_data 
                 }
 
@@ -291,6 +301,7 @@ def get_required_approver_count(
             has_threshold_approver = False
             if getattr(v_workflow, 'is_threshold_enabled', False):
                 threshold = float(v_workflow.amount_threshold) if v_workflow.amount_threshold is not None else 0.0
+                rule_amount_threshold = threshold
                 if amount is not None and amount >= threshold and v_workflow.threshold_approver:
                     assigned_approvers.append({"emails": parse_approvers(v_workflow.threshold_approver), "type": "threshold"})
                     has_threshold_approver = True
@@ -375,6 +386,7 @@ def get_required_approver_count(
                     has_threshold_approver = False
                     if getattr(cod_workflow, 'is_threshold_enabled', False):
                         threshold = float(cod_workflow.amount_threshold) if cod_workflow.amount_threshold is not None else 0.0
+                        rule_amount_threshold = threshold
                         if amount is not None and amount >= threshold and cod_workflow.threshold_approver:
                             assigned_approvers.append({"emails": parse_approvers(cod_workflow.threshold_approver), "type": "threshold"})
                             has_threshold_approver = True
@@ -469,7 +481,8 @@ def get_required_approver_count(
             "vendor_eligible": vendor_eligible, 
             "is_parallel": is_parallel,
             "has_posting_approver": has_posting_approver if 'has_posting_approver' in locals() else False,
-            "has_threshold_approver": has_threshold_approver if 'has_threshold_approver' in locals() else False
+            "has_threshold_approver": has_threshold_approver if 'has_threshold_approver' in locals() else False,
+            "amount_threshold": rule_amount_threshold if 'rule_amount_threshold' in locals() else None
         }
     }
 
@@ -512,7 +525,16 @@ async def get_workflow_history(
     snapshot_statuses = {"waiting_approval", "reworked", "sage_post_failed", "approved", "sage_posted", "rejected"}
     snapshot_approvers_list = getattr(invoice, "assigned_approvers_list", None) or []
 
-    if invoice_status_str in snapshot_statuses and snapshot_approvers_list:
+    breakdown_data = {}
+    if invoice.approver_breakdown:
+        try: breakdown_data = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+        except: pass
+
+    is_custom = False
+    if isinstance(breakdown_data, dict) and breakdown_data.get("is_custom_workflow"):
+        is_custom = True
+
+    if (invoice_status_str in snapshot_statuses or is_custom) and snapshot_approvers_list:
         # Reconstruct levels from persisted rows
         levels = {}
         for a in snapshot_approvers_list:
@@ -677,3 +699,93 @@ async def get_approver_status(
             } for s in steps
         ]
     }
+
+@router.put("/custom/{invoice_id}")
+async def save_custom_invoice_workflow(
+    invoice_id: int,
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    Save an ad-hoc custom workflow sequence for a specific invoice.
+    Updates the database with assigned approvers and marks the invoice
+    as using a custom workflow override.
+    """
+    invoice = invoice_repo.get(db, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    # User can only edit if status is waiting_coding
+    status_str = invoice.status.value if hasattr(invoice.status, "value") else str(invoice.status)
+    if status_str != "waiting_coding":
+        raise HTTPException(
+            status_code=400, 
+            detail="Invoice workflow can only be edited when status is waiting_coding"
+        )
+        
+    approvers = payload.get("approvers", [])  # list of levels: [{"level": 1, "emails": [...], "is_finance": bool}]
+    if not approvers:
+        raise HTTPException(status_code=400, detail="Approvers sequence cannot be empty")
+        
+    # Validate structure and resolve flat list of levels
+    from app.repository.repositories import invoice_assigned_approver_repo
+    
+    # 1. Clear existing assigned approvers
+    invoice_assigned_approver_repo.delete_all(db, filters={"invoice_id": invoice_id})
+    
+    # 2. Write new custom assigned approvers
+    from app.models.db_models import User
+    
+    for idx, lvl in enumerate(approvers):
+        emails = lvl.get("emails", [])
+        is_finance = lvl.get("is_finance", False)
+        
+        if is_finance:
+            # Fetch active finance department users
+            finance_users = (
+                db.query(User)
+                .filter(
+                    User.department != None,
+                    User.department.ilike("%finance%"),
+                    ~User.department.ilike("%non-finance%"),
+                    User.status == "active"
+                )
+                .all()
+            )
+            finance_emails = [u.email.lower() for u in finance_users if u.email]
+            combined = set(e.strip().lower() for e in emails if e) | set(finance_emails)
+        else:
+            combined = set(e.strip().lower() for e in emails if e)
+            
+        # Save each email in this level with the sequence order
+        for email in combined:
+            if email:
+                invoice_assigned_approver_repo.create(db, obj_in={
+                    "invoice_id": invoice_id,
+                    "approver_email": email.strip().lower(),
+                    "sequence_order": idx + 1,
+                    "is_finance": is_finance
+                })
+                
+    # 3. Update Invoice required approvers and breakdown
+    invoice.required_approvers = len(approvers)
+    
+    has_posting_approver = payload.get("has_posting_approver", False)
+    has_threshold_approver = payload.get("has_threshold_approver", False)
+    amount_threshold = payload.get("amount_threshold")
+    
+    # Store custom breakdown with is_custom_workflow set to True
+    custom_breakdown = {
+        "type": "custom",
+        "is_custom_workflow": True,
+        "vendor_eligible": False,
+        "is_parallel": False,
+        "has_posting_approver": has_posting_approver,
+        "has_threshold_approver": has_threshold_approver,
+        "amount_threshold": amount_threshold
+    }
+    invoice.approver_breakdown = json.dumps(custom_breakdown)
+    db.commit()
+    
+    return {"message": "Custom invoice workflow saved successfully"}

@@ -152,15 +152,19 @@ def _parse_list(val: Any) -> List[str]:
     return []
 
 
-def _check_concurrency(invoice: Invoice, last_updated_at: Optional[datetime]):
+def _check_concurrency(db: Session, invoice: Invoice, last_updated_at: Optional[datetime], current_user: UserResponse):
     if last_updated_at and invoice.updated_at:
         db_ts = invoice.updated_at.replace(microsecond=0)
         req_ts = last_updated_at.replace(microsecond=0)
         if db_ts > req_ts:
-            raise HTTPException(
-                status_code=409,
-                detail="This invoice has been modified by another user. Please refresh."
-            )
+            from app.models.db_models import AuditLog
+            latest_audit = db.query(AuditLog).filter(AuditLog.invoice_id == invoice.id).order_by(AuditLog.timestamp.desc()).first()
+            last_audit_user = latest_audit.user if latest_audit else None
+            if not last_audit_user or (last_audit_user != current_user.email and last_audit_user != current_user.username):
+                raise HTTPException(
+                    status_code=409,
+                    detail="This invoice has been modified by another user. Please refresh."
+                )
 
 
 def _get_finance_users(db: Session, entity: str) -> List[str]:
@@ -1107,12 +1111,14 @@ async def get_ui_status_from_frontend(
                 and s.step_type == StepType.POSTING_APPROVED
                 for s in steps_for_level_check
             )
-            if current_level > len(mandatory) and not already_posting_approved:
+            # Guard: posting approver can only act once threshold (if any) is done
+            posting_stage_ready = not has_threshold or threshold_done
+            if current_level > len(mandatory) and not already_posting_approved and posting_stage_ready:
                 can_act = True
             else:
                 current_lvl_entry = next(
                     (e for e in assigned if e.get("level") == current_level), None)
-                if current_lvl_entry and current_lvl_entry.get("type") == "posting" and not already_posting_approved:
+                if current_lvl_entry and current_lvl_entry.get("type") == "posting" and not already_posting_approved and posting_stage_ready:
                     can_act = True
  
         elif is_threshold_approver:
@@ -1188,7 +1194,7 @@ async def approve_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -1226,7 +1232,7 @@ async def approve_invoice(
     has_posting = bool(posting_entries)
 
     # ── CASE A: Mandatory levels ──
-    if not mandatory_levels_done:
+    if current_level <= len(mandatory):
         level_entry = next(
             (e for e in mandatory if e.get("level") == current_level), None
         )
@@ -1671,7 +1677,7 @@ async def reject_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -1796,7 +1802,7 @@ async def rework_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -1978,7 +1984,7 @@ async def enable_editing(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -2065,7 +2071,7 @@ async def repost_to_sage(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -2187,7 +2193,7 @@ async def recall_invoice(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    _check_concurrency(invoice, request.last_updated_at)
+    _check_concurrency(db, invoice, request.last_updated_at, current_user)
 
     # Strictly Coder check
     user_role = (current_user.role or "").lower()

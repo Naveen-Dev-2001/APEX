@@ -155,7 +155,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         setUiStatusReady(false);
         fetchUIStatus();
     }, [workflowData, fetchUIStatus]);
-    
+
     const validateRequiredFields = useCallback(() => {
         for (const section of QUICK_VIEW_CONFIG) {
             if (section.type !== "form") continue;
@@ -525,32 +525,30 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
                 {/* Right — Action buttons */}
                 <div className="flex items-center gap-3">
-                     {["rejected", "sage_posted", "deleted", "archived"].includes((currentStatus || "").toLowerCase()) && (
-                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm ${
-                             (currentStatus || "").toLowerCase() === "sage_posted"
-                                 ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                                 : (currentStatus || "").toLowerCase() === "archived"
-                                     ? "bg-blue-50 border-blue-200 text-blue-700"
-                                     : "bg-red-50 border-red-200 text-red-700"
-                         }`}>
-                             <div className={`w-2 h-2 rounded-full ${
-                                 (currentStatus || "").toLowerCase() === "sage_posted"
-                                     ? "bg-emerald-500"
-                                     : (currentStatus || "").toLowerCase() === "archived"
-                                         ? "bg-blue-500"
-                                         : "bg-red-500"
-                             }`} />
-                             <span className="text-[11px] font-bold uppercase tracking-wider custom-font-creato leading-none">
-                                 {(currentStatus || "").toLowerCase() === "sage_posted"
-                                     ? "Posted to Sage"
-                                     : (currentStatus || "").toLowerCase() === "rejected"
-                                         ? "Rejected"
-                                         : (currentStatus || "").toLowerCase() === "archived"
-                                             ? "Archived"
-                                             : "Deleted"}
-                             </span>
-                         </div>
-                     )}
+                    {["rejected", "sage_posted", "deleted", "archived"].includes((currentStatus || "").toLowerCase()) && (
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm ${(currentStatus || "").toLowerCase() === "sage_posted"
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                : (currentStatus || "").toLowerCase() === "archived"
+                                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                                    : "bg-red-50 border-red-200 text-red-700"
+                            }`}>
+                            <div className={`w-2 h-2 rounded-full ${(currentStatus || "").toLowerCase() === "sage_posted"
+                                    ? "bg-emerald-500"
+                                    : (currentStatus || "").toLowerCase() === "archived"
+                                        ? "bg-blue-500"
+                                        : "bg-red-500"
+                                }`} />
+                            <span className="text-[11px] font-bold uppercase tracking-wider custom-font-creato leading-none">
+                                {(currentStatus || "").toLowerCase() === "sage_posted"
+                                    ? "Posted to Sage"
+                                    : (currentStatus || "").toLowerCase() === "rejected"
+                                        ? "Rejected"
+                                        : (currentStatus || "").toLowerCase() === "archived"
+                                            ? "Archived"
+                                            : "Deleted"}
+                            </span>
+                        </div>
+                    )}
                     {!activeInvoiceData?.is_archived && (
                         <>
                             {/* ── Scanner / Coder buttons ───────────────────────── */}

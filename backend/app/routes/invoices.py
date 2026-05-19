@@ -2385,10 +2385,16 @@ async def update_invoice(
         req_ts = invoice_update.last_updated_at.replace(microsecond=0)
         
         if db_ts > req_ts:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="This invoice has been modified by another user. Please refresh."
-            )
+            from app.models.db_models import AuditLog
+            latest_audit = db.query(AuditLog).filter(AuditLog.invoice_id == invoice.id).order_by(AuditLog.timestamp.desc()).first()
+            last_audit_user = latest_audit.user if latest_audit else None
+            
+            # Allow update if the current user was the last one to modify it
+            if not last_audit_user or (last_audit_user != current_user.email and last_audit_user != current_user.username):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This invoice has been modified by another user. Please refresh."
+                )
 
     # --- Duplicate Check Logic (Constraint Enforcement) ---
     # Determine the effective vendor_id and invoice_number after update
@@ -2609,67 +2615,78 @@ async def update_invoice(
          from app.routes.workflow import get_vendor_data_from_invoice, get_required_approver_count, get_invoice_total_from_invoice
          from app.models.db_models import User
          from app.repository.repositories import invoice_assigned_approver_repo
+         import json
          
-         vendor_name, vendor_id = get_vendor_data_from_invoice(db, invoice_id)
-         total_amount = get_invoice_total_from_invoice(db, invoice_id)
-         currency = (deserialize_json_field(invoice.extracted_data) or {}).get("invoice_details", {}).get("currency", {}).get("value", "USD")
-         
-         # Always recalculate requirements on transition
-         requirement_data = get_required_approver_count(
-             db, vendor_name, total_amount, invoice_id,
-             currency=currency, entity=invoice.entity,
-             force_vendor_id=vendor_id, force_vendor_name=vendor_name
-         )
-         
-         invoice.required_approvers = requirement_data["required"]
-         invoice.approver_breakdown = serialize_json_field(requirement_data.get("breakdown", {}))
-         
-         # Clear existing assigned approvers
-         invoice_assigned_approver_repo.delete_all(db, filters={"invoice_id": invoice_id})
-         
-         # Fetch all finance-department users once (used for finance-level expansion)
-         finance_users = (
-             db.query(User)
-             .filter(
-                 User.department != None,
-                 User.department.ilike("%finance%"),
-                 ~User.department.ilike("%non-finance%"),
-                 User.status == "active"
-             )
-             .all()
-         )
-         finance_emails = [u.email.lower() for u in finance_users if u.email]
-         
-         # Store assigned approvers
-         assigned_approvers = requirement_data.get("assigned_approvers", [])
-         level_1_emails = []
-         for idx, level_data in enumerate(assigned_approvers):
-             is_finance_level = False
-             emails = []
+         is_custom_wf = False
+         if invoice.approver_breakdown:
+             try:
+                 bd = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+                 if isinstance(bd, dict) and bd.get("is_custom_workflow"):
+                     is_custom_wf = True
+             except:
+                 pass
+                 
+         if not is_custom_wf:
+             vendor_name, vendor_id = get_vendor_data_from_invoice(db, invoice_id)
+             total_amount = get_invoice_total_from_invoice(db, invoice_id)
+             currency = (deserialize_json_field(invoice.extracted_data) or {}).get("invoice_details", {}).get("currency", {}).get("value", "USD")
              
-             if isinstance(level_data, dict):
-                 emails = level_data.get("emails", [])
-                 is_finance_level = level_data.get("is_finance", False)
-             else:
-                 emails = [level_data] if isinstance(level_data, str) else level_data
+             # Always recalculate requirements on transition
+             requirement_data = get_required_approver_count(
+                 db, vendor_name, total_amount, invoice_id,
+                 currency=currency, entity=invoice.entity,
+                 force_vendor_id=vendor_id, force_vendor_name=vendor_name
+             )
+             
+             invoice.required_approvers = requirement_data["required"]
+             invoice.approver_breakdown = serialize_json_field(requirement_data.get("breakdown", {}))
+             
+             # Clear existing assigned approvers
+             invoice_assigned_approver_repo.delete_all(db, filters={"invoice_id": invoice_id})
+             
+             # Fetch all finance-department users once (used for finance-level expansion)
+             finance_users = (
+                 db.query(User)
+                 .filter(
+                     User.department != None,
+                     User.department.ilike("%finance%"),
+                     ~User.department.ilike("%non-finance%"),
+                     User.status == "active"
+                 )
+                 .all()
+             )
+             finance_emails = [u.email.lower() for u in finance_users if u.email]
+             
+             # Store assigned approvers
+             assigned_approvers = requirement_data.get("assigned_approvers", [])
+             level_1_emails = []
+             for idx, level_data in enumerate(assigned_approvers):
+                 is_finance_level = False
+                 emails = []
                  
-             if is_finance_level and finance_emails:
-                 combined = set(e.lower() for e in emails if e) | set(finance_emails)
-             else:
-                 combined = set(e.lower() for e in emails if e)
-                 
-             if idx == 0:
-                 level_1_emails = list(combined)
-
-
-             for email in combined:
-                 if email:
-                     invoice_assigned_approver_repo.create(db, obj_in={
-                         "invoice_id": invoice_id,
-                         "approver_email": email,
-                         "sequence_order": idx + 1,
-                         "is_finance": is_finance_level
-                     })
+                 if isinstance(level_data, dict):
+                     emails = level_data.get("emails", [])
+                     is_finance_level = level_data.get("is_finance", False)
+                 else:
+                     emails = [level_data] if isinstance(level_data, str) else level_data
+                     
+                 if is_finance_level and finance_emails:
+                     combined = set(e.lower() for e in emails if e) | set(finance_emails)
+                 else:
+                     combined = set(e.lower() for e in emails if e)
+                     
+                 if idx == 0:
+                     level_1_emails = list(combined)
+    
+                 for email in combined:
+                     if email:
+                         invoice_assigned_approver_repo.create(db, obj_in={
+                             "invoice_id": invoice_id,
+                             "approver_email": email,
+                             "sequence_order": idx + 1,
+                             "is_finance": is_finance_level
+                         })
+                     
 
     # Update attributes
     update_fields = [
