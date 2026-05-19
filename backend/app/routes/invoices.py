@@ -2615,7 +2615,6 @@ async def update_invoice(
          from app.routes.workflow import get_vendor_data_from_invoice, get_required_approver_count, get_invoice_total_from_invoice
          from app.models.db_models import User
          from app.repository.repositories import invoice_assigned_approver_repo
-         import json
          
          is_custom_wf = False
          if invoice.approver_breakdown:
