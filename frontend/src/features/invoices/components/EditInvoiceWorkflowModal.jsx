@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Layers, ShieldCheck, DollarSign, Send } from 'lucide-react';
+import { Modal, Radio, Checkbox } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import useWorkflowStore from '../../../store/workflow.store';
 import { saveCustomInvoiceWorkflow } from '../../../api/invoiceApi';
 import toast from '../../../utils/toast';
 import Dropdown from '../../../components/ui/Dropdown';
+import CustomInput from '../../../shared/components/CustomInput';
+import CustomButton from '../../../shared/components/CustomButton';
 
 const EMPTY_FORM = {
     approver_count: 1,
@@ -19,33 +21,6 @@ const EMPTY_FORM = {
     amount_threshold: '',
     posting_approver: []
 };
-
-const RadioGroup = ({ label, value, options, onChange }) => (
-    <div className="flex flex-col gap-2 w-full text-left">
-        <label className="text-[13px] font-semibold text-gray-700">{label}</label>
-        <div className="flex items-center gap-6">
-            {options.map((opt) => (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer group">
-                    <div className="relative flex items-center justify-center">
-                        <input
-                            type="radio"
-                            className="sr-only"
-                            name={label}
-                            value={opt}
-                            checked={value === opt}
-                            onChange={() => onChange(opt)}
-                        />
-                        <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center
-                            ${value === opt ? 'border-[#24A1DD]' : 'border-gray-300'}`}>
-                            {value === opt && <div className="w-2.5 h-2.5 rounded-full bg-[#24A1DD]" />}
-                        </div>
-                    </div>
-                    <span className="text-[14px] text-gray-600 font-medium">{opt}</span>
-                </label>
-            ))}
-        </div>
-    </div>
-);
 
 const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess }) => {
     const queryClient = useQueryClient();
@@ -172,7 +147,6 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
             });
             toast.success('Custom approval chain saved for this invoice!');
 
-            // Invalidate React Query caches for this invoice's preview and workflow configuration
             queryClient.invalidateQueries(["invoice-preview", invoice.id]);
             queryClient.invalidateQueries(["invoice-preview", String(invoice.id)]);
             queryClient.invalidateQueries(["workflow", invoice.id]);
@@ -187,7 +161,6 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
         }
     };
 
-    // Filtered options for Posting / Threshold Approvers (finance approvers only, showing ALL members as per RuleModal.jsx)
     const financeApprovers = useMemo(() => {
         return (approversList || [])
             .filter(a => a.department?.toLowerCase() === 'finance')
@@ -228,35 +201,34 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
     const matchedRuleType = workflowData?.workflow_type || 'None (Default Fallback)';
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[4px]">
-            <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[680px] mx-4 flex flex-col max-h-[92vh] border border-gray-100 transform scale-100 transition-all duration-300">
-                {/* Header */}
-                <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 bg-[#f9fafb] rounded-t-[16px]">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-[#24A1DD]/10 flex items-center justify-center text-[#24A1DD]">
-                            <Layers size={18} />
-                        </div>
-                        <div>
-                            <h2 className="text-[17px] font-bold text-gray-900 leading-none">
-                                Edit Invoice Approval Chain
-                            </h2>
-                            <p className="text-[12px] text-gray-500 mt-1 font-medium">
-                                Invoice #{invoice?.invoice_number || invoice?.id} &bull; Custom override for this invoice only
-                            </p>
-                        </div>
-                    </div>
+        <Modal
+            open={true}
+            onCancel={onClose}
+            footer={null}
+            width={760}
+            centered
+            maskClosable={false}
+            closeIcon={null}
+            styles={{ content: { padding: 0, borderRadius: 12, overflow: "hidden" } }}
+        >
+            <div className="bg-white flex flex-col" style={{ maxHeight: "85vh" }}>
+                {/* HEADER */}
+                <div className="flex justify-between items-center px-6 py-4 border-b border-[#E0E0E0] flex-shrink-0">
+                    <h2 className="font-semibold custom-font-jura text-[16px] text-gray-800">
+                        Edit Invoice Approval Chain
+                    </h2>
                     <button
                         onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-all"
+                        className="text-gray-400 hover:text-gray-600 text-xl leading-none"
                     >
-                        <X size={20} />
+                        ×
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="overflow-y-auto px-8 py-6 flex flex-col gap-6">
+                {/* BODY */}
+                <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
                     {/* Read-Only Criteria Section */}
-                    <div className="bg-gray-50 p-4 rounded-[12px] border border-gray-100 grid grid-cols-2 gap-x-6 gap-y-4 text-left">
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 grid grid-cols-2 gap-x-6 gap-y-4 text-left">
                         <div className="flex flex-col">
                             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Vendor Match</span>
                             <span className="text-[13px] font-semibold text-gray-700 mt-0.5 truncate" title={invoice?.vendor_name}>
@@ -265,7 +237,7 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                         </div>
                         <div className="flex flex-col">
                             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Matched Rule Type</span>
-                            <span className="text-[13px] font-bold text-[#24A1DD] mt-0.5 capitalize">
+                            <span className="text-[13px] font-bold text-blue-500 mt-0.5 capitalize">
                                 {matchedRuleType.replace(/_/g, ' ')}
                             </span>
                         </div>
@@ -280,10 +252,11 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                     </div>
 
                     {/* Step Configuration */}
-                    <div className="flex flex-col gap-5 border-t pt-5 border-gray-100">
+                    <div className="grid grid-cols-2 gap-4 items-end">
                         <Dropdown
                             label="Number of Approval Levels *"
                             value={form.approver_count}
+                            onChange={(val) => setForm(prev => ({ ...prev, approver_count: val }))}
                             options={[
                                 { value: 1, label: '1 Level' },
                                 { value: 2, label: '2 Levels' },
@@ -291,32 +264,38 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                                 { value: 4, label: '4 Levels' },
                                 { value: 5, label: '5 Levels' },
                             ]}
-                            onChange={(val) => setForm(prev => ({ ...prev, approver_count: val }))}
                         />
-
-                        <RadioGroup
-                            label="Enable Threshold Approver"
-                            value={form.enableThreshold}
-                            options={['Yes', 'No']}
-                            onChange={(val) => setForm(prev => ({ ...prev, enableThreshold: val }))}
-                        />
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium text-gray-700">
+                                Enable Threshold Approver
+                            </label>
+                            <div className="flex items-center gap-6 rounded-md bg-white px-3" style={{ height: 36 }}>
+                                <Radio.Group
+                                    value={form.enableThreshold}
+                                    onChange={(e) => setForm(prev => ({ ...prev, enableThreshold: e.target.value }))}
+                                    className="flex gap-4"
+                                >
+                                    <Radio value="Yes">Yes</Radio>
+                                    <Radio value="No">No</Radio>
+                                </Radio.Group>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Mandatory Levels List */}
-                    <div className="flex flex-col gap-5 border-t pt-5 border-gray-100">
-                        <h3 className="text-[13px] font-bold text-gray-900 text-left flex items-center gap-1.5 mb-1">
-                            <ShieldCheck size={16} className="text-[#1AB394]" />
-                            Mandatory Approval Levels
-                        </h3>
-                        {Array.from({ length: form.approver_count }).map((_, idx) => (
-                            <div key={idx} className="flex flex-col gap-2 p-4 rounded-lg bg-gray-50 border border-gray-100 text-left">
-                                <label className="text-[13px] font-semibold text-gray-700">
-                                    Level {idx + 1} Approvers *
-                                </label>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <input
-                                        type="checkbox"
-                                        id={`finance_flag_${idx + 1}`}
+                    <div>
+                        <p className="text-sm font-semibold text-gray-700 mb-3">
+                            Approver Configuration
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                            {Array.from({ length: form.approver_count }).map((_, idx) => (
+                                <div key={idx} className="flex flex-col gap-2 p-3 rounded-lg bg-gray-50 border border-gray-100 text-left">
+                                    <label className="text-sm font-medium text-gray-700">
+                                        <span className="text-red-500 mr-1">*</span>
+                                        Level {idx + 1} Approver(s)
+                                        <span className="ml-1 text-xs text-gray-400 font-normal">(Mandatory)</span>
+                                    </label>
+                                    <Checkbox
                                         checked={!!form.financeFlags?.[idx + 1]}
                                         onChange={(e) => {
                                             const checked = e.target.checked;
@@ -329,55 +308,44 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                                                 [`mandatory_approver_${idx + 1}`]: []
                                             }));
                                         }}
-                                        className="w-4 h-4 rounded border-gray-300 text-[#24A1DD] focus:ring-[#24A1DD] cursor-pointer"
+                                    >
+                                        <span className="text-sm text-gray-600">Assign to Finance Team</span>
+                                    </Checkbox>
+                                    <Dropdown
+                                        placeholder={form.financeFlags?.[idx + 1] ? "Assigned to whole Finance Team" : `Select Approver(s)`}
+                                        value={form[`mandatory_approver_${idx + 1}`] || []}
+                                        mode="multiple"
+                                        options={getFilteredApprovers(`mandatory_approver_${idx + 1}`)}
+                                        onChange={(val) => setForm(prev => ({
+                                            ...prev,
+                                            [`mandatory_approver_${idx + 1}`]: val,
+                                            financeFlags: {
+                                                ...prev.financeFlags,
+                                                [idx + 1]: false
+                                            }
+                                        }))}
+                                        disabled={!!form.financeFlags?.[idx + 1]}
                                     />
-                                    <label htmlFor={`finance_flag_${idx + 1}`} className="text-sm text-gray-600 font-medium cursor-pointer">
-                                        Assign to Finance Team
-                                    </label>
                                 </div>
-                                <Dropdown
-                                    placeholder={form.financeFlags?.[idx + 1] ? "Assigned to whole Finance Team" : `Select Approver(s) for Level ${idx + 1}`}
-                                    value={form[`mandatory_approver_${idx + 1}`] || []}
-                                    mode="multiple"
-                                    options={getFilteredApprovers(`mandatory_approver_${idx + 1}`)}
-                                    onChange={(val) => setForm(prev => ({
-                                        ...prev,
-                                        [`mandatory_approver_${idx + 1}`]: val,
-                                        financeFlags: {
-                                            ...prev.financeFlags,
-                                            [idx + 1]: false
-                                        }
-                                    }))}
-                                    disabled={!!form.financeFlags?.[idx + 1]}
-                                />
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
 
                     {/* Threshold Section */}
                     {form.enableThreshold === 'Yes' && (
-                        <div className="flex flex-col gap-5 border-t pt-5 border-gray-100 text-left">
-                            <h3 className="text-[13px] font-bold text-gray-900 text-left flex items-center gap-1.5 mb-1">
-                                <DollarSign size={16} className="text-amber-500" />
-                                Threshold Settings
-                            </h3>
-                            <div className="grid grid-cols-2 gap-6 items-end">
-                                <div className="flex flex-col gap-1 w-full text-left">
-                                    <label htmlFor="amount_threshold" className="text-[13px] font-medium text-gray-700">
-                                        <span className="text-red-500 mr-1">*</span>
-                                        Amount Threshold
-                                    </label>
-                                    <input
-                                        id="amount_threshold"
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="$ 0.00"
-                                        value={form.amount_threshold || ''}
-                                        onChange={(e) => setForm(prev => ({ ...prev, amount_threshold: e.target.value }))}
-                                        className="h-[40px] px-3 border border-[#D9D9D9] rounded-[8px] text-[14px] text-[#333333] outline-none
-                                            focus:border-[#24A1DD] focus:ring-1 focus:ring-[#24A1DD]/20 transition-all bg-white shadow-sm"
-                                    />
-                                </div>
+                        <div>
+                            <p className="text-sm font-semibold text-gray-700 mb-3">Threshold Settings</p>
+                            <div className="grid grid-cols-2 gap-4 items-end text-left">
+                                <CustomInput
+                                    label="Amount Threshold *"
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="$ 0.00"
+                                    value={form.amount_threshold || ''}
+                                    onChange={(e) => setForm(prev => ({ ...prev, amount_threshold: e.target.value }))}
+                                    className="mb-0"
+                                    height="40px"
+                                />
                                 <Dropdown
                                     label="Threshold Approver *"
                                     value={form.threshold_approver || []}
@@ -391,51 +359,39 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                     )}
 
                     {/* Posting Section (Always Mandatory and Required!) */}
-                    <div className="flex flex-col gap-5 border-t pt-5 border-gray-100">
-                        <h3 className="text-[13px] font-bold text-gray-900 text-left flex items-center gap-1.5 mb-1">
-                            <Send size={16} className="text-[#24A1DD]" />
-                            Posting Approver Settings
-                        </h3>
-                        <Dropdown
-                            label="Posting Approver *"
-                            required
-                            value={form.posting_approver || []}
-                            mode="multiple"
-                            options={financeApprovers}
-                            onChange={(val) => setForm(prev => ({ ...prev, posting_approver: val }))}
-                            placeholder="Select Posting Approver(s)"
-                        />
+                    <div>
+                        <p className="text-sm font-semibold text-gray-700 mb-3">Posting Approver Settings</p>
+                        <div className="grid grid-cols-2 gap-4 items-end text-left">
+                            <Dropdown
+                                label="Posting Approver *"
+                                required
+                                value={form.posting_approver || []}
+                                mode="multiple"
+                                options={financeApprovers}
+                                onChange={(val) => setForm(prev => ({ ...prev, posting_approver: val }))}
+                                placeholder="Select Posting Approver(s)"
+                            />
+                        </div>
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-3 px-8 py-5 border-t border-gray-100 bg-[#f9fafb] rounded-b-[16px]">
-                    <button
-                        onClick={onClose}
-                        className="px-6 h-[40px] text-[14px] font-medium text-gray-600 border border-gray-300 rounded-[8px] hover:bg-gray-100 hover:text-gray-800 transition-all"
-                        disabled={isSubmitting}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className={`px-8 h-[40px] text-[14px] font-semibold text-white bg-[#24A1DD] hover:bg-[#1d8cb8] rounded-[8px] transition-all shadow-sm flex items-center justify-center gap-2
-                            ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
-                        disabled={isSubmitting}
-                    >
-                        {isSubmitting ? (
-                            <>
-                                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                Saving...
-                            </>
-                        ) : 'Save Workflow'}
-                    </button>
+                {/* FOOTER */}
+                <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#E0E0E0] flex-shrink-0 bg-white">
+                    <div className="w-[100px]">
+                        <CustomButton onClick={onClose} disabled={isSubmitting}>Cancel</CustomButton>
+                    </div>
+                    <div className="w-[120px]">
+                        <CustomButton
+                            className="bg-blue-500 text-white"
+                            onClick={handleSave}
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? "Saving..." : "Save Workflow"}
+                        </CustomButton>
+                    </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 };
 
