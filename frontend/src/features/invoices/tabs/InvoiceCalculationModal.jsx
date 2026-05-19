@@ -47,7 +47,6 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"
-            onClick={onClose}
         >
             <div
                 className="bg-white w-[620px] max-h-[80vh] rounded-md shadow-md border flex flex-col"

@@ -663,6 +663,7 @@ const CodingTab = ({ isActive = false }) => {
                     footer={null}
                     width={600}
                     centered
+                    maskClosable={false}
                     styles={{ 
                         header: { padding: '20px 24px', borderBottom: '1px solid #f0f0f0', margin: 0, textAlign: 'center' }, 
                         body: { padding: 0 } 
