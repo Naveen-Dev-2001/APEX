@@ -563,13 +563,6 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                             {((["scanner", "coder"].some(r => userRole.includes(r)) && (currentStatus || "").toLowerCase() === "processed") ||
                                 (userRole.includes("coder") && (currentStatus || "").toLowerCase() === "waiting_coding")) && (
                                     <>
-                                        <button
-                                            onClick={handleRefresh}
-                                            disabled={!!actionLoading}
-                                            className={getBtnClass("blue", !actionLoading)}
-                                        >
-                                            {busy("refreshing") ? "Refreshing..." : "Refresh"}
-                                        </button>
                                         <div className="w-[130px]">
                                             <CustomButton variant="outline" height="h-[34px]" onClick={handleDiscard}>Discard</CustomButton>
                                         </div>
