@@ -257,6 +257,12 @@ export const useInvoiceStore = create((set, get) => ({
                 [key]: value,
             };
 
+            // Removed memo/notes sync because they are separate fields
+
+            // Sync totalAmount and totalInvoiceAmount since they also represent the same field
+            if (key === "totalAmount") updatedFormData.totalInvoiceAmount = value;
+            if (key === "totalInvoiceAmount") updatedFormData.totalAmount = value;
+
             const triggerKeys = [
                 "totalTaxAmount",
                 "tdsRate",
@@ -265,7 +271,7 @@ export const useInvoiceStore = create((set, get) => ({
                 "total_invoice_amount",
             ];
 
-            return { quickViewFormData: updatedFormData, };
+            return { quickViewFormData: updatedFormData };
         }),
 
 
@@ -310,7 +316,7 @@ export const useInvoiceStore = create((set, get) => ({
             totalAmount: data.extracted_data?.amounts?.total_invoice_amount?.value ?? "",
             totalPayable: data.extracted_data?.amounts?.amount_due?.value ?? "",
             amountPaid: data.extracted_data?.amounts?.amount_paid?.value ?? "",
-            memo: data.extracted_data?.additional_info?.notes_terms?.value ?? "",
+            memo: data.extracted_data?.additional_info?.memo?.value ?? "",
 
             invoiceType: data.extracted_data?.invoice_details?.type?.value ?? "",
             poNumber: data.extracted_data?.invoice_details?.po_number?.value ?? "",

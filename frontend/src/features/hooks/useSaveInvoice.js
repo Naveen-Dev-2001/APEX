@@ -211,7 +211,8 @@ export const useSaveInvoice = () => {
 
             additional_info: {
                 ...activeInvoiceData.extracted_data?.additional_info,
-                notes_terms: { ...activeInvoiceData.extracted_data?.additional_info?.notes_terms, value: f.notes || f.memo },
+                notes_terms: { ...activeInvoiceData.extracted_data?.additional_info?.notes_terms, value: f.notes },
+                memo: { ...activeInvoiceData.extracted_data?.additional_info?.memo, value: f.memo },
                 qr_code_irn: { ...activeInvoiceData.extracted_data?.additional_info?.qr_code_irn, value: f.qrOrIrn },
                 company_registration_number: { ...activeInvoiceData.extracted_data?.additional_info?.company_registration_number, value: f.companyRegistrationNumber },
             },
