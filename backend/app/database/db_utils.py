@@ -43,12 +43,10 @@ def get_status_label(invoice: Invoice, db: Session = None) -> str:
 
     # Get max level and current level config
     max_level = None
-    current_approver_config = None
 
     if invoice.assigned_approvers_list:
         # Use already loaded relationship for performance
         max_level = max((a.sequence_order for a in invoice.assigned_approvers_list), default=None)
-        current_approver_config = next((a for a in invoice.assigned_approvers_list if a.sequence_order == level), None)
     else:
         # Fallback to DB query if relationship not loaded
         if not db:
@@ -58,25 +56,33 @@ def get_status_label(invoice: Invoice, db: Session = None) -> str:
             max_level = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
                 InvoiceAssignedApprover.invoice_id == invoice.id
             ).scalar()
-            current_approver_config = db.query(InvoiceAssignedApprover).filter(
-                InvoiceAssignedApprover.invoice_id == invoice.id,
-                InvoiceAssignedApprover.sequence_order == level
-            ).first()
 
-    if max_level and level == max_level:
-        # The final level is always the posting level
-        return "Waiting for posting approver"
+    breakdown = {}
+    if invoice.approver_breakdown:
+        try:
+            breakdown = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+        except:
+            pass
 
-    # Per user request: Level 1 and 2 always show as "Waiting for approver N"
-    # Even if they are technically threshold levels in the workflow.
-    if level in [1, 2]:
-        return f"Waiting for approver {level}"
+    has_posting = breakdown.get("has_posting_approver", False)
+    has_threshold = breakdown.get("has_threshold_approver", False)
 
-    if current_approver_config and not current_approver_config.is_finance:
-        # Threshold label for levels 3+ (if not finance)
-        return "Waiting for threshold approver"
+    if max_level:
+        posting_level = max_level if has_posting else None
+        threshold_level = None
+        if has_threshold:
+            threshold_level = (max_level - 1) if has_posting else max_level
+            
+        if posting_level and level == posting_level:
+            return "Waiting for posting approver"
+            
+        # Per user request: Level 1 and 2 always show as "Waiting for approver N"
+        if level in [1, 2]:
+            return f"Waiting for approver {level}"
+            
+        if threshold_level and level == threshold_level:
+            return "Waiting for threshold approver"
 
-    # Default for Level 3+ finance levels
     return f"Waiting for approver {level}"
 
 

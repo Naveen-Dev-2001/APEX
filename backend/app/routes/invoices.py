@@ -109,37 +109,42 @@ def _apply_status_label_filters(status_vals, expressions, db):
                 level_str = val_str.replace("Waiting for approver ", "").strip()
                 level = int(level_str)
                 
-                # Logic: Waiting for approver 1/2 always matches those levels (if not last)
-                # For levels 3+, it only matches if it's a finance level.
                 max_level_sq = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
                     InvoiceAssignedApprover.invoice_id == Invoice.id
                 ).correlate(Invoice).scalar_subquery()
                 
-                is_threshold_sq = exists().where(
-                    and_(
-                        InvoiceAssignedApprover.invoice_id == Invoice.id,
-                        InvoiceAssignedApprover.sequence_order == level,
-                        InvoiceAssignedApprover.is_finance == False
-                    )
+                has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
+                has_threshold_cond = Invoice.approver_breakdown.ilike('%"has_threshold_approver": true%')
+                
+                posting_level_expr = func.case(
+                    (has_posting_cond, max_level_sq),
+                    else_=-1 # dummy value that won't match a level
+                )
+                
+                threshold_level_expr = func.case(
+                    (and_(has_posting_cond, has_threshold_cond), max_level_sq - 1),
+                    (has_threshold_cond, max_level_sq),
+                    else_=-1 # dummy value that won't match a level
                 )
                 
                 if level in [1, 2]:
-                    # For levels 1 and 2, we don't care about the is_finance flag for the label
+                    # For levels 1 and 2, we don't care if they are technically threshold levels for the label, 
+                    # they always show as "Waiting for approver N", EXCEPT if they are the posting approver.
                     conditions.append(
                         and_(
                             Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
                             Invoice.current_approver_level == level,
-                            Invoice.current_approver_level != max_level_sq
+                            Invoice.current_approver_level != posting_level_expr
                         )
                     )
                 else:
-                    # For levels 3+, only match if it's NOT a threshold level
+                    # For levels 3+, match if it's NOT the threshold level and NOT the posting level
                     conditions.append(
                         and_(
                             Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
                             Invoice.current_approver_level == level,
-                            Invoice.current_approver_level != max_level_sq,
-                            ~is_threshold_sq
+                            Invoice.current_approver_level != posting_level_expr,
+                            Invoice.current_approver_level != threshold_level_expr
                         )
                     )
             except:
@@ -149,20 +154,20 @@ def _apply_status_label_filters(status_vals, expressions, db):
                 InvoiceAssignedApprover.invoice_id == Invoice.id
             ).correlate(Invoice).scalar_subquery()
             
-            is_threshold_sq = exists().where(
-                and_(
-                    InvoiceAssignedApprover.invoice_id == Invoice.id,
-                    InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
-                    InvoiceAssignedApprover.is_finance == False
-                )
+            has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
+            has_threshold_cond = Invoice.approver_breakdown.ilike('%"has_threshold_approver": true%')
+            
+            threshold_level_expr = func.case(
+                (and_(has_posting_cond, has_threshold_cond), max_level_sq - 1),
+                (has_threshold_cond, max_level_sq),
+                else_=-1
             )
             
             conditions.append(
                 and_(
                     Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
-                    Invoice.current_approver_level != max_level_sq,
-                    Invoice.current_approver_level > 2, # Threshold label only for 3+
-                    is_threshold_sq
+                    Invoice.current_approver_level > 2, # Threshold label only applies if level > 2
+                    Invoice.current_approver_level == threshold_level_expr
                 )
             )
         elif val_str == "Waiting for posting approver":
@@ -170,10 +175,17 @@ def _apply_status_label_filters(status_vals, expressions, db):
                 InvoiceAssignedApprover.invoice_id == Invoice.id
             ).correlate(Invoice).scalar_subquery()
             
+            has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
+            
+            posting_level_expr = func.case(
+                (has_posting_cond, max_level_sq),
+                else_=-1
+            )
+            
             conditions.append(
                 and_(
                     Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
-                    Invoice.current_approver_level == max_level_sq
+                    Invoice.current_approver_level == posting_level_expr
                 )
             )
         else:
