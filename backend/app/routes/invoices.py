@@ -1523,7 +1523,7 @@ async def get_invoice_filter_options(
     return formatted_options
 
 
-@router.get("/{invoice_id}/", response_model=InvoiceResponse)
+@router.get("/{invoice_id}", response_model=InvoiceResponse)
 async def get_invoice(
     invoice_id: int,
     current_user: UserResponse = Depends(get_current_user),
