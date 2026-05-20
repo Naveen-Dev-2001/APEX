@@ -191,6 +191,8 @@ def _is_future_threshold_approver_db(db: Session, invoice_id: int, email: str, c
     Query the DB to determine if `email` is a threshold approver for this invoice
     at a stage LATER than the current level.
     """
+    if not _has_threshold_db(db, invoice_id):
+        return False
     try:
         from sqlalchemy import func as sqla_func
         max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
@@ -252,6 +254,12 @@ def _is_finance_level_db(db: Session, invoice_id: int, level: int) -> bool:
 def _has_threshold_db(db: Session, invoice_id: int) -> bool:
     """Check if invoice has a threshold stage in DB."""
     try:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        if invoice and invoice.approver_breakdown:
+            bd = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+            if isinstance(bd, dict) and "has_threshold_approver" in bd:
+                return bool(bd.get("has_threshold_approver"))
+
         from sqlalchemy import func as sqla_func
         max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
             InvoiceAssignedApprover.invoice_id == invoice_id
@@ -270,6 +278,12 @@ def _has_threshold_db(db: Session, invoice_id: int) -> bool:
 def _has_posting_db(db: Session, invoice_id: int) -> bool:
     """Check if invoice has a posting stage in DB."""
     try:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        if invoice and invoice.approver_breakdown:
+            bd = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+            if isinstance(bd, dict) and "has_posting_approver" in bd:
+                return bool(bd.get("has_posting_approver"))
+
         from sqlalchemy import func as sqla_func
         max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
             InvoiceAssignedApprover.invoice_id == invoice_id
@@ -1024,12 +1038,33 @@ async def get_ui_status_from_frontend(
             #authoritative check for is_finance_level using DB.
             is_fin_lvl_db = is_finance_level or _is_finance_level_db(db, invoice_id, current_level)
             
+            is_assigned_at_later_level = False
+            from sqlalchemy import func as sqla_func
+            max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                InvoiceAssignedApprover.invoice_id == invoice_id
+            ).scalar() or 0
+
+            for idx, entry in enumerate(assigned):
+                entry_level = entry.get("level") or (idx + 1)
+                if entry_level > current_level:
+                    is_entry_posting = (
+                        entry.get("type") == "posting"
+                        or entry_level == max_seq
+                    )
+                    if is_entry_posting or entry.get("is_finance"):
+                        continue
+                    entry_emails = [e.lower() for e in _parse_list(entry.get("emails", []))]
+                    if email in entry_emails:
+                        is_assigned_at_later_level = True
+                        break
+
+
             is_threshold_at_lower_level = (
                 is_fin_lvl_db
                 and _is_future_threshold_approver_db(db, invoice_id, email, current_level)
             )
 
-            if is_threshold_at_lower_level:
+            if is_threshold_at_lower_level or (is_fin_lvl_db and is_assigned_at_later_level):
                 user_in_level = False
             else:
                 user_in_level = (
@@ -1254,7 +1289,7 @@ async def approve_invoice(
                 delegated_authority = True
                 break
 
-        # ── Block threshold approvers from acting at lower Finance Team levels ──
+        # ── Block threshold approvers and future level approvers from acting at lower Finance Team levels ──
         # Query the DB directly — the snapshot reconstruction loses 'type' info,
         # so we cannot rely on threshold_entries being populated here.
         is_threshold_approver_here = (
@@ -1262,9 +1297,36 @@ async def approve_invoice(
             and _is_future_threshold_approver_db(db, invoice_id, email, current_level)
         )
 
+        is_posting_approver_here = (
+            email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]
+            or _is_posting_approver_db(db, invoice_id, email)
+        )
+
+        is_assigned_at_later_level = False
+        from sqlalchemy import func as sqla_func
+        max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id
+        ).scalar() or 0
+
+        for idx, entry in enumerate(assigned):
+            entry_level = entry.get("level") or (idx + 1)
+            if entry_level > current_level:
+                is_entry_posting = (
+                    entry.get("type") == "posting"
+                    or entry_level == max_seq
+                )
+                if is_entry_posting or entry.get("is_finance"):
+                    continue
+                entry_emails = [e.lower() for e in _parse_list(entry.get("emails", []))]
+                if email in entry_emails:
+                    is_assigned_at_later_level = True
+                    break
+
+
         user_eligible = (
             (is_finance_level and email in [f.lower() for f in finance_users]
-             and not is_threshold_approver_here)
+             and not is_threshold_approver_here
+             and not is_assigned_at_later_level)
             or (not is_finance_level and email in emails_at_level)
             or delegated_authority
         )
@@ -1272,6 +1334,9 @@ async def approve_invoice(
             if is_threshold_approver_here:
                 raise HTTPException(
                     403, "You are a threshold approver and cannot act at Finance Team levels.")
+            if is_finance_level and is_assigned_at_later_level:
+                raise HTTPException(
+                    403, "You are assigned to a later level of this workflow and cannot approve as a generic finance team member.")
             raise HTTPException(
                 403, f"You are not an approver for level {current_level}")
 
