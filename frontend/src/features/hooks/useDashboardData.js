@@ -14,12 +14,12 @@ export const useDashboardData = () => {
     const entity = useCommonStore((state) => state.entity)
     const results = useQueries({
         queries: [
-            { queryKey: ["summary", entity], queryFn: getSummary },
-            { queryKey: ["aging", entity], queryFn: getAging },
-            { queryKey: ["status", entity], queryFn: getStatusBreakdown },
-            { queryKey: ["vendors", entity], queryFn: getVendors },
-            { queryKey: ["topVendors", entity], queryFn: getTopVendors },
-            { queryKey: ["payments", entity], queryFn: getPayments },
+            { queryKey: ["dashboard", "summary", entity], queryFn: getSummary },
+            { queryKey: ["dashboard", "aging", entity], queryFn: getAging },
+            { queryKey: ["dashboard", "status", entity], queryFn: getStatusBreakdown },
+            { queryKey: ["dashboard", "vendors", entity], queryFn: getVendors },
+            { queryKey: ["dashboard", "topVendors", entity], queryFn: getTopVendors },
+            { queryKey: ["dashboard", "payments", entity], queryFn: getPayments },
         ],
     });
 
@@ -32,6 +32,7 @@ export const useDashboardData = () => {
         payments: results[5].data,
 
         isLoading: results.some(q => q.isLoading),
+        isFetching: results.some(q => q.isFetching),
         isError: results.some(q => q.isError),
     };
 };

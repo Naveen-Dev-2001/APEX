@@ -10,6 +10,7 @@ import { Skeleton } from "antd";
 import { useInvoiceData } from "../hooks/useInvoiceData";
 import { getCondensedColumns, getFullColumns, VIEW_OPTIONS } from "./invoiceColumns";
 import { useInvoiceStore } from "../../store/invoice.store";
+import { useQueryClient } from "@tanstack/react-query";
 import { v4 as uuidv4 } from 'uuid';
 import AddInvoiceModal from "./AddInvoiceModel";
 import { getInvoices, fetchDeletedInvoices, deleteInvoice, uploadInvoices, cancelUpload, fetchEntityMaster, getInvoiceFilterOptions, archiveInvoice, bulkDeleteInvoices, bulkArchiveInvoices } from "../../api/invoiceApi";
@@ -38,6 +39,7 @@ const ACCESSOR_TO_DB_FIELD = {
 };
 
 const Invoice = () => {
+    const queryClient = useQueryClient();
     const {
         invoiceSection, skip, limit, view, setView, setInvoiceSection,
         setIsModalOpen, isModalOpen, setFileName, setViewInvoiceId,
@@ -178,6 +180,7 @@ const Invoice = () => {
         try {
             await deleteInvoice(data.id);
             toast.success("Invoice deleted successfully");
+            await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
             refetch();
             setDeleteModalState({ isOpen: false, data: null, loading: false });
         } catch (err) {
@@ -198,6 +201,7 @@ const Invoice = () => {
         try {
             await archiveInvoice(data.id);
             toast.success("Invoice archived successfully");
+            await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
             refetch();
             setArchiveModalState({ isOpen: false, data: null, loading: false });
         } catch (err) {
@@ -214,7 +218,10 @@ const Invoice = () => {
             const res = await bulkDeleteInvoices(selectedInvoiceIds);
             const successCount = res.success?.length || 0;
             const failedCount = res.failed?.length || 0;
-            if (successCount > 0) toast.success(`Successfully deleted ${successCount} invoices`);
+            if (successCount > 0) {
+                toast.success(`Successfully deleted ${successCount} invoices`);
+                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+            }
             if (failedCount > 0) toast.error(`Failed to delete ${failedCount} invoices`);
             setSelectedInvoiceIds([]);
             refetch();
@@ -233,7 +240,10 @@ const Invoice = () => {
             const res = await bulkArchiveInvoices(selectedInvoiceIds);
             const successCount = res.success?.length || 0;
             const failedCount = res.failed?.length || 0;
-            if (successCount > 0) toast.success(`Successfully archived ${successCount} invoices`);
+            if (successCount > 0) {
+                toast.success(`Successfully archived ${successCount} invoices`);
+                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+            }
             if (failedCount > 0) toast.error(`Failed to archive ${failedCount} invoices`);
             setSelectedInvoiceIds([]);
             refetch();
@@ -311,6 +321,7 @@ const Invoice = () => {
             }, controller.signal);
             setUploadProgress(100);
             toast.success(`${response?.data?.count ?? files.length} file(s) processed successfully!`);
+            await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
             await refetch();
             if (files.length === 1 && response?.data?.invoices?.length > 0) handleView(response.data.invoices[0]);
             else setInvoiceSection(1);

@@ -205,7 +205,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             // THEN: success case
             if (payload?.status === "waiting_coding") {
                 toast.success("Invoice sent for coding successfully!");
-                await queryClient.invalidateQueries(["invoices"]);
+                await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
                 resetQuickView();
                 setInvoiceSection(1);
                 navigate("/invoices");
@@ -264,7 +265,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             });
             if (payload?.status === "waiting_approval") {
                 toast.success("Invoice sent for approval successfully!");
-                await queryClient.invalidateQueries(["invoices"]);
+                await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
                 resetQuickView();
                 setInvoiceSection(1);
                 navigate("/coding");
@@ -295,8 +297,9 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             const response = await handleSave(extraFields, vendor);
             if (response) {
                 toast.success("Invoice Saved Successfully!");
-                await queryClient.invalidateQueries(["invoices"]);
-                await queryClient.invalidateQueries(["invoice-preview", viewInvoiceId]);
+                await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+                await queryClient.invalidateQueries({ queryKey: ["invoice-preview", viewInvoiceId] });
+                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
 
                 // ── Lock fields back to read-only after save ────────────────────
                 // Resetting editingEnabled hides the Save button and re-shows
@@ -333,12 +336,13 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
         setActionLoading("refreshing");
         try {
             await Promise.all([
-                queryClient.invalidateQueries(["invoice-preview", viewInvoiceId]),
-                queryClient.invalidateQueries(["workflow", viewInvoiceId]),
-                queryClient.invalidateQueries(["auditFlow", viewInvoiceId]),
-                queryClient.invalidateQueries(["vendor", selectedVendorId]),
-                queryClient.invalidateQueries(["coding-suggestions", viewInvoiceId, selectedVendorId]),
-                queryClient.invalidateQueries(["invoices"]),
+                queryClient.invalidateQueries({ queryKey: ["invoice-preview", viewInvoiceId] }),
+                queryClient.invalidateQueries({ queryKey: ["workflow", viewInvoiceId] }),
+                queryClient.invalidateQueries({ queryKey: ["auditFlow", viewInvoiceId] }),
+                queryClient.invalidateQueries({ queryKey: ["vendor", selectedVendorId] }),
+                queryClient.invalidateQueries({ queryKey: ["coding-suggestions", viewInvoiceId, selectedVendorId] }),
+                queryClient.invalidateQueries({ queryKey: ["invoices"] }),
+                queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
             ]);
 
             await fetchUIStatus();
@@ -414,9 +418,10 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             }
 
             // Invalidate cache to ensure fresh data on next view
-            queryClient.invalidateQueries(["workflow", viewInvoiceId]);
-            queryClient.invalidateQueries(["auditFlow", viewInvoiceId]);
-            queryClient.invalidateQueries(["invoices"]);
+            queryClient.invalidateQueries({ queryKey: ["workflow", viewInvoiceId] });
+            queryClient.invalidateQueries({ queryKey: ["auditFlow", viewInvoiceId] });
+            queryClient.invalidateQueries({ queryKey: ["invoices"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard"] });
 
             resetQuickView();
 
