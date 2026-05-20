@@ -228,7 +228,7 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                 {/* BODY */}
                 <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
                     {/* Read-Only Criteria Section */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 grid grid-cols-2 gap-x-6 gap-y-4 text-left">
+                    {/* <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 grid grid-cols-2 gap-x-6 gap-y-4 text-left">
                         <div className="flex flex-col">
                             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Vendor Match</span>
                             <span className="text-[13px] font-semibold text-gray-700 mt-0.5 truncate" title={invoice?.vendor_name}>
@@ -249,7 +249,7 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Department</span>
                             <span className="text-[13px] font-semibold text-gray-700 mt-0.5">{deptVal}</span>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Step Configuration */}
                     <div className="grid grid-cols-2 gap-4 items-end">
