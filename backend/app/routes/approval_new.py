@@ -152,15 +152,19 @@ def _parse_list(val: Any) -> List[str]:
     return []
 
 
-def _check_concurrency(invoice: Invoice, last_updated_at: Optional[datetime]):
+def _check_concurrency(db: Session, invoice: Invoice, last_updated_at: Optional[datetime], current_user: UserResponse):
     if last_updated_at and invoice.updated_at:
         db_ts = invoice.updated_at.replace(microsecond=0)
         req_ts = last_updated_at.replace(microsecond=0)
         if db_ts > req_ts:
-            raise HTTPException(
-                status_code=409,
-                detail="This invoice has been modified by another user. Please refresh."
-            )
+            from app.models.db_models import AuditLog
+            latest_audit = db.query(AuditLog).filter(AuditLog.invoice_id == invoice.id).order_by(AuditLog.timestamp.desc()).first()
+            last_audit_user = latest_audit.user if latest_audit else None
+            if not last_audit_user or (last_audit_user != current_user.email and last_audit_user != current_user.username):
+                raise HTTPException(
+                    status_code=409,
+                    detail="This invoice has been modified by another user. Please refresh."
+                )
 
 
 def _get_finance_users(db: Session, entity: str) -> List[str]:
@@ -187,6 +191,8 @@ def _is_future_threshold_approver_db(db: Session, invoice_id: int, email: str, c
     Query the DB to determine if `email` is a threshold approver for this invoice
     at a stage LATER than the current level.
     """
+    if not _has_threshold_db(db, invoice_id):
+        return False
     try:
         from sqlalchemy import func as sqla_func
         max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
@@ -248,6 +254,12 @@ def _is_finance_level_db(db: Session, invoice_id: int, level: int) -> bool:
 def _has_threshold_db(db: Session, invoice_id: int) -> bool:
     """Check if invoice has a threshold stage in DB."""
     try:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        if invoice and invoice.approver_breakdown:
+            bd = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+            if isinstance(bd, dict) and "has_threshold_approver" in bd:
+                return bool(bd.get("has_threshold_approver"))
+
         from sqlalchemy import func as sqla_func
         max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
             InvoiceAssignedApprover.invoice_id == invoice_id
@@ -266,6 +278,12 @@ def _has_threshold_db(db: Session, invoice_id: int) -> bool:
 def _has_posting_db(db: Session, invoice_id: int) -> bool:
     """Check if invoice has a posting stage in DB."""
     try:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        if invoice and invoice.approver_breakdown:
+            bd = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+            if isinstance(bd, dict) and "has_posting_approver" in bd:
+                return bool(bd.get("has_posting_approver"))
+
         from sqlalchemy import func as sqla_func
         max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
             InvoiceAssignedApprover.invoice_id == invoice_id
@@ -1020,12 +1038,33 @@ async def get_ui_status_from_frontend(
             #authoritative check for is_finance_level using DB.
             is_fin_lvl_db = is_finance_level or _is_finance_level_db(db, invoice_id, current_level)
             
+            is_assigned_at_later_level = False
+            from sqlalchemy import func as sqla_func
+            max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+                InvoiceAssignedApprover.invoice_id == invoice_id
+            ).scalar() or 0
+
+            for idx, entry in enumerate(assigned):
+                entry_level = entry.get("level") or (idx + 1)
+                if entry_level > current_level:
+                    is_entry_posting = (
+                        entry.get("type") == "posting"
+                        or entry_level == max_seq
+                    )
+                    if is_entry_posting or entry.get("is_finance"):
+                        continue
+                    entry_emails = [e.lower() for e in _parse_list(entry.get("emails", []))]
+                    if email in entry_emails:
+                        is_assigned_at_later_level = True
+                        break
+
+
             is_threshold_at_lower_level = (
                 is_fin_lvl_db
                 and _is_future_threshold_approver_db(db, invoice_id, email, current_level)
             )
 
-            if is_threshold_at_lower_level:
+            if is_threshold_at_lower_level or (is_fin_lvl_db and is_assigned_at_later_level):
                 user_in_level = False
             else:
                 user_in_level = (
@@ -1107,12 +1146,14 @@ async def get_ui_status_from_frontend(
                 and s.step_type == StepType.POSTING_APPROVED
                 for s in steps_for_level_check
             )
-            if current_level > len(mandatory) and not already_posting_approved:
+            # Guard: posting approver can only act once threshold (if any) is done
+            posting_stage_ready = not has_threshold or threshold_done
+            if current_level > len(mandatory) and not already_posting_approved and posting_stage_ready:
                 can_act = True
             else:
                 current_lvl_entry = next(
                     (e for e in assigned if e.get("level") == current_level), None)
-                if current_lvl_entry and current_lvl_entry.get("type") == "posting" and not already_posting_approved:
+                if current_lvl_entry and current_lvl_entry.get("type") == "posting" and not already_posting_approved and posting_stage_ready:
                     can_act = True
  
         elif is_threshold_approver:
@@ -1188,7 +1229,7 @@ async def approve_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -1226,7 +1267,7 @@ async def approve_invoice(
     has_posting = bool(posting_entries)
 
     # ── CASE A: Mandatory levels ──
-    if not mandatory_levels_done:
+    if current_level <= len(mandatory):
         level_entry = next(
             (e for e in mandatory if e.get("level") == current_level), None
         )
@@ -1248,7 +1289,7 @@ async def approve_invoice(
                 delegated_authority = True
                 break
 
-        # ── Block threshold approvers from acting at lower Finance Team levels ──
+        # ── Block threshold approvers and future level approvers from acting at lower Finance Team levels ──
         # Query the DB directly — the snapshot reconstruction loses 'type' info,
         # so we cannot rely on threshold_entries being populated here.
         is_threshold_approver_here = (
@@ -1256,9 +1297,36 @@ async def approve_invoice(
             and _is_future_threshold_approver_db(db, invoice_id, email, current_level)
         )
 
+        is_posting_approver_here = (
+            email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]
+            or _is_posting_approver_db(db, invoice_id, email)
+        )
+
+        is_assigned_at_later_level = False
+        from sqlalchemy import func as sqla_func
+        max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id
+        ).scalar() or 0
+
+        for idx, entry in enumerate(assigned):
+            entry_level = entry.get("level") or (idx + 1)
+            if entry_level > current_level:
+                is_entry_posting = (
+                    entry.get("type") == "posting"
+                    or entry_level == max_seq
+                )
+                if is_entry_posting or entry.get("is_finance"):
+                    continue
+                entry_emails = [e.lower() for e in _parse_list(entry.get("emails", []))]
+                if email in entry_emails:
+                    is_assigned_at_later_level = True
+                    break
+
+
         user_eligible = (
             (is_finance_level and email in [f.lower() for f in finance_users]
-             and not is_threshold_approver_here)
+             and not is_threshold_approver_here
+             and not is_assigned_at_later_level)
             or (not is_finance_level and email in emails_at_level)
             or delegated_authority
         )
@@ -1266,6 +1334,9 @@ async def approve_invoice(
             if is_threshold_approver_here:
                 raise HTTPException(
                     403, "You are a threshold approver and cannot act at Finance Team levels.")
+            if is_finance_level and is_assigned_at_later_level:
+                raise HTTPException(
+                    403, "You are assigned to a later level of this workflow and cannot approve as a generic finance team member.")
             raise HTTPException(
                 403, f"You are not an approver for level {current_level}")
 
@@ -1671,7 +1742,7 @@ async def reject_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -1796,7 +1867,7 @@ async def rework_invoice(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -1978,7 +2049,7 @@ async def enable_editing(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -2065,7 +2136,7 @@ async def repost_to_sage(
     if not invoice:
         raise HTTPException(404, "Invoice not found")
 
-    _check_concurrency(invoice, payload.last_updated_at)
+    _check_concurrency(db, invoice, payload.last_updated_at, current_user)
 
     current_status = (
         invoice.status.value
@@ -2187,7 +2258,7 @@ async def recall_invoice(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    _check_concurrency(invoice, request.last_updated_at)
+    _check_concurrency(db, invoice, request.last_updated_at, current_user)
 
     # Strictly Coder check
     user_role = (current_user.role or "").lower()

@@ -3,7 +3,7 @@ import { getAudit, getworkflowApprovers, getWorkflowData } from "../../api/invoi
 
 export const useWorkflowDataSync = (invoiceId, params = {}) => {
 
-    const { data, isLoading, isError } = useQuery({
+    const { data, isLoading, isError, refetch } = useQuery({
         queryKey: ["workflow", invoiceId, params],
         queryFn: () => getWorkflowData(invoiceId, params),
         enabled: !!invoiceId,
@@ -15,6 +15,7 @@ export const useWorkflowDataSync = (invoiceId, params = {}) => {
         workflowData: data,
         isLoadingWorkflowData: isLoading,
         isWorkflowDataError: isError,
+        refetchWorkflowData: refetch,
     };
 };
 

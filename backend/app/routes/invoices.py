@@ -109,37 +109,42 @@ def _apply_status_label_filters(status_vals, expressions, db):
                 level_str = val_str.replace("Waiting for approver ", "").strip()
                 level = int(level_str)
                 
-                # Logic: Waiting for approver 1/2 always matches those levels (if not last)
-                # For levels 3+, it only matches if it's a finance level.
                 max_level_sq = db.query(func.max(InvoiceAssignedApprover.sequence_order)).filter(
                     InvoiceAssignedApprover.invoice_id == Invoice.id
                 ).correlate(Invoice).scalar_subquery()
                 
-                is_threshold_sq = exists().where(
-                    and_(
-                        InvoiceAssignedApprover.invoice_id == Invoice.id,
-                        InvoiceAssignedApprover.sequence_order == level,
-                        InvoiceAssignedApprover.is_finance == False
-                    )
+                has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
+                has_threshold_cond = Invoice.approver_breakdown.ilike('%"has_threshold_approver": true%')
+                
+                posting_level_expr = func.case(
+                    (has_posting_cond, max_level_sq),
+                    else_=-1 # dummy value that won't match a level
+                )
+                
+                threshold_level_expr = func.case(
+                    (and_(has_posting_cond, has_threshold_cond), max_level_sq - 1),
+                    (has_threshold_cond, max_level_sq),
+                    else_=-1 # dummy value that won't match a level
                 )
                 
                 if level in [1, 2]:
-                    # For levels 1 and 2, we don't care about the is_finance flag for the label
+                    # For levels 1 and 2, we don't care if they are technically threshold levels for the label, 
+                    # they always show as "Waiting for approver N", EXCEPT if they are the posting approver.
                     conditions.append(
                         and_(
                             Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
                             Invoice.current_approver_level == level,
-                            Invoice.current_approver_level != max_level_sq
+                            Invoice.current_approver_level != posting_level_expr
                         )
                     )
                 else:
-                    # For levels 3+, only match if it's NOT a threshold level
+                    # For levels 3+, match if it's NOT the threshold level and NOT the posting level
                     conditions.append(
                         and_(
                             Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
                             Invoice.current_approver_level == level,
-                            Invoice.current_approver_level != max_level_sq,
-                            ~is_threshold_sq
+                            Invoice.current_approver_level != posting_level_expr,
+                            Invoice.current_approver_level != threshold_level_expr
                         )
                     )
             except:
@@ -149,20 +154,20 @@ def _apply_status_label_filters(status_vals, expressions, db):
                 InvoiceAssignedApprover.invoice_id == Invoice.id
             ).correlate(Invoice).scalar_subquery()
             
-            is_threshold_sq = exists().where(
-                and_(
-                    InvoiceAssignedApprover.invoice_id == Invoice.id,
-                    InvoiceAssignedApprover.sequence_order == Invoice.current_approver_level,
-                    InvoiceAssignedApprover.is_finance == False
-                )
+            has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
+            has_threshold_cond = Invoice.approver_breakdown.ilike('%"has_threshold_approver": true%')
+            
+            threshold_level_expr = func.case(
+                (and_(has_posting_cond, has_threshold_cond), max_level_sq - 1),
+                (has_threshold_cond, max_level_sq),
+                else_=-1
             )
             
             conditions.append(
                 and_(
                     Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
-                    Invoice.current_approver_level != max_level_sq,
-                    Invoice.current_approver_level > 2, # Threshold label only for 3+
-                    is_threshold_sq
+                    Invoice.current_approver_level > 2, # Threshold label only applies if level > 2
+                    Invoice.current_approver_level == threshold_level_expr
                 )
             )
         elif val_str == "Waiting for posting approver":
@@ -170,10 +175,17 @@ def _apply_status_label_filters(status_vals, expressions, db):
                 InvoiceAssignedApprover.invoice_id == Invoice.id
             ).correlate(Invoice).scalar_subquery()
             
+            has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
+            
+            posting_level_expr = func.case(
+                (has_posting_cond, max_level_sq),
+                else_=-1
+            )
+            
             conditions.append(
                 and_(
                     Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
-                    Invoice.current_approver_level == max_level_sq
+                    Invoice.current_approver_level == posting_level_expr
                 )
             )
         else:
@@ -1511,7 +1523,324 @@ async def get_invoice_filter_options(
     return formatted_options
 
 
-@router.get("/{invoice_id}/", response_model=InvoiceResponse)
+@router.get("/deleted", summary="List deleted (archived) invoices")
+async def list_deleted_invoices(
+    entity: str = Depends(get_current_entity),
+    vendor_id: Optional[str] = Query(None, description="Filter by vendor ID"),
+    invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50),
+    sort_by: str = Query("deleted_at", description="Field to sort by"),
+    sort_dir: str = Query("desc", description="Sort direction (asc/desc)"),
+    filters: Optional[str] = Query(None, description="JSON string of filters"),
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Return a paginated list of soft-deleted (archived) invoices.
+    Accessible by all authenticated users.
+    """
+    # [Requirement Update] Deleted invoices can be viewed by all roles.
+    # if current_user.role != "admin":
+    #     raise HTTPException(status_code=403, detail="Only admins can view deleted invoices")
+
+    query = db.query(DeletedInvoice)
+    if entity:
+        query = query.filter(DeletedInvoice.entity == entity)
+    if vendor_id:
+        query = query.filter(DeletedInvoice.vendor_id == vendor_id)
+    if invoice_number:
+        query = query.filter(DeletedInvoice.invoice_number == invoice_number)
+
+    if filters:
+        try:
+            extra_filters = json.loads(filters)
+            if isinstance(extra_filters, dict):
+                # Apply date casting for date fields if needed by _apply_filters
+                for k, v in list(extra_filters.items()):
+                    col_attr = getattr(DeletedInvoice, k, None)
+                    if col_attr is not None and hasattr(col_attr, "type"):
+                        from sqlalchemy import Date, DateTime, cast
+                        if isinstance(col_attr.type, (Date, DateTime)):
+                            vals = v if isinstance(v, list) else [v]
+                            try:
+                                parsed_dates = [datetime.strptime(str(x), "%m-%d-%Y").date() for x in vals]
+                                query = query.filter(cast(col_attr, Date).in_(parsed_dates))
+                                del extra_filters[k]
+                            except:
+                                pass
+                
+                # Apply remaining filters using repo helper for robustness (between, ops, etc)
+                query = deleted_invoice_repo._apply_filters(query, extra_filters)
+        except Exception as e:
+            print(f"Error parsing filters in list_deleted_invoices: {e}")
+
+
+    # Dynamic sorting
+    if hasattr(DeletedInvoice, sort_by):
+        col = getattr(DeletedInvoice, sort_by)
+        if sort_dir.lower() == "desc":
+            query = query.order_by(col.desc())
+        else:
+            query = query.order_by(col.asc())
+    else:
+        query = query.order_by(DeletedInvoice.deleted_at.desc())
+
+    # Extra role filtering for non-finance approvers in archived invoices
+    user_roles = [r.strip().lower() for r in current_user.role.split(",")]
+    user_dept = (current_user.department or "").lower()
+    
+    is_approver = "approver" in user_roles
+    is_admin = "admin" in user_roles
+    is_finance = "finance" in user_dept and "non-finance" not in user_dept
+
+    if is_approver and not is_admin and not is_finance:
+        from app.models.db_models import Delegation
+        curr_time = get_ist_now()
+        active_delegations = db.query(Delegation.delegator_email).filter(
+            Delegation.substitute_email.ilike(current_user.email),
+            Delegation.entity == entity,
+            Delegation.start_date <= curr_time,
+            Delegation.end_date >= curr_time
+        ).all()
+        target_emails = [current_user.email.lower()] + [d[0].lower() for d in active_delegations]
+        
+        from sqlalchemy import or_
+        # DeletedInvoice has assigned_approvers_json (JSON string snapshot)
+        # We use ILIKE to search for any target email within the JSON string
+        email_filters = [DeletedInvoice.assigned_approvers_json.ilike(f"%{email}%") for email in target_emails]
+        if email_filters:
+            query = query.filter(or_(*email_filters))
+        else:
+            # If no target emails (shouldn't happen), return nothing for safety
+            query = query.filter(DeletedInvoice.id == -1)
+
+    total = query.count()
+    if limit == -1:
+        records = query.all()
+    else:
+        records = query.offset(skip).limit(limit).all()
+
+    def _serialize(r: DeletedInvoice):
+        # Parse JSON fields safely
+        try:
+            extracted_data = json.loads(r.extracted_data) if r.extracted_data else {}
+        except:
+            extracted_data = {}
+
+        # Calculate last_modified_by from workflow_steps_json snapshot
+        last_modified_by = r.uploaded_by
+        try:
+            if r.workflow_steps_json:
+                steps = json.loads(r.workflow_steps_json)
+                if isinstance(steps, list) and steps:
+                    # Sort by timestamp desc to find the most recent non-pending action
+                    # Steps in JSON usually have ISO format timestamps
+                    sorted_steps = sorted(steps, key=lambda x: x.get("timestamp", ""), reverse=True)
+                    for step in sorted_steps:
+                        if step.get("status") in ["completed", "approved", "rejected", "reworked"]:
+                            last_modified_by = step.get("user")
+                            break
+        except Exception as e:
+            print(f"Error parsing workflow steps for deleted invoice {r.id}: {e}")
+
+        # Resolve email to username for last_modified_by if possible
+        if last_modified_by and "@" in last_modified_by:
+            user_obj = db.query(User).filter(User.email == last_modified_by).first()
+            if user_obj:
+                last_modified_by = user_obj.username or last_modified_by.split("@")[0]
+            else:
+                last_modified_by = last_modified_by.split("@")[0]
+
+        return {
+            "id": r.id,
+            "original_invoice_id": r.original_invoice_id,
+            "filename": r.original_filename or r.filename,
+            "vendor_id": r.vendor_id,
+            "vendor_name": r.vendor_name,
+            "invoice_number": r.invoice_number,
+            "entity": r.entity,
+            "status": r.status,
+            "uploaded_by": r.uploaded_by,
+            "uploaded_at": r.uploaded_at.strftime("%m-%d-%Y") if r.uploaded_at else None,
+            "deleted_by": r.deleted_by,
+            "deleted_at": r.deleted_at.strftime("%m-%d-%Y") if r.deleted_at else None,
+            "sage_bill_number": r.sage_bill_number,
+            "extracted_data": extracted_data,
+            "total_amount": float(r.total_amount) if r.total_amount else None,
+            "amount_due": float(r.amount_due) if r.amount_due else None,
+            "invoice_date": r.invoice_date.strftime("%m-%d-%Y") if r.invoice_date else None,
+            "due_date": r.due_date.strftime("%m-%d-%Y") if r.due_date else None,
+            "confidence_score": r.confidence_score,
+            "processed_at": r.processed_at.strftime("%m-%d-%Y") if r.processed_at else None,
+            "last_modified_by": last_modified_by,
+            "action_time": r.processed_at.strftime("%m-%d-%Y") if r.processed_at else None,
+        }
+
+    return {
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "data": [_serialize(r) for r in records]
+    }
+
+@router.get("/deleted/{archive_id}", summary="Get deleted invoice details")
+async def get_deleted_invoice(
+    archive_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Return full snapshot details of a deleted invoice.
+    """
+    record = db.query(DeletedInvoice).filter(DeletedInvoice.id == archive_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Archived invoice not found")
+
+    # Helper to deserialize the snapshots
+    def _safe_json(s):
+        if not s: return None
+        try: return json.loads(s)
+        except: return s
+
+    # Reconstruct a dictionary similar to invoice_to_dict but from snapshots
+    extracted_data = _safe_json(record.extracted_data) or {}
+    coding_row = _safe_json(record.coding_json)
+    
+    line_items_list = []
+    if coding_row and isinstance(coding_row, dict):
+        line_items_str = coding_row.get("line_items")
+        if line_items_str:
+            line_items_list = _safe_json(line_items_str) or []
+    
+    # Ensure the frontend's loadLineItemTable sees this as a saved record with a snapshot
+    if line_items_list:
+        extracted_data["isModified"] = True
+        extracted_data["lineItemsSnapshot"] = line_items_list
+    
+    # Enrich extracted_data with metadata for specific UI views
+    if record.status in ['waiting_approval', 'approved', 'processed', 'sage_posted', 'rejected', 'reworked']:
+        if line_items_list:
+            extracted_data["is_coded"] = True
+
+    res = {
+        "id": record.id,
+        "original_invoice_id": record.original_invoice_id,
+        "filename": record.filename,
+        "original_filename": record.original_filename,
+        "file_path": record.file_path,
+        "uploaded_by": record.uploaded_by,
+        "status": record.status,
+        "entity": record.entity,
+        "vendor_id": record.vendor_id,
+        "vendor_name": record.vendor_name,
+        "invoice_number": record.invoice_number,
+        "azure_vendor_name": record.azure_vendor_name,
+        "azure_vendor_address": record.azure_vendor_address,
+        "line_grouping": record.line_grouping,
+        "exchange_rate": float(record.exchange_rate) if record.exchange_rate else None,
+        "sage_bill_number": record.sage_bill_number,
+        "extracted_data": extracted_data,
+        "vendor_details": _safe_json(record.vendor_details),
+        "processing_steps": _safe_json(record.processing_steps),
+        "validation_results": _safe_json(record.validation_results),
+        "duplicate_info": _safe_json(record.duplicate_info),
+        "original_items": _safe_json(record.original_items),
+        "approver_breakdown": _safe_json(record.approver_breakdown),
+        "gl_summary": _safe_json(record.gl_summary),
+        "confidence_score": record.confidence_score,
+        "uploaded_at": record.uploaded_at.isoformat() if record.uploaded_at else None,
+        "processed_at": record.processed_at.isoformat() if record.processed_at else None,
+        "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
+        "deleted_by": record.deleted_by,
+        "current_approver_level": record.current_approver_level or 1,
+        "required_approvers": record.required_approvers or 0,
+        # Snapshots
+        "status_history": _safe_json(record.status_history_json),
+        "workflow_steps": _safe_json(record.workflow_steps_json),
+        "coding": coding_row,
+        "audit_logs": _safe_json(record.audit_logs_json),
+        "is_archived": True
+    }
+
+    # Resolve User Names for Workflow Steps
+    if res["workflow_steps"]:
+        involved_users = set()
+        for step in res["workflow_steps"]:
+            if step.get("user"):
+                involved_users.add(step.get("user").lower())
+        
+        if involved_users:
+            user_list = db.query(User).filter(User.email.in_(list(involved_users))).all()
+            user_names_map = {u.email.lower(): u.username for u in user_list}
+            # For each step, if it has a user email, try to attach username if not already there
+            # (Though history snapshot might already have some names, resolution ensures consistency)
+            res["user_names"] = user_names_map
+
+    # Normalize approved_by
+    approved_by_snap = _safe_json(record.approved_by_json) or []
+    res["approved_by"] = [a.get("approver_email") for a in approved_by_snap if a.get("approver_email")]
+
+    # Normalize assigned_approvers
+    assigned_snap = _safe_json(record.assigned_approvers_json) or []
+    if assigned_snap:
+        grouped = {}
+        for a in sorted(assigned_snap, key=lambda x: x.get("sequence_order", 0)):
+            seq = a.get("sequence_order", 0)
+            if seq not in grouped: grouped[seq] = []
+            grouped[seq].append(a.get("approver_email"))
+        
+        breakdown_data = _safe_json(record.approver_breakdown) or {}
+        has_posting = breakdown_data.get("has_posting_approver", False)
+        has_threshold = breakdown_data.get("has_threshold_approver", False)
+        
+        assigned_list = []
+        sorted_keys = sorted(grouped.keys())
+        for seq in sorted_keys:
+            assigned_list.append({"emails": grouped[seq], "type": "mandatory"})
+            
+        if assigned_list:
+            if has_posting:
+                assigned_list[-1]["type"] = "posting"
+            if has_threshold:
+                idx = len(assigned_list) - (2 if has_posting else 1)
+                if idx >= 0:
+                    assigned_list[idx]["type"] = "threshold"
+                    
+        res["assigned_approvers"] = assigned_list
+    else:
+        res["assigned_approvers"] = []
+
+    return res
+
+@router.get("/debug/last-approved")
+async def debug_last_approved(db: Session = Depends(get_db)):
+    from app.models.db_models import Invoice
+    invs = db.query(Invoice).filter(Invoice.status == InvoiceStatusEnum.APPROVED).order_by(Invoice.id.desc()).limit(10).all()
+    return [{"id": i.id, "number": i.invoice_number, "status": i.status, "approvals": len(i.approved_by_list or []), "required": i.required_approvers} for i in invs]
+
+@router.get("/debug/log")
+async def debug_log(lines: int = 100):
+    try:
+        with open("application_error.log", "r") as f:
+            content = f.readlines()
+            return {"log": content[-lines:]}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+
+
+
+
+
+
+
+
+
+
+
+@router.get("/{invoice_id}", response_model=InvoiceResponse)
 async def get_invoice(
     invoice_id: int,
     current_user: UserResponse = Depends(get_current_user),
@@ -2385,10 +2714,16 @@ async def update_invoice(
         req_ts = invoice_update.last_updated_at.replace(microsecond=0)
         
         if db_ts > req_ts:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="This invoice has been modified by another user. Please refresh."
-            )
+            from app.models.db_models import AuditLog
+            latest_audit = db.query(AuditLog).filter(AuditLog.invoice_id == invoice.id).order_by(AuditLog.timestamp.desc()).first()
+            last_audit_user = latest_audit.user if latest_audit else None
+            
+            # Allow update if the current user was the last one to modify it
+            if not last_audit_user or (last_audit_user != current_user.email and last_audit_user != current_user.username):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This invoice has been modified by another user. Please refresh."
+                )
 
     # --- Duplicate Check Logic (Constraint Enforcement) ---
     # Determine the effective vendor_id and invoice_number after update
@@ -2610,66 +2945,76 @@ async def update_invoice(
          from app.models.db_models import User
          from app.repository.repositories import invoice_assigned_approver_repo
          
-         vendor_name, vendor_id = get_vendor_data_from_invoice(db, invoice_id)
-         total_amount = get_invoice_total_from_invoice(db, invoice_id)
-         currency = (deserialize_json_field(invoice.extracted_data) or {}).get("invoice_details", {}).get("currency", {}).get("value", "USD")
-         
-         # Always recalculate requirements on transition
-         requirement_data = get_required_approver_count(
-             db, vendor_name, total_amount, invoice_id,
-             currency=currency, entity=invoice.entity,
-             force_vendor_id=vendor_id, force_vendor_name=vendor_name
-         )
-         
-         invoice.required_approvers = requirement_data["required"]
-         invoice.approver_breakdown = serialize_json_field(requirement_data.get("breakdown", {}))
-         
-         # Clear existing assigned approvers
-         invoice_assigned_approver_repo.delete_all(db, filters={"invoice_id": invoice_id})
-         
-         # Fetch all finance-department users once (used for finance-level expansion)
-         finance_users = (
-             db.query(User)
-             .filter(
-                 User.department != None,
-                 User.department.ilike("%finance%"),
-                 ~User.department.ilike("%non-finance%"),
-                 User.status == "active"
-             )
-             .all()
-         )
-         finance_emails = [u.email.lower() for u in finance_users if u.email]
-         
-         # Store assigned approvers
-         assigned_approvers = requirement_data.get("assigned_approvers", [])
-         level_1_emails = []
-         for idx, level_data in enumerate(assigned_approvers):
-             is_finance_level = False
-             emails = []
+         is_custom_wf = False
+         if invoice.approver_breakdown:
+             try:
+                 bd = json.loads(invoice.approver_breakdown) if isinstance(invoice.approver_breakdown, str) else invoice.approver_breakdown
+                 if isinstance(bd, dict) and bd.get("is_custom_workflow"):
+                     is_custom_wf = True
+             except:
+                 pass
+                 
+         if not is_custom_wf:
+             vendor_name, vendor_id = get_vendor_data_from_invoice(db, invoice_id)
+             total_amount = get_invoice_total_from_invoice(db, invoice_id)
+             currency = (deserialize_json_field(invoice.extracted_data) or {}).get("invoice_details", {}).get("currency", {}).get("value", "USD")
              
-             if isinstance(level_data, dict):
-                 emails = level_data.get("emails", [])
-                 is_finance_level = level_data.get("is_finance", False)
-             else:
-                 emails = [level_data] if isinstance(level_data, str) else level_data
+             # Always recalculate requirements on transition
+             requirement_data = get_required_approver_count(
+                 db, vendor_name, total_amount, invoice_id,
+                 currency=currency, entity=invoice.entity,
+                 force_vendor_id=vendor_id, force_vendor_name=vendor_name
+             )
+             
+             invoice.required_approvers = requirement_data["required"]
+             invoice.approver_breakdown = serialize_json_field(requirement_data.get("breakdown", {}))
+             
+             # Clear existing assigned approvers
+             invoice_assigned_approver_repo.delete_all(db, filters={"invoice_id": invoice_id})
+             
+             # Fetch all finance-department users once (used for finance-level expansion)
+             finance_users = (
+                 db.query(User)
+                 .filter(
+                     User.department != None,
+                     User.department.ilike("%finance%"),
+                     ~User.department.ilike("%non-finance%"),
+                     User.status == "active"
+                 )
+                 .all()
+             )
+             finance_emails = [u.email.lower() for u in finance_users if u.email]
+             
+             # Store assigned approvers
+             assigned_approvers = requirement_data.get("assigned_approvers", [])
+             level_1_emails = []
+             for idx, level_data in enumerate(assigned_approvers):
+                 is_finance_level = False
+                 emails = []
                  
-             if is_finance_level and finance_emails:
-                 combined = set(e.lower() for e in emails if e) | set(finance_emails)
-             else:
-                 combined = set(e.lower() for e in emails if e)
-                 
-             if idx == 0:
-                 level_1_emails = list(combined)
-
-
-             for email in combined:
-                 if email:
-                     invoice_assigned_approver_repo.create(db, obj_in={
-                         "invoice_id": invoice_id,
-                         "approver_email": email,
-                         "sequence_order": idx + 1,
-                         "is_finance": is_finance_level
-                     })
+                 if isinstance(level_data, dict):
+                     emails = level_data.get("emails", [])
+                     is_finance_level = level_data.get("is_finance", False)
+                 else:
+                     emails = [level_data] if isinstance(level_data, str) else level_data
+                     
+                 if is_finance_level and finance_emails:
+                     combined = set(e.lower() for e in emails if e) | set(finance_emails)
+                 else:
+                     combined = set(e.lower() for e in emails if e)
+                     
+                 if idx == 0:
+                     level_1_emails = list(combined)
+    
+                 for email in combined:
+                     if email:
+                         invoice_assigned_approver_repo.create(db, obj_in={
+                             "invoice_id": invoice_id,
+                             "approver_email": email,
+                             "sequence_order": idx + 1,
+                             "is_finance": is_finance_level
+                         })
+                     
 
     # Update attributes
     update_fields = [
@@ -3539,302 +3884,6 @@ async def bulk_archive_invoices(
     return results
 
 
-@router.get("/deleted", summary="List deleted (archived) invoices")
-async def list_deleted_invoices(
-    entity: str = Depends(get_current_entity),
-    vendor_id: Optional[str] = Query(None, description="Filter by vendor ID"),
-    invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50),
-    sort_by: str = Query("deleted_at", description="Field to sort by"),
-    sort_dir: str = Query("desc", description="Sort direction (asc/desc)"),
-    filters: Optional[str] = Query(None, description="JSON string of filters"),
-    current_user: UserResponse = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Return a paginated list of soft-deleted (archived) invoices.
-    Accessible by all authenticated users.
-    """
-    # [Requirement Update] Deleted invoices can be viewed by all roles.
-    # if current_user.role != "admin":
-    #     raise HTTPException(status_code=403, detail="Only admins can view deleted invoices")
-
-    query = db.query(DeletedInvoice)
-    if entity:
-        query = query.filter(DeletedInvoice.entity == entity)
-    if vendor_id:
-        query = query.filter(DeletedInvoice.vendor_id == vendor_id)
-    if invoice_number:
-        query = query.filter(DeletedInvoice.invoice_number == invoice_number)
-
-    if filters:
-        try:
-            extra_filters = json.loads(filters)
-            if isinstance(extra_filters, dict):
-                # Apply date casting for date fields if needed by _apply_filters
-                for k, v in list(extra_filters.items()):
-                    col_attr = getattr(DeletedInvoice, k, None)
-                    if col_attr is not None and hasattr(col_attr, "type"):
-                        from sqlalchemy import Date, DateTime, cast
-                        if isinstance(col_attr.type, (Date, DateTime)):
-                            vals = v if isinstance(v, list) else [v]
-                            try:
-                                parsed_dates = [datetime.strptime(str(x), "%m-%d-%Y").date() for x in vals]
-                                query = query.filter(cast(col_attr, Date).in_(parsed_dates))
-                                del extra_filters[k]
-                            except:
-                                pass
-                
-                # Apply remaining filters using repo helper for robustness (between, ops, etc)
-                query = deleted_invoice_repo._apply_filters(query, extra_filters)
-        except Exception as e:
-            print(f"Error parsing filters in list_deleted_invoices: {e}")
-
-
-    # Dynamic sorting
-    if hasattr(DeletedInvoice, sort_by):
-        col = getattr(DeletedInvoice, sort_by)
-        if sort_dir.lower() == "desc":
-            query = query.order_by(col.desc())
-        else:
-            query = query.order_by(col.asc())
-    else:
-        query = query.order_by(DeletedInvoice.deleted_at.desc())
-
-    # Extra role filtering for non-finance approvers in archived invoices
-    user_roles = [r.strip().lower() for r in current_user.role.split(",")]
-    user_dept = (current_user.department or "").lower()
-    
-    is_approver = "approver" in user_roles
-    is_admin = "admin" in user_roles
-    is_finance = "finance" in user_dept and "non-finance" not in user_dept
-
-    if is_approver and not is_admin and not is_finance:
-        from app.models.db_models import Delegation
-        curr_time = get_ist_now()
-        active_delegations = db.query(Delegation.delegator_email).filter(
-            Delegation.substitute_email.ilike(current_user.email),
-            Delegation.entity == entity,
-            Delegation.start_date <= curr_time,
-            Delegation.end_date >= curr_time
-        ).all()
-        target_emails = [current_user.email.lower()] + [d[0].lower() for d in active_delegations]
-        
-        from sqlalchemy import or_
-        # DeletedInvoice has assigned_approvers_json (JSON string snapshot)
-        # We use ILIKE to search for any target email within the JSON string
-        email_filters = [DeletedInvoice.assigned_approvers_json.ilike(f"%{email}%") for email in target_emails]
-        if email_filters:
-            query = query.filter(or_(*email_filters))
-        else:
-            # If no target emails (shouldn't happen), return nothing for safety
-            query = query.filter(DeletedInvoice.id == -1)
-
-    total = query.count()
-    if limit == -1:
-        records = query.all()
-    else:
-        records = query.offset(skip).limit(limit).all()
-
-    def _serialize(r: DeletedInvoice):
-        # Parse JSON fields safely
-        try:
-            extracted_data = json.loads(r.extracted_data) if r.extracted_data else {}
-        except:
-            extracted_data = {}
-
-        # Calculate last_modified_by from workflow_steps_json snapshot
-        last_modified_by = r.uploaded_by
-        try:
-            if r.workflow_steps_json:
-                steps = json.loads(r.workflow_steps_json)
-                if isinstance(steps, list) and steps:
-                    # Sort by timestamp desc to find the most recent non-pending action
-                    # Steps in JSON usually have ISO format timestamps
-                    sorted_steps = sorted(steps, key=lambda x: x.get("timestamp", ""), reverse=True)
-                    for step in sorted_steps:
-                        if step.get("status") in ["completed", "approved", "rejected", "reworked"]:
-                            last_modified_by = step.get("user")
-                            break
-        except Exception as e:
-            print(f"Error parsing workflow steps for deleted invoice {r.id}: {e}")
-
-        # Resolve email to username for last_modified_by if possible
-        if last_modified_by and "@" in last_modified_by:
-            user_obj = db.query(User).filter(User.email == last_modified_by).first()
-            if user_obj:
-                last_modified_by = user_obj.username or last_modified_by.split("@")[0]
-            else:
-                last_modified_by = last_modified_by.split("@")[0]
-
-        return {
-            "id": r.id,
-            "original_invoice_id": r.original_invoice_id,
-            "filename": r.original_filename or r.filename,
-            "vendor_id": r.vendor_id,
-            "vendor_name": r.vendor_name,
-            "invoice_number": r.invoice_number,
-            "entity": r.entity,
-            "status": r.status,
-            "uploaded_by": r.uploaded_by,
-            "uploaded_at": r.uploaded_at.strftime("%m-%d-%Y") if r.uploaded_at else None,
-            "deleted_by": r.deleted_by,
-            "deleted_at": r.deleted_at.strftime("%m-%d-%Y") if r.deleted_at else None,
-            "sage_bill_number": r.sage_bill_number,
-            "extracted_data": extracted_data,
-            "total_amount": float(r.total_amount) if r.total_amount else None,
-            "amount_due": float(r.amount_due) if r.amount_due else None,
-            "invoice_date": r.invoice_date.strftime("%m-%d-%Y") if r.invoice_date else None,
-            "due_date": r.due_date.strftime("%m-%d-%Y") if r.due_date else None,
-            "confidence_score": r.confidence_score,
-            "processed_at": r.processed_at.strftime("%m-%d-%Y") if r.processed_at else None,
-            "last_modified_by": last_modified_by,
-            "action_time": r.processed_at.strftime("%m-%d-%Y") if r.processed_at else None,
-        }
-
-    return {
-        "total": total,
-        "skip": skip,
-        "limit": limit,
-        "data": [_serialize(r) for r in records]
-    }
-
-@router.get("/deleted/{archive_id}", summary="Get deleted invoice details")
-async def get_deleted_invoice(
-    archive_id: int,
-    current_user: UserResponse = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Return full snapshot details of a deleted invoice.
-    """
-    record = db.query(DeletedInvoice).filter(DeletedInvoice.id == archive_id).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Archived invoice not found")
-
-    # Helper to deserialize the snapshots
-    def _safe_json(s):
-        if not s: return None
-        try: return json.loads(s)
-        except: return s
-
-    # Reconstruct a dictionary similar to invoice_to_dict but from snapshots
-    extracted_data = _safe_json(record.extracted_data) or {}
-    coding_row = _safe_json(record.coding_json)
-    
-    line_items_list = []
-    if coding_row and isinstance(coding_row, dict):
-        line_items_str = coding_row.get("line_items")
-        if line_items_str:
-            line_items_list = _safe_json(line_items_str) or []
-    
-    # Ensure the frontend's loadLineItemTable sees this as a saved record with a snapshot
-    if line_items_list:
-        extracted_data["isModified"] = True
-        extracted_data["lineItemsSnapshot"] = line_items_list
-    
-    # Enrich extracted_data with metadata for specific UI views
-    if record.status in ['waiting_approval', 'approved', 'processed', 'sage_posted', 'rejected', 'reworked']:
-        if line_items_list:
-            extracted_data["is_coded"] = True
-
-    res = {
-        "id": record.id,
-        "original_invoice_id": record.original_invoice_id,
-        "filename": record.filename,
-        "original_filename": record.original_filename,
-        "file_path": record.file_path,
-        "uploaded_by": record.uploaded_by,
-        "status": record.status,
-        "entity": record.entity,
-        "vendor_id": record.vendor_id,
-        "vendor_name": record.vendor_name,
-        "invoice_number": record.invoice_number,
-        "azure_vendor_name": record.azure_vendor_name,
-        "azure_vendor_address": record.azure_vendor_address,
-        "line_grouping": record.line_grouping,
-        "exchange_rate": float(record.exchange_rate) if record.exchange_rate else None,
-        "sage_bill_number": record.sage_bill_number,
-        "extracted_data": extracted_data,
-        "vendor_details": _safe_json(record.vendor_details),
-        "processing_steps": _safe_json(record.processing_steps),
-        "validation_results": _safe_json(record.validation_results),
-        "duplicate_info": _safe_json(record.duplicate_info),
-        "original_items": _safe_json(record.original_items),
-        "approver_breakdown": _safe_json(record.approver_breakdown),
-        "gl_summary": _safe_json(record.gl_summary),
-        "confidence_score": record.confidence_score,
-        "uploaded_at": record.uploaded_at.isoformat() if record.uploaded_at else None,
-        "processed_at": record.processed_at.isoformat() if record.processed_at else None,
-        "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
-        "deleted_by": record.deleted_by,
-        "current_approver_level": record.current_approver_level or 1,
-        "required_approvers": record.required_approvers or 0,
-        # Snapshots
-        "status_history": _safe_json(record.status_history_json),
-        "workflow_steps": _safe_json(record.workflow_steps_json),
-        "coding": coding_row,
-        "audit_logs": _safe_json(record.audit_logs_json),
-        "is_archived": True
-    }
-
-    # Resolve User Names for Workflow Steps
-    if res["workflow_steps"]:
-        involved_users = set()
-        for step in res["workflow_steps"]:
-            if step.get("user"):
-                involved_users.add(step.get("user").lower())
-        
-        if involved_users:
-            user_list = db.query(User).filter(User.email.in_(list(involved_users))).all()
-            user_names_map = {u.email.lower(): u.username for u in user_list}
-            # For each step, if it has a user email, try to attach username if not already there
-            # (Though history snapshot might already have some names, resolution ensures consistency)
-            res["user_names"] = user_names_map
-
-    # Normalize approved_by
-    approved_by_snap = _safe_json(record.approved_by_json) or []
-    res["approved_by"] = [a.get("approver_email") for a in approved_by_snap if a.get("approver_email")]
-
-    # Normalize assigned_approvers
-    assigned_snap = _safe_json(record.assigned_approvers_json) or []
-    if assigned_snap:
-        grouped = {}
-        for a in sorted(assigned_snap, key=lambda x: x.get("sequence_order", 0)):
-            seq = a.get("sequence_order", 0)
-            if seq not in grouped: grouped[seq] = []
-            grouped[seq].append(a.get("approver_email"))
-        
-        breakdown_data = _safe_json(record.approver_breakdown) or {}
-        has_posting = breakdown_data.get("has_posting_approver", False)
-        has_threshold = breakdown_data.get("has_threshold_approver", False)
-        
-        assigned_list = []
-        sorted_keys = sorted(grouped.keys())
-        for seq in sorted_keys:
-            assigned_list.append({"emails": grouped[seq], "type": "mandatory"})
-            
-        if assigned_list:
-            if has_posting:
-                assigned_list[-1]["type"] = "posting"
-            if has_threshold:
-                idx = len(assigned_list) - (2 if has_posting else 1)
-                if idx >= 0:
-                    assigned_list[idx]["type"] = "threshold"
-                    
-        res["assigned_approvers"] = assigned_list
-    else:
-        res["assigned_approvers"] = []
-
-    return res
-
-@router.get("/debug/last-approved")
-async def debug_last_approved(db: Session = Depends(get_db)):
-    from app.models.db_models import Invoice
-    invs = db.query(Invoice).filter(Invoice.status == InvoiceStatusEnum.APPROVED).order_by(Invoice.id.desc()).limit(10).all()
-    return [{"id": i.id, "number": i.invoice_number, "status": i.status, "approvals": len(i.approved_by_list or []), "required": i.required_approvers} for i in invs]
-
 @router.get("/{invoice_id}/delegation-info")
 async def get_delegation_info(
     invoice_id: int,
@@ -4068,23 +4117,4 @@ async def generate_pdf_debug(invoice_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         import traceback
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
-
-@router.get("/debug/log")
-async def debug_log(lines: int = 100):
-    try:
-        with open("application_error.log", "r") as f:
-            content = f.readlines()
-            return {"log": content[-lines:]}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-
-
-
-
-
-
-
-
 
