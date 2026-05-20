@@ -7,12 +7,13 @@ import DonutChart from './charts/DonutChart';
 import { useDashboardData } from '../hooks/useDashboardData';
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { Spin } from "antd";
 
 const CARD_SKELETONS = Array(4).fill(0);
 const CHART_SKELETONS = Array(2).fill(0);
 
 const DashboardPage = React.memo(() => {
-    const { summary, aging, status, vendors, topVendors, isLoading } = useDashboardData();
+    const { summary, aging, status, vendors, topVendors, isLoading, isFetching } = useDashboardData();
 
     // ─── Mappers ────────────────────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ const DashboardPage = React.memo(() => {
     // ─── Render ──────────────────────────────────────────────────────────────────
 
     return (
-        <div className="bg-[#F7F7F7] p-2 space-y-4">
+        <div className="relative bg-[#F7F7F7] p-2 space-y-4 min-h-[400px]">
             {/* Header Area */}
             {/* <div className="flex flex-col gap-1 px-2">
                 <h1 className="text-2xl font-extrabold text-[#333333]">Dashboard</h1>
@@ -197,6 +198,16 @@ const DashboardPage = React.memo(() => {
                 </div>
             </div>
 
+            {isFetching && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+                    <div className="flex flex-col items-center gap-3">
+                        <Spin size="large" />
+                        <span className="text-xs font-semibold tracking-wide text-[#2F5D7C] uppercase">
+                            Loading Dashboard Data...
+                        </span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 });
