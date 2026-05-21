@@ -143,7 +143,8 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                 approvers: approversPayload,
                 has_posting_approver: true,
                 has_threshold_approver: form.enableThreshold === 'Yes',
-                amount_threshold: form.enableThreshold === 'Yes' ? Number(form.amount_threshold) : null
+                amount_threshold: form.enableThreshold === 'Yes' ? Number(form.amount_threshold) : null,
+                last_updated_at: invoice?.updated_at
             });
             toast.success('Custom approval chain saved for this invoice!');
 
@@ -155,7 +156,7 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
             onSuccess?.();
             onClose();
         } catch (err) {
-            toast.error(err.message || 'Failed to save custom workflow sequence.');
+            toast.error(err.response?.data?.detail || err.message || 'Failed to save custom workflow sequence.');
         } finally {
             setIsSubmitting(false);
         }

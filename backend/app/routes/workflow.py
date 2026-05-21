@@ -723,6 +723,32 @@ async def save_custom_invoice_workflow(
             status_code=400, 
             detail="Invoice workflow can only be edited when status is waiting_coding"
         )
+
+    # ─── Concurrency Check (Optimistic Locking) ───
+    req_last_updated = payload.get("last_updated_at")
+    if req_last_updated and invoice.updated_at:
+        try:
+            from dateutil.parser import parse as parse_date
+            if isinstance(req_last_updated, str):
+                req_ts = parse_date(req_last_updated).replace(microsecond=0, tzinfo=None)
+            else:
+                req_ts = req_last_updated.replace(microsecond=0, tzinfo=None)
+                
+            db_ts = invoice.updated_at.replace(microsecond=0, tzinfo=None)
+            if db_ts > req_ts:
+                from app.models.db_models import AuditLog
+                latest_audit = db.query(AuditLog).filter(AuditLog.invoice_id == invoice.id).order_by(AuditLog.timestamp.desc()).first()
+                last_audit_user = latest_audit.user if latest_audit else None
+                
+                if not last_audit_user or (last_audit_user != current_user.email and last_audit_user != current_user.username):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This invoice has been modified by another user. Please refresh."
+                    )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Error checking workflow timestamp: {e}")
         
     approvers = payload.get("approvers", [])  # list of levels: [{"level": 1, "emails": [...], "is_finance": bool}]
     if not approvers:
@@ -786,6 +812,10 @@ async def save_custom_invoice_workflow(
         "amount_threshold": amount_threshold
     }
     invoice.approver_breakdown = json.dumps(custom_breakdown)
+    
+    from app.models.db_models import get_ist_now
+    invoice.updated_at = get_ist_now()
+    
     db.commit()
     
     return {"message": "Custom invoice workflow saved successfully"}
