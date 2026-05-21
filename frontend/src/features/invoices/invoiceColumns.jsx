@@ -178,7 +178,7 @@ export const VIEW_OPTIONS = [
 ];
 
 // ─── Condensed columns ────────────────────────────────────────────────────────
-export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null, hideDelete = false) => [
+export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null, hideDelete = false, hideNextActionBy = false) => [
     {
         header: "Vendor Name",
         accessor: "vendor_name",
@@ -272,10 +272,10 @@ export const getCondensedColumns = (onView, onDelete, onArchive, userRole, openi
         filterable: true,
     },
     actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete),
-];
+].filter(col => !(hideNextActionBy && col.accessor === "next_approver"));
 
 // ─── Full columns ─────────────────────────────────────────────────────────────
-export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null, hideDelete = false) => [
+export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInvoiceId = null, hideDelete = false, hideNextActionBy = false) => [
     {
         header: "Vendor Name",
         accessor: "vendor_name",
@@ -497,4 +497,4 @@ export const getFullColumns = (onView, onDelete, onArchive, userRole, openingInv
     //     render: (val) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : "-",
     // },
     actionsCol(onView, onDelete, onArchive, userRole, openingInvoiceId, hideDelete),
-];
+].filter(col => !(hideNextActionBy && col.accessor === "next_approver"));
