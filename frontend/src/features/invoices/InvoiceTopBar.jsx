@@ -347,10 +347,14 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
             const freshInvoice = await getInvoiceById(viewInvoiceId);
             if (freshInvoice) {
-                setActiveInvoiceData({
-                    ...activeInvoiceData,
-                    ...freshInvoice,
-                });
+                const oldStatus = (activeInvoiceData?.status || "").toLowerCase();
+                const newStatus = (freshInvoice?.status || "").toLowerCase();
+
+                setInvoiceData(freshInvoice);
+
+                if (oldStatus === "processed" && newStatus === "waiting_coding") {
+                    setInvoiceActiveTab("Coding");
+                }
             }
 
             await fetchUIStatus();
@@ -568,6 +572,16 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                             {((["scanner", "coder"].some(r => userRole.includes(r)) && (currentStatus || "").toLowerCase() === "processed") ||
                                 (userRole.includes("coder") && (currentStatus || "").toLowerCase() === "waiting_coding")) && (
                                     <>
+                                        <div className="w-[130px]">
+                                            <CustomButton
+                                                variant="outline"
+                                                height="h-[34px]"
+                                                disabled={!!actionLoading}
+                                                onClick={handleRefresh}
+                                            >
+                                                {busy("refreshing") ? "Refreshing..." : "Refresh"}
+                                            </CustomButton>
+                                        </div>
                                         <div className="w-[130px]">
                                             <CustomButton variant="outline" height="h-[34px]" onClick={handleDiscard}>Discard</CustomButton>
                                         </div>
