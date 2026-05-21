@@ -137,7 +137,7 @@ const addSystemRows = (rows, formData, entityMaster) => {
 };
 
 const loadLineItemTable = (props) => {
-    const { activeInvoiceData, quickViewFormData, vendor, isVendorChanged, entityMaster } = props;
+    const { activeInvoiceData, quickViewFormData, isVendorChanged, entityMaster, storeOriginalLineItems } = props;
 
     const isSaved = activeInvoiceData?.extracted_data?.isModified || false;
     const isLineGroupingEnabled = quickViewFormData?.lineGrouping === "Yes";
@@ -146,11 +146,18 @@ const loadLineItemTable = (props) => {
 
     //  CASE 1: Not saved → normal flow from extracted Items
     if (!isSaved) {
-        const extracted_items = activeInvoiceData?.extracted_data?.Items?.value || [];
-        baseItems = normalizeItems(extracted_items).map(row => ({
-            ...row,
-            netAmount: calculateNetAmount(row)
-        }));
+        if (storeOriginalLineItems && storeOriginalLineItems.length > 0) {
+            baseItems = storeOriginalLineItems.map(row => ({
+                ...row,
+                netAmount: calculateNetAmount(row)
+            }));
+        } else {
+            const extracted_items = activeInvoiceData?.extracted_data?.Items?.value || [];
+            baseItems = normalizeItems(extracted_items).map(row => ({
+                ...row,
+                netAmount: calculateNetAmount(row)
+            }));
+        }
     }
     //  CASE 2: Saved + vendor changed → MUST recompute from OriginalItems
     else if (isVendorChanged) {

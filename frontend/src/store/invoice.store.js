@@ -209,6 +209,7 @@ export const useInvoiceStore = create((set, get) => ({
         return [...regularItems, ...systemRows];
     },
 
+    isVendorSynced: false,
     originalLineItems: [],
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -262,14 +263,6 @@ export const useInvoiceStore = create((set, get) => ({
             // Sync totalAmount and totalInvoiceAmount since they also represent the same field
             if (key === "totalAmount") updatedFormData.totalInvoiceAmount = value;
             if (key === "totalInvoiceAmount") updatedFormData.totalAmount = value;
-
-            const triggerKeys = [
-                "totalTaxAmount",
-                "tdsRate",
-                "tdsApplicability",
-                "totalInvoiceAmount",
-                "total_invoice_amount",
-            ];
 
             return { quickViewFormData: updatedFormData };
         }),
@@ -437,6 +430,7 @@ export const useInvoiceStore = create((set, get) => ({
             quickViewFormData: formData,
             lineItems: mappedItems,
             originalLineItems: mappedOriginalItems,
+            isVendorSynced: false,
         });
     },
 
@@ -446,6 +440,7 @@ export const useInvoiceStore = create((set, get) => ({
         selectedVendorId: null,
         activeInvoiceData: null,
         isPreviewLoading: false,
+        isVendorSynced: false,
     }),
 
     // =============================
@@ -494,5 +489,6 @@ export const useInvoiceStore = create((set, get) => ({
         quickViewFormData: {},
         lineItems: [],
         activeInvoiceData: null,
+        isVendorSynced: false,
     }),
 }));

@@ -5,3 +5,4 @@ backend_old
 helper
 tmp
 .codex
+*.log

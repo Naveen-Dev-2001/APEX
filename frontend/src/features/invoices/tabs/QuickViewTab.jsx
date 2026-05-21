@@ -401,7 +401,8 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 quickViewFormData: updatedFormData,
                 vendor: vendor,
                 isVendorChanged: false,
-                entityMaster: state.entityMaster
+                entityMaster: state.entityMaster,
+                storeOriginalLineItems: state.originalLineItems
             });
             if (result) setLineItems(result);
         }
@@ -470,6 +471,19 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         if (!vendor || !selectedVendorId) return;
         if (vendor.vendor_id !== selectedVendorId) return;
 
+        const storeState = useInvoiceStore.getState();
+        const isVendorSynced = storeState.isVendorSynced;
+        const prevVendorId = prevVendorRef.current;
+
+        prevVendorRef.current = vendor?.vendor_id;
+
+        const isVendorChanged = prevVendorId !== null          // not first load
+            && prevVendorId !== vendor?.vendor_id;
+
+        if (!isVendorChanged && isVendorSynced) {
+            return;
+        }
+
         const TERMS = ['NET 7', 'NET 8', 'NET 12', 'NET 15', 'NET 20', 'NET 30', 'NET 45', 'NET 60', 'NET 90'];
 
         const parseDateFlexible = (dateStr) => {
@@ -503,13 +517,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             return "";
         };
 
-        const prev = useInvoiceStore.getState().quickViewFormData;
-        const prevVendorId = prevVendorRef.current;
-
-        prevVendorRef.current = vendor?.vendor_id;
-
-        const isVendorChanged = prevVendorId !== null          // not first load
-            && prevVendorId !== vendor?.vendor_id
+        const prev = storeState.quickViewFormData;
 
         const extractedPayTerms = prev?.paymentTerms;
         const computedDueDate = getDueDate(
@@ -563,10 +571,12 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             quickViewFormData: updatedFormData,
             vendor,
             isVendorChanged,
-            entityMaster
+            entityMaster,
+            storeOriginalLineItems: storeState.originalLineItems
         });
 
         if (result) setLineItems(result);
+        useInvoiceStore.setState({ isVendorSynced: true });
 
     }, [vendor, selectedVendorId]);
 
@@ -674,6 +684,12 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 return item;
             });
         });
+
+        // Also sync deletion to originalLineItems in store
+        const isGrouped = useInvoiceStore.getState().quickViewFormData?.lineGrouping === "Yes";
+        useInvoiceStore.setState(state => ({
+            originalLineItems: isGrouped ? [] : state.originalLineItems.filter(item => item.id !== id)
+        }));
     }, [setLineItems]);
 
     const handleHoverField = useCallback((key) => {
