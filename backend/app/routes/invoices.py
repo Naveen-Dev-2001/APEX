@@ -10,7 +10,7 @@ from app.models.workflow import WorkflowStepType, WorkflowStepStatus
 from app.database.database import get_db, SessionLocal
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_, exists, func, cast, Date, DateTime
+from sqlalchemy import or_, and_, exists, func, cast, Date, DateTime, case
 from app.middleware.logger import logger
 error_logger = logging.getLogger("application_error")
 from fastapi import Query
@@ -116,12 +116,12 @@ def _apply_status_label_filters(status_vals, expressions, db):
                 has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
                 has_threshold_cond = Invoice.approver_breakdown.ilike('%"has_threshold_approver": true%')
                 
-                posting_level_expr = func.case(
+                posting_level_expr = case(
                     (has_posting_cond, max_level_sq),
                     else_=-1 # dummy value that won't match a level
                 )
                 
-                threshold_level_expr = func.case(
+                threshold_level_expr = case(
                     (and_(has_posting_cond, has_threshold_cond), max_level_sq - 1),
                     (has_threshold_cond, max_level_sq),
                     else_=-1 # dummy value that won't match a level
@@ -157,7 +157,7 @@ def _apply_status_label_filters(status_vals, expressions, db):
             has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
             has_threshold_cond = Invoice.approver_breakdown.ilike('%"has_threshold_approver": true%')
             
-            threshold_level_expr = func.case(
+            threshold_level_expr = case(
                 (and_(has_posting_cond, has_threshold_cond), max_level_sq - 1),
                 (has_threshold_cond, max_level_sq),
                 else_=-1
@@ -177,7 +177,7 @@ def _apply_status_label_filters(status_vals, expressions, db):
             
             has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
             
-            posting_level_expr = func.case(
+            posting_level_expr = case(
                 (has_posting_cond, max_level_sq),
                 else_=-1
             )
