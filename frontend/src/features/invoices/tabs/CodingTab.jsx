@@ -38,16 +38,35 @@ const LINE_TYPE_OPTIONS = [
 // Only syncs from outside when user is NOT actively typing.
 // ─────────────────────────────────────────────────────────────────────────────
 const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabled = false, isCurrency = false }) => {
-    const [local, setLocal] = useState(value ?? "");
+    const [local, setLocal] = useState(() => {
+        let val = value ?? "";
+        if (isCurrency && typeof val === "string") {
+            val = val.replace(/[^\d.-]/g, '');
+            const parts = val.split('.');
+            if (parts.length > 2) {
+                val = parts[0] + '.' + parts.slice(1).join('');
+            }
+        }
+        return val;
+    });
     const [isFocused, setIsFocused] = useState(false);
     const debounceRef = useRef(null);
     const isEditingRef = useRef(false);
 
     useEffect(() => {
         if (!isEditingRef.current) {
-            setLocal(value ?? "");
+            let val = value ?? "";
+            if (isCurrency && typeof val === "string") {
+                val = val.replace(/[^\d.-]/g, '');
+                const parts = val.split('.');
+                if (parts.length > 2) {
+                    val = parts[0] + '.' + parts.slice(1).join('');
+                }
+            }
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setLocal(val);
         }
-    }, [value]);
+    }, [value, isCurrency]);
 
     const handleChange = (e) => {
         let v = e.target.value;

@@ -43,15 +43,35 @@ const CURRENCY_KEYS = [
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
 const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, isAmountMismatch, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading, onSearch, searchLoading, options: dynamicOptions, loading: dynamicLoading, onOpenChange: dynamicOnOpenChange }) => {
-    const [localValue, setLocalValue] = useState(storeValue ?? "");
+    const isCurrencyField = CURRENCY_KEYS.includes(field.key);
+    const [prevStoreValue, setPrevStoreValue] = useState(storeValue);
+    const [localValue, setLocalValue] = useState(() => {
+        let val = storeValue ?? "";
+        if (isCurrencyField && typeof val === "string") {
+            val = val.replace(/[^\d.-]/g, '');
+            const parts = val.split('.');
+            if (parts.length > 2) {
+                val = parts[0] + '.' + parts.slice(1).join('');
+            }
+        }
+        return val;
+    });
     const [isFocused, setIsFocused] = useState(false);
     const debounceRef = useRef(null);
 
-    useEffect(() => {
-        setLocalValue(storeValue ?? "");
-    }, [storeValue]);
+    if (storeValue !== prevStoreValue) {
+        setPrevStoreValue(storeValue);
+        let val = storeValue ?? "";
+        if (isCurrencyField && typeof val === "string") {
+            val = val.replace(/[^\d.-]/g, '');
+            const parts = val.split('.');
+            if (parts.length > 2) {
+                val = parts[0] + '.' + parts.slice(1).join('');
+            }
+        }
+        setLocalValue(val);
+    }
 
-    const isCurrencyField = CURRENCY_KEYS.includes(field.key);
 
     const handleChange = useCallback((value) => {
         let cleanValue = value;
@@ -210,18 +230,37 @@ const LINE_ITEM_CURRENCY_KEYS = ["unitPrice", "discount", "netAmount", "taxAmt"]
 // ─── FIX 1: LineItemCell — change the useEffect condition ────────────────────
 const LineItemCell = memo(
     ({ value, disabled, rowId, colKey, onUpdate, onHover, onLeave }) => {
-        const [local, setLocal] = useState(value ?? "");
+        const isCurrency = LINE_ITEM_CURRENCY_KEYS.includes(colKey);
+        const [local, setLocal] = useState(() => {
+            let val = value ?? "";
+            if (isCurrency && typeof val === "string") {
+                val = val.replace(/[^\d.-]/g, '');
+                const parts = val.split('.');
+                if (parts.length > 2) {
+                    val = parts[0] + '.' + parts.slice(1).join('');
+                }
+            }
+            return val;
+        });
         const [isFocused, setIsFocused] = useState(false);
         const isEditing = useRef(false);
         const editTimerRef = useRef(null);
 
         useEffect(() => {
             if (!isEditing.current) {
-                setLocal(value ?? "");
+                let val = value ?? "";
+                if (isCurrency && typeof val === "string") {
+                    val = val.replace(/[^\d.-]/g, '');
+                    const parts = val.split('.');
+                    if (parts.length > 2) {
+                        val = parts[0] + '.' + parts.slice(1).join('');
+                    }
+                }
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setLocal(val);
             }
-        }, [value]);
+        }, [value, isCurrency]);
 
-        const isCurrency = LINE_ITEM_CURRENCY_KEYS.includes(colKey);
 
         const handleChange = useCallback((e) => {
             let v = e.target.value;
