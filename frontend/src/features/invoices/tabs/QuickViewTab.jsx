@@ -274,6 +274,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     const duplicateMessage = useInvoiceStore(s => s.duplicateMessage);
     const lineItems = useInvoiceStore(s => s.lineItems);
     const setLineItems = useInvoiceStore(s => s.setLineItems);
+    const isVendorSynced = useInvoiceStore(s => s.isVendorSynced);
 
     // ── Vendor Logic (Optimized for 35k+ vendors) ──────────────────────────
     const { vendor } = useVendorDetailSync(selectedVendorId);
@@ -578,7 +579,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         if (result) setLineItems(result);
         useInvoiceStore.setState({ isVendorSynced: true });
 
-    }, [vendor, selectedVendorId]);
+    }, [vendor, selectedVendorId, isVendorSynced]);
 
     // ── Vendor options ─────────────────────────────────────────────────────────
     // No longer needed: full mapping of 35k vendors

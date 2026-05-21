@@ -226,7 +226,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     const handleDiscard = () => {
         setIsPreviewLoading(true);
         setTimeout(() => {
-            setInvoiceData(activeInvoiceData);
+            setInvoiceData(activeInvoiceData, true);
             setIsPreviewLoading(false);
             toast.success("Changes discarded!");
         }, 100);

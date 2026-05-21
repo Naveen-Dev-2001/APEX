@@ -279,12 +279,12 @@ export const useInvoiceStore = create((set, get) => ({
             return { quickViewFormData: updatedFormData };
         }),
 
-    setInvoiceData: (data) => {
+    setInvoiceData: (data, shouldDiscard = false) => {
         if (!data) return;
 
         const state = get();
-        const currentFormData = state.quickViewFormData;
-        const currentVendorId = state.selectedVendorId;
+        const currentFormData = shouldDiscard ? {} : state.quickViewFormData;
+        const currentVendorId = shouldDiscard ? null : state.selectedVendorId;
 
         const removeCurrencyFormat = (value) => {
             if (!value) return 0;
