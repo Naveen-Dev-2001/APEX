@@ -38,12 +38,12 @@ export const QUICK_VIEW_CONFIG = [
                 ],
                 visible: (f, ent) => ent?.gst_applicable === true
             },
-            { key: "tdsRate", label: "TDS Rate", type: "input", editable: true, visible: (f, ent) => ent?.gst_applicable === true && f.tdsApplicability === "Yes" },
             {
                 key: "tdsSection", label: "TDS Section", type: "dropdown", editable: true,
                 visible: (f, ent) => ent?.gst_applicable === true && f.tdsApplicability === "Yes"
                 // options will be injected dynamically
             },
+            { key: "tdsRate", label: "TDS Rate", type: "input", editable: false, visible: (f, ent) => ent?.gst_applicable === true && f.tdsApplicability === "Yes" },
             {
                 key: "lineGrouping", label: "Line Grouping", type: "dropdown", editable: true,
                 options: [
