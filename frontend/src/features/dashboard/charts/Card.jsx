@@ -25,7 +25,7 @@ const Card = ({ icon, title, value, subtitle }) => {
             {/* Value Section */}
             <div className="flex items-end gap-3">
                 <span className="text-[32px] font-creato text-[#303030] font-[700] leading-none">
-                    {value}
+                    {value ?? 0}
                 </span>
                 {subtitle && (
                     <span className="text-[16px] text-[#969696] pb-1">
