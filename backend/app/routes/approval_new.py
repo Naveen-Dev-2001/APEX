@@ -830,11 +830,36 @@ def _resolve_user_role_in_workflow(
         emails_at_lvl = [e.lower() for e in _parse_list(current_entry.get("emails", []))]
         
         # Check eligibility for THIS specific level
-        is_eligible = (
-            (is_fin_lvl and result["is_finance_team"])
-            or (email in emails_at_lvl)
-            or any(email in [s.lower() for s in check_active_delegation(db, e, entity)] for e in emails_at_lvl)
-        )
+        is_assigned_at_later_level = False
+        from sqlalchemy import func as sqla_func
+        max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id
+        ).scalar() or 0
+
+        for idx, entry in enumerate(assigned):
+            entry_level = entry.get("level") or (idx + 1)
+            if entry_level > current_level:
+                is_entry_posting = (
+                    entry.get("type") == "posting"
+                    or entry_level == max_seq
+                )
+                if is_entry_posting or entry.get("is_finance"):
+                    continue
+                entry_emails = [e.lower() for e in _parse_list(entry.get("emails", []))]
+                if email in entry_emails:
+                    is_assigned_at_later_level = True
+                    break
+
+        is_threshold_at_lower_level = _is_future_threshold_approver_db(db, invoice_id, email, current_level)
+
+        if is_threshold_at_lower_level or is_assigned_at_later_level:
+            is_eligible = False
+        else:
+            is_eligible = (
+                (is_fin_lvl and result["is_finance_team"])
+                or (email in emails_at_lvl)
+                or any(email in [s.lower() for s in check_active_delegation(db, e, entity)] for e in emails_at_lvl)
+            )
         if is_eligible:
             # Scoped to current mandatory level
             # IMPORTANT: Re-derive level_already_approved for THIS specific
@@ -1059,12 +1084,9 @@ async def get_ui_status_from_frontend(
                         break
 
 
-            is_threshold_at_lower_level = (
-                is_fin_lvl_db
-                and _is_future_threshold_approver_db(db, invoice_id, email, current_level)
-            )
+            is_threshold_at_lower_level = _is_future_threshold_approver_db(db, invoice_id, email, current_level)
 
-            if is_threshold_at_lower_level or (is_fin_lvl_db and is_assigned_at_later_level):
+            if is_threshold_at_lower_level or is_assigned_at_later_level:
                 user_in_level = False
             else:
                 user_in_level = (
@@ -1289,13 +1311,10 @@ async def approve_invoice(
                 delegated_authority = True
                 break
 
-        # ── Block threshold approvers and future level approvers from acting at lower Finance Team levels ──
+        # ── Block threshold approvers and future level approvers from acting at lower levels ──
         # Query the DB directly — the snapshot reconstruction loses 'type' info,
         # so we cannot rely on threshold_entries being populated here.
-        is_threshold_approver_here = (
-            is_finance_level
-            and _is_future_threshold_approver_db(db, invoice_id, email, current_level)
-        )
+        is_threshold_approver_here = _is_future_threshold_approver_db(db, invoice_id, email, current_level)
 
         is_posting_approver_here = (
             email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]
@@ -1324,19 +1343,20 @@ async def approve_invoice(
 
 
         user_eligible = (
-            (is_finance_level and email in [f.lower() for f in finance_users]
-             and not is_threshold_approver_here
-             and not is_assigned_at_later_level)
+            (is_finance_level and email in [f.lower() for f in finance_users])
             or (not is_finance_level and email in emails_at_level)
             or delegated_authority
         )
+        if is_threshold_approver_here or is_assigned_at_later_level:
+            user_eligible = False
+
         if not user_eligible:
             if is_threshold_approver_here:
                 raise HTTPException(
-                    403, "You are a threshold approver and cannot act at Finance Team levels.")
-            if is_finance_level and is_assigned_at_later_level:
+                    403, "You are a threshold approver and cannot act at earlier levels.")
+            if is_assigned_at_later_level:
                 raise HTTPException(
-                    403, "You are assigned to a later level of this workflow and cannot approve as a generic finance team member.")
+                    403, "You are assigned to a later level of this workflow and cannot approve at an earlier level.")
             raise HTTPException(
                 403, f"You are not an approver for level {current_level}")
 
