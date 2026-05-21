@@ -93,7 +93,17 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
 
     const handleSave = async () => {
         const approversPayload = [];
-
+// Validate no duplicate approvers across all selections
+const allSelected = [
+  ...Array.from({ length: form.approver_count }).flatMap((_, i) => form[`mandatory_approver_${i + 1}`] || []),
+  ...(form.threshold_approver || []),
+  ...(form.posting_approver || [])
+];
+const duplicate = allSelected.find((email, idx) => allSelected.indexOf(email) !== idx);
+if (duplicate) {
+  toast.error(`Approver ${duplicate} selected multiple times. Each approver must be unique.`);
+  return;
+}
         // 1. Add Mandatory Levels
         for (let i = 1; i <= form.approver_count; i++) {
             const isFinance = form.financeFlags?.[i] || false;
@@ -162,44 +172,66 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
         }
     };
 
-    const financeApprovers = useMemo(() => {
-        return (approversList || [])
-            .filter(a => a.department?.toLowerCase() === 'finance')
-            .map(opt => ({
-                ...opt,
-                label: opt.label.includes(' (') ? opt.label.split(' (')[0] : opt.label
-            }));
-    }, [approversList]);
 
-    const getFilteredApprovers = (currentField) => {
-        const selected = new Set();
-        [
-            form.mandatory_approver_1,
-            form.mandatory_approver_2,
-            form.mandatory_approver_3,
-            form.mandatory_approver_4,
-            form.mandatory_approver_5,
-            form.threshold_approver,
-            form.posting_approver
-        ].forEach(field => {
-            if (field === form[currentField]) return;
-            if (Array.isArray(field)) {
-                field.forEach(email => selected.add(email));
-            }
-        });
-
-        return (approversList || [])
-            .filter(apt => !selected.has(apt.value))
-            .map(opt => ({
-                ...opt,
-                label: opt.label.includes(' (') ? opt.label.split(' (')[0] : opt.label
-            }));
-    };
 
     const firstLine = invoice?.line_items?.[0] || {};
     const lobVal = firstLine.lob || 'N/A';
     const deptVal = firstLine.department || 'N/A';
     const matchedRuleType = workflowData?.workflow_type || 'None (Default Fallback)';
+// Finance team approvers with label "Name - Department"
+const financeApprovers = useMemo(() => {
+    return (approversList || [])
+        .filter(a => a.department?.toLowerCase() === 'finance')
+        .map(opt => ({
+            ...opt,
+            label: `${opt.label.includes(' (') ? opt.label.split(' (')[0] : opt.label} - ${opt.department}`
+        }));
+}, [approversList]);
+
+// Filter approvers for any field to avoid duplicates
+const getFilteredApprovers = (currentField) => {
+    const selected = new Set();
+    [
+        form.mandatory_approver_1,
+        form.mandatory_approver_2,
+        form.mandatory_approver_3,
+        form.mandatory_approver_4,
+        form.mandatory_approver_5,
+        form.threshold_approver,
+        form.posting_approver
+    ].forEach(field => {
+        if (field === form[currentField]) return;
+        if (Array.isArray(field)) {
+            field.forEach(email => selected.add(email));
+        }
+    });
+    return (approversList || [])
+        .filter(apt => !selected.has(apt.value))
+        .map(opt => ({
+            ...opt,
+            label: `${opt.label.includes(' (') ? opt.label.split(' (')[0] : opt.label} - ${opt.department}`
+        }));
+};
+
+// Finance-only filtered approvers for threshold and posting levels
+const getFilteredFinanceApprovers = (currentField) => {
+    const selected = new Set();
+    [
+        form.mandatory_approver_1,
+        form.mandatory_approver_2,
+        form.mandatory_approver_3,
+        form.mandatory_approver_4,
+        form.mandatory_approver_5,
+        form.threshold_approver,
+        form.posting_approver
+    ].forEach(field => {
+        if (field === form[currentField]) return;
+        if (Array.isArray(field)) {
+            field.forEach(email => selected.add(email));
+        }
+    });
+    return financeApprovers.filter(opt => !selected.has(opt.value));
+};
 
     return (
         <Modal
@@ -351,7 +383,7 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                                     label="Threshold Approver *"
                                     value={form.threshold_approver || []}
                                     mode="multiple"
-                                    options={financeApprovers}
+                                    options={getFilteredFinanceApprovers('threshold_approver')}
                                     onChange={(val) => setForm(prev => ({ ...prev, threshold_approver: val }))}
                                     placeholder="Select Threshold Approver(s)"
                                 />
