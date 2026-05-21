@@ -15,7 +15,7 @@ import * as XLSX from "xlsx";
 import dayjs from "dayjs";
 import QuickViewTab from "./QuickViewTab";
 import InvoiceCalculationModal from "./InvoiceCalculationModal";
-import { formatCurrency } from "../../../utils/formatters";
+import { formatCurrency, formatNumberWithCommas } from "../../../utils/formatters";
 
 import CustomInput from "../../../shared/components/CustomInput";
 import CustomDropdown from "../../../shared/components/CustomDropdown";
@@ -37,8 +37,9 @@ const LINE_TYPE_OPTIONS = [
 // EditableCell — local state with debounced propagation.
 // Only syncs from outside when user is NOT actively typing.
 // ─────────────────────────────────────────────────────────────────────────────
-const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabled = false }) => {
+const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabled = false, isCurrency = false }) => {
     const [local, setLocal] = useState(value ?? "");
+    const [isFocused, setIsFocused] = useState(false);
     const debounceRef = useRef(null);
     const isEditingRef = useRef(false);
 
@@ -49,7 +50,14 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabl
     }, [value]);
 
     const handleChange = (e) => {
-        const v = e.target.value;
+        let v = e.target.value;
+        if (isCurrency) {
+            v = v.replace(/[^\d.-]/g, '');
+            const parts = v.split('.');
+            if (parts.length > 2) {
+                v = parts[0] + '.' + parts.slice(1).join('');
+            }
+        }
         isEditingRef.current = true;
         setLocal(v);
         clearTimeout(debounceRef.current);
@@ -59,18 +67,33 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabl
         }, 300);
     };
 
+    const handleFocus = useCallback(() => {
+        setIsFocused(true);
+    }, []);
+
+    const handleBlur = useCallback(() => {
+        setIsFocused(false);
+    }, []);
+
     useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+    const displayValue = isCurrency && (!isFocused || disabled)
+        ? formatNumberWithCommas(local)
+        : local;
 
     return (
         <CustomInput
-            value={local}
-            title={local}
+            value={displayValue}
+            title={displayValue}
             onChange={handleChange}
+            onFocus={isCurrency ? handleFocus : undefined}
+            onBlur={handleBlur}
             placeholder={placeholder}
             className="mb-0 w-full"
             height="32px"
             type={type}
             disabled={disabled}
+            icon={isCurrency ? <span className="text-gray-400 font-medium">$</span> : undefined}
         />
     );
 },
@@ -79,6 +102,7 @@ const EditableCell = memo(({ value, onChange, placeholder, type = "text", disabl
         prev.type === next.type &&
         prev.placeholder === next.placeholder &&
         prev.disabled === next.disabled &&
+        prev.isCurrency === next.isCurrency &&
         prev.onChange === next.onChange
 );
 
@@ -862,10 +886,10 @@ const CodingTab = ({ isActive = false }) => {
                                                     <EditableCell disabled={isViewOnly} value={row.qty} onChange={(v) => handleUpdate(row.id, "qty", v)} type="number" />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100 whitespace-nowrap">
-                                                    <EditableCell disabled={isViewOnly} value={row.unitPrice} onChange={(v) => handleUpdate(row.id, "unitPrice", v)} type="number" />
+                                                    <EditableCell disabled={isViewOnly} value={row.unitPrice} onChange={(v) => handleUpdate(row.id, "unitPrice", v)} type="text" isCurrency={true} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100 whitespace-nowrap">
-                                                    <EditableCell disabled={isViewOnly} value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="number" />
+                                                    <EditableCell disabled={isViewOnly} value={row.netAmount} onChange={(v) => handleUpdate(row.id, "netAmount", v)} type="text" isCurrency={true} />
                                                 </td>
                                                 <td className="p-2 border-r border-gray-100 whitespace-nowrap">
                                                     <DropdownCell

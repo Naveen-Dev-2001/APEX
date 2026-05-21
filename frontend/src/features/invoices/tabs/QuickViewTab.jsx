@@ -17,37 +17,79 @@ import { getInvoiceHeuristics } from "../../../utils/invoiceCalculations";
 import * as XLSX from "xlsx";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { Trash2 } from "lucide-react";
-import { formatCurrency } from "../../../utils/formatters";
+import { formatCurrency, formatNumberWithCommas } from "../../../utils/formatters";
 
 dayjs.extend(customParseFormat);
 
 const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+
+const CURRENCY_KEYS = [
+    "totalAmount",
+    "totalPayable",
+    "amountPaid",
+    "totalTaxAmount",
+    "cgst",
+    "sgst",
+    "igst",
+    "withholdingTax",
+    "subtotal",
+    "shippingFees",
+    "surcharges",
+    "totalInvoiceAmount",
+    "amountDue"
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Isolated field component — only re-renders when ITS value changes
 // ─────────────────────────────────────────────────────────────────────────────
 const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, isAmountMismatch, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading, onSearch, searchLoading, options: dynamicOptions, loading: dynamicLoading, onOpenChange: dynamicOnOpenChange }) => {
     const [localValue, setLocalValue] = useState(storeValue ?? "");
+    const [isFocused, setIsFocused] = useState(false);
     const debounceRef = useRef(null);
 
     useEffect(() => {
         setLocalValue(storeValue ?? "");
     }, [storeValue]);
 
+    const isCurrencyField = CURRENCY_KEYS.includes(field.key);
+
     const handleChange = useCallback((value) => {
-        setLocalValue(value);
+        let cleanValue = value;
+        if (isCurrencyField) {
+            cleanValue = value.replace(/[^\d.-]/g, '');
+            const parts = cleanValue.split('.');
+            if (parts.length > 2) {
+                cleanValue = parts[0] + '.' + parts.slice(1).join('');
+            }
+        }
+        setLocalValue(cleanValue);
         clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => onCommit(field.key, value), 300);
-    }, [field.key, onCommit]);
+        debounceRef.current = setTimeout(() => onCommit(field.key, cleanValue), 300);
+    }, [field.key, onCommit, isCurrencyField]);
+
+    const handleFocus = useCallback(() => {
+        setIsFocused(true);
+    }, []);
+
+    const handleBlur = useCallback(() => {
+        setIsFocused(false);
+    }, []);
 
     useEffect(() => () => clearTimeout(debounceRef.current), []);
 
+    const displayValue = isCurrencyField && (!isFocused || forceDisabled || !field.editable)
+        ? formatNumberWithCommas(localValue)
+        : localValue;
+
     const commonProps = {
         label: field.label,
-        value: localValue,
+        value: displayValue,
         disabled: forceDisabled || !field.editable,
         onMouseEnter: () => onHover(field.key),
         onMouseLeave: onLeave,
+        onFocus: isCurrencyField ? handleFocus : undefined,
+        onBlur: isCurrencyField ? handleBlur : undefined,
+        icon: isCurrencyField ? <span className="text-gray-400 font-medium">$</span> : undefined,
     };
 
     const fieldContent = (() => {
@@ -163,10 +205,13 @@ FieldRenderer.displayName = "FieldRenderer";
 // ─────────────────────────────────────────────────────────────────────────────
 // Line-item cell — isolated so only the changed cell re-renders
 // ─────────────────────────────────────────────────────────────────────────────
+const LINE_ITEM_CURRENCY_KEYS = ["unitPrice", "discount", "netAmount", "taxAmt"];
+
 // ─── FIX 1: LineItemCell — change the useEffect condition ────────────────────
 const LineItemCell = memo(
     ({ value, disabled, rowId, colKey, onUpdate, onHover, onLeave }) => {
         const [local, setLocal] = useState(value ?? "");
+        const [isFocused, setIsFocused] = useState(false);
         const isEditing = useRef(false);
         const editTimerRef = useRef(null);
 
@@ -176,8 +221,17 @@ const LineItemCell = memo(
             }
         }, [value]);
 
+        const isCurrency = LINE_ITEM_CURRENCY_KEYS.includes(colKey);
+
         const handleChange = useCallback((e) => {
-            const v = e.target.value;
+            let v = e.target.value;
+            if (isCurrency) {
+                v = v.replace(/[^\d.-]/g, '');
+                const parts = v.split('.');
+                if (parts.length > 2) {
+                    v = parts[0] + '.' + parts.slice(1).join('');
+                }
+            }
             isEditing.current = true;
             setLocal(v);
             clearTimeout(editTimerRef.current);
@@ -185,26 +239,37 @@ const LineItemCell = memo(
                 isEditing.current = false;
             }, 300);
             onUpdate(rowId, colKey, v);
-        }, [rowId, colKey, onUpdate]);
+        }, [rowId, colKey, onUpdate, isCurrency]);
+
+        const handleFocus = useCallback(() => {
+            setIsFocused(true);
+        }, []);
 
         const handleBlur = useCallback(() => {
             isEditing.current = false;
+            setIsFocused(false);
         }, []);
 
         useEffect(() => () => clearTimeout(editTimerRef.current), []);
+
+        const displayValue = isCurrency && (!isFocused || disabled)
+            ? formatNumberWithCommas(local)
+            : local;
 
         return (
             <div
                 onMouseEnter={() => onHover(rowId, colKey)}
                 onMouseLeave={onLeave}
                 className="w-full h-full min-h-[40px] flex items-center"
-                title={local}
+                title={displayValue}
             >
                 <CustomInput
-                    value={local}
+                    value={displayValue}
                     disabled={disabled}
                     onChange={handleChange}
+                    onFocus={isCurrency ? handleFocus : undefined}
                     onBlur={handleBlur}
+                    icon={isCurrency ? <span className="text-gray-400 font-medium">$</span> : undefined}
                     className="mb-0 w-full"
                 />
             </div>
@@ -1036,11 +1101,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                                                                                     : col.key === "qty"
                                                                                         ? "1"
                                                                                         : col.key === "unitPrice"
-                                                                                            ? formatCurrency(row.unitPrice)
+                                                                                            ? row.unitPrice
                                                                                             : col.key === "discount"
                                                                                                 ? "0"
                                                                                                 : col.key === "netAmount"
-                                                                                                    ? formatCurrency(row.netAmount)
+                                                                                                    ? row.netAmount
                                                                                                     : col.key === "taxAmt"
                                                                                                         ? "0"
                                                                                                         : ""

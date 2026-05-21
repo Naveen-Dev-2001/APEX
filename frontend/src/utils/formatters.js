@@ -23,6 +23,31 @@ export const formatCurrency = (value) => {
         maximumFractionDigits: 2
     })}`;
 };
+
+/**
+ * Formats a number or string with thousands separators and two decimal places (no $ prefix).
+ * Used for currency input displays when blurred/disabled.
+ * 
+ * @param {number|string} value - The value to format
+ * @returns {string} - The formatted string
+ */
+export const formatNumberWithCommas = (value) => {
+    if (value === null || value === undefined || value === "") return "";
+    
+    let cleanValue = value;
+    if (typeof value === "string") {
+        cleanValue = value.replace(/[^\d.-]/g, '').trim();
+    }
+    
+    const num = parseFloat(cleanValue);
+    
+    if (isNaN(num)) return value;
+    
+    return num.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+};
 /**
  * Formats a date string into IST format: MM/DD/YYYY, HH:MM AM/PM IST
  * Example: 05/08/2026, 01:15 PM IST
