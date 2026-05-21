@@ -137,8 +137,8 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, onParamsChange, externalSea
 
     const columnDefs = useMemo(() => {
         const cols = view === "condensed"
-            ? getCondensedColumns(handleView, null, null, userRole, null, true)
-            : getFullColumns(handleView, null, null, userRole, null, true);
+            ? getCondensedColumns(handleView, null, null, userRole, null, true, true)
+            : getFullColumns(handleView, null, null, userRole, null, true, true);
 
         return cols.map(col => ({
             ...col,

@@ -1070,7 +1070,7 @@ async def get_invoices(
                             conditions.append(
                                 or_(
                                     and_(
-                                        Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                        Invoice.status.in_([InvoiceStatusEnum.WAITING_APPROVAL, InvoiceStatusEnum.REWORKED, InvoiceStatusEnum.SAGE_POST_FAILED]),
                                         exists().where(
                                             and_(
                                                 InvoiceAssignedApprover.invoice_id == Invoice.id,
@@ -1099,7 +1099,7 @@ async def get_invoices(
                             
                             conditions.append(
                                 and_(
-                                    Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
+                                    Invoice.status.in_([InvoiceStatusEnum.WAITING_APPROVAL, InvoiceStatusEnum.REWORKED, InvoiceStatusEnum.SAGE_POST_FAILED]),
                                     exists().where(
                                         and_(
                                             InvoiceAssignedApprover.invoice_id == Invoice.id,
@@ -1388,7 +1388,7 @@ async def get_invoice_filter_options(
         
         options = set()
         for inv in invoices:
-            if inv.status == InvoiceStatusEnum.WAITING_APPROVAL:
+            if inv.status in [InvoiceStatusEnum.WAITING_APPROVAL, InvoiceStatusEnum.REWORKED, InvoiceStatusEnum.SAGE_POST_FAILED]:
                 level = inv.current_approver_level or 1
                 # Find approvers for this level
                 approvers = [a for a in inv.assigned_approvers_list if a.sequence_order == level]
