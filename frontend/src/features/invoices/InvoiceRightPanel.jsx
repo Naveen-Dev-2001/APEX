@@ -2,7 +2,7 @@ import { useInvoiceStore } from "../../store/invoice.store";
 import CustomTabs from "./CustomTabs";
 import { lazy, Suspense, useState, useEffect } from "react";
 import React from "react";
-import { Skeleton } from "antd";
+import { Skeleton, Spin } from "antd";
 import InfiniteScroll from "react-infinite-scroll-component";
 
 const QuickViewTab = React.memo(lazy(() => import("./tabs/QuickViewTab")));
@@ -49,7 +49,7 @@ const TabContent = React.memo(({ tabName, isActive }) => {
     );
 });
 
-const InvoiceRightPanel = ({ invoice = {} }) => {
+const InvoiceRightPanel = () => {
 
     const { invoiceActiveTab, setInvoiceActiveTab, tabList, activeInvoiceData } = useInvoiceStore();
 
@@ -60,17 +60,38 @@ const InvoiceRightPanel = ({ invoice = {} }) => {
     // Safety check just in case state gets out of sync with the visible tabs
     const validActiveTab = visibleTabs.includes(invoiceActiveTab) ? invoiceActiveTab : (visibleTabs[0] || "Quick View");
 
+    // Track active tab display state with delay to show loader and keep UX smooth
+    const [prevActiveTab, setPrevActiveTab] = useState(validActiveTab);
+    const [displayTab, setDisplayTab] = useState(validActiveTab);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
     // Keep track of which tabs have been rendered to avoid mounting them until needed
     const [renderedTabs, setRenderedTabs] = useState(() => new Set([validActiveTab]));
 
-    useEffect(() => {
+    // Sync state during render when validActiveTab changes (standard React pattern)
+    if (validActiveTab !== prevActiveTab) {
+        setPrevActiveTab(validActiveTab);
+        setIsTransitioning(true);
+    }
+
+    if (!renderedTabs.has(validActiveTab)) {
         setRenderedTabs(prev => {
-            if (prev.has(validActiveTab)) return prev;
             const next = new Set(prev);
             next.add(validActiveTab);
             return next;
         });
-    }, [validActiveTab]);
+    }
+
+    // Handle transition delay asynchronously in useEffect to avoid synchronous setState warnings
+    useEffect(() => {
+        if (isTransitioning) {
+            const timer = setTimeout(() => {
+                setDisplayTab(validActiveTab);
+                setIsTransitioning(false);
+            }, 180); // 180ms delay allows the browser to render the spinner before mounting/rendering the heavy tab
+            return () => clearTimeout(timer);
+        }
+    }, [isTransitioning, validActiveTab]);
 
     return (
         <div className="h-full flex flex-col">
@@ -86,6 +107,16 @@ const InvoiceRightPanel = ({ invoice = {} }) => {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-hidden mt-4 relative">
+                {isTransitioning && (
+                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/70 backdrop-blur-[1px]">
+                        <div className="flex flex-col items-center gap-3">
+                            <Spin size="large" />
+                            <span className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                                Loading tab content...
+                            </span>
+                        </div>
+                    </div>
+                )}
                 {visibleTabs.map(tabName => {
                     // Only render tabs that have been visited
                     if (!renderedTabs.has(tabName)) return null;
@@ -94,7 +125,7 @@ const InvoiceRightPanel = ({ invoice = {} }) => {
                         <TabContent
                             key={tabName}
                             tabName={tabName}
-                            isActive={validActiveTab === tabName}
+                            isActive={displayTab === tabName}
                         />
                     );
                 })}
