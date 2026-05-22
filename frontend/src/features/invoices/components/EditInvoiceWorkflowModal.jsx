@@ -93,11 +93,12 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
 
     const handleSave = async () => {
         const approversPayload = [];
-// Validate no duplicate approvers across all selections
+// Validate no duplicate approvers across mandatory + threshold levels only.
+// Posting Approver is a special Sage-posting role and is intentionally allowed
+// to overlap with regular level approvers.
 const allSelected = [
   ...Array.from({ length: form.approver_count }).flatMap((_, i) => form[`mandatory_approver_${i + 1}`] || []),
-  ...(form.threshold_approver || []),
-  ...(form.posting_approver || [])
+  ...(form.threshold_approver || [])
 ];
 const duplicate = allSelected.find((email, idx) => allSelected.indexOf(email) !== idx);
 if (duplicate) {
@@ -188,7 +189,9 @@ const financeApprovers = useMemo(() => {
         }));
 }, [approversList]);
 
-// Filter approvers for any field to avoid duplicates
+// Filter approvers for mandatory/threshold level dropdowns to avoid duplicates.
+// posting_approver is intentionally excluded from this filter because it is a
+// special Sage-posting role and is allowed to share a person with regular levels.
 const getFilteredApprovers = (currentField) => {
     const selected = new Set();
     [
@@ -197,8 +200,8 @@ const getFilteredApprovers = (currentField) => {
         form.mandatory_approver_3,
         form.mandatory_approver_4,
         form.mandatory_approver_5,
-        form.threshold_approver,
-        form.posting_approver
+        form.threshold_approver
+        // posting_approver intentionally omitted — allowed to overlap
     ].forEach(field => {
         if (field === form[currentField]) return;
         if (Array.isArray(field)) {
@@ -213,7 +216,8 @@ const getFilteredApprovers = (currentField) => {
         }));
 };
 
-// Finance-only filtered approvers for threshold and posting levels
+// Finance-only filtered approvers for threshold level.
+// posting_approver is intentionally excluded from this filter.
 const getFilteredFinanceApprovers = (currentField) => {
     const selected = new Set();
     [
@@ -222,8 +226,8 @@ const getFilteredFinanceApprovers = (currentField) => {
         form.mandatory_approver_3,
         form.mandatory_approver_4,
         form.mandatory_approver_5,
-        form.threshold_approver,
-        form.posting_approver
+        form.threshold_approver
+        // posting_approver intentionally omitted — allowed to overlap
     ].forEach(field => {
         if (field === form[currentField]) return;
         if (Array.isArray(field)) {
