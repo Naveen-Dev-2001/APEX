@@ -262,11 +262,11 @@ const Invoice = () => {
 
         return cols.map(col => ({
             ...col,
-            onGetOptions: col.filterable ? async (accessor) => {
+            onGetOptions: col.filterable ? async (accessor, search) => {
                 const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[dbField];
-                return await getInvoiceFilterOptions(dbField, otherFilters, pageTab === "delete" ? undefined : pageTab);
+                return await getInvoiceFilterOptions(dbField, otherFilters, pageTab === "delete" ? undefined : pageTab, search);
             } : undefined
         }));
     }, [view, handleView, handleDelete, handleArchive, backendFilters, userRole, openingInvoiceId, pageTab]);

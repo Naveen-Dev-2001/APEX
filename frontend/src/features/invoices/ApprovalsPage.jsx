@@ -208,7 +208,7 @@ const ApprovalsPage = () => {
             accessor: "vendor_name",
             sortable: true,
             filterable: true,
-            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
+            onGetOptions: (col, search) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals', search),
             onClick: () => handleSort("vendor_name")
         },
         {
@@ -216,7 +216,7 @@ const ApprovalsPage = () => {
             accessor: "invoice_number",
             sortable: true,
             filterable: true,
-            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
+            onGetOptions: (col, search) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals', search),
             onClick: () => handleSort("invoice_number")
         },
         {
@@ -224,7 +224,7 @@ const ApprovalsPage = () => {
             accessor: "total_amount",
             sortable: true,
             filterable: true,
-            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
+            onGetOptions: (col, search) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals', search),
             onClick: () => handleSort("total_amount"),
             filterRender: (val) => formatCurrency(val),
             render: (val) => formatCurrency(val)
@@ -234,14 +234,14 @@ const ApprovalsPage = () => {
             accessor: "uploaded_by",
             sortable: true,
             filterable: true,
-            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
+            onGetOptions: (col, search) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals', search),
             onClick: () => handleSort("uploaded_by")
         },
         {
             header: "Status",
             accessor: "status",
             filterable: true,
-            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
+            onGetOptions: (col, search) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals', search),
             getFilterValue: (row) => row.status_label || "Waiting Approval",
             render: (val, row) => {
                 const label = row.status_label || (row.current_approver_level ? `Waiting for Approval (Level ${row.current_approver_level})` : 'Waiting for Approval');
@@ -263,7 +263,7 @@ const ApprovalsPage = () => {
             accessor: "approver_name",
             sortable: true,
             filterable: true,
-            onGetOptions: (col) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals'),
+            onGetOptions: (col, search) => getInvoiceFilterOptions(col, { approvals_view: true }, 'approvals', search),
             onClick: () => handleSort("approver_name")
         },
         {

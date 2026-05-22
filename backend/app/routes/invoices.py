@@ -1177,6 +1177,7 @@ async def get_invoice_filter_options(
     column: str,
     filters: Optional[str] = Query(None),
     tab: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     entity: str = Depends(get_current_entity),
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1244,7 +1245,11 @@ async def get_invoice_filter_options(
         for u in uploaders:
             if u[0]: options.add(u[0])
         
-        return sorted([o for o in options if o], key=lambda x: str(x))
+        res_opts = sorted([o for o in options if o], key=lambda x: str(x))
+        if search:
+            search_lower = search.lower()
+            res_opts = [opt for opt in res_opts if search_lower in str(opt).lower()]
+        return res_opts
 
     if filters:
         try:
@@ -1405,7 +1410,11 @@ async def get_invoice_filter_options(
             elif inv.status == InvoiceStatusEnum.REJECTED:
                 options.add("Rejected")
         
-        return sorted([o for o in options if o], key=lambda x: str(x))
+        res_opts = sorted([o for o in options if o], key=lambda x: str(x))
+        if search:
+            search_lower = search.lower()
+            res_opts = [opt for opt in res_opts if search_lower in str(opt).lower()]
+        return res_opts
 
     if column == "status":
         query = db.query(Invoice)
@@ -1424,7 +1433,11 @@ async def get_invoice_filter_options(
             if label and label not in seen:
                 formatted_options.append(label)
                 seen.add(label)
-        return sorted(formatted_options)
+        res_opts = sorted(formatted_options)
+        if search:
+            search_lower = search.lower()
+            res_opts = [opt for opt in res_opts if search_lower in str(opt).lower()]
+        return res_opts
 
     # Query unique non-null values for the column with applied filters
     target_model = Invoice
@@ -1520,6 +1533,10 @@ async def get_invoice_filter_options(
             formatted_options.append(fmt)
             seen_fmt.add(fmt)
             
+    if search:
+        search_lower = search.lower()
+        formatted_options = [opt for opt in formatted_options if search_lower in str(opt).lower()]
+        
     return formatted_options
 
 

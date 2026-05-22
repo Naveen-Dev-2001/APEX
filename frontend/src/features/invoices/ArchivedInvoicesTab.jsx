@@ -142,10 +142,10 @@ const ArchivedInvoicesTab = ({ onView, onDataChange, onParamsChange, externalSea
 
         return cols.map(col => ({
             ...col,
-            onGetOptions: col.filterable ? async (accessor) => {
+            onGetOptions: col.filterable ? async (accessor, search) => {
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[accessor];
-                return await getInvoiceFilterOptions(accessor, otherFilters, "delete");
+                return await getInvoiceFilterOptions(accessor, otherFilters, "delete", search);
             } : undefined
         }));
     }, [view, handleView, userRole, backendFilters]);

@@ -168,11 +168,11 @@ const CodingPage = () => {
             sortable: true,
             filterType: 'number',
             filterable: true,
-            onGetOptions: async (accessor) => {
+            onGetOptions: async (accessor, search) => {
                 const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
                 const otherFilters = { ...backendFilters };
                 delete otherFilters[dbField];
-                return await getInvoiceFilterOptions(dbField, otherFilters);
+                return await getInvoiceFilterOptions(dbField, otherFilters, undefined, search);
             },
             filterRender: (val) => formatCurrency(val),
             render: (_, row) => {
@@ -201,7 +201,7 @@ const CodingPage = () => {
             minWidth: 160,
             sortable: true,
             filterable: true,
-            onGetOptions: (col) => getInvoiceFilterOptions(col, { coding_view: true }),
+            onGetOptions: (col, search) => getInvoiceFilterOptions(col, { coding_view: true }, undefined, search),
             render: (status, row) => {
                 const colorMap = {
                     waiting_coding: "bg-orange-100 text-orange-600",
@@ -342,6 +342,23 @@ const CodingPage = () => {
         }
     ], [currentPage, itemsPerPage, handleView, backendFilters]);
 
+    const columnDefs = useMemo(() => {
+        return columns.map(col => {
+            if (!col.filterable) return col;
+            return {
+                ...col,
+                onGetOptions: col.onGetOptions
+                    ? (accessor, search) => col.onGetOptions(accessor, search)
+                    : async (accessor, search) => {
+                        const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
+                        const otherFilters = { ...backendFilters };
+                        delete otherFilters[dbField];
+                        return await getInvoiceFilterOptions(dbField, otherFilters, undefined, search);
+                    }
+            };
+        });
+    }, [columns, backendFilters]);
+
     const handlePageChange = (page) => {
         setCurrentPage(page);
     };
@@ -389,7 +406,7 @@ const CodingPage = () => {
                         <ExportButton
                             data={invoices}
                             fetchData={handleFetchAllForExport}
-                            columns={columns}
+                            columns={columnDefs}
                             fileName="CodingQueue.xlsx"
                         />
                     </div>
@@ -398,7 +415,7 @@ const CodingPage = () => {
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <DataTable
-                    columns={columns}
+                    columns={columnDefs}
                     data={invoices}
                     loading={loading}
                     totalItems={total}
