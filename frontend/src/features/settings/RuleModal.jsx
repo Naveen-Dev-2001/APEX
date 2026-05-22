@@ -6,6 +6,42 @@ import CustomButton from "../../shared/components/CustomButton";
 import workflowAPI from "../../api/workflowAPI";
 import toast from "../../utils/toast";
 import { useWorkflowFormData } from "../hooks/useWorkflowFormData";
+import { formatNumberWithCommas } from "../../utils/formatters";
+
+const AmountThresholdInput = ({ value, onChange }) => {
+    const [isFocused, setIsFocused] = useState(false);
+
+    const displayValue = isFocused
+        ? value
+        : value
+            ? formatNumberWithCommas(value)
+            : "";
+
+    return (
+        <div className="flex flex-col gap-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <span className="text-red-500 mr-1">*</span>
+                Amount Threshold
+            </label>
+            <div
+                className="flex items-center border border-[#d9d9d9] rounded-lg bg-white px-3 transition-all hover:border-[#40a9ff]"
+                style={{ height: "40px" }}
+            >
+                <span className="text-gray-400 font-medium mr-1 select-none">$</span>
+                <input
+                    type={isFocused ? "number" : "text"}
+                    value={displayValue}
+                    placeholder="0.00"
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="flex-1 outline-none border-none bg-transparent text-[14px] text-gray-800 placeholder-gray-300"
+                    style={{ MozAppearance: "textfield" }}
+                />
+            </div>
+        </div>
+    );
+};
 
 const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onSuccess }) => {
     const isEdit = !!editData;
@@ -541,14 +577,9 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                         <div>
                             <p className="text-sm font-semibold text-gray-700 mb-3">Threshold Settings</p>
                             <div className="grid grid-cols-2 gap-4 items-end">
-                                <CustomInput
-                                    label="Amount Threshold"
-                                    required
-                                    placeholder="$ 0.00"
+                                <AmountThresholdInput
                                     value={form.thresholdAmount}
-                                    onChange={(e) => setForm({ ...form, thresholdAmount: e.target.value })}
-                                    className="mb-0"
-                                    height="40px"
+                                    onChange={(val) => setForm({ ...form, thresholdAmount: val })}
                                 />
                                 <Dropdown
                                     label="Threshold Approver"

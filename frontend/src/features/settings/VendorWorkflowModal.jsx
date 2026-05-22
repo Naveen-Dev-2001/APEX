@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import useWorkflowStore from '../../store/workflow.store';
 import toast from '../../utils/toast';
 import Dropdown from '../../components/ui/Dropdown';
+import { formatNumberWithCommas } from '../../utils/formatters';
 
 const EMPTY_FORM = {
     vendor_id: '',
@@ -19,23 +20,41 @@ const EMPTY_FORM = {
     is_parallel: true
 };
 
-const FormField = ({ label, id, value, onChange, type = "text", placeholder = '', required = false }) => (
-    <div className="flex flex-col gap-1 w-full text-left">
-        <label htmlFor={id} className="text-[13px] font-medium text-[#333333]">
-            {required && <span className="text-red-500 mr-1">*</span>}
-            {label}
-        </label>
-        <input
-            id={id}
-            type={type}
-            value={value || ''}
-            onChange={onChange}
-            placeholder={placeholder}
-            className="h-[40px] px-3 border border-[#D9D9D9] rounded-[8px] text-[14px] text-[#333333] outline-none
-                focus:border-[#24A1DD] focus:ring-1 focus:ring-[#24A1DD]/20 transition-all bg-white shadow-sm"
-        />
-    </div>
-);
+const FormField = ({ label, id, value, onChange, type = "text", placeholder = '', required = false, isCurrency = false }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    
+    let displayValue = value || '';
+    if (isCurrency && !isFocused && value) {
+        displayValue = formatNumberWithCommas(value);
+    }
+
+    return (
+        <div className="flex flex-col gap-1 w-full text-left">
+            <label htmlFor={id} className="text-[13px] font-medium text-[#333333]">
+                {required && <span className="text-red-500 mr-1">*</span>}
+                {label}
+            </label>
+            <div className="relative">
+                {isCurrency && (
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium z-10 pointer-events-none">
+                        $
+                    </span>
+                )}
+                <input
+                    id={id}
+                    type={isCurrency && !isFocused ? "text" : type}
+                    value={displayValue}
+                    onChange={onChange}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    placeholder={placeholder}
+                    className={`h-[40px] ${isCurrency ? 'pl-7 pr-3' : 'px-3'} w-full border border-[#D9D9D9] rounded-[8px] text-[14px] text-[#333333] outline-none
+                        focus:border-[#24A1DD] focus:ring-1 focus:ring-[#24A1DD]/20 transition-all bg-white shadow-sm`}
+                />
+            </div>
+        </div>
+    );
+};
 
 const RadioGroup = ({ label, value, options, onChange }) => (
     <div className="flex flex-col gap-2 w-full text-left">
@@ -308,6 +327,7 @@ const VendorWorkflowModal = ({ mode, rowData, onClose, onSuccess }) => {
                                 required={true}
                                 id="amount_threshold"
                                 type="number"
+                                isCurrency={true}
                                 value={form.amount_threshold}
                                 onChange={(e) => setForm(prev => ({ ...prev, amount_threshold: e.target.value }))}
                                 placeholder="Enter threshold amount"
