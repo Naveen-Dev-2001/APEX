@@ -385,3 +385,48 @@
     border-color: #d1d5db !important;
     color: #374151 !important;
 }
+
+/* Container Queries for Right Preview Panel */
+.right-side-preview-container {
+    container-type: inline-size;
+    container-name: right-panel;
+}
+
+/* 1 Column: container width under 600px */
+@container right-panel (max-width: 599px) {
+    .right-side-preview-container .grid-cols-2 {
+        grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    }
+}
+
+/* 2 Columns: container width between 600px and 899px */
+@container right-panel (min-width: 600px) and (max-width: 899px) {
+    .right-side-preview-container .grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+/* 3 Columns: container width between 900px and 1199px */
+@container right-panel (min-width: 900px) and (max-width: 1199px) {
+    .right-side-preview-container .grid-cols-2 {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
+/* 4 Columns: container width 1200px and above */
+@container right-panel (min-width: 1200px) {
+    .right-side-preview-container .grid-cols-2 {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+}
+
+/* Adjust paddings and font size for narrow panels under 520px */
+@container right-panel (max-width: 520px) {
+    .right-side-preview-container .px-5 {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    .right-side-preview-container button {
+        font-size: 12px !important;
+    }
+}

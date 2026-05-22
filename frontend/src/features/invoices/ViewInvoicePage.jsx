@@ -42,7 +42,7 @@ const ViewInvoicePage = () => {
                     </div>
 
                     {/* RIGHT - Details */}
-                    <div className="flex flex-col overflow-hidden bg-white border-l border-[#E0E0E0]">
+                    <div className="flex flex-col overflow-hidden bg-white border-l border-[#E0E0E0] right-side-preview-container">
                         <div className="flex-1 min-h-0 p-4">
                             <InvoiceRightPanel />
                         </div>
