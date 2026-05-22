@@ -372,7 +372,7 @@ export const useInvoiceStore = create((set, get) => ({
             .map((item, index) => {
                 const desc = item.description?.value || "";
                 const netAmount = Number(item.amount?.value) || 0;
-                const qty = Number(item.qty?.value) || 1;
+                const qty = Number(item.qty?.value ?? item.quantity?.value) || 1;
                 const unitPrice = Number(item.unit_price?.value) || 0;
                 const discount = Number(item.discount?.value) || 0;
                 const taxAmt = Number(item.tax_amount?.value) || 0;
@@ -409,7 +409,7 @@ export const useInvoiceStore = create((set, get) => ({
             ? originalItems.map((item, index) => ({
                 id: index + 1,
                 description: item.description?.value || "",
-                qty: Number(item.qty?.value) || 1,
+                qty: Number(item.qty?.value ?? item.quantity?.value) || 1,
                 unitPrice: Number(item.unit_price?.value) || 0,
                 discount: Number(item.discount?.value) || 0,
                 netAmount: Number(item.amount?.value) || 0,
