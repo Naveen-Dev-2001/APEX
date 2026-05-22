@@ -2,7 +2,6 @@ import { useInvoiceStore } from "../../../store/invoice.store";
 import { useVendorDetailSync } from "../../hooks/useInvoiceDetailSync";
 import { formatCurrency } from "../../../utils/formatters";
 import { getInvoiceHeuristics } from "../../../utils/invoiceCalculations";
-import CustomButton from "../../../shared/components/CustomButton";
 
 const InvoiceCalculationModal = ({ open, onClose }) => {
     const { quickViewFormData, lineItems, originalLineItems, selectedVendorId } = useInvoiceStore();
@@ -90,14 +89,20 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="px-6 pt-5 pb-3">
+                <div className="flex justify-between items-center px-6 pt-5 pb-3 flex-shrink-0">
                     <h2 className="text-[18px] font-bold text-gray-800 custom-font-jura">
                         Total Invoice Amount - Calculation Details
                     </h2>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-400 hover:text-gray-600 text-2xl leading-none cursor-pointer"
+                    >
+                        &times;
+                    </button>
                 </div>
 
                 {/* Body */}
-                <div className="px-6 pb-4 overflow-y-auto flex-1 space-y-5 text-[13px]">
+                <div className="px-6 pb-6 overflow-y-auto flex-1 space-y-5 text-[13px]">
                     
                     {/* First Table Box */}
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -196,25 +201,6 @@ const InvoiceCalculationModal = ({ open, onClose }) => {
 
                 </div>
 
-                {/* Footer */}
-                <div className="flex justify-end gap-3 px-6 py-4 bg-white border-t border-gray-150">
-                    <div className="w-[110px]">
-                        <CustomButton
-                            variant="outline"
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </CustomButton>
-                    </div>
-                    <div className="w-[110px]">
-                        <CustomButton
-                            variant="primary"
-                            onClick={onClose}
-                        >
-                            Ok
-                        </CustomButton>
-                    </div>
-                </div>
             </div>
         </div>
     );
