@@ -24,7 +24,11 @@
     "test:dashboard": "npx playwright test --config=tests/dashboard/playwright.config.js",
     "test:dashboard:headed": "npx playwright test --config=tests/dashboard/playwright.config.js --headed",
     "test:dashboard:ui": "npx playwright test --config=tests/dashboard/playwright.config.js --ui",
-    "test:dashboard:debug": "npx playwright test --config=tests/dashboard/playwright.config.js --debug"
+    "test:dashboard:debug": "npx playwright test --config=tests/dashboard/playwright.config.js --debug",
+    "test:invoices": "npx playwright test --config=tests/invoices/playwright.config.js",
+    "test:invoices:headed": "npx playwright test --config=tests/invoices/playwright.config.js --headed",
+    "test:invoices:ui": "npx playwright test --config=tests/invoices/playwright.config.js --ui",
+    "test:invoices:debug": "npx playwright test --config=tests/invoices/playwright.config.js --debug"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
