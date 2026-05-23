@@ -11,3 +11,4 @@ tmp
 .env.production.example
 playwright-report
 test-results
+*.bat
