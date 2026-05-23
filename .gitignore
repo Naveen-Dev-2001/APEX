@@ -9,3 +9,5 @@ tmp
 .env
 .env.test.example
 .env.production.example
+playwright-report
+test-results

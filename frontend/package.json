@@ -12,7 +12,11 @@
     "test:login": "npx playwright test --config=tests/login/playwright.config.js",
     "test:login:headed": "npx playwright test --config=tests/login/playwright.config.js --headed",
     "test:login:ui": "npx playwright test --config=tests/login/playwright.config.js --ui",
-    "test:login:debug": "npx playwright test --config=tests/login/playwright.config.js --debug"
+    "test:login:debug": "npx playwright test --config=tests/login/playwright.config.js --debug",
+    "test:register": "npx playwright test --config=tests/register/playwright.config.js",
+    "test:register:headed": "npx playwright test --config=tests/register/playwright.config.js --headed",
+    "test:register:ui": "npx playwright test --config=tests/register/playwright.config.js --ui",
+    "test:register:debug": "npx playwright test --config=tests/register/playwright.config.js --debug"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
