@@ -20,7 +20,11 @@
     "test:select-entity": "npx playwright test --config=tests/select-entity/playwright.config.js",
     "test:select-entity:headed": "npx playwright test --config=tests/select-entity/playwright.config.js --headed",
     "test:select-entity:ui": "npx playwright test --config=tests/select-entity/playwright.config.js --ui",
-    "test:select-entity:debug": "npx playwright test --config=tests/select-entity/playwright.config.js --debug"
+    "test:select-entity:debug": "npx playwright test --config=tests/select-entity/playwright.config.js --debug",
+    "test:dashboard": "npx playwright test --config=tests/dashboard/playwright.config.js",
+    "test:dashboard:headed": "npx playwright test --config=tests/dashboard/playwright.config.js --headed",
+    "test:dashboard:ui": "npx playwright test --config=tests/dashboard/playwright.config.js --ui",
+    "test:dashboard:debug": "npx playwright test --config=tests/dashboard/playwright.config.js --debug"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
