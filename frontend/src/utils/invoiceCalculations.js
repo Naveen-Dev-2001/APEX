@@ -84,7 +84,7 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
 
     // Note: The calculation modal uses tdsRate directly. If tdsRate is 2 (for 2%), 
     // it's treated as 2.0 unless corrected. Keeping consistency with modal logic for now.
-    const tdsDeduction = isEntityGstApplicable ? -Math.abs((tdsRate) * (lineItemsSubtotal + totalTax)) : 0;
+    const tdsDeduction = isEntityGstApplicable ? -Math.abs((tdsRate) * (lineItemsSubtotal)) : 0;
 
     const invoiceTotal_calc1 = parseFloat((lineItemsSubtotal).toFixed(2));
     const invoiceTotal_calc2 = parseFloat((extractedSubtotal + totalTax).toFixed(2));
