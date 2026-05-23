@@ -11,6 +11,8 @@ const SelectEntityPage = () => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const entityContainerRef = useRef(null);
+  const roleContainerRef = useRef(null);
   const setEntity = useCommonStore((state) => state.setEntity)
 
   // State for selected entity display and dropdown visibility
@@ -120,6 +122,12 @@ const SelectEntityPage = () => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
       }
+      if (entityContainerRef.current && !entityContainerRef.current.contains(event.target)) {
+        setIsSelectOpen(false);
+      }
+      if (roleContainerRef.current && !roleContainerRef.current.contains(event.target)) {
+        setIsRoleSelectOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
@@ -188,7 +196,7 @@ const SelectEntityPage = () => {
           <p className="text-[14px] text-gray-500 mb-6">Choose which entity you want to work with.</p>
 
           {hasMultipleRoles && (
-            <div className="relative w-full text-left mt-6">
+            <div className="relative w-full text-left mt-6" ref={roleContainerRef}>
               <label className="text-[12px] text-gray-500 mb-1 block font-medium">Login As</label>
               <button
                 ref={roleButtonRef}
@@ -232,7 +240,7 @@ const SelectEntityPage = () => {
             </div>
           )}
 
-          <div className="relative w-full text-left mt-6">
+          <div className="relative w-full text-left mt-6" ref={entityContainerRef}>
             <label className="text-[12px] text-gray-500 mb-1 block font-medium">Select Entity</label>
             <button
               ref={entityButtonRef}
