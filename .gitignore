@@ -6,3 +6,6 @@ helper
 tmp
 .codex
 *.log
+.env
+.env.test.example
+.env.production.example

@@ -8,7 +8,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "npm run dev"
+    "start": "npm run dev",
+    "test:login": "npx playwright test --config=tests/login/playwright.config.js",
+    "test:login:headed": "npx playwright test --config=tests/login/playwright.config.js --headed",
+    "test:login:ui": "npx playwright test --config=tests/login/playwright.config.js --ui",
+    "test:login:debug": "npx playwright test --config=tests/login/playwright.config.js --debug"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
@@ -38,6 +42,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@originjs/vite-plugin-commonjs": "^1.0.3",
+    "@playwright/test": "^1.60.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
