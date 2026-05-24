@@ -7,6 +7,7 @@ import toast from '../../../utils/toast';
 import Dropdown from '../../../components/ui/Dropdown';
 import CustomInput from '../../../shared/components/CustomInput';
 import CustomButton from '../../../shared/components/CustomButton';
+import { formatNumberWithCommas } from '../../../utils/formatters';
 
 const EMPTY_FORM = {
     approver_count: 1,
@@ -22,10 +23,21 @@ const EMPTY_FORM = {
     posting_approver: []
 };
 
+const cleanAmount = (val) => {
+    if (typeof val !== 'string') val = String(val ?? '');
+    let clean = val.replace(/[^\d.-]/g, '');
+    const parts = clean.split('.');
+    if (parts.length > 2) {
+        clean = parts[0] + '.' + parts.slice(1).join('');
+    }
+    return clean;
+};
+
 const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess }) => {
     const queryClient = useQueryClient();
     const [form, setForm] = useState(EMPTY_FORM);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isThresholdFocused, setIsThresholdFocused] = useState(false);
 
     const {
         approversList,
@@ -72,7 +84,7 @@ const EditInvoiceWorkflowModal = ({ invoice, workflowData, onClose, onSuccess })
                 approver_count: count,
                 enableThreshold: hasThreshold ? 'Yes' : 'No',
                 threshold_approver: thresholdEmails,
-                amount_threshold: amountThreshold,
+                amount_threshold: amountThreshold ? cleanAmount(String(amountThreshold)) : '',
                 posting_approver: postingEmails
             };
 
@@ -375,11 +387,16 @@ const getFilteredFinanceApprovers = (currentField) => {
                             <div className="grid grid-cols-2 gap-4 items-end text-left">
                                 <CustomInput
                                     label="Amount Threshold *"
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="$ 0.00"
-                                    value={form.amount_threshold || ''}
-                                    onChange={(e) => setForm(prev => ({ ...prev, amount_threshold: e.target.value }))}
+                                    type="text"
+                                    placeholder="0.00"
+                                    value={isThresholdFocused ? form.amount_threshold : formatNumberWithCommas(form.amount_threshold)}
+                                    onChange={(e) => {
+                                        const cleaned = cleanAmount(e.target.value);
+                                        setForm(prev => ({ ...prev, amount_threshold: cleaned }));
+                                    }}
+                                    onFocus={() => setIsThresholdFocused(true)}
+                                    onBlur={() => setIsThresholdFocused(false)}
+                                    icon={<span className="text-gray-400 font-medium">$</span>}
                                     className="mb-0"
                                     height="40px"
                                 />
