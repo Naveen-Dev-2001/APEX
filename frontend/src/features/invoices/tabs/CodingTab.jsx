@@ -401,18 +401,6 @@ const CodingTab = ({ isActive = false }) => {
         }
     }, [isActive, loadMasterData]);
 
-    // ── Reactive Store Synchronization ───────────────────────────────────────
-    // Ensures that when the Coding tab becomes active, it forces a store-level
-    // reconciliation from activeInvoiceData to prevent any stale data rendering
-    // after navigating away from other tabs (like Quick View).
-    useEffect(() => {
-        if (isActive) {
-            const currentData = useInvoiceStore.getState().activeInvoiceData;
-            if (currentData) {
-                useInvoiceStore.getState().setInvoiceData(currentData);
-            }
-        }
-    }, [isActive]);
 
     // ── Suggestions Logic ────────────────────────────────────────────────────
     // Check cache first (pre-seeded by useInvoicePreviewData parallel fetch).
@@ -657,6 +645,22 @@ const CodingTab = ({ isActive = false }) => {
                     return item;
                 });
             });
+
+            if (itemToDelete === "gst-row") {
+                useInvoiceStore.getState().setQuickViewField("isGstDeleted", true);
+                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", 0);
+            } else if (itemToDelete === "tds-row") {
+                useInvoiceStore.getState().setQuickViewField("tdsApplicability", "No");
+                useInvoiceStore.getState().setQuickViewField("tdsRate", 0);
+                useInvoiceStore.getState().setQuickViewField("tds_percentage", 0);
+            } else {
+                // Remove standard items from originalLineItems as well
+                const isGrouped = useInvoiceStore.getState().quickViewFormData?.lineGrouping === "Yes";
+                useInvoiceStore.setState(state => ({
+                    originalLineItems: isGrouped ? [] : state.originalLineItems.filter(item => item.id !== itemToDelete)
+                }));
+            }
+
             setDeleteModalVisible(false);
             setItemToDelete(null);
         }
@@ -685,6 +689,10 @@ const CodingTab = ({ isActive = false }) => {
             const normalRows = prev.filter(r => !r.isSystemRow);
             return [...normalRows, newItem, ...systemRows];
         });
+
+        useInvoiceStore.setState(state => ({
+            originalLineItems: [...(state.originalLineItems || []), newItem]
+        }));
     }, [setLineItems]);
 
     const filterOption = useCallback((input, option) =>

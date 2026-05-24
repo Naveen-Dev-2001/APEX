@@ -207,6 +207,7 @@ export const useSaveInvoice = () => {
                 // Persist user overrides so they survive reload
                 line_grouping: { value: f.lineGrouping ?? "" },
                 gst_eligibility: { value: f.gstEligibility ?? "" },
+                is_gst_deleted: { value: f.isGstDeleted ?? false },
             },
 
             additional_info: {

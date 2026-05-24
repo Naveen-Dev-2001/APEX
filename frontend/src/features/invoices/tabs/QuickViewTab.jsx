@@ -486,6 +486,10 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             // Start with current store state
             const updatedFormData = { ...state.quickViewFormData, [key]: value };
 
+            if (key === "gstEligibility") {
+                updatedFormData.isGstDeleted = (value === "Ineligible");
+            }
+
             // Ensure booleans and numbers are correctly typed for the calculation logic
             updatedFormData.tds_applicability = (updatedFormData.tdsApplicability === "Yes");
             updatedFormData.tds_percentage = parseFloat(updatedFormData.tdsRate || 0);
@@ -642,6 +646,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             gstEligibility: useVendorDefaults
                 ? (vendor?.gst_eligibility ? "Eligible" : "Ineligible")
                 : (prev?.gstEligibility || (vendor?.gst_eligibility ? "Eligible" : "Ineligible")),
+            isGstDeleted: useVendorDefaults ? !vendor?.gst_eligibility : prev?.isGstDeleted,
             lineGrouping: useVendorDefaults
                 ? (vendor?.line_grouping ? "Yes" : "No")
                 : (prev?.lineGrouping || (vendor?.line_grouping ? "Yes" : "No")),
@@ -790,11 +795,20 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             });
         });
 
-        // Also sync deletion to originalLineItems in store
-        const isGrouped = useInvoiceStore.getState().quickViewFormData?.lineGrouping === "Yes";
-        useInvoiceStore.setState(state => ({
-            originalLineItems: isGrouped ? [] : state.originalLineItems.filter(item => item.id !== id)
-        }));
+        if (id === "gst-row") {
+            useInvoiceStore.getState().setQuickViewField("isGstDeleted", true);
+            useInvoiceStore.getState().setQuickViewField("totalTaxAmount", 0);
+        } else if (id === "tds-row") {
+            useInvoiceStore.getState().setQuickViewField("tdsApplicability", "No");
+            useInvoiceStore.getState().setQuickViewField("tdsRate", 0);
+            useInvoiceStore.getState().setQuickViewField("tds_percentage", 0);
+        } else {
+            // Also sync deletion to originalLineItems in store
+            const isGrouped = useInvoiceStore.getState().quickViewFormData?.lineGrouping === "Yes";
+            useInvoiceStore.setState(state => ({
+                originalLineItems: isGrouped ? [] : state.originalLineItems.filter(item => item.id !== id)
+            }));
+        }
     }, [setLineItems]);
 
     const handleHoverField = useCallback((key) => {
@@ -842,6 +856,10 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
 
             return [...regularRows, newItem, ...systemRows];
         });
+
+        useInvoiceStore.setState(state => ({
+            originalLineItems: [...(state.originalLineItems || []), newItem]
+        }));
     }, [setLineItems]);
 
     // ── Totals — derived directly from quickViewLineItems (single source of truth) ──

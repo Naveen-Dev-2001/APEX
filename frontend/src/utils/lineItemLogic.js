@@ -78,7 +78,8 @@ const addSystemRows = (rows, formData, entityMaster) => {
     let result = [...rows];
 
     //  GST
-    const isGstApplicable = entityMaster?.gst_applicable === true;
+    const isGstDeleted = formData?.isGstDeleted === true || formData?.isGstDeleted === "true";
+    const isGstApplicable = entityMaster?.gst_applicable === true && !isGstDeleted;
     if (isGstApplicable) {
         const gstValue = Number(formData?.totalTaxAmount || 0);
         const gstLabel = "Total GST";

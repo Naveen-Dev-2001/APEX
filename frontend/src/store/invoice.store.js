@@ -146,7 +146,8 @@ export const useInvoiceStore = create((set, get) => ({
         const existingTdsRow = lineItems.find(i => i.type === "TDS");
 
         const entityMaster = get().entityMaster;
-        const isGstApplicable = entityMaster?.gst_applicable === true;
+        const isGstDeleted = formData?.isGstDeleted === true || formData?.isGstDeleted === "true";
+        const isGstApplicable = entityMaster?.gst_applicable === true && !isGstDeleted;
 
         if (isModified) {
             // Preserve saved system rows exactly as-is if GST is applicable
@@ -363,6 +364,7 @@ export const useInvoiceStore = create((set, get) => ({
             lineGrouping:
                 data.extracted_data?.amounts?.line_grouping?.value ||
                 ((currentVendorId === data.vendor_id) ? (currentFormData.lineGrouping || "") : ""),
+            isGstDeleted: data.extracted_data?.amounts?.is_gst_deleted?.value ?? false,
         };
 
         const isGstApplicable = state.entityMaster?.gst_applicable === true;
