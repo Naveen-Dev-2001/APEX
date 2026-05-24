@@ -66,20 +66,26 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
     const isEntityGstApplicable = entityMaster?.gst_applicable !== false;
     const isGstApplicable = isEntityGstApplicable && totalTax > 0;
 
-    if (selectedVendorDetails) {
+    let isTDSApplicable = quickViewFormData?.tdsApplicability === "Yes";
+    const isTDSExplicitlyNo = quickViewFormData?.tdsApplicability === "No";
+
+    if (!isTDSApplicable && !isTDSExplicitlyNo && selectedVendorDetails) {
         const tdsApplicabilityVal = findVal(selectedVendorDetails, [
             'TDS/Withhold Tax Applicability Configuration',
             'TDS Applicability', 'TDS Applicable', 'Withholding Tax Applicable'
         ]);
+        isTDSApplicable = tdsApplicabilityVal?.toString().toLowerCase().trim() === 'yes';
+    }
 
-        const isTDSApplicable = tdsApplicabilityVal?.toString().toLowerCase().trim() === 'yes';
-
-        if (isTDSApplicable && isGstApplicable) {
+    if (isTDSApplicable && isGstApplicable) {
+        if (!quickViewFormData?.tdsRate && selectedVendorDetails) {
             const tdsRateVal = findVal(selectedVendorDetails, [
                 'TDS Percentage', 'Percentage', 'Rate', 'TDS Rate', 'Withholding Rate'
             ]) || '0';
             tdsRate = parseFloat(tdsRateVal.toString().replace('%', '')) || 0;
         }
+    } else {
+        tdsRate = 0;
     }
 
     // Note: The calculation modal uses tdsRate directly. If tdsRate is 2 (for 2%), 

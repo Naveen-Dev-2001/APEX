@@ -406,6 +406,35 @@ export const useInvoiceStore = create((set, get) => ({
                 return true;
             });
 
+        // ── Enrich coding fields from lineItemsSnapshot ───────────────────────
+        // The backend says "extracted_data.Items always has empty gl_code/lob/
+        // department because those are never written back to the nested Items
+        // structure" — lineItemsSnapshot is the authoritative coding source.
+        // Mirror the backend's snapshot-first lookup (by description then index)
+        // so that Refresh / initial load for approvers never wipes coding fields.
+        const snapshot = data?.extracted_data?.lineItemsSnapshot || [];
+        if (snapshot.length > 0) {
+            const snapByDesc = {};
+            const snapByIdx  = {};
+            snapshot.forEach((s, i) => {
+                const key = (s.description || "").trim().toLowerCase();
+                if (key) snapByDesc[key] = s;
+                snapByIdx[i] = s;
+            });
+            mappedItems.forEach((row, i) => {
+                if (row.isSystemRow) return; // leave GST/TDS rows alone
+                const key = (row.description || "").trim().toLowerCase();
+                const snap = snapByDesc[key] || snapByIdx[i] || null;
+                if (!snap) return;
+                if (!row.glCode     && snap.glCode)     row.glCode     = snap.glCode;
+                if (!row.lob        && snap.lob)        row.lob        = snap.lob;
+                if (!row.department && snap.department) row.department = snap.department;
+                if (!row.customer   && snap.customer)   row.customer   = snap.customer;
+                if (!row.item       && snap.item)       row.item       = snap.item;
+                if (!row.lineType   && snap.lineType)   row.lineType   = snap.lineType;
+            });
+        }
+
         const originalItems = data?.extracted_data?.OriginalItems?.value || [];
         const mappedOriginalItems = originalItems.length
             ? originalItems.map((item, index) => ({
