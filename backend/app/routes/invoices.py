@@ -3183,11 +3183,12 @@ async def update_invoice(
                     department = snap.get("department") or get_val(item, "department", "")
                     customer   = snap.get("customer")   or get_val(item, "customer",   "")
                     item_val   = snap.get("item")       or get_val(item, "item",       "")
+                    line_type  = snap.get("lineType")  or snap.get("line_type") or get_val(item, "line_type", "Expense")
 
                     coding_line_items.append(LineItemCoding(
                         s_no=idx + 1,
                         description=desc,
-                        line_type="Expense",
+                        line_type=line_type,
                         quantity=float(get_val(item, "qty", 1) or 1),
                         unit_price=float(get_val(item, "unit_price", 0) or 0),
                         net_amount=float(get_val(item, "amount", 0) or 0),

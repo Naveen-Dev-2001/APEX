@@ -73,7 +73,7 @@ const mergeIntoFirstRow = (data) => {
     return [updatedData[0]]; // only one grouped row
 };
 
-const addSystemRows = (rows, formData, entityMaster) => {
+const addSystemRows = (rows, formData, entityMaster, activeInvoiceData) => {
 
     let result = [...rows];
 
@@ -83,6 +83,27 @@ const addSystemRows = (rows, formData, entityMaster) => {
     if (isGstApplicable) {
         const gstValue = Number(formData?.totalTaxAmount || 0);
         const gstLabel = "Total GST";
+
+        let gstCoding = { glCode: "", lob: "", department: "", customer: "", item: "", lineType: "Expense" };
+        if (activeInvoiceData) {
+            const items = activeInvoiceData?.extracted_data?.Items?.value || [];
+            const existingGst = items.find(item => {
+                const desc = item.description?.value || item.description || "";
+                return item.is_system_row === true || item.isSystemRow === true ||
+                       item.type === "GST" || item.row_type === "GST" ||
+                       desc === "Total GST" || desc === "Total Tax";
+            });
+            if (existingGst) {
+                gstCoding = {
+                    glCode: existingGst.gl_code?.value ?? existingGst.glCode ?? "",
+                    lob: existingGst.lob?.value ?? existingGst.lob ?? "",
+                    department: existingGst.department?.value ?? existingGst.department ?? "",
+                    customer: existingGst.customer?.value ?? existingGst.customer ?? "",
+                    item: existingGst.item?.value ?? existingGst.item ?? "",
+                    lineType: existingGst.line_type?.value ?? existingGst.lineType ?? "Expense",
+                };
+            }
+        }
 
         const gstRow = {
             id: "gst-row",
@@ -95,12 +116,12 @@ const addSystemRows = (rows, formData, entityMaster) => {
             taxAmt: 0,
             isSystemRow: true,
 
-            lineType: "",
-            glCode: "",
-            lob: "",
-            department: "",
-            customer: "",
-            item: "",
+            lineType: gstCoding.lineType,
+            glCode: gstCoding.glCode,
+            lob: gstCoding.lob,
+            department: gstCoding.department,
+            customer: gstCoding.customer,
+            item: gstCoding.item,
         };
 
         result.push(gstRow);
@@ -114,6 +135,27 @@ const addSystemRows = (rows, formData, entityMaster) => {
     if (isTdsApplicable) {
         const tdsValue = roundTo2(-Math.abs((tdsRate) * totalInvoiceAmount));
 
+        let tdsCoding = { glCode: "", lob: "", department: "", customer: "", item: "", lineType: "Expense" };
+        if (activeInvoiceData) {
+            const items = activeInvoiceData?.extracted_data?.Items?.value || [];
+            const existingTds = items.find(item => {
+                const desc = item.description?.value || item.description || "";
+                return item.is_system_row === true || item.isSystemRow === true ||
+                       item.type === "TDS" || item.row_type === "TDS" ||
+                       desc === "TDS Deduction";
+            });
+            if (existingTds) {
+                tdsCoding = {
+                    glCode: existingTds.gl_code?.value ?? existingTds.glCode ?? "",
+                    lob: existingTds.lob?.value ?? existingTds.lob ?? "",
+                    department: existingTds.department?.value ?? existingTds.department ?? "",
+                    customer: existingTds.customer?.value ?? existingTds.customer ?? "",
+                    item: existingTds.item?.value ?? existingTds.item ?? "",
+                    lineType: existingTds.line_type?.value ?? existingTds.lineType ?? "Expense",
+                };
+            }
+        }
+
         const tdsRow = {
             id: "tds-row",
             type: "TDS",
@@ -125,12 +167,12 @@ const addSystemRows = (rows, formData, entityMaster) => {
             taxAmt: 0,
             isSystemRow: true,
 
-            lineType: "",
-            glCode: "",
-            lob: "",
-            department: "",
-            customer: "",
-            item: "",
+            lineType: tdsCoding.lineType,
+            glCode: tdsCoding.glCode,
+            lob: tdsCoding.lob,
+            department: tdsCoding.department,
+            customer: tdsCoding.customer,
+            item: tdsCoding.item,
         };
 
         result.push(tdsRow);
@@ -224,7 +266,7 @@ const loadLineItemTable = (props) => {
         ? mergeIntoFirstRow(baseItems)
         : baseItems;
 
-    const finalData = addSystemRows(processedRows, quickViewFormData, entityMaster);
+    const finalData = addSystemRows(processedRows, quickViewFormData, entityMaster, activeInvoiceData);
 
     return finalData;
 };

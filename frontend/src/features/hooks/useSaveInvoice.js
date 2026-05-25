@@ -66,6 +66,7 @@ export const useSaveInvoice = () => {
                 department: { value: item.department || "", source: "user" },
                 customer: { value: item.customer || "", source: "user" },
                 item: { value: item.item || "", source: "user" },
+                line_type: { value: item.lineType || "Expense", source: "user" },
                 ...(item.isSystemRow ? { is_system_row: true, row_type: item.type } : {}),
             };
         });

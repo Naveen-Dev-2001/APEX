@@ -5,7 +5,7 @@ import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 import { useSaveInvoice } from "../hooks/useSaveInvoice";
 import { useInvoicePreviewData } from "../hooks/useInvoicePreviewData";
 import toast from "../../utils/toast";
-import { saveInvoice, getInvoiceById } from "../../api/invoiceApi";
+import { saveInvoice, getInvoiceById, fetchEntityMaster } from "../../api/invoiceApi";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import workflowActionsAPI from "../../api/workflowActionsAPI";
@@ -349,6 +349,22 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             if (freshInvoice) {
                 const oldStatus = (activeInvoiceData?.status || "").toLowerCase();
                 const newStatus = (freshInvoice?.status || "").toLowerCase();
+
+                // Ensure entityMaster is populated in the store
+                let currentEntityMaster = useInvoiceStore.getState().entityMaster;
+                if (!currentEntityMaster || !currentEntityMaster.entity_id) {
+                    try {
+                        const res = await fetchEntityMaster();
+                        const entities = res.data || [];
+                        const selectedEntityId = sessionStorage.getItem('selected_entity');
+                        const selectedEntity = entities.find((item) => String(item.entity_id) === String(selectedEntityId));
+                        if (selectedEntity) {
+                            useInvoiceStore.getState().setEntityMaster(selectedEntity);
+                        }
+                    } catch (err) {
+                        console.error("Failed to fetch entity master in handleRefresh", err);
+                    }
+                }
 
                 setInvoiceData(freshInvoice);
 

@@ -128,7 +128,7 @@ const Invoice = () => {
         fetchEntityMaster().then((res) => {
             const data = res.data || [];
             const selectedEntityId = sessionStorage.getItem('selected_entity');
-            const selectedEntity = data.filter((item) => item.entity_id === selectedEntityId);
+            const selectedEntity = data.filter((item) => String(item.entity_id) === String(selectedEntityId));
             setEntityMaster(selectedEntity?.[0] || {});
         }).catch((err) => console.error("Failed to fetch entity master", err));
     }, [entity]);
@@ -151,7 +151,7 @@ const Invoice = () => {
                 const res = await fetchEntityMaster();
                 const entities = res.data || [];
                 const selectedEntityId = sessionStorage.getItem('selected_entity');
-                const selectedEntity = entities.find((item) => item.entity_id === selectedEntityId);
+                const selectedEntity = entities.find((item) => String(item.entity_id) === String(selectedEntityId));
                 if (selectedEntity) {
                     setEntityMaster(selectedEntity);
                 }
