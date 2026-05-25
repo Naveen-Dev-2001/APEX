@@ -327,23 +327,28 @@ const CodingTab = ({ isActive = false }) => {
                 const systemRows = prev.filter(r => r.isSystemRow);
                 const regularRows = prev.filter(r => !r.isSystemRow);
                 const updatedRegular = [...regularRows, ...newItems];
-                const sumTax = updatedRegular.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
+                
+                const importedHasTax = newItems.some(item => (parseFloat(item.taxAmt) || 0) > 0);
 
-                // Update quickViewFormData in store
-                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+                if (importedHasTax) {
+                    const sumTax = updatedRegular.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
+                    // Update quickViewFormData in store
+                    useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
 
-                const updatedSystem = systemRows.map(item => {
-                    if (item.type === "GST") {
-                        return {
-                            ...item,
-                            unitPrice: sumTax,
-                            netAmount: sumTax
-                        };
-                    }
-                    return item;
-                });
+                    const updatedSystem = systemRows.map(item => {
+                        if (item.type === "GST") {
+                            return {
+                                ...item,
+                                unitPrice: sumTax,
+                                netAmount: sumTax
+                            };
+                        }
+                        return item;
+                    });
+                    return [...updatedRegular, ...updatedSystem];
+                }
 
-                return [...updatedRegular, ...updatedSystem];
+                return [...updatedRegular, ...systemRows];
             });
         };
         reader.readAsArrayBuffer(file);
@@ -626,24 +631,29 @@ const CodingTab = ({ isActive = false }) => {
     const confirmDelete = useCallback(() => {
         if (itemToDelete) {
             setLineItems(prev => {
+                const deletedItem = prev.find(item => item.id === itemToDelete);
                 const filtered = prev.filter(item => item.id !== itemToDelete);
                 const regularItems = filtered.filter(item => !item.isSystemRow);
-                const sumTax = regularItems.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
 
-                // Update quickViewFormData in store
-                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+                if (deletedItem && (parseFloat(deletedItem.taxAmt) || 0) > 0) {
+                    const sumTax = regularItems.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
 
-                // Update the GST/Total Tax row in filtered
-                return filtered.map(item => {
-                    if (item.isSystemRow && item.type === "GST") {
-                        return {
-                            ...item,
-                            unitPrice: sumTax,
-                            netAmount: sumTax
-                        };
-                    }
-                    return item;
-                });
+                    // Update quickViewFormData in store
+                    useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+
+                    // Update the GST/Total Tax row in filtered
+                    return filtered.map(item => {
+                        if (item.isSystemRow && item.type === "GST") {
+                            return {
+                                ...item,
+                                unitPrice: sumTax,
+                                netAmount: sumTax
+                            };
+                        }
+                        return item;
+                    });
+                }
+                return filtered;
             });
 
             if (itemToDelete === "gst-row") {

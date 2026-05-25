@@ -585,105 +585,105 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         const isVendorChanged = prevVendorId !== null          // not first load
             && prevVendorId !== vendor?.vendor_id;
 
-        let updatedFormData = storeState.quickViewFormData;
-
-        // 1. Sync vendor defaults only if vendor changed or is not yet synced
-        if (isVendorChanged || !isVendorSynced) {
-            const TERMS = ['NET 7', 'NET 8', 'NET 12', 'NET 15', 'NET 20', 'NET 30', 'NET 45', 'NET 60', 'NET 90'];
-
-            const parseDateFlexible = (dateStr) => {
-                if (!dateStr) return null;
-                const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
-                for (const fmt of formats) {
-                    const d = dayjs(dateStr, fmt, true);
-                    if (d.isValid()) return d;
-                }
-                const d = dayjs(dateStr);
-                return d.isValid() ? d : null;
-            };
-
-            const extractDays = (payTerms) => {
-                if (!payTerms) return null;
-                const match = payTerms.match(/\d+/);
-                return match ? parseInt(match[0], 10) : null;
-            };
-
-            const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
-                if (existingDueDate) {
-                    const d = parseDateFlexible(existingDueDate);
-                    if (d) return d.format("MM-DD-YYYY");
-                }
-                const baseDate = parseDateFlexible(invoiceDate);
-                if (!baseDate) return "";
-                const invoiceDays = extractDays(invoicePayTerms);
-                if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
-                const vendorDays = extractDays(vendorPayTerms);
-                if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
-                return "";
-            };
-
-            const prev = storeState.quickViewFormData;
-            const extractedPayTerms = prev?.paymentTerms;
-            const computedDueDate = getDueDate(
-                prev?.dueDate,
-                prev?.invoiceDate,
-                extractedPayTerms,
-                vendor?.pay_terms
-            );
-
-            const isSavedInvoice = !!prev?.isModified;
-            const useVendorDefaults = isVendorChanged || !isSavedInvoice;
-
-            updatedFormData = {
-                ...prev,
-                // Only apply vendor defaults for GST/TDS/Grouping when appropriate
-                gstEligibility: useVendorDefaults
-                    ? (vendor?.gst_eligibility ? "Eligible" : "Ineligible")
-                    : (prev?.gstEligibility || (vendor?.gst_eligibility ? "Eligible" : "Ineligible")),
-                lineGrouping: useVendorDefaults
-                    ? (vendor?.line_grouping ? "Yes" : "No")
-                    : (prev?.lineGrouping || (vendor?.line_grouping ? "Yes" : "No")),
-                tdsApplicability: useVendorDefaults
-                    ? (vendor?.tds_applicability ? "Yes" : "No")
-                    : (prev?.tdsApplicability || (vendor?.tds_applicability ? "Yes" : "No")),
-                tdsRate: useVendorDefaults
-                    ? (vendor?.tds_percentage ?? 0)
-                    : (prev?.tdsRate ?? vendor?.tds_percentage ?? 0),
-                tdsSection: useVendorDefaults
-                    ? (vendor?.tds_section_code ?? "NA")
-                    : (prev?.tdsSection || vendor?.tds_section_code || "NA"),
-                // Always sync payment terms and due date
-                paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || "",
-                dueDate: computedDueDate,
-                // Keep internal flags in sync
-                gst_eligibility: useVendorDefaults ? vendor?.gst_eligibility : prev?.gst_eligibility,
-                tds_applicability: useVendorDefaults ? vendor?.tds_applicability : prev?.tds_applicability,
-                tds_percentage: useVendorDefaults
-                    ? (vendor?.tds_percentage ?? 0)
-                    : (prev?.tds_percentage ?? vendor?.tds_percentage ?? 0),
-                totalTaxAmount: prev?.totalTaxAmount,
-            };
-
-            // Commit to store
-            setQuickViewFormData(updatedFormData);
-            useInvoiceStore.setState({ isVendorSynced: true });
+        if (!isVendorChanged && isVendorSynced) {
+            return;
         }
 
-        // 2. Always reload line items when vendor details, activeInvoiceData, or entityMaster updates
-        if (activeInvoiceData) {
-            const result = loadLineItemTable({
-                activeInvoiceData,
-                quickViewFormData: updatedFormData,
-                vendor,
-                isVendorChanged,
-                entityMaster,
-                storeOriginalLineItems: storeState.originalLineItems
-            });
+        const TERMS = ['NET 7', 'NET 8', 'NET 12', 'NET 15', 'NET 20', 'NET 30', 'NET 45', 'NET 60', 'NET 90'];
 
-            if (result) setLineItems(result);
-        }
+        const parseDateFlexible = (dateStr) => {
+            if (!dateStr) return null;
+            const formats = ["MM-DD-YYYY", "YYYY-MM-DD", "DD-MM-YYYY", "MM/DD/YYYY", "YYYY/MM/DD"];
+            for (const fmt of formats) {
+                const d = dayjs(dateStr, fmt, true);
+                if (d.isValid()) return d;
+            }
+            const d = dayjs(dateStr);
+            return d.isValid() ? d : null;
+        };
 
-    }, [vendor, selectedVendorId, isVendorSynced, activeInvoiceData, entityMaster]);
+        const extractDays = (payTerms) => {
+            if (!payTerms) return null;
+            const match = payTerms.match(/\d+/);
+            return match ? parseInt(match[0], 10) : null;
+        };
+
+        const getDueDate = (existingDueDate, invoiceDate, invoicePayTerms, vendorPayTerms) => {
+            if (existingDueDate) {
+                const d = parseDateFlexible(existingDueDate);
+                if (d) return d.format("MM-DD-YYYY");
+            }
+            const baseDate = parseDateFlexible(invoiceDate);
+            if (!baseDate) return "";
+            const invoiceDays = extractDays(invoicePayTerms);
+            if (invoiceDays !== null) return baseDate.add(invoiceDays, "day").format("MM-DD-YYYY");
+            const vendorDays = extractDays(vendorPayTerms);
+            if (vendorDays !== null) return baseDate.add(vendorDays, "day").format("MM-DD-YYYY");
+            return "";
+        };
+
+        const prev = storeState.quickViewFormData;
+
+        const extractedPayTerms = prev?.paymentTerms;
+        const computedDueDate = getDueDate(
+            prev?.dueDate,
+            prev?.invoiceDate,
+            extractedPayTerms,
+            vendor?.pay_terms
+        );
+        // When the invoice is already saved AND the vendor hasn't changed,
+        // preserve the user's saved overrides — don't overwrite with vendor master.
+        const isSavedInvoice = !!prev?.isModified;
+        const useVendorDefaults = isVendorChanged || !isSavedInvoice;
+
+        const updatedFormData = {
+            ...prev,
+            // Only apply vendor defaults for GST/TDS/Grouping when appropriate
+            gstEligibility: useVendorDefaults
+                ? (vendor?.gst_eligibility ? "Eligible" : "Ineligible")
+                : (prev?.gstEligibility || (vendor?.gst_eligibility ? "Eligible" : "Ineligible")),
+            lineGrouping: useVendorDefaults
+                ? (vendor?.line_grouping ? "Yes" : "No")
+                : (prev?.lineGrouping || (vendor?.line_grouping ? "Yes" : "No")),
+            tdsApplicability: useVendorDefaults
+                ? (vendor?.tds_applicability ? "Yes" : "No")
+                : (prev?.tdsApplicability || (vendor?.tds_applicability ? "Yes" : "No")),
+            tdsRate: useVendorDefaults
+                ? (vendor?.tds_percentage ?? 0)
+                : (prev?.tdsRate ?? vendor?.tds_percentage ?? 0),
+            tdsSection: useVendorDefaults
+                ? (vendor?.tds_section_code ?? "NA")
+                : (prev?.tdsSection || vendor?.tds_section_code || "NA"),
+            // Always sync payment terms and due date
+            paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || "",
+            dueDate: computedDueDate,
+            // Keep internal flags in sync
+            gst_eligibility: useVendorDefaults ? vendor?.gst_eligibility : prev?.gst_eligibility,
+            tds_applicability: useVendorDefaults ? vendor?.tds_applicability : prev?.tds_applicability,
+            tds_percentage: useVendorDefaults
+                ? (vendor?.tds_percentage ?? 0)
+                : (prev?.tds_percentage ?? vendor?.tds_percentage ?? 0),
+            totalTaxAmount: prev?.totalTaxAmount,
+        };
+
+        // Commit to store
+        setQuickViewFormData(updatedFormData);
+        if (!activeInvoiceData) return;
+        // const prevVendorId = prevVendorRef.current;
+        // const isVendorChanged = prevVendorId !== vendor?.vendor_id;
+        const result = loadLineItemTable({
+            activeInvoiceData,
+            quickViewFormData: updatedFormData,
+            vendor,
+            isVendorChanged,
+            entityMaster,
+            storeOriginalLineItems: storeState.originalLineItems
+        });
+
+        if (result) setLineItems(result);
+        useInvoiceStore.setState({ isVendorSynced: true });
+
+    }, [vendor, selectedVendorId, isVendorSynced]);
 
     // ── Vendor options ─────────────────────────────────────────────────────────
     // No longer needed: full mapping of 35k vendors
@@ -770,24 +770,29 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
 
     const handleDeleteLineItem = useCallback((id) => {
         setLineItems(prev => {
+            const deletedItem = prev.find(item => item.id === id);
             const filtered = prev.filter(item => item.id !== id);
             const regularItems = filtered.filter(item => !item.isSystemRow);
-            const sumTax = regularItems.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
 
-            // Update quickViewFormData in store
-            useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+            if (deletedItem && (parseFloat(deletedItem.taxAmt) || 0) > 0) {
+                const sumTax = regularItems.reduce((sum, item) => sum + (parseFloat(item.taxAmt) || 0), 0);
 
-            // Update the GST/Total Tax row in filtered
-            return filtered.map(item => {
-                if (item.isSystemRow && item.type === "GST") {
-                    return {
-                        ...item,
-                        unitPrice: sumTax,
-                        netAmount: sumTax
-                    };
-                }
-                return item;
-            });
+                // Update quickViewFormData in store
+                useInvoiceStore.getState().setQuickViewField("totalTaxAmount", sumTax);
+
+                // Update the GST/Total Tax row in filtered
+                return filtered.map(item => {
+                    if (item.isSystemRow && item.type === "GST") {
+                        return {
+                            ...item,
+                            unitPrice: sumTax,
+                            netAmount: sumTax
+                        };
+                    }
+                    return item;
+                });
+            }
+            return filtered;
         });
 
         if (id === "gst-row") {
