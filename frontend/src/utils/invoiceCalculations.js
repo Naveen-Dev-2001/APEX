@@ -77,7 +77,7 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
         isTDSApplicable = tdsApplicabilityVal?.toString().toLowerCase().trim() === 'yes';
     }
 
-    if (isTDSApplicable && isGstApplicable) {
+    if (isTDSApplicable) {
         if (!quickViewFormData?.tdsRate && selectedVendorDetails) {
             const tdsRateVal = findVal(selectedVendorDetails, [
                 'TDS Percentage', 'Percentage', 'Rate', 'TDS Rate', 'Withholding Rate'
