@@ -125,8 +125,8 @@ const Header = () => {
                 const roles = nav.roles || [];
                 const roleAccess = roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === currentRole);
                 
-                // Show Master Data for scanner and coder as well
-                if (nav.label === 'Master Data' && (currentRole === 'scanner' || currentRole === 'coder')) {
+                // Show Master Data and Settings for scanner and coder as well
+                if ((nav.label === 'Master Data' || nav.label === 'Settings') && (currentRole === 'scanner' || currentRole === 'coder')) {
                     return true;
                 }
 

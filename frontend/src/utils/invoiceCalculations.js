@@ -32,16 +32,15 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
 
     const calculatedSubtotal = lineItemsForCalculations.reduce((sum, item) => {
         // Skip system rows (GST, TDS) added by the frontend
-        if (item.isSystemRow || item.type === "GST" || item.type === "TDS") {
-            return sum;
-        }
+        // if (item.isSystemRow || item.type === "GST" || item.type === "TDS") {
+        //     return sum;
+        // }
 
         const desc = (extractValue(item.description) || item.description?.value || '').toString().trim();
         const lowDesc = desc.toLowerCase();
 
         // Safeguard: Skip system tax lines and OCR-extracted generic tax lines
-        if (desc === 'Total GST' || desc === 'Total GST (Ineligible)' || desc === 'TDS Deduction' || desc === 'Tax' ||
-            lowDesc === 'gst' || lowDesc === 'vat' || lowDesc === 'igst' || lowDesc === 'cgst' || lowDesc === 'sgst') {
+        if (desc === 'TDS Deduction' || desc === 'Tax') {
             return sum;
         }
 
@@ -67,27 +66,33 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
     const isEntityGstApplicable = entityMaster?.gst_applicable !== false;
     const isGstApplicable = isEntityGstApplicable && totalTax > 0;
 
-    if (selectedVendorDetails) {
+    let isTDSApplicable = quickViewFormData?.tdsApplicability === "Yes";
+    const isTDSExplicitlyNo = quickViewFormData?.tdsApplicability === "No";
+
+    if (!isTDSApplicable && !isTDSExplicitlyNo && selectedVendorDetails) {
         const tdsApplicabilityVal = findVal(selectedVendorDetails, [
             'TDS/Withhold Tax Applicability Configuration',
             'TDS Applicability', 'TDS Applicable', 'Withholding Tax Applicable'
         ]);
+        isTDSApplicable = tdsApplicabilityVal?.toString().toLowerCase().trim() === 'yes';
+    }
 
-        const isTDSApplicable = tdsApplicabilityVal?.toString().toLowerCase().trim() === 'yes';
-
-        if (isTDSApplicable && isGstApplicable) {
+    if (isTDSApplicable && isGstApplicable) {
+        if (!quickViewFormData?.tdsRate && selectedVendorDetails) {
             const tdsRateVal = findVal(selectedVendorDetails, [
                 'TDS Percentage', 'Percentage', 'Rate', 'TDS Rate', 'Withholding Rate'
             ]) || '0';
             tdsRate = parseFloat(tdsRateVal.toString().replace('%', '')) || 0;
         }
+    } else {
+        tdsRate = 0;
     }
 
     // Note: The calculation modal uses tdsRate directly. If tdsRate is 2 (for 2%), 
     // it's treated as 2.0 unless corrected. Keeping consistency with modal logic for now.
-    const tdsDeduction = isEntityGstApplicable ? -Math.abs((tdsRate) * (lineItemsSubtotal + totalTax)) : 0;
+    const tdsDeduction = isEntityGstApplicable ? -Math.abs((tdsRate) * (lineItemsSubtotal)) : 0;
 
-    const invoiceTotal_calc1 = parseFloat((lineItemsSubtotal + totalTax).toFixed(2));
+    const invoiceTotal_calc1 = parseFloat((lineItemsSubtotal).toFixed(2));
     const invoiceTotal_calc2 = parseFloat((extractedSubtotal + totalTax).toFixed(2));
     const invoiceTotal_calc3 = parseFloat((lineItemsSubtotal + totalTax - amountPaid + shipping + surcharges).toFixed(2));
 

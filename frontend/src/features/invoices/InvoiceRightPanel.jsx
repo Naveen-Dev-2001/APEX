@@ -1,6 +1,6 @@
 import { useInvoiceStore } from "../../store/invoice.store";
 import CustomTabs from "./CustomTabs";
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, useTransition } from "react";
 import React from "react";
 import { Skeleton, Spin } from "antd";
 import InfiniteScroll from "react-infinite-scroll-component";
@@ -60,19 +60,19 @@ const InvoiceRightPanel = () => {
     // Safety check just in case state gets out of sync with the visible tabs
     const validActiveTab = visibleTabs.includes(invoiceActiveTab) ? invoiceActiveTab : (visibleTabs[0] || "Quick View");
 
-    // Track active tab display state with delay to show loader and keep UX smooth
-    const [prevActiveTab, setPrevActiveTab] = useState(validActiveTab);
     const [displayTab, setDisplayTab] = useState(validActiveTab);
-    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [isPending, startTransition] = useTransition();
+
+    useEffect(() => {
+        if (validActiveTab !== displayTab) {
+            startTransition(() => {
+                setDisplayTab(validActiveTab);
+            });
+        }
+    }, [validActiveTab, displayTab]);
 
     // Keep track of which tabs have been rendered to avoid mounting them until needed
     const [renderedTabs, setRenderedTabs] = useState(() => new Set([validActiveTab]));
-
-    // Sync state during render when validActiveTab changes (standard React pattern)
-    if (validActiveTab !== prevActiveTab) {
-        setPrevActiveTab(validActiveTab);
-        setIsTransitioning(true);
-    }
 
     if (!renderedTabs.has(validActiveTab)) {
         setRenderedTabs(prev => {
@@ -81,17 +81,6 @@ const InvoiceRightPanel = () => {
             return next;
         });
     }
-
-    // Handle transition delay asynchronously in useEffect to avoid synchronous setState warnings
-    useEffect(() => {
-        if (isTransitioning) {
-            const timer = setTimeout(() => {
-                setDisplayTab(validActiveTab);
-                setIsTransitioning(false);
-            }, 180); // 180ms delay allows the browser to render the spinner before mounting/rendering the heavy tab
-            return () => clearTimeout(timer);
-        }
-    }, [isTransitioning, validActiveTab]);
 
     return (
         <div className="h-full flex flex-col">
@@ -107,7 +96,7 @@ const InvoiceRightPanel = () => {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-hidden mt-4 relative">
-                {isTransitioning && (
+                {isPending && (
                     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/70 backdrop-blur-[1px]">
                         <div className="flex flex-col items-center gap-3">
                             <Spin size="large" />

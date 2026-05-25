@@ -146,7 +146,9 @@ export const useInvoiceStore = create((set, get) => ({
         const existingTdsRow = lineItems.find(i => i.type === "TDS");
 
         const entityMaster = get().entityMaster;
-        const isGstApplicable = entityMaster?.gst_applicable === true;
+        const isEntityGstApplicable = entityMaster?.gst_applicable === true;
+        const isGstDeleted = formData?.isGstDeleted === true || formData?.isGstDeleted === "true";
+        const isGstApplicable = isEntityGstApplicable && !isGstDeleted;
 
         if (isModified) {
             // Preserve saved system rows exactly as-is if GST is applicable
@@ -177,7 +179,7 @@ export const useInvoiceStore = create((set, get) => ({
             formData?.totalInvoiceAmount || formData?.total_invoice_amount || 0
         );
         const tdsValue = roundTo2(-Math.abs(tdsRate * totalInvoiceAmount));
-        const isTdsApplicable = isGstApplicable && formData?.tdsApplicability === "Yes";
+        const isTdsApplicable = isEntityGstApplicable && formData?.tdsApplicability === "Yes";
 
         const gstRow = isGstApplicable ? {
             id: "gst-row",
@@ -363,6 +365,7 @@ export const useInvoiceStore = create((set, get) => ({
             lineGrouping:
                 data.extracted_data?.amounts?.line_grouping?.value ||
                 ((currentVendorId === data.vendor_id) ? (currentFormData.lineGrouping || "") : ""),
+            isGstDeleted: data.extracted_data?.amounts?.is_gst_deleted?.value ?? false,
         };
 
         const isGstApplicable = state.entityMaster?.gst_applicable === true;
@@ -403,6 +406,35 @@ export const useInvoiceStore = create((set, get) => ({
                 if ((item.type === "GST" || item.type === "TDS") && !isGstApplicable) return false;
                 return true;
             });
+
+        // ── Enrich coding fields from lineItemsSnapshot ───────────────────────
+        // The backend says "extracted_data.Items always has empty gl_code/lob/
+        // department because those are never written back to the nested Items
+        // structure" — lineItemsSnapshot is the authoritative coding source.
+        // Mirror the backend's snapshot-first lookup (by description then index)
+        // so that Refresh / initial load for approvers never wipes coding fields.
+        const snapshot = data?.extracted_data?.lineItemsSnapshot || [];
+        if (snapshot.length > 0) {
+            const snapByDesc = {};
+            const snapByIdx  = {};
+            snapshot.forEach((s, i) => {
+                const key = (s.description || "").trim().toLowerCase();
+                if (key) snapByDesc[key] = s;
+                snapByIdx[i] = s;
+            });
+            mappedItems.forEach((row, i) => {
+                if (row.isSystemRow) return; // leave GST/TDS rows alone
+                const key = (row.description || "").trim().toLowerCase();
+                const snap = snapByDesc[key] || snapByIdx[i] || null;
+                if (!snap) return;
+                if (!row.glCode     && snap.glCode)     row.glCode     = snap.glCode;
+                if (!row.lob        && snap.lob)        row.lob        = snap.lob;
+                if (!row.department && snap.department) row.department = snap.department;
+                if (!row.customer   && snap.customer)   row.customer   = snap.customer;
+                if (!row.item       && snap.item)       row.item       = snap.item;
+                if (!row.lineType   && snap.lineType)   row.lineType   = snap.lineType;
+            });
+        }
 
         const originalItems = data?.extracted_data?.OriginalItems?.value || [];
         const mappedOriginalItems = originalItems.length

@@ -207,6 +207,7 @@ export const useSaveInvoice = () => {
                 // Persist user overrides so they survive reload
                 line_grouping: { value: f.lineGrouping ?? "" },
                 gst_eligibility: { value: f.gstEligibility ?? "" },
+                is_gst_deleted: { value: f.isGstDeleted ?? false },
             },
 
             additional_info: {
@@ -312,9 +313,19 @@ export const useSaveInvoice = () => {
             const response = await saveInvoice(viewInvoiceId, object);
             console.log("Save response →", response);
 
-            // Sync the store with the server response (contains latest updated_at)
+            // Sync only server-side metadata (updated_at, status) back onto the
+            // already-correct optimistic state.  Do NOT call setInvoiceData(response)
+            // here — the server response may not echo back the full extracted_data
+            // (Items with gl_code/lob/department/customer/item), which would cause
+            // setInvoiceData to re-map all line items and wipe those fields.
             if (response) {
-                setInvoiceData(response);
+                // Patch only the metadata fields that the server owns
+                const patchedData = {
+                    ...finalPayload,
+                    updated_at: response.updated_at ?? finalPayload.updated_at,
+                    status: response.status ?? finalPayload.status,
+                };
+                setActiveInvoiceData(patchedData);
             }
 
             return response;

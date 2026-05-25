@@ -444,6 +444,61 @@ def _posting_approved(steps: List[WorkflowStep]) -> bool:
     return any(s.step_type == StepType.POSTING_APPROVED for s in steps)
 
 
+def _reconstruct_workflow_state(steps: List[WorkflowStep], mandatory_count: int) -> tuple[Dict[int, List[str]], bool, bool]:
+    """
+    Chronologically reconstructs the workflow state of approvals.
+    Properly handles partial reworks so that previous levels are not incorrectly
+    considered unapproved when a rework goes back to a middle level.
+    """
+    import re
+    approved_levels: Dict[int, List[str]] = {}
+    threshold_done = False
+    posting_done = False
+    
+    for s in steps:
+        if s.step_type == StepType.LEVEL_APPROVED and s.approver_number is not None:
+            approved_levels.setdefault(s.approver_number, []).append((s.user or "").lower())
+        elif s.step_type == StepType.THRESHOLD_APPROVED:
+            threshold_done = True
+        elif s.step_type == StepType.POSTING_APPROVED:
+            posting_done = True
+        elif s.step_type == StepType.APPROVED:
+            threshold_done = True
+            posting_done = True
+        elif s.step_type in {StepType.REWORKED, StepType.RECALLED}:
+            if s.step_type == StepType.RECALLED:
+                approved_levels.clear()
+                threshold_done = False
+                posting_done = False
+            else:
+                # REWORKED
+                target_level = 1
+                if s.approver_number and s.approver_number > 1:
+                    target_level = s.approver_number - 1
+                if s.step_name:
+                    match = re.search(r'Level\s*(\d+)', s.step_name)
+                    if match:
+                        target_level = int(match.group(1))
+                
+                # Remove any approved levels >= target_level
+                keys_to_remove = [k for k in approved_levels.keys() if k >= target_level]
+                for k in keys_to_remove:
+                    approved_levels.pop(k, None)
+                    
+                # Reset threshold/posting if the rework affected mandatory or previous virtual stages
+                if target_level <= mandatory_count:
+                    threshold_done = False
+                    posting_done = False
+                elif target_level == mandatory_count + 1:
+                    threshold_done = False
+                    posting_done = False
+                elif target_level == mandatory_count + 2:
+                    posting_done = False
+                    
+    return approved_levels, threshold_done, posting_done
+
+
+
 def _level_is_complete(
     db: Session,
     level_entry: Dict,
@@ -740,9 +795,10 @@ def _resolve_user_role_in_workflow(
     # Filter steps to the current cycle (post-rework/recall)
     current_cycle_steps = _get_current_cycle_steps(steps)
     
-    approved_levels = _get_approved_levels(current_cycle_steps)
-    threshold_done = _threshold_approved(current_cycle_steps)
-    posting_done = _posting_approved(current_cycle_steps)
+    # Reconstruct active approval states from full step history to handle partial reworks correctly
+    mandatory = [a for a in assigned if a.get("type") == "mandatory"]
+    approved_levels, threshold_done, posting_done = _reconstruct_workflow_state(steps, len(mandatory))
+
 
     # Determine if user is the posting/threshold approver via DB-authoritative check
     # (Snapshot reconstruction often loses the 'type' field, marking everything as mandatory).
@@ -1004,9 +1060,9 @@ async def get_ui_status_from_frontend(
     threshold_entries = [a for a in assigned if a.get("type") == "threshold"]
     posting_entries = [a for a in assigned if a.get("type") == "posting"]
  
-    approved_levels = _get_approved_levels(steps_for_level_check)
-    threshold_done = _threshold_approved(steps_for_level_check)
-    posting_done = _posting_approved(steps_for_level_check)
+    # Reconstruct active approval states from full step history to handle partial reworks correctly
+    approved_levels, threshold_done, posting_done = _reconstruct_workflow_state(steps, len(mandatory))
+
  
     mandatory_levels_done = all(
         bool(approved_levels.get(e.get("level"))) for e in mandatory
@@ -1278,9 +1334,9 @@ async def approve_invoice(
     # ── Filter steps to the current cycle (post-rework/recall) ──
     current_cycle_steps = _get_current_cycle_steps(steps)
 
-    approved_levels = _get_approved_levels(current_cycle_steps)
-    threshold_done = _threshold_approved(current_cycle_steps)
-    posting_done_already = _posting_approved(current_cycle_steps)
+    # Reconstruct active approval states from full step history to handle partial reworks correctly
+    approved_levels, threshold_done, posting_done_already = _reconstruct_workflow_state(steps, len(mandatory))
+
 
     mandatory_levels_done = all(
         bool(approved_levels.get(e.get("level"))) for e in mandatory
