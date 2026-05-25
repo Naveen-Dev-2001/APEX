@@ -27,7 +27,7 @@ const SettingsPage = () => {
     } = useWorkflowStore();
 
     const { user, activeRole } = useAuthStore();
-    const isCoder = activeRole?.toLowerCase() === 'coder';
+    const isReadOnly = ['coder', 'scanner'].includes(activeRole?.toLowerCase());
 
     const { showConfirm } = useToastStore();
     const [modalState, setModalState] = useState({ open: false, mode: 'add', rowData: null });
@@ -253,7 +253,7 @@ const SettingsPage = () => {
             sortable: true,
             render: (val) => getApproverName(val)
         },
-        ...(!isCoder ? [{
+        ...(!isReadOnly ? [{
             header: 'Actions',
             accessor: 'actions',
             render: (_, row) => (
@@ -392,7 +392,7 @@ const SettingsPage = () => {
             getFilterValue: (row) => getApproverText(row.posting_approver),
             render: (val) => getApproverName(val)
         },
-        ...(!isCoder ? [{
+        ...(!isReadOnly ? [{
             header: 'Actions',
             accessor: 'actions',
             render: (_, row) => (
@@ -530,7 +530,7 @@ const SettingsPage = () => {
                 />
 
                 {/* Add Rule Button */}
-                {!isCoder && (
+                {!isReadOnly && (
                     <button
                         onClick={openAdd}
                         className="bg-[#24A1DD] hover:bg-[#1c8ad1] text-white px-4 h-[40px] min-w-[110px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"

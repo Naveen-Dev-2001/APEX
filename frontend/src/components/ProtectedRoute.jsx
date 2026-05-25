@@ -48,9 +48,13 @@ const ProtectedRoute = () => {
         
         if (navItem) {
             const allowedRoles = navItem.roles || [];
-            const hasAccess = allowedRoles.some(r => 
+            let hasAccess = allowedRoles.some(r => 
                 r.toLowerCase() === 'all' || r.toLowerCase() === userActiveRole
             );
+
+            if ((navItem.path === '/master-data' || navItem.path === '/settings') && (userActiveRole === 'scanner' || userActiveRole === 'coder')) {
+                hasAccess = true;
+            }
             
             if (!hasAccess) {
                 // If user doesn't have access, redirect to appropriate default route

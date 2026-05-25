@@ -486,10 +486,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             // Start with current store state
             const updatedFormData = { ...state.quickViewFormData, [key]: value };
 
-            if (key === "gstEligibility") {
-                updatedFormData.isGstDeleted = (value === "Ineligible");
-            }
-
             // Ensure booleans and numbers are correctly typed for the calculation logic
             updatedFormData.tds_applicability = (updatedFormData.tdsApplicability === "Yes");
             updatedFormData.tds_percentage = parseFloat(updatedFormData.tdsRate || 0);
@@ -646,7 +642,6 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             gstEligibility: useVendorDefaults
                 ? (vendor?.gst_eligibility ? "Eligible" : "Ineligible")
                 : (prev?.gstEligibility || (vendor?.gst_eligibility ? "Eligible" : "Ineligible")),
-            isGstDeleted: useVendorDefaults ? !vendor?.gst_eligibility : prev?.isGstDeleted,
             lineGrouping: useVendorDefaults
                 ? (vendor?.line_grouping ? "Yes" : "No")
                 : (prev?.lineGrouping || (vendor?.line_grouping ? "Yes" : "No")),
