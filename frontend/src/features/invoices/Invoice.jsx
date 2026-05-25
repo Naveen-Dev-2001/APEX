@@ -137,14 +137,29 @@ const Invoice = () => {
         // Redundant refetch removed as useInvoiceData already watches pageTab
     }, [invoiceSection, pageTab]);
 
-    const handleView = useCallback((data) => {
+    const handleView = useCallback(async (data) => {
         const id = Number(data.id);
         if (!id) return;
         setOpeningInvoiceId(id);
-        const { setInvoiceData, setFileName, setViewInvoiceId, setInvoiceSection, setInvoiceActiveTab, setIsPreviewLoading } = useInvoiceStore.getState();
+        const { setInvoiceData, setFileName, setViewInvoiceId, setInvoiceSection, setInvoiceActiveTab, setIsPreviewLoading, entityMaster, setEntityMaster } = useInvoiceStore.getState();
         setIsPreviewLoading(true);
         setInvoiceSection(2);
         setViewInvoiceId(id);
+
+        try {
+            if (!entityMaster || !entityMaster.entity_id) {
+                const res = await fetchEntityMaster();
+                const entities = res.data || [];
+                const selectedEntityId = sessionStorage.getItem('selected_entity');
+                const selectedEntity = entities.find((item) => item.entity_id === selectedEntityId);
+                if (selectedEntity) {
+                    setEntityMaster(selectedEntity);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch entity master in handleView", err);
+        }
+
         if (openPreviewTimerRef.current) clearTimeout(openPreviewTimerRef.current);
         openPreviewTimerRef.current = setTimeout(() => {
             try {

@@ -6,6 +6,7 @@ import '../../layout/AuthLayout.css';
 import logo from '../../assets/loandna_logo_dark.png';
 import { useCommonStore } from '../../store/common.store';
 import useMasterDataStore from '../../store/masterData.store';
+import { useInvoiceStore } from '../../store/invoice.store';
 
 const SelectEntityPage = () => {
   const navigate = useNavigate();
@@ -101,6 +102,12 @@ const SelectEntityPage = () => {
     setEntity(entity.entityId || entity.name);
     sessionStorage.setItem('selected_entity', entity.entityId || entity.name); // entity_id for DB FK
     sessionStorage.setItem('selected_entity_name', entity.displayName);         // Display name for UI
+
+    // Sync selected entity details immediately to useInvoiceStore
+    const rawEntity = entityData.find((item) => item.entity_id === entity.entityId);
+    if (rawEntity) {
+      useInvoiceStore.getState().setEntityMaster(rawEntity);
+    }
 
     let targetRoute = "/dashboard";
     const roleForRouting = activeRole.toLowerCase();
