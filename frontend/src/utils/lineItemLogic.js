@@ -106,7 +106,8 @@ const addSystemRows = (rows, formData, entityMaster) => {
         result.push(gstRow);
     }
     //  TDS (only if applicable)
-    const isTdsApplicable = isGstApplicable && (formData?.tds_applicability || formData?.tdsApplicability === "Yes");
+    const isEntityGstApplicable = entityMaster?.gst_applicable === true;
+    const isTdsApplicable = isEntityGstApplicable && (formData?.tds_applicability || formData?.tdsApplicability === "Yes");
     const tdsRate = Number(formData?.tds_percentage || formData?.tdsRate || 0);
     const totalInvoiceAmount = Number(formData?.totalInvoiceAmount || 0);
 
