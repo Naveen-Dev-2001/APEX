@@ -7,6 +7,7 @@ const useAdminStore = create((set, get) => ({
     roles: [],
     statuses: [],
     navigation: [],
+    cronjobConfig: { enabled: false, folder_directory: '', interval_minutes: 5, entity_id: 'DEFAULT' },
     loading: false,
     error: null,
     totalUsers: 0,
@@ -40,6 +41,7 @@ const useAdminStore = create((set, get) => ({
                 roles: data.roles || [], 
                 statuses: data.statuses || [],
                 navigation: data.navigation || [],
+                cronjobConfig: data.cronjob_config || { enabled: false, folder_directory: '', interval_minutes: 5, entity_id: 'DEFAULT' },
                 loading: false
             });
         } catch (error) {
@@ -55,7 +57,8 @@ const useAdminStore = create((set, get) => ({
             set({ 
                 roles: newSettings.roles, 
                 statuses: newSettings.statuses,
-                navigation: newSettings.navigation 
+                navigation: newSettings.navigation,
+                cronjobConfig: newSettings.cronjob_config || get().cronjobConfig
             });
             toast.success('Settings saved successfully');
             return true;
@@ -68,42 +71,56 @@ const useAdminStore = create((set, get) => ({
         }
     },
 
-    addStatus: async (statusName) => {
+    saveCronjobConfig: async (config) => {
         const { statuses, roles, navigation } = get();
+        const newSettings = {
+            roles,
+            statuses,
+            navigation,
+            cronjob_config: config
+        };
+        return await get().updateSettings(newSettings);
+    },
+
+    addStatus: async (statusName) => {
+        const { statuses, roles, navigation, cronjobConfig } = get();
         if (statuses.includes(statusName)) return false;
         const newSettings = {
             roles,
             statuses: [...statuses, statusName],
-            navigation
+            navigation,
+            cronjob_config: cronjobConfig
         };
         return await get().updateSettings(newSettings);
     },
 
     removeStatus: async (statusName) => {
-        const { statuses, roles, navigation } = get();
+        const { statuses, roles, navigation, cronjobConfig } = get();
         const newSettings = {
             roles,
             statuses: statuses.filter(s => s !== statusName),
-            navigation
+            navigation,
+            cronjob_config: cronjobConfig
         };
         return await get().updateSettings(newSettings);
     },
 
     addRole: async (roleName) => {
-        const { statuses, roles, navigation } = get();
+        const { statuses, roles, navigation, cronjobConfig } = get();
         const lowerRole = roleName.toLowerCase();
         if (roles.includes(lowerRole)) return false;
         
         const newSettings = {
             roles: [...roles, lowerRole],
             statuses,
-            navigation
+            navigation,
+            cronjob_config: cronjobConfig
         };
         return await get().updateSettings(newSettings);
     },
 
     removeRole: async (roleName) => {
-        const { statuses, roles, navigation } = get();
+        const { statuses, roles, navigation, cronjobConfig } = get();
         const lowerRole = roleName.toLowerCase();
         const newSettings = {
             roles: roles.filter(r => r !== lowerRole),
@@ -111,13 +128,14 @@ const useAdminStore = create((set, get) => ({
             navigation: navigation.map(nav => ({
                 ...nav,
                 roles: nav.roles.filter(r => r !== lowerRole)
-            })).filter(nav => nav.roles.length > 0 || nav.roles.includes('all'))
+            })).filter(nav => nav.roles.length > 0 || nav.roles.includes('all')),
+            cronjob_config: cronjobConfig
         };
         return await get().updateSettings(newSettings);
     },
 
     updateRoleAccess: async (roleName, accessibleLabels) => {
-        const { statuses, roles, navigation } = get();
+        const { statuses, roles, navigation, cronjobConfig } = get();
         const lowerRole = roleName.toLowerCase();
         
         // Navigation in settings is Label -> Roles
@@ -143,7 +161,8 @@ const useAdminStore = create((set, get) => ({
         const newSettings = {
             roles,
             statuses,
-            navigation: newNavigation
+            navigation: newNavigation,
+            cronjob_config: cronjobConfig
         };
         return await get().updateSettings(newSettings);
     },

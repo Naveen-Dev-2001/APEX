@@ -79,6 +79,11 @@ async def startup_event():
         # Initialize database (create tables and default data)
         init_database()
         print("✓ Database initialized successfully")
+
+        # Start background cronjob watcher service
+        from app.services.cronjob_service import start_cronjob_task
+        start_cronjob_task()
+        print("✓ Cronjob watcher task initialized successfully")
     except Exception as e:
         print(f"✗ Startup initialization error: {e}")
         import traceback

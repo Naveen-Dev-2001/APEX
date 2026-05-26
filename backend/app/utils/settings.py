@@ -15,7 +15,13 @@ DEFAULT_SETTINGS = {
         {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
         {"label": "Settings", "path": "/settings", "roles": ["admin"]},
         {"label": "Admin", "path": "/admin", "roles": ["admin"]}
-    ]
+    ],
+    "cronjob_config": {
+        "enabled": False,
+        "folder_directory": "",
+        "interval_minutes": 5,
+        "entity_id": "DEFAULT"
+    }
 }
 
 def get_app_settings(db: Session = None):

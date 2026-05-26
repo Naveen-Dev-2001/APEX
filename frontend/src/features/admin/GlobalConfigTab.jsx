@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import useAdminStore from '../../store/useAdminStore';
 import AccessControl from './components/AccessControl';
+import CronjobConfig from './components/CronjobConfig';
 import AddRoleModal from './modals/AddRoleModal';
 import EditAccessModal from './modals/EditAccessModal';
 
@@ -29,6 +30,9 @@ const GlobalConfigTab = () => {
                 onAdd={() => toggleModal('addRole')}
                 onEdit={(role) => toggleModal('editAccess', role)}
             />
+
+            {/* Cronjob Config Section */}
+            {!loading && <CronjobConfig />}
 
             {/* Modals */}
             {modals.addRole && (
