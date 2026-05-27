@@ -1007,14 +1007,17 @@ async def get_invoices(
                     # Combine: Hide if...
                     # - We are NOT at the last stage AND user has acted at any level
                     # - OR we ARE at the last stage AND user has already done a Posting Approval
-                    hide_condition = or_(
-                        and_(
-                            Invoice.current_approver_level != is_last_stage_subquery,
-                            user_acted_any_subquery
-                        ),
-                        and_(
-                            Invoice.current_approver_level == is_last_stage_subquery,
-                            user_acted_posting_subquery
+                    hide_condition = and_(
+                        Invoice.status != InvoiceStatusEnum.SAGE_POST_FAILED,
+                        or_(
+                            and_(
+                                Invoice.current_approver_level != is_last_stage_subquery,
+                                user_acted_any_subquery
+                            ),
+                            and_(
+                                Invoice.current_approver_level == is_last_stage_subquery,
+                                user_acted_posting_subquery
+                            )
                         )
                     )
 
@@ -1022,7 +1025,8 @@ async def get_invoices(
                         and_(
                             or_(
                                 Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
-                                Invoice.status == InvoiceStatusEnum.REWORKED
+                                Invoice.status == InvoiceStatusEnum.REWORKED,
+                                Invoice.status == InvoiceStatusEnum.SAGE_POST_FAILED
                             ),
                             approver_subquery,
                             # Block ONLY threshold approvers from seeing the invoice at lower
@@ -1346,14 +1350,17 @@ async def get_invoice_filter_options(
                         )
                     )
 
-                    hide_condition = or_(
-                        and_(
-                            Invoice.current_approver_level != is_last_stage_subquery,
-                            user_acted_any_subquery
-                        ),
-                        and_(
-                            Invoice.current_approver_level == is_last_stage_subquery,
-                            user_acted_posting_subquery
+                    hide_condition = and_(
+                        Invoice.status != InvoiceStatusEnum.SAGE_POST_FAILED,
+                        or_(
+                            and_(
+                                Invoice.current_approver_level != is_last_stage_subquery,
+                                user_acted_any_subquery
+                            ),
+                            and_(
+                                Invoice.current_approver_level == is_last_stage_subquery,
+                                user_acted_posting_subquery
+                            )
                         )
                     )
 
@@ -1361,7 +1368,8 @@ async def get_invoice_filter_options(
                         and_(
                             or_(
                                 Invoice.status == InvoiceStatusEnum.WAITING_APPROVAL,
-                                Invoice.status == InvoiceStatusEnum.REWORKED
+                                Invoice.status == InvoiceStatusEnum.REWORKED,
+                                Invoice.status == InvoiceStatusEnum.SAGE_POST_FAILED
                             ),
                             approver_subquery,
                             # Block ONLY threshold approvers from seeing the invoice at lower
