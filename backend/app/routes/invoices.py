@@ -985,7 +985,8 @@ async def get_invoices(
                             ]),
                             or_(
                                 last_reset_subquery == None,
-                                WorkflowStep.timestamp > last_reset_subquery
+                                WorkflowStep.timestamp > last_reset_subquery,
+                                WorkflowStep.approver_number < Invoice.current_approver_level
                             )
                         )
                     )
