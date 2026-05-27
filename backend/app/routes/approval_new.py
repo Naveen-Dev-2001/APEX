@@ -933,14 +933,19 @@ def _resolve_user_role_in_workflow(
             # Rule: if a user already acted at ANY other mandatory level in this cycle
             # they cannot act again at this level — UNLESS they are the posting approver
             # (posting approvers are allowed at their mandatory level + posting stage).
+            acted_in_current_cycle = any(
+                (s.user or "").lower() == email
+                and s.step_type == StepType.LEVEL_APPROVED
+                and s.approver_number != current_level
+                for s in current_cycle_steps
+            )
+            acted_in_valid_previous_level = any(
+                email in emails and lvl != current_level
+                for lvl, emails in approved_levels.items()
+            )
             already_acted_at_other_mandatory = (
                 not result["is_posting_approver"]
-                and any(
-                    (s.user or "").lower() == email
-                    and s.step_type == StepType.LEVEL_APPROVED
-                    and s.approver_number != current_level
-                    for s in current_cycle_steps
-                )
+                and (acted_in_current_cycle or acted_in_valid_previous_level)
             )
             result["can_act"] = (
                 not current_level_approved
@@ -1164,14 +1169,19 @@ async def get_ui_status_from_frontend(
                 InvoiceAssignedApprover.invoice_id == invoice_id
             ).scalar() or 0
 
+            acted_in_current_cycle = any(
+                (s.user or "").lower() == email
+                and s.step_type == StepType.LEVEL_APPROVED
+                and s.approver_number != current_level
+                for s in steps_for_level_check
+            )
+            acted_in_valid_previous_level = any(
+                email in emails and lvl != current_level
+                for lvl, emails in approved_levels.items()
+            )
             already_acted_at_other_mandatory = (
                 not (is_posting_approver and current_level == max_seq)
-                and any(
-                    (s.user or "").lower() == email
-                    and s.step_type == StepType.LEVEL_APPROVED
-                    and s.approver_number != current_level
-                    for s in steps_for_level_check
-                )
+                and (acted_in_current_cycle or acted_in_valid_previous_level)
             )
             can_act = user_in_level and not already_acted_here and not already_acted_at_other_mandatory
  
@@ -1438,17 +1448,27 @@ async def approve_invoice(
             email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]
             or _is_posting_approver_db(db, invoice_id, email)
         )
-        if not is_posting_approver_here:
-            acted_at_other_level = any(
-                (s.user or "").lower() == email
-                and s.step_type == StepType.LEVEL_APPROVED
-                and s.approver_number != current_level
-                for s in current_cycle_steps
-            )
-            if acted_at_other_level:
+        acted_in_current_cycle = any(
+            (s.user or "").lower() == email
+            and s.step_type == StepType.LEVEL_APPROVED
+            and s.approver_number != current_level
+            for s in current_cycle_steps
+        )
+        acted_in_valid_previous_level = any(
+            email in emails and lvl != current_level
+            for lvl, emails in approved_levels.items()
+        )
+        
+        from sqlalchemy import func as sqla_func
+        max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id
+        ).scalar() or 0
+
+        if not (is_posting_approver_here and current_level == max_seq):
+            if acted_in_current_cycle or acted_in_valid_previous_level:
                 raise HTTPException(
                     400,
-                    "You have already acted at a different approval level in this cycle"
+                    "You have already acted at a different approval level"
                 )
 
         _record_step(
