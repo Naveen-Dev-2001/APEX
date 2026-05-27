@@ -205,6 +205,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             // THEN: success case
             if (payload?.status === "waiting_coding") {
                 toast.success("Invoice sent for coding successfully!");
+                await queryClient.invalidateQueries({ queryKey: ["invoice-preview", viewInvoiceId] });
                 await queryClient.invalidateQueries({ queryKey: ["invoices"] });
                 await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
                 resetQuickView();
@@ -265,6 +266,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             });
             if (payload?.status === "waiting_approval") {
                 toast.success("Invoice sent for approval successfully!");
+                await queryClient.invalidateQueries({ queryKey: ["invoice-preview", viewInvoiceId] });
                 await queryClient.invalidateQueries({ queryKey: ["invoices"] });
                 await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
                 resetQuickView();
@@ -446,6 +448,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             }
 
             // Invalidate cache to ensure fresh data on next view
+            queryClient.invalidateQueries({ queryKey: ["invoice-preview", viewInvoiceId] });
             queryClient.invalidateQueries({ queryKey: ["workflow", viewInvoiceId] });
             queryClient.invalidateQueries({ queryKey: ["auditFlow", viewInvoiceId] });
             queryClient.invalidateQueries({ queryKey: ["invoices"] });
