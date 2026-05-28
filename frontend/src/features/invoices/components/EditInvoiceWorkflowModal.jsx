@@ -3,6 +3,7 @@ import { Modal, Radio, Checkbox } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import useWorkflowStore from '../../../store/workflow.store';
 import { saveCustomInvoiceWorkflow } from '../../../api/invoiceApi';
+import { useInvoiceStore } from '../../../store/invoice.store';
 import toast from '../../../utils/toast';
 import Dropdown from '../../../components/ui/Dropdown';
 import CustomInput from '../../../shared/components/CustomInput';
@@ -138,6 +139,15 @@ if (duplicate) {
                 toast.error('Amount Threshold must be greater than 0');
                 return;
             }
+            const storeState = useInvoiceStore.getState ? useInvoiceStore.getState() : {};
+            const storeAmount = storeState?.quickViewFormData?.totalAmount ?? storeState?.quickViewFormData?.totalInvoiceAmount;
+            const rawAmount = storeAmount ?? invoice?.total_amount ?? invoice?.extracted_data?.amounts?.total_invoice_amount?.value ?? 0;
+            const invoiceAmount = Number(cleanAmount(String(rawAmount)) || 0);
+            const thresholdAmount = Number(cleanAmount(String(form.amount_threshold || 0)));
+            if (invoiceAmount <= thresholdAmount) {
+                toast.error(`Threshold amount ($${thresholdAmount.toFixed(2)}) must be lesser than or equal to the invoice amount ($${invoiceAmount.toFixed(2)}) to enable a threshold approver.`);
+                return;
+            }
             if (!form.threshold_approver || form.threshold_approver.length === 0) {
                 toast.error('Please select at least one threshold approver');
                 return;
@@ -149,22 +159,22 @@ if (duplicate) {
             });
         }
 
-        // 3. Add Posting Level (Mandatory and required!)
-        if (!form.posting_approver || form.posting_approver.length === 0) {
-            toast.error('Posting Approver is required');
-            return;
-        }
-        approversPayload.push({
-            level: approversPayload.length + 1,
-            emails: form.posting_approver,
-            is_finance: false
-        });
+        // 3. Add Posting Level (Mandatory and required!) - COMMENTED OUT TEMPORARILY AS POSTING DONE IN SAGE
+        // if (!form.posting_approver || form.posting_approver.length === 0) {
+        //     toast.error('Posting Approver is required');
+        //     return;
+        // }
+        // approversPayload.push({
+        //     level: approversPayload.length + 1,
+        //     emails: form.posting_approver,
+        //     is_finance: false
+        // });
 
         setIsSubmitting(true);
         try {
             await saveCustomInvoiceWorkflow(invoice.id, {
                 approvers: approversPayload,
-                has_posting_approver: true,
+                has_posting_approver: false,
                 has_threshold_approver: form.enableThreshold === 'Yes',
                 amount_threshold: form.enableThreshold === 'Yes' ? Number(form.amount_threshold) : null,
                 last_updated_at: invoice?.updated_at
@@ -412,8 +422,8 @@ const getFilteredFinanceApprovers = (currentField) => {
                         </div>
                     )}
 
-                    {/* Posting Section (Always Mandatory and Required!) */}
-                    <div>
+                    {/* Posting Section (Always Mandatory and Required!) - COMMENTED OUT TEMPORARILY AS POSTING DONE IN SAGE */}
+                    {/* <div>
                         <p className="text-sm font-semibold text-gray-700 mb-3">Posting Approver Settings</p>
                         <div className="grid grid-cols-2 gap-4 items-end text-left">
                             <Dropdown
@@ -426,7 +436,7 @@ const getFilteredFinanceApprovers = (currentField) => {
                                 placeholder="Select Posting Approver(s)"
                             />
                         </div>
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* FOOTER */}

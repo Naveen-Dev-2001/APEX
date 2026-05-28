@@ -932,12 +932,18 @@ async def get_invoices(
                         InvoiceAssignedApprover.invoice_id == Invoice.id
                     ).correlate(Invoice).scalar_subquery()
 
+                    has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
+                    max_threshold_level_expr = case(
+                        (has_posting_cond, max_level_sq - 1),
+                        else_=max_level_sq
+                    )
+
                     is_future_threshold_approver_subquery = exists().where(
                         and_(
                             FutureApprover.invoice_id == Invoice.id,
                             FutureApprover.approver_email.in_(target_emails),
                             FutureApprover.sequence_order > Invoice.current_approver_level,
-                            FutureApprover.sequence_order < max_level_sq,  # not the posting level
+                            FutureApprover.sequence_order <= max_threshold_level_expr,
                             FutureApprover.is_finance == False  # dedicated threshold slot
                         )
                     )
@@ -1286,12 +1292,18 @@ async def get_invoice_filter_options(
                         InvoiceAssignedApprover.invoice_id == Invoice.id
                     ).correlate(Invoice).scalar_subquery()
 
+                    has_posting_cond = Invoice.approver_breakdown.ilike('%"has_posting_approver": true%')
+                    max_threshold_level_fo_expr = case(
+                        (has_posting_cond, max_level_fo_sq - 1),
+                        else_=max_level_fo_sq
+                    )
+
                     is_future_threshold_approver_fo_subquery = exists().where(
                         and_(
                             FutureApproverFO.invoice_id == Invoice.id,
                             FutureApproverFO.approver_email.in_(target_emails),
                             FutureApproverFO.sequence_order > Invoice.current_approver_level,
-                            FutureApproverFO.sequence_order < max_level_fo_sq,  # not the posting level
+                            FutureApproverFO.sequence_order <= max_threshold_level_fo_expr,
                             FutureApproverFO.is_finance == False  # dedicated threshold slot
                         )
                     )

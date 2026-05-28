@@ -202,12 +202,15 @@ def _is_future_threshold_approver_db(db: Session, invoice_id: int, email: str, c
         if max_seq <= 1:
             return False
 
+        has_posting = _has_posting_db(db, invoice_id)
+        max_threshold_seq = max_seq - 1 if has_posting else max_seq
+
         row = db.query(InvoiceAssignedApprover).filter(
             InvoiceAssignedApprover.invoice_id == invoice_id,
             InvoiceAssignedApprover.approver_email.ilike(email),
             InvoiceAssignedApprover.is_finance == False,
             InvoiceAssignedApprover.sequence_order > current_level, # Only future levels
-            InvoiceAssignedApprover.sequence_order < max_seq       # exclude posting
+            InvoiceAssignedApprover.sequence_order <= max_threshold_seq
         ).first()
         return row is not None
     except Exception as exc:
@@ -219,6 +222,8 @@ def _is_posting_approver_db(db: Session, invoice_id: int, email: str) -> bool:
     """
     Query the DB to determine if `email` is the posting approver (last level).
     """
+    if not _has_posting_db(db, invoice_id):
+        return False
     try:
         from sqlalchemy import func as sqla_func
         max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
@@ -897,7 +902,7 @@ def _resolve_user_role_in_workflow(
             if entry_level > current_level:
                 is_entry_posting = (
                     entry.get("type") == "posting"
-                    or entry_level == max_seq
+                    or (has_posting and entry_level == max_seq)
                 )
                 if is_entry_posting or entry.get("is_finance"):
                     continue
@@ -1135,7 +1140,7 @@ async def get_ui_status_from_frontend(
                 if entry_level > current_level:
                     is_entry_posting = (
                         entry.get("type") == "posting"
-                        or entry_level == max_seq
+                        or (has_posting and entry_level == max_seq)
                     )
                     if is_entry_posting or entry.get("is_finance"):
                         continue
@@ -1352,7 +1357,7 @@ async def approve_invoice(
         bool(approved_levels.get(e.get("level"))) for e in mandatory
     )
     has_threshold = bool(threshold_entries)
-    has_posting = bool(posting_entries)
+    has_posting = bool(posting_entries) or _has_posting_db(db, invoice_id)
 
     # ── CASE A: Mandatory levels ──
     if current_level <= len(mandatory):
@@ -1398,7 +1403,7 @@ async def approve_invoice(
             if entry_level > current_level:
                 is_entry_posting = (
                     entry.get("type") == "posting"
-                    or entry_level == max_seq
+                    or (has_posting and entry_level == max_seq)
                 )
                 if is_entry_posting or entry.get("is_finance"):
                     continue

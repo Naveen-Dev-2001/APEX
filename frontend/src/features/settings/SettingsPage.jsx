@@ -247,12 +247,12 @@ const SettingsPage = () => {
             sortable: true,
             render: (val) => formatCurrency(val)
         },
-        {
-            header: 'Posting Approver',
-            accessor: 'posting_approver',
-            sortable: true,
-            render: (val) => getApproverName(val)
-        },
+        // {
+        //     header: 'Posting Approver',
+        //     accessor: 'posting_approver',
+        //     sortable: true,
+        //     render: (val) => getApproverName(val)
+        // },
         ...(!isReadOnly ? [{
             header: 'Actions',
             accessor: 'actions',
@@ -386,12 +386,12 @@ const SettingsPage = () => {
             sortable: true,
             render: (val) => formatCurrency(val)
         },
-        {
-            header: 'Posting Approver',
-            accessor: 'posting_approver',
-            getFilterValue: (row) => getApproverText(row.posting_approver),
-            render: (val) => getApproverName(val)
-        },
+        // {
+        //     header: 'Posting Approver',
+        //     accessor: 'posting_approver',
+        //     getFilterValue: (row) => getApproverText(row.posting_approver),
+        //     render: (val) => getApproverName(val)
+        // },
         ...(!isReadOnly ? [{
             header: 'Actions',
             accessor: 'actions',

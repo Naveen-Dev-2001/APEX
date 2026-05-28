@@ -304,7 +304,7 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                 return "Threshold Approver is required";
             }
         }
-        if (!form.postingApprover || form.postingApprover.length === 0) return "Posting Approver is required";
+        // if (!form.postingApprover || form.postingApprover.length === 0) return "Posting Approver is required";
         return null;
     };
 
@@ -596,8 +596,8 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                         </div>
                     )}
 
-                    {/* Posting Approver */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Posting Approver - HIDE / COMMENT OUT TEMPORARILY AS POSTING DONE IN SAGE ONLY */}
+                    {/* <div className="grid grid-cols-2 gap-4">
                         <Dropdown
                             label="Posting Approver"
                             required
@@ -609,7 +609,7 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                             disabled={approversLoading}
                             placeholder={approversLoading ? "Loading..." : "Select Approver(s)"}
                         />
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* FOOTER */}

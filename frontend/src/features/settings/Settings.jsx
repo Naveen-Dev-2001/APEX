@@ -226,15 +226,15 @@ const Settings = () => {
             cellRenderer: ({ value }) => <ApproverCell value={value} isFinance={false} />,
             getFilterValue: (data) => Array.isArray(data.threshold_approver) ? data.threshold_approver.join(", ") : (data.threshold_approver || "")
         },
-        {
-            headerName: "Posting Approver",
-            field: "posting_approver",
-            width: 160,
-            cellRenderer: ({ value }) =>
-                value
-                    ? <span className="text-xs text-gray-600 truncate" title={value}>{value.split("@")[0]}</span>
-                    : <span className="text-gray-300 text-xs">—</span>,
-        },
+        // {
+        //     headerName: "Posting Approver",
+        //     field: "posting_approver",
+        //     width: 160,
+        //     cellRenderer: ({ value }) =>
+        //         value
+        //             ? <span className="text-xs text-gray-600 truncate" title={value}>{value.split("@")[0]}</span>
+        //             : <span className="text-gray-300 text-xs">—</span>,
+        // },
         {
             headerName: "Actions",
             field: "actions",
@@ -311,15 +311,15 @@ const Settings = () => {
             cellRenderer: ({ value }) => <ApproverCell value={value} isFinance={false} />,
             getFilterValue: (data) => Array.isArray(data.threshold_approver) ? data.threshold_approver.join(", ") : (data.threshold_approver || "")
         },
-        {
-            headerName: "Posting Approver",
-            field: "posting_approver",
-            width: 160,
-            cellRenderer: ({ value }) =>
-                value
-                    ? <span className="text-xs text-gray-600 truncate" title={value}>{value.split("@")[0]}</span>
-                    : <span className="text-gray-300 text-xs">—</span>,
-        },
+        // {
+        //     headerName: "Posting Approver",
+        //     field: "posting_approver",
+        //     width: 160,
+        //     cellRenderer: ({ value }) =>
+        //         value
+        //             ? <span className="text-xs text-gray-600 truncate" title={value}>{value.split("@")[0]}</span>
+        //             : <span className="text-gray-300 text-xs">—</span>,
+        // },
         {
             headerName: "Actions",
             field: "actions",
