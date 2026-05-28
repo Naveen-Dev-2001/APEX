@@ -244,6 +244,30 @@ def _is_posting_approver_db(db: Session, invoice_id: int, email: str) -> bool:
         return False
 
 
+def _is_last_level_approver_db(db: Session, invoice_id: int, email: str) -> bool:
+    """
+    Query the DB to determine if `email` is assigned to the last level (max_seq) of the workflow.
+    """
+    try:
+        from sqlalchemy import func as sqla_func
+        max_seq = db.query(sqla_func.max(InvoiceAssignedApprover.sequence_order)).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id
+        ).scalar() or 0
+
+        if max_seq == 0:
+            return False
+
+        row = db.query(InvoiceAssignedApprover).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id,
+            InvoiceAssignedApprover.approver_email.ilike(email),
+            InvoiceAssignedApprover.sequence_order == max_seq
+        ).first()
+        return row is not None
+    except Exception as exc:
+        logger.warning("_is_last_level_approver_db error: %s", exc)
+        return False
+
+
 def _is_finance_level_db(db: Session, invoice_id: int, level: int) -> bool:
     """Check if a specific level is a Finance Team (pool-expanded) level in DB."""
     try:
@@ -807,7 +831,8 @@ def _resolve_user_role_in_workflow(
 
     # Determine if user is the posting/threshold approver via DB-authoritative check
     # (Snapshot reconstruction often loses the 'type' field, marking everything as mandatory).
-    db_is_posting = _is_posting_approver_db(db, invoice_id, email)
+    has_posting = _has_posting_db(db, invoice_id)
+    db_is_posting = _is_posting_approver_db(db, invoice_id, email) or (not has_posting and _is_last_level_approver_db(db, invoice_id, email))
     db_is_threshold = _is_future_threshold_approver_db(db, invoice_id, email, current_level)
 
     result = {
@@ -1087,6 +1112,7 @@ async def get_ui_status_from_frontend(
     is_posting_approver = (
         email in [e.lower() for e in posting_emails]
         or _is_posting_approver_db(db, invoice_id, email)
+        or (not has_posting and _is_last_level_approver_db(db, invoice_id, email))
     )
  
     # ── Threshold approver check ──
@@ -1452,6 +1478,7 @@ async def approve_invoice(
         is_posting_approver_here = (
             email in [e.lower() for pe in posting_entries for e in _parse_list(pe.get("emails", []))]
             or _is_posting_approver_db(db, invoice_id, email)
+            or (not has_posting and _is_last_level_approver_db(db, invoice_id, email))
         )
         acted_in_current_cycle = any(
             (s.user or "").lower() == email
