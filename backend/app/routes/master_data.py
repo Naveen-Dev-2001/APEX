@@ -165,7 +165,8 @@ async def trigger_master_sync(
     """
     from app.services.master_sync_services import (
         GLSyncService, LOBSyncService, DepartmentSyncService,
-        CustomerSyncService, ItemSyncService, ExchangeRateSyncService
+        CustomerSyncService, ItemSyncService, ExchangeRateSyncService,
+        EntitySyncService
     )
 
     services = {
@@ -175,7 +176,9 @@ async def trigger_master_sync(
         "Customer": CustomerSyncService,
         "Item": ItemSyncService,
         "Line_Items": ItemSyncService,
-        "Exchange_Rate": ExchangeRateSyncService
+        "Exchange_Rate": ExchangeRateSyncService,
+        "Entity": EntitySyncService,
+        "Entity_Master": EntitySyncService
     }
 
     service_class = services.get(tab_name)
@@ -194,7 +197,9 @@ async def trigger_master_sync(
         "Customer": "sync_customers",
         "Item": "sync_items",
         "Line_Items": "sync_items",
-        "Exchange_Rate": "sync_exchange_rates"
+        "Exchange_Rate": "sync_exchange_rates",
+        "Entity": "sync_entities",
+        "Entity_Master": "sync_entities"
     }
 
     try:

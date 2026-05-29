@@ -24,13 +24,17 @@ class BaseSyncService:
         self.username = os.getenv("SAGE_USERNAME", settings.SAGE_USERNAME)
         self.verify_ssl = os.getenv("SAGE_VERIFY_SSL", "true").lower() == "true"
 
-    async def _get_access_token(self, client: httpx.AsyncClient) -> str:
+    async def _get_access_token(self, client: httpx.AsyncClient, top_level: bool = False) -> str:
         """Fetch OAuth2 token."""
+        username = self.username
+        if top_level and "|" in username:
+            username = username.split("|")[0].strip()
+
         payload = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,
             "client_secret": self.client_secret,
-            "username": self.username
+            "username": username
         }
         r = await client.post(self.token_url, json=payload)
         r.raise_for_status()
@@ -96,7 +100,8 @@ class BaseSyncService:
                     sage_object: str, 
                     fields: List[str], 
                     key_field: str,
-                    event: Optional[asyncio.Event] = None):
+                    event: Optional[asyncio.Event] = None,
+                    top_level: bool = False):
         """Two-Stage Sync: Fetch Keys -> Fetch Details."""
         lock = self._get_lock(sage_object)
         if lock.locked(): 
@@ -109,7 +114,7 @@ class BaseSyncService:
             
             try:
                 async with httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=50), verify=self.verify_ssl) as client:
-                    token = await self._get_access_token(client)
+                    token = await self._get_access_token(client, top_level=top_level)
                     # Extract location ID from username if possible (e.g. Apex...|201)
                     location_id = "201"
                     if "|" in self.username:
@@ -118,9 +123,10 @@ class BaseSyncService:
                     headers = {
                         "Authorization": f"Bearer {token}", 
                         "Accept": "application/json",
-                        "Content-Type": "application/json",
-                        "locationid": location_id
+                        "Content-Type": "application/json"
                     }
+                    if sage_object != "company-config/entity":
+                        headers["locationid"] = location_id
                     
                     # 1. Fetch Data in Bulk using Query API (Proven pattern from VendorSync)
                     query_url = f"{self.base_url}/services/core/query"
@@ -208,7 +214,8 @@ class BaseSyncService:
                     model: Type, 
                     sage_object: str, 
                     key_field: str,
-                    event: Optional[asyncio.Event] = None):
+                    event: Optional[asyncio.Event] = None,
+                    top_level: bool = False):
         """Pure REST Sync: List Keys -> Fetch Details."""
         lock = self._get_lock(sage_object)
         if lock.locked(): 
@@ -221,7 +228,7 @@ class BaseSyncService:
             
             try:
                 async with httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=50), verify=self.verify_ssl) as client:
-                    token = await self._get_access_token(client)
+                    token = await self._get_access_token(client, top_level=top_level)
                     # Extract location ID from username if possible
                     location_id = "201"
                     if "|" in self.username:
@@ -230,9 +237,10 @@ class BaseSyncService:
                     headers = {
                         "Authorization": f"Bearer {token}", 
                         "Accept": "application/json",
-                        "Content-Type": "application/json",
-                        "locationid": location_id
+                        "Content-Type": "application/json"
                     }
+                    if sage_object != "company-config/entity":
+                        headers["locationid"] = location_id
                     
                     # 1. Fetch List of Objects (to get keys)
                     # Note: offset/limit query parameters are NOT supported for all objects in v1 (REST)

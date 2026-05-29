@@ -1,17 +1,17 @@
 import asyncio
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Type
 from sqlalchemy.orm import Session
 from datetime import datetime
 import json
 
 from app.services.base_sync_service import BaseSyncService
 from app.models.db_models import (
-    GLMaster, LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster
+    GLMaster, LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster, EntityMaster
 )
 from app.repository.repositories import (
     gl_master_repo, lob_master_repo, department_master_repo, 
-    customer_master_repo, item_master_repo, exchange_rate_master_repo
+    customer_master_repo, item_master_repo, exchange_rate_master_repo, entity_master_repo
 )
 
 logger = logging.getLogger(__name__)
@@ -283,4 +283,91 @@ class ExchangeRateSyncService(BaseSyncService):
 
     async def get_all_data(self) -> List[ExchangeRateMaster]:
         return exchange_rate_master_repo.get_multi(self.db, limit=100000)
+
+
+class EntitySyncService(BaseSyncService):
+    def _extract_map(self, v: Dict[str, Any]) -> Dict[str, Any]:
+        address = v.get("address") or {}
+        if not isinstance(address, dict):
+            address = {}
+
+        addr_line1 = address.get("addressLine1") or v.get("addressLine1") or v.get("address_line1")
+        addr_line2 = address.get("addressLine2") or v.get("addressLine2") or v.get("address_line2")
+        addr_line3 = address.get("addressLine3") or v.get("addressLine3") or v.get("address_line3")
+        city = address.get("city") or v.get("city")
+        state = address.get("state") or v.get("stateOrTerritory") or v.get("state_or_territory")
+        zip_code = address.get("zip") or v.get("zipOrPostalCode") or v.get("zip_or_postal_code")
+        country = address.get("country") or v.get("countryCode") or v.get("country_code")
+
+        gst_app = v.get("gstApplicable")
+        if gst_app is None:
+            gst_app = True
+        elif isinstance(gst_app, str):
+            gst_app = gst_app.strip().lower() in ["true", "yes", "1", "t", "y"]
+        else:
+            gst_app = bool(gst_app)
+
+        return {
+            "entity_id": v.get("id"),
+            "entity_name": v.get("name") or "Unknown",
+            "registered_address": v.get("registeredAddress") or v.get("registered_address"),
+            "address_line1": addr_line1,
+            "address_line2": addr_line2,
+            "address_line3": addr_line3,
+            "city": city,
+            "state_or_territory": state,
+            "zip_or_postal_code": zip_code,
+            "country_code": country,
+            "gst_applicable": gst_app,
+            "updated_at": datetime.utcnow()
+        }
+
+    def _bulk_upsert(self, model: Type, items: List[Dict[str, Any]], key_field: str):
+        if not items: return 0, 0
+        
+        to_insert = []
+        to_update = []
+        
+        # Use 'id' from Sage (which maps to 'entity_id') as key
+        ids = [str(item.get("id")) for item in items if item.get("id")]
+        
+        col = getattr(model, key_field)
+        existing = self.db.query(col).filter(col.in_(ids)).all()
+        existing_keys = {str(r[0]) for r in existing}
+
+        for item in items:
+            mapped = self._extract_map(item)
+            if not mapped.get(key_field):
+                continue
+            if str(mapped[key_field]) in existing_keys:
+                to_update.append(mapped)
+            else:
+                to_insert.append(mapped)
+
+        if to_insert:
+            self.db.bulk_insert_mappings(model, to_insert)
+        
+        if to_update:
+            existing_records = self.db.query(model.id, col).filter(col.in_(ids)).all()
+            key_to_id = {str(r[1]): r.id for r in existing_records}
+            
+            for m in to_update:
+                k_val = str(m[key_field])
+                if k_val in key_to_id:
+                    m["id"] = key_to_id[k_val]
+            
+            to_update = [m for m in to_update if "id" in m]
+            if to_update:
+                self.db.bulk_update_mappings(model, to_update)
+        
+        self.db.commit()
+        return len(to_insert), len(to_update)
+
+    async def sync_entities(self, event: Optional[asyncio.Event] = None):
+        fields = ["key", "id", "name", "status"]
+        await self.sync_object(EntityMaster, "company-config/entity", fields, "entity_id", event, top_level=True)
+
+    async def get_all_data(self) -> List[EntityMaster]:
+        return entity_master_repo.get_multi(self.db, limit=10000)
+
 
