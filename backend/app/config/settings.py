@@ -25,8 +25,8 @@ class Settings:
    
 
     # Legacy MongoDB URL (kept for backward compatibility during migration)
-    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-    DATABASE_NAME: str = "accounts_payable"
+    # MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    # DATABASE_NAME: str = "accounts_payable"
     
     # JWT Settings
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
