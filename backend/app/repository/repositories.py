@@ -3,8 +3,7 @@ from app.models.db_models import (
     User, Invoice, EntityMaster, VendorMaster, TdsRate, GLMaster, 
     LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, 
     ExchangeRateMaster, OTPRecord, Coding, AuditLog, WorkflowStep, 
-    Currency, Delegation, GlobalSetting, ApproverAmount, ApproverGL, 
-    ApproverNumber, ApproverDefault, VendorMetadata, VendorWorkflow, 
+    Currency, Delegation, GlobalSetting, VendorMetadata, VendorWorkflow, 
     CodificationWorkflow, CodingHistory, RawExtractionData, InvoiceRegistry,
     InvoiceStatusHistory, InvoiceAssignedApprover, InvoiceApprovedBy, DeletedInvoice
 )
@@ -35,10 +34,6 @@ workflow_step_repo = BaseRepository[WorkflowStep, Any, Any](WorkflowStep)
 currency_repo = BaseRepository[Currency, Any, Any](Currency)
 delegation_repo = BaseRepository[Delegation, Any, Any](Delegation)
 global_setting_repo = BaseRepository[GlobalSetting, Any, Any](GlobalSetting)
-approver_amount_repo = BaseRepository[ApproverAmount, Any, Any](ApproverAmount)
-approver_gl_repo = BaseRepository[ApproverGL, Any, Any](ApproverGL)
-approver_number_repo = BaseRepository[ApproverNumber, Any, Any](ApproverNumber)
-approver_default_repo = BaseRepository[ApproverDefault, Any, Any](ApproverDefault)
 vendor_metadata_repo = BaseRepository[VendorMetadata, Any, Any](VendorMetadata)
 vendor_workflow_repo = BaseRepository[VendorWorkflow, Any, Any](VendorWorkflow)
 codification_workflow_repo = BaseRepository[CodificationWorkflow, Any, Any](CodificationWorkflow)

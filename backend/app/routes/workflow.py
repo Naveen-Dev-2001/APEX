@@ -9,14 +9,11 @@ from datetime import datetime
 from app.database.database import get_db
 from app.models.db_models import (
     Invoice, WorkflowStep, VendorWorkflow, CodificationWorkflow, 
-    VendorMaster, Coding as DBCoding,
-    ApproverAmount, ApproverGL, ApproverNumber, ApproverDefault
+    VendorMaster, Coding as DBCoding
 )
 from app.repository.repositories import (
     invoice_repo, workflow_step_repo, vendor_workflow_repo,
-    codification_workflow_repo, vendor_master_repo, coding_repo,
-    approver_amount_repo, approver_gl_repo, approver_number_repo,
-    approver_default_repo
+    codification_workflow_repo, vendor_master_repo, coding_repo
 )
 from app.auth.jwt import get_current_user
 from app.dependencies import get_current_entity
@@ -397,65 +394,7 @@ def get_required_approver_count(
                         assigned_approvers.append({"emails": parse_approvers(cod_workflow.posting_approver), "type": "posting"})
                         has_posting_approver = True
 
-    # 4. Fallback Logic (Progressive check of other config tables)
-    if not workflow_found and entity:
-        # A. Check GL based configuration
-        coding_list = coding_repo.get_multi(db, filters={"invoice_id": invoice_id}, limit=1) if invoice_id else []
-        coding = coding_list[0] if coding_list else None
-        if coding and coding.header_coding:
-            hc = json.loads(coding.header_coding)
-            gl_code = hc.get("gl_code")
-            if gl_code:
-                approver_gl_list = approver_gl_repo.get_multi(db, filters={"gl_code": gl_code, "entity": entity}, limit=1)
-                approver_gl = approver_gl_list[0] if approver_gl_list else None
-                if approver_gl:
-                    workflow_found = True
-                    workflow_type = "approver_gl"
-                    count = approver_gl.required_approvers
-                    emails = json.loads(approver_gl.approver_emails) if approver_gl.approver_emails else []
-                    assigned_approvers = [e for e in emails if e]
-
-        # B. Check Amount based configuration
-        if not workflow_found and amount is not None:
-            approver_amt_list = approver_amount_repo.get_multi(
-                db, 
-                filters={"entity": entity},
-                expressions=[
-                    ApproverAmount.min_amount <= amount,
-                    ApproverAmount.max_amount >= amount
-                ],
-                limit=1
-            )
-            approver_amt = approver_amt_list[0] if approver_amt_list else None
-            if approver_amt:
-                workflow_found = True
-                workflow_type = "approver_amount"
-                count = approver_amt.required_approvers
-                emails = json.loads(approver_amt.approver_emails) if approver_amt.approver_emails else []
-                assigned_approvers = [e for e in emails if e]
-
-        # C. Check Approver Number (Count based)
-        if not workflow_found:
-            approver_num_list = approver_number_repo.get_multi(db, filters={"entity": entity}, limit=1)
-            approver_num = approver_num_list[0] if approver_num_list else None
-            if approver_num:
-                workflow_found = True
-                workflow_type = "approver_number"
-                count = approver_num.approver_count
-                emails = json.loads(approver_num.approver_emails) if approver_num.approver_emails else []
-                assigned_approvers = [e for e in emails if e]
-
-        # D. Check Default configuration
-        if not workflow_found:
-            approver_def_list = approver_default_repo.get_multi(db, filters={"entity": entity}, limit=1)
-            approver_def = approver_def_list[0] if approver_def_list else None
-            if approver_def:
-                workflow_found = True
-                workflow_type = "approver_default"
-                count = approver_def.required_approvers
-                emails = json.loads(approver_def.approver_emails) if approver_def.approver_emails else []
-                assigned_approvers = [e for e in emails if e]
-
+    # 4. Fallback Logic removed as requested
     if not workflow_found:
         return {
             "required": 1,
