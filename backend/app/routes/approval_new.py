@@ -174,7 +174,9 @@ def _get_finance_users(db: Session, entity: str) -> List[str]:
             .filter(
                 User.department != None,
                 func.lower(User.department).like("%finance%"),
-                ~func.lower(User.department).like("%non-finance%")
+                ~func.lower(User.department).like("%non-finance%"),
+                User.role == "approver",
+                User.status == "active"
             )
             .all()
         )

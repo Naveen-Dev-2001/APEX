@@ -93,6 +93,7 @@ async def send_to_approval(
             User.department != None,
             User.department.ilike("%finance%"),
             ~User.department.ilike("%non-finance%"),
+            User.role == "approver",
             User.status == "active"
         )
         .all()
