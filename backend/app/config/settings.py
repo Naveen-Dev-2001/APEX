@@ -37,7 +37,7 @@ class Settings:
     # Admin Defaults
     ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
     ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "admin123")
-    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@apex-dev.local")
+    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
     
     # App Settings
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:3000")
