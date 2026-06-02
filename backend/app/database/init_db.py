@@ -7,7 +7,7 @@ then creates tables and inserts default data.
 from sqlalchemy import create_engine, text
 from app.database.database import Base, engine, SessionLocal
 from app.models.db_models import (
-    User, Currency, GlobalSetting, ApproverDefault, EntityMaster
+    User, Currency, GlobalSetting, EntityMaster
 )
 from app.auth.jwt import get_password_hash
 from app.config.settings import settings
