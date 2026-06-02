@@ -97,4 +97,11 @@ async def get_current_user(
         email_notifications=getattr(user, 'email_notifications', True)
     )
         
+    # Set the thread-local context variable for logging
+    from app.middleware.logger import current_user_var
+    current_user_var.set({
+        "username": user_response.username,
+        "email": user_response.email
+    })
+
     return user_response

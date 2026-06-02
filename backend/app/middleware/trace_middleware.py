@@ -17,7 +17,7 @@ error_logger.setLevel(logging.ERROR)
 # File handler for trace log
 log_file = os.path.join(os.getcwd(), "application_trace.log")
 handler = logging.FileHandler(log_file)
-formatter = logging.Formatter('%(asctime)s | %(message)s')
+formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
 handler.setFormatter(formatter)
 trace_logger.addHandler(handler)
 

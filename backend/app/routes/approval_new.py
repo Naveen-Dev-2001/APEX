@@ -45,7 +45,7 @@ from app.services.audit_service import audit_service
 from app.models.audit_log import AuditAction
 from app.services.email_service import email_service
 
-logger = logging.getLogger(__name__)
+from app.middleware.logger import logger
 router = APIRouter(prefix="/workflow/action", tags=["Workflow Actions"])
 
 
@@ -552,12 +552,13 @@ async def _finalize_and_post(db: Session, invoice: Invoice, current_user: UserRe
     """
     Sets status to APPROVED, records approval steps, and triggers Sage posting.
     """
+    invoice_id = invoice.id
+    logger.info(f"[Workflow] Invoice {invoice_id} approved by {current_user.username} (Level/Action: {step_name})")
+
     from app.services.audit_service import audit_service
     from app.models.audit_log import AuditAction
     from app.models.invoice import InvoiceStatus
     from app.repository.repositories import invoice_repo
-    
-    invoice_id = invoice.id
     
     # 1. Internal status: APPROVED
     _update_invoice_status(db, invoice, InvoiceStatus.APPROVED)
@@ -622,6 +623,7 @@ async def _finalize_and_post(db: Session, invoice: Invoice, current_user: UserRe
             sage_bill_number=actual_bill_no
         )
         db.commit()
+        logger.info(f"[SagePost] Successfully posted invoice {invoice_id} to Sage (Bill Number: {actual_bill_no})")
         return ActionResponse(
             success=True,
             message="Invoice approved and successfully posted to Sage.",
@@ -648,6 +650,7 @@ async def _finalize_and_post(db: Session, invoice: Invoice, current_user: UserRe
             details={"error": sage_result.get("message")}
         )
         db.commit()
+        logger.error(f"[SagePost] Sage posting failed for invoice {invoice_id}: {sage_result.get('message')}")
         return ActionResponse(
             success=False,
             message=f"Approved, but Sage posting failed: {sage_result['message']}",
@@ -1545,6 +1548,7 @@ async def approve_invoice(
                 notify_next_approvers(db, invoice, next_mandatory, background_tasks)
                 
                 db.commit()
+                logger.info(f"[Workflow] Level {current_level} approved by {current_user.username} for invoice {invoice_id}. Moved to level {next_mandatory['level']}.")
                 return ActionResponse(
                     success=True,
                     message=f"Level {current_level} approved. Moved to level {next_mandatory['level']}.",
@@ -1707,6 +1711,7 @@ async def approve_invoice(
                 notify_next_approvers(db, invoice, pe, background_tasks)
                 
             db.commit()
+            logger.info(f"[Workflow] Invoice {invoice_id} THRESHOLD approved by {current_user.username}. Advancing to posting stage.")
             return ActionResponse(
                 success=True,
                 message="Threshold approved. Awaiting posting approver.",
@@ -1740,6 +1745,7 @@ async def approve_invoice(
                     entity=entity,
                 )
                 db.commit()
+                logger.info(f"[Workflow] Invoice {invoice_id} fully approved after THRESHOLD by {current_user.username}. Posted to Sage (Bill: {sage_result.get('sage_bill_number')}).")
                 return ActionResponse(
                     success=True,
                     message="Invoice fully approved after threshold and posted to Sage.",
@@ -1758,6 +1764,7 @@ async def approve_invoice(
                     entity=entity,
                 )
                 db.commit()
+                logger.error(f"[SagePost] Sage posting failed after threshold approval for invoice {invoice_id}: {sage_result.get('message')}")
                 return ActionResponse(
                     success=False,
                     message=f"Invoice fully approved after threshold but Sage post failed: {sage_result['message']}",
@@ -1935,6 +1942,7 @@ async def reject_invoice(
     )
 
     db.commit()
+    logger.info(f"[Workflow] Invoice {invoice_id} REJECTED by {current_user.username} at level {current_level}. Comment: {payload.comment!r}")
 
     # --- NOTIFY CODER OF REJECTION ---
     # Find the user who did the coding step
@@ -2073,6 +2081,7 @@ async def rework_invoice(
             details={"comment": payload.comment, "rework_to": "coder"}
         )
         db.commit()
+        logger.info(f"[Workflow] Invoice {invoice_id} sent for REWORK to Coder by {current_user.username}. Comment: {payload.comment!r}")
 
         return ActionResponse(
             success=True,
@@ -2119,6 +2128,7 @@ async def rework_invoice(
         details={"comment": payload.comment, "rework_to_level": prev_finance_level}
     )
     db.commit()
+    logger.info(f"[Workflow] Invoice {invoice_id} sent for REWORK to level {prev_finance_level} by {current_user.username}. Comment: {payload.comment!r}")
 
     # --- NOTIFY PREVIOUS FINANCE TEAM OF REWORK ---
     prev_finance_emails = []
@@ -2238,6 +2248,7 @@ async def enable_editing(
         entity=entity,
     )
     db.commit()
+    logger.info(f"[Workflow] Invoice {invoice_id} — EDITING ENABLED by {current_user.username}")
 
     return ActionResponse(
         success=True,
@@ -2364,6 +2375,7 @@ async def repost_to_sage(
             details={"error": sage_result.get("message")}
         )
         db.commit()
+        logger.error(f"[SageRepost] Sage repost failed for invoice {invoice_id} by {current_user.username}: {sage_result.get('message')}")
         return ActionResponse(
             success=False,
             message=f"Sage repost failed: {sage_result['message']}",
@@ -2433,6 +2445,7 @@ async def recall_invoice(
     )
 
     db.commit()
+    logger.info(f"[Workflow] Invoice {invoice_id} RECALLED to coding by {current_user.username}. Comment: {request.comment!r}")
 
     return ActionResponse(
         success=True,

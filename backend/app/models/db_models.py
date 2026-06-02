@@ -370,48 +370,6 @@ class GlobalSetting(Base):
     updated_at = Column(DateTime, nullable=True, onupdate=get_ist_now)
 
 
-# ==================== APPROVER CONFIGURATIONS ====================
-
-class ApproverAmount(Base):
-    __tablename__ = "approver_amount"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    entity = Column(String(100), nullable=False, index=True)
-    currency = Column(String(10), nullable=False)
-    min_amount = Column(DECIMAL(18, 2), nullable=False)
-    max_amount = Column(DECIMAL(18, 2), nullable=False)
-    required_approvers = Column(Integer, nullable=False)
-    approver_emails = Column(Text, nullable=True)  # JSON array
-
-
-class ApproverGL(Base):
-    __tablename__ = "approver_gl"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    entity = Column(String(100), nullable=False, index=True)
-    gl_code = Column(String(100), nullable=False, index=True)
-    required_approvers = Column(Integer, nullable=False)
-    approver_emails = Column(Text, nullable=True)  # JSON array
-
-
-class ApproverNumber(Base):
-    __tablename__ = "approver_number"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    entity = Column(String(100), nullable=False, index=True)
-    approver_count = Column(Integer, nullable=False)
-    approver_emails = Column(Text, nullable=True)  # JSON array
-
-
-class ApproverDefault(Base):
-    __tablename__ = "approver_default"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    entity = Column(String(100), nullable=False, unique=True, index=True)
-    required_approvers = Column(Integer, nullable=False, default=1)
-    approver_emails = Column(Text, nullable=True)  # JSON array
-
-
 # ==================== MASTER DATA ====================
 class EntityMaster(Base):
     """
