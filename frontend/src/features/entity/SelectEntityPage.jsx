@@ -22,10 +22,23 @@ const SelectEntityPage = () => {
 
 
 
-  const { masters, fetchEntityMasterData, entityLoading } = useMasterDataStore();
+  const { masters, entityLoading } = useMasterDataStore();
+  const [entityData, setEntityData] = useState([]);
 
-  // Get entities from store and format them
-  const entityData = masters['Entity Master']?.data || [];
+  useEffect(() => {
+    const fetchAllEntities = async () => {
+      try {
+        const { masterDataService } = await import('../../api/masterdataAPI');
+        const response = await masterDataService.getEntityMasterData({ page: 1, page_size: 1000 });
+        setEntityData(response.data || []);
+      } catch (err) {
+        console.error("Failed to load entities:", err);
+      }
+    };
+    fetchAllEntities();
+  }, []);
+
+  // Format entities for dropdown
   const entities = entityData.map((entity, index) => {
     const baseName = entity.entity_name === 'Default Entity' ? 'Top Level' : entity.entity_name;
     const combinedName = `${entity.entity_id} - ${baseName}`;
@@ -36,12 +49,6 @@ const SelectEntityPage = () => {
       displayName: combinedName      // Combined display name for dropdown
     };
   });
-
-  useEffect(() => {
-    if (entityData.length === 0) {
-      fetchEntityMasterData();
-    }
-  }, []);
 
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
