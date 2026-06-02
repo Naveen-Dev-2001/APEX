@@ -301,7 +301,7 @@ class EntitySyncService(BaseSyncService):
 
         gst_app = v.get("gstApplicable")
         if gst_app is None:
-            gst_app = True
+            gst_app = False
         elif isinstance(gst_app, str):
             gst_app = gst_app.strip().lower() in ["true", "yes", "1", "t", "y"]
         else:

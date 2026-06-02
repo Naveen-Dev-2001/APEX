@@ -893,16 +893,22 @@ def delete_row(
     if not repo:
         raise HTTPException(404, "Table not found")
 
-    # Try to find the record to get its ID if offset was passed.
-    # Ideally frontend should pass ID.
-    record = db.query(repo.model).order_by(
-        repo.model.id).offset(row_index).limit(1).first()
+    # Prefer primary key lookup for accuracy (frontend passes row.id)
+    record = repo.get(db, id=row_index) if hasattr(repo, 'get') else db.query(repo.model).filter(repo.model.id == row_index).first()
+    
+    if not record:
+        # Fallback to offset if record not found by ID (legacy behavior)
+        record = db.query(repo.model).order_by(
+            repo.model.id).offset(row_index).limit(1).first()
     
     if record:
         # Restriction: Prevent deletion if invoices exist for this entity
         if identifier in ["Entity_Master", "entity_master", "Entity"]:
-            active_count = db.query(Invoice).filter(Invoice.entity == record.entity_id).count()
-            deleted_count = db.query(DeletedInvoice).filter(DeletedInvoice.entity == record.entity_id).count()
+            active_count = 0
+            deleted_count = 0
+            if record.entity_id:
+                active_count = db.query(Invoice).filter(Invoice.entity == record.entity_id).count()
+                deleted_count = db.query(DeletedInvoice).filter(DeletedInvoice.entity == record.entity_id).count()
             
             if active_count > 0 or deleted_count > 0:
                 raise HTTPException(status_code=400, detail="invoices is under this level,you can't deelte")

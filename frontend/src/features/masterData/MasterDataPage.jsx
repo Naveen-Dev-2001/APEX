@@ -209,25 +209,25 @@ const MasterDataPage = () => {
                     const indexToDelete = realIndex !== -1 ? realIndex : absoluteIndex;
 
                     if (isEntityTab) {
-                        await deleteEntityRow(indexToDelete);
+                        await deleteEntityRow(row.id);
                     } else if (isVendorTab) {
-                        await deleteVendorRow(indexToDelete);
+                        await deleteVendorRow(row.id);
                     } else if (isTDSTab) {
-                        await deleteTDSRateRow(indexToDelete);
+                        await deleteTDSRateRow(row.id);
                     } else if (isGLTab) {
-                        await deleteGLRow(indexToDelete);
+                        await deleteGLRow(row.id);
                     } else if (isLOBTab) {
-                        await deleteLOBRow(indexToDelete);
+                        await deleteLOBRow(row.id);
                     } else if (isDepartmentTab) {
-                        await deleteDepartmentRow(indexToDelete);
+                        await deleteDepartmentRow(row.id);
                     } else if (isCustomerTab) {
-                        await deleteCustomerRow(indexToDelete);
+                        await deleteCustomerRow(row.id);
                     } else if (isItemTab) {
-                        await deleteItemRow(indexToDelete);
+                        await deleteItemRow(row.id);
                     } else if (isCurrencyTab) {
                         await deleteCurrencyRow(row.id);
                     } else if (isExchangeRateTab) {
-                        await deleteExchangeRateRow(indexToDelete);
+                        await deleteExchangeRateRow(row.id);
                     }
                     toast.dismiss(loadingToast);
                     toast.success(`${activeTab} deleted successfully`);
