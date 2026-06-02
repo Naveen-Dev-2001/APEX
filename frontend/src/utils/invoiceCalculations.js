@@ -40,7 +40,7 @@ export const getInvoiceHeuristics = (quickViewFormData, lineItems, originalLineI
         const lowDesc = desc.toLowerCase();
 
         // Safeguard: Skip system tax lines and OCR-extracted generic tax lines
-        if (desc === 'TDS Deduction' || desc === 'Tax') {
+        if (desc === 'TDS Deduction') {
             return sum;
         }
 
