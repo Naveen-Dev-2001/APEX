@@ -3136,6 +3136,11 @@ async def update_invoice(
     # in the background to provide an immediate response.
     if "status" in update_data and update_data["status"] == InvoiceStatusEnum.WAITING_CODING:
         def run_auto_coding(inv_id):
+            from app.middleware.logger import current_user_var
+            current_user_var.set({
+                "username": current_user.username,
+                "email": current_user.email
+            })
             bg_db = SessionLocal()
             try:
                 from app.routes.coding import apply_coding_suggestions_to_invoice
@@ -3155,6 +3160,11 @@ async def update_invoice(
     if "extracted_data" in update_data:
         # Prepare the data needed for the background task to avoid closure issues
         def run_coding_sync(inv_id, data_dict, v_name, v_id):
+            from app.middleware.logger import current_user_var
+            current_user_var.set({
+                "username": current_user.username,
+                "email": current_user.email
+            })
             bg_db = SessionLocal()
             try:
                 from app.routes.coding import update_coding_history
