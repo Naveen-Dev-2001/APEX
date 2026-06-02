@@ -34,7 +34,7 @@
 
 import logging
 import sys
-from logging.handlers import TimedRotatingFileHandler
+
 
 
 from contextvars import ContextVar
@@ -86,16 +86,12 @@ def setup_logger():
     console_handler.setFormatter(formatter)
     console_handler.addFilter(user_filter)
 
-    # Daily Rotating File Handler
-    file_handler = TimedRotatingFileHandler(
+    # Standard File Handler
+    file_handler = logging.FileHandler(
         filename="app.log",
-        when="midnight",
-        interval=1,
-        backupCount=0,  # Keep all log files
         encoding="utf-8"
     )
 
-    file_handler.suffix = "%Y-%m-%d"
     file_handler.setFormatter(formatter)
     file_handler.addFilter(user_filter)
 
