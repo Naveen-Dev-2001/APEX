@@ -24,7 +24,7 @@ class Settings:
     
     # Admin Defaults (admin password must be set via .env in production)
     ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
-    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD")
+    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD","admin123")
     ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
     
     # App Settings
