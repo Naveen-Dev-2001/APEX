@@ -29,7 +29,7 @@ ATTACHMENT_FOLDER_KEY = "55"
 def post_ap_bill(
     invoice, 
     pdf_path: str,
-    gl_account: str = "50010",
+    gl_account: str = None,
     location: str = LOCATION_ID,
     dept: str = None,
     vendor_dim: str = None,
@@ -267,9 +267,12 @@ def _create_ap_bill(
         logger.info(f"[PostAPBill] Constructing {len(line_items)} lines for bill.")
         for item_data in line_items:
             # 1. Resolve GL Account for this line
-            line_gl = item_data.get("gl_code") or item_data.get("glAccount") or gl_account or "50010"
+            line_gl = item_data.get("gl_code") or item_data.get("glAccount") or gl_account
             line_gl = _extract_id(line_gl)
-            if line_gl.lower() in ["none", "null", ""]: line_gl = "50010"
+            if not line_gl or str(line_gl).lower() in ["none", "null", ""]:
+                raise ValueError(
+                    f"GL Account is required for line item: {item_data}"
+                )
 
             # 2. Resolve Amount for this line
             line_amt = item_data.get("amount") or item_data.get("net_amount") or item_data.get("total_amount") or "0"
@@ -305,7 +308,8 @@ def _create_ap_bill(
     else:
         # Fallback to single aggregate line
         gl_account_clean = _extract_id(gl_account)
-        if gl_account_clean.lower() in ["none", "null", ""]: gl_account_clean = "50010"
+        if not gl_account_clean or str(gl_account_clean).lower() in ["none", "null", ""]:
+            raise ValueError("GL Account is required to create AP Bill")
 
         header_dims = {
             "location": {"id": _extract_id(location)} if location else None,
