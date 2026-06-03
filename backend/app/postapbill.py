@@ -21,7 +21,7 @@ CLIENT_SECRET = settings.SAGE_CLIENT_SECRET
 USERNAME = settings.SAGE_USERNAME
 
 LOCATION_ID = "" # Default fallback
-ATTACHMENT_FOLDER_KEY = "55"
+ATTACHMENT_FOLDER_KEY = settings.ATTACHMENT_FOLDER_KEY
 
 
 # --------------------------------------------------
