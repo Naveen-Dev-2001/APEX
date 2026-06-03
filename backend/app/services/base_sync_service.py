@@ -56,44 +56,54 @@ class BaseSyncService:
         """Executes high-speed bulk upsert for a single batch."""
         if not items: return 0, 0
         
-        to_insert = []
-        to_update = []
+        total_inserted = 0
+        total_updated = 0
+        chunk_size = 1000
         
-        # Pre-fetch existing keys for the batch to decide between insert and update
-        # Use optimized repository logic for pre-fetching keys
-        keys = [str(item.get("key")) for item in items if item.get("key")]
-        # For bulk check, we can use a specialized repository check if needed, 
-        # but for now we'll keep it efficient with a direct query if repo doesn't support specific col fetch
-        col = getattr(model, key_field)
-        existing = self.db.query(col).filter(col.in_(keys)).all()
-        existing_keys = {str(r[0]) for r in existing}
-
-        for item in items:
-            mapped = self._extract_map(item)
-            if mapped[key_field] in existing_keys:
-                to_update.append(mapped)
-            else:
-                to_insert.append(mapped)
-
-        if to_insert:
-            self.db.bulk_insert_mappings(model, to_insert)
-        
-        if to_update:
-            # Fetch IDs for the entire update batch
-            existing_records = self.db.query(model.id, col).filter(col.in_(keys)).all()
-            key_to_id = {str(r[1]): r.id for r in existing_records}
+        for i in range(0, len(items), chunk_size):
+            chunk = items[i:i+chunk_size]
             
-            for m in to_update:
-                if m[key_field] in key_to_id:
-                    m["id"] = key_to_id[m[key_field]]
+            to_insert = []
+            to_update = []
             
-            # Filter out any that somehow missed their ID
-            to_update = [m for m in to_update if "id" in m]
+            # Pre-fetch existing keys for the batch to decide between insert and update
+            # Use optimized repository logic for pre-fetching keys
+            keys = [str(item.get("key")) for item in chunk if item.get("key")]
+            # For bulk check, we can use a specialized repository check if needed, 
+            # but for now we'll keep it efficient with a direct query if repo doesn't support specific col fetch
+            col = getattr(model, key_field)
+            existing = self.db.query(col).filter(col.in_(keys)).all()
+            existing_keys = {str(r[0]) for r in existing}
+
+            for item in chunk:
+                mapped = self._extract_map(item)
+                if mapped[key_field] in existing_keys:
+                    to_update.append(mapped)
+                else:
+                    to_insert.append(mapped)
+
+            if to_insert:
+                self.db.bulk_insert_mappings(model, to_insert)
+            
             if to_update:
-                self.db.bulk_update_mappings(model, to_update)
-        
-        self.db.commit()
-        return len(to_insert), len(to_update)
+                # Fetch IDs for the entire update batch
+                existing_records = self.db.query(model.id, col).filter(col.in_(keys)).all()
+                key_to_id = {str(r[1]): r.id for r in existing_records}
+                
+                for m in to_update:
+                    if m[key_field] in key_to_id:
+                        m["id"] = key_to_id[m[key_field]]
+                
+                # Filter out any that somehow missed their ID
+                to_update = [m for m in to_update if "id" in m]
+                if to_update:
+                    self.db.bulk_update_mappings(model, to_update)
+            
+            self.db.commit()
+            total_inserted += len(to_insert)
+            total_updated += len(to_update)
+            
+        return total_inserted, total_updated
 
     async def sync_object(self, 
                     model: Type, 

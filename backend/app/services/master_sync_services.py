@@ -325,43 +325,52 @@ class EntitySyncService(BaseSyncService):
     def _bulk_upsert(self, model: Type, items: List[Dict[str, Any]], key_field: str):
         if not items: return 0, 0
         
-        to_insert = []
-        to_update = []
+        total_insert = 0
+        total_update = 0
+        chunk_size = 1000
         
-        # Use 'id' from Sage (which maps to 'entity_id') as key
-        ids = [str(item.get("id")) for item in items if item.get("id")]
-        
-        col = getattr(model, key_field)
-        existing = self.db.query(col).filter(col.in_(ids)).all()
-        existing_keys = {str(r[0]) for r in existing}
-
-        for item in items:
-            mapped = self._extract_map(item)
-            if not mapped.get(key_field):
-                continue
-            if str(mapped[key_field]) in existing_keys:
-                to_update.append(mapped)
-            else:
-                to_insert.append(mapped)
-
-        if to_insert:
-            self.db.bulk_insert_mappings(model, to_insert)
-        
-        if to_update:
-            existing_records = self.db.query(model.id, col).filter(col.in_(ids)).all()
-            key_to_id = {str(r[1]): r.id for r in existing_records}
+        for i in range(0, len(items), chunk_size):
+            chunk = items[i:i+chunk_size]
+            to_insert = []
+            to_update = []
             
-            for m in to_update:
-                k_val = str(m[key_field])
-                if k_val in key_to_id:
-                    m["id"] = key_to_id[k_val]
+            # Use 'id' from Sage (which maps to 'entity_id') as key
+            ids = [str(item.get("id")) for item in chunk if item.get("id")]
             
-            to_update = [m for m in to_update if "id" in m]
+            col = getattr(model, key_field)
+            existing = self.db.query(col).filter(col.in_(ids)).all()
+            existing_keys = {str(r[0]) for r in existing}
+
+            for item in chunk:
+                mapped = self._extract_map(item)
+                if not mapped.get(key_field):
+                    continue
+                if str(mapped[key_field]) in existing_keys:
+                    to_update.append(mapped)
+                else:
+                    to_insert.append(mapped)
+
+            if to_insert:
+                self.db.bulk_insert_mappings(model, to_insert)
+            
             if to_update:
-                self.db.bulk_update_mappings(model, to_update)
-        
-        self.db.commit()
-        return len(to_insert), len(to_update)
+                existing_records = self.db.query(model.id, col).filter(col.in_(ids)).all()
+                key_to_id = {str(r[1]): r.id for r in existing_records}
+                
+                for m in to_update:
+                    k_val = str(m[key_field])
+                    if k_val in key_to_id:
+                        m["id"] = key_to_id[k_val]
+                
+                to_update = [m for m in to_update if "id" in m]
+                if to_update:
+                    self.db.bulk_update_mappings(model, to_update)
+            
+            self.db.commit()
+            total_insert += len(to_insert)
+            total_update += len(to_update)
+            
+        return total_insert, total_update
 
     async def sync_entities(self, event: Optional[asyncio.Event] = None):
         fields = ["key", "id", "name", "status"]
