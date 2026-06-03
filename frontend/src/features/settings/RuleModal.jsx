@@ -510,7 +510,22 @@ const RuleModal = ({ open, onCancel, mode = "codification", editData = null, onS
                             label="Number of Approvers"
                             required
                             value={form.approverCount}
-                            onChange={(val) => setForm({ ...form, approverCount: val })}
+                            onChange={(val) => {
+                                setForm((prev) => {
+                                    const newApprovers = { ...prev.approvers };
+                                    const newFinanceFlags = { ...prev.financeFlags };
+                                    for (let i = val + 1; i <= 5; i++) {
+                                        delete newApprovers[i];
+                                        delete newFinanceFlags[i];
+                                    }
+                                    return {
+                                        ...prev,
+                                        approverCount: val,
+                                        approvers: newApprovers,
+                                        financeFlags: newFinanceFlags,
+                                    };
+                                });
+                            }}
                             options={[1, 2, 3, 4, 5].map((n) => ({
                                 label: `${n} Approver${n > 1 ? "s" : ""}`,
                                 value: n,
