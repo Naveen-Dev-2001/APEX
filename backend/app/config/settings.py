@@ -36,5 +36,6 @@ class Settings:
     SAGE_CLIENT_ID: str = os.getenv("SAGE_CLIENT_ID")
     SAGE_CLIENT_SECRET: str = os.getenv("SAGE_CLIENT_SECRET")
     SAGE_USERNAME: str = os.getenv("SAGE_USERNAME")
+    ATTACHMENT_FOLDER_KEY: str = os.getenv("ATTACHMENT_FOLDER_KEY")
 
 settings = Settings()
