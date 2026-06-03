@@ -5,7 +5,7 @@ import { useDuplicateCheck } from "../hooks/useDuplicateCheck";
 import { useSaveInvoice } from "../hooks/useSaveInvoice";
 import { useInvoicePreviewData } from "../hooks/useInvoicePreviewData";
 import toast from "../../utils/toast";
-import { saveInvoice, getInvoiceById, fetchEntityMaster } from "../../api/invoiceApi";
+import { saveInvoice, getInvoiceById, fetchEntityMaster, getWorkflowData } from "../../api/invoiceApi";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import workflowActionsAPI from "../../api/workflowActionsAPI";
@@ -246,8 +246,26 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
 
         // 2. Workflow validation
         if (isWorkflowMissing) {
-            toast.error("No workflow defined for this invoice. Please configure a vendor or codification workflow.");
-            return;
+            // The cached workflow state says it's missing. Double-check with the server
+            // in case the user just created the workflow in another tab.
+            setActionLoading("sendToApproval");
+            try {
+                const freshWorkflow = await getWorkflowData(viewInvoiceId, workflowParams);
+                if (!freshWorkflow?.assigned_approvers?.length) {
+                    toast.error("No workflow defined for this invoice. Please configure a vendor or codification workflow.");
+                    setActionLoading(null);
+                    return;
+                }
+                // If the workflow exists now, update the React Query cache so the UI syncs, and proceed.
+                queryClient.setQueryData(["invoice-preview", viewInvoiceId, selectedVendorId, workflowParams], (old) => {
+                    return old ? { ...old, workflowData: freshWorkflow } : old;
+                });
+            } catch (err) {
+                console.error("Failed to re-verify workflow:", err);
+                toast.error("No workflow defined for this invoice. Please configure a vendor or codification workflow.");
+                setActionLoading(null);
+                return;
+            }
         }
 
         setActionLoading("sendToApproval");

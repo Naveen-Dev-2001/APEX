@@ -308,7 +308,7 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
         )
 
     hashed_password = get_password_hash(request.new_password)
-    user_repo.update(db, db_obj=user, obj_in={"password": hashed_password})
+    user_repo.update(db, db_obj=user, obj_in={"password": hashed_password, "ispasswordchange": True})
 
     return {"message": "Password updated successfully"}
 
