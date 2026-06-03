@@ -68,7 +68,7 @@ def post_ap_bill(
         if location:
             auth_headers["X-IA-API-Param-Entity"] = location
         
-        logger.info(f"[PostAPBill] Sage Auth Headers: {auth_headers}")
+        # logger.info(f"[PostAPBill] Sage Auth Headers: {auth_headers}")
         logger.info(f"[PostAPBill] Posting invoice {invoice.id} to location: '{location or 'Top Level'}'")
         logger.info(f"[PostAPBill] Authenticated with Sage Intacct for invoice {invoice.id}")
 
