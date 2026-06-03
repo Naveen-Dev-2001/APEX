@@ -7,16 +7,18 @@ import requests
 
 logger = logging.getLogger("ai_app")
 
+from app.config.settings import settings
+
 # --------------------------------------------------
 # CONFIG
 # --------------------------------------------------
 
-BASE_URL = "https://api.intacct.com/ia/api/v1"
-TOKEN_URL = f"{BASE_URL}/oauth2/token"
+BASE_URL = settings.SAGE_BASE_URL
+TOKEN_URL = settings.SAGE_TOKEN_URL
 
-CLIENT_ID = "3f83ee41b095ea8e5659.app.sage.com"
-CLIENT_SECRET = "e49424e23f3df286f49e1f052e897ea944e3dce1"
-USERNAME = "Apex@consolidatedanalytics-sandbox"
+CLIENT_ID = settings.SAGE_CLIENT_ID
+CLIENT_SECRET = settings.SAGE_CLIENT_SECRET
+USERNAME = settings.SAGE_USERNAME
 
 LOCATION_ID = "" # Default fallback
 ATTACHMENT_FOLDER_KEY = "55"
@@ -29,7 +31,7 @@ ATTACHMENT_FOLDER_KEY = "55"
 def post_ap_bill(
     invoice, 
     pdf_path: str,
-    gl_account: str = "50010",
+    gl_account: str = None,
     location: str = LOCATION_ID,
     dept: str = None,
     vendor_dim: str = None,
@@ -64,9 +66,9 @@ def post_ap_bill(
             "Accept": "application/json",
         }
         if location:
-            auth_headers["locationid"] = location
+            auth_headers["X-IA-API-Param-Entity"] = location
         
-        logger.info(f"[PostAPBill] Sage Auth Headers: {auth_headers}")
+        # logger.info(f"[PostAPBill] Sage Auth Headers: {auth_headers}")
         logger.info(f"[PostAPBill] Posting invoice {invoice.id} to location: '{location or 'Top Level'}'")
         logger.info(f"[PostAPBill] Authenticated with Sage Intacct for invoice {invoice.id}")
 
@@ -129,9 +131,13 @@ def post_ap_bill(
 # --------------------------------------------------
 
 def _get_access_token(location=None) -> str:
+    # If the username in .env already has an entity ID (e.g., User@Company|201),
+    # extract just the base 'User@Company' part so we don't end up with two pipes.
+    base_username = USERNAME.split("|")[0] if USERNAME else ""
+    
     token_username = USERNAME
     if location:
-        token_username = f"{USERNAME}|{location}"
+        token_username = f"{base_username}|{location}"
         
     token_payload = {
         "grant_type": "client_credentials",
@@ -141,6 +147,10 @@ def _get_access_token(location=None) -> str:
     }
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     resp = requests.post(TOKEN_URL, json=token_payload, headers=headers, timeout=30)
+    
+    if not resp.ok:
+        logger.error(f"[PostAPBill] Token request failed: {resp.status_code} - {resp.text}")
+        
     resp.raise_for_status()
     return resp.json()["access_token"]
 
@@ -267,9 +277,12 @@ def _create_ap_bill(
         logger.info(f"[PostAPBill] Constructing {len(line_items)} lines for bill.")
         for item_data in line_items:
             # 1. Resolve GL Account for this line
-            line_gl = item_data.get("gl_code") or item_data.get("glAccount") or gl_account or "50010"
+            line_gl = item_data.get("gl_code") or item_data.get("glAccount") or gl_account
             line_gl = _extract_id(line_gl)
-            if line_gl.lower() in ["none", "null", ""]: line_gl = "50010"
+            if not line_gl or str(line_gl).lower() in ["none", "null", ""]:
+                raise ValueError(
+                    f"GL Account is required for line item: {item_data}"
+                )
 
             # 2. Resolve Amount for this line
             line_amt = item_data.get("amount") or item_data.get("net_amount") or item_data.get("total_amount") or "0"
@@ -305,7 +318,8 @@ def _create_ap_bill(
     else:
         # Fallback to single aggregate line
         gl_account_clean = _extract_id(gl_account)
-        if gl_account_clean.lower() in ["none", "null", ""]: gl_account_clean = "50010"
+        if not gl_account_clean or str(gl_account_clean).lower() in ["none", "null", ""]:
+            raise ValueError("GL Account is required to create AP Bill")
 
         header_dims = {
             "location": {"id": _extract_id(location)} if location else None,
