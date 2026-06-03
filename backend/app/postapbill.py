@@ -11,12 +11,14 @@ logger = logging.getLogger("ai_app")
 # CONFIG
 # --------------------------------------------------
 
-BASE_URL = "https://api.intacct.com/ia/api/v1"
-TOKEN_URL = f"{BASE_URL}/oauth2/token"
+from app.config.settings import settings
 
-CLIENT_ID = "3f83ee41b095ea8e5659.app.sage.com"
-CLIENT_SECRET = "e49424e23f3df286f49e1f052e897ea944e3dce1"
-USERNAME = "Apex@consolidatedanalytics-sandbox"
+BASE_URL = settings.SAGE_BASE_URL
+TOKEN_URL = settings.SAGE_TOKEN_URL
+
+CLIENT_ID =settings.SAGE_CLIENT_ID
+CLIENT_SECRET = settings.SAGE_CLIENT_SECRET
+USERNAME = settings.SAGE_USERNAME
 
 LOCATION_ID = "" # Default fallback
 ATTACHMENT_FOLDER_KEY = "55"
