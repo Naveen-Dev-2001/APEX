@@ -7,16 +7,16 @@ import requests
 
 logger = logging.getLogger("ai_app")
 
+from app.config.settings import settings
+
 # --------------------------------------------------
 # CONFIG
 # --------------------------------------------------
 
-from app.config.settings import settings
-
 BASE_URL = settings.SAGE_BASE_URL
 TOKEN_URL = settings.SAGE_TOKEN_URL
 
-CLIENT_ID =settings.SAGE_CLIENT_ID
+CLIENT_ID = settings.SAGE_CLIENT_ID
 CLIENT_SECRET = settings.SAGE_CLIENT_SECRET
 USERNAME = settings.SAGE_USERNAME
 
@@ -66,7 +66,7 @@ def post_ap_bill(
             "Accept": "application/json",
         }
         if location:
-            auth_headers["locationid"] = location
+            auth_headers["X-IA-API-Param-Entity"] = location
         
         logger.info(f"[PostAPBill] Sage Auth Headers: {auth_headers}")
         logger.info(f"[PostAPBill] Posting invoice {invoice.id} to location: '{location or 'Top Level'}'")
@@ -131,9 +131,13 @@ def post_ap_bill(
 # --------------------------------------------------
 
 def _get_access_token(location=None) -> str:
+    # If the username in .env already has an entity ID (e.g., User@Company|201),
+    # extract just the base 'User@Company' part so we don't end up with two pipes.
+    base_username = USERNAME.split("|")[0] if USERNAME else ""
+    
     token_username = USERNAME
     if location:
-        token_username = f"{USERNAME}|{location}"
+        token_username = f"{base_username}|{location}"
         
     token_payload = {
         "grant_type": "client_credentials",
@@ -143,6 +147,10 @@ def _get_access_token(location=None) -> str:
     }
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     resp = requests.post(TOKEN_URL, json=token_payload, headers=headers, timeout=30)
+    
+    if not resp.ok:
+        logger.error(f"[PostAPBill] Token request failed: {resp.status_code} - {resp.text}")
+        
     resp.raise_for_status()
     return resp.json()["access_token"]
 
