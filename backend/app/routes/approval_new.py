@@ -673,18 +673,11 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
         if not invoice:
             return {"success": False, "message": "Invoice not found", "sage_bill_number": None}
 
-        # 2. Ensure Approval PDF exists (or regenerate it)
-        pdf_path = None
-        try:
-             pdf_path = generate_approval_pdf(db, invoice_id)
-             logger.info(f"[SagePost] Approval report path: {pdf_path}")
-        except Exception as pdf_err:
-             logger.error(f"[SagePost] Error ensuring approval PDF: {pdf_err}", exc_info=True)
-
-        # 3. Extract finalized coding details (Capture at approval)
+        # 2. Extract finalized coding details FIRST (Capture at approval)
+        # This must happen before PDF generation so the PDF reads the correct per-item coding.
         hc, line_items = _get_finalized_coding_data(invoice)
         
-        # Synchronously update the coding record to ensure DB matches what we send to Sage
+        # Synchronously update the coding record so the DB is consistent before PDF is rendered
         if invoice.coding:
             from app.repository.repositories import coding_repo
             invoice.coding.header_coding = json.dumps(hc) if hc else None
@@ -692,6 +685,14 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
             db.add(invoice.coding)
             db.flush()
             logger.info(f"[SagePost] Finalized coding captured and saved for invoice {invoice_id}")
+
+        # 3. Generate Approval PDF AFTER coding is flushed to DB
+        pdf_path = None
+        try:
+             pdf_path = generate_approval_pdf(db, invoice_id)
+             logger.info(f"[SagePost] Approval report path: {pdf_path}")
+        except Exception as pdf_err:
+             logger.error(f"[SagePost] Error ensuring approval PDF: {pdf_err}", exc_info=True)
 
         # Robust extraction: if header fields are missing, try to get from first line item
         if line_items and not hc.get("gl_code"):

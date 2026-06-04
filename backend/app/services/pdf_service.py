@@ -423,9 +423,30 @@ def generate_approval_pdf(db: Session, invoice_id: int) -> str:
         # Header coding
         pass
 
-        # Line items (if present)
+        # Line items — prefer lineItemsSnapshot (authoritative per-item coding, same
+        # source that Sage posting uses) and fall back to coding.line_items.
         try:
-            line_items = json.loads(coding.line_items) if coding.line_items else []
+            extracted = {}
+            if invoice.extracted_data:
+                extracted = json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else invoice.extracted_data
+
+            snapshot = extracted.get("lineItemsSnapshot", [])
+            if snapshot:
+                # Convert camelCase snapshot → normalised shape
+                line_items = []
+                for s in snapshot:
+                    line_items.append({
+                        "description": s.get("description", ""),
+                        "gl_code":     s.get("glCode") or s.get("gl_code", ""),
+                        "lob":         s.get("lob", ""),
+                        "department":  s.get("department", ""),
+                        "customer":    s.get("customer", ""),
+                        "item":        s.get("item", ""),
+                        "amount":      s.get("netAmount") or s.get("net_amount") or s.get("amount", ""),
+                    })
+            else:
+                # Fallback: read from the coding record
+                line_items = json.loads(coding.line_items) if coding.line_items else []
         except Exception:
             line_items = []
 
@@ -436,16 +457,18 @@ def generate_approval_pdf(db: Session, invoice_id: int) -> str:
                 ParagraphStyle("li_h", fontSize=9, textColor=PRIMARY,
                                fontName="Helvetica-Bold", spaceBefore=4, spaceAfter=3)
             ))
-            li_headers = ["#", "Description", "GL Code", "LOB", "Department", "Amount"]
-            li_col_w   = [0.8*cm, 5.5*cm, 2.5*cm, 2.5*cm, 2.5*cm, 2.4*cm]
+            li_headers = ["#", "Description", "GL Code", "LOB", "Department", "Customer", "Item", "Amount"]
+            li_col_w   = [0.8*cm, 4.0*cm, 2.2*cm, 2.0*cm, 2.2*cm, 2.2*cm, 2.0*cm, 2.0*cm]
             li_rows = []
             for idx, item in enumerate(line_items, start=1):
                 li_rows.append([
                     str(idx),
-                    _truncate(str(item.get("description", "—")), 50),
+                    _truncate(str(item.get("description", "—")), 40),
                     _safe_str(item.get("gl_code")),
                     _safe_str(item.get("lob")),
                     _safe_str(item.get("department_id") or item.get("department")),
+                    _safe_str(item.get("customer")),
+                    _safe_str(item.get("item")),
                     _safe_str(item.get("amount")),
                 ])
             story.append(_data_table(li_headers, li_rows, li_col_w))
