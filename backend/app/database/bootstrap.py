@@ -36,16 +36,16 @@ def bootstrap_admin():
                 "username": settings.ADMIN_USERNAME,
                 "email": settings.ADMIN_EMAIL,
                 "password": get_password_hash(settings.ADMIN_PASSWORD),
-                "role": "admin",
+                "role": "super admin",
                 "status": "active",
                 "created_at": datetime.utcnow()
             }
             user_repo.create(db, obj_in=admin_data)
             logger.info(f"Admin user created successfully")
         else:
-            if existing_admin.role != "admin":
-                logger.info("Updating existing admin user to have admin role")
-                user_repo.update(db, db_obj=existing_admin, obj_in={"role": "admin", "status": "active"})
+            if existing_admin.role != "super admin":
+                logger.info("Updating existing admin user to have super admin role")
+                user_repo.update(db, db_obj=existing_admin, obj_in={"role": "super admin", "status": "active"})
     except Exception as e:
         logger.error(f"Error during admin bootstrap: {e}")
         db.rollback()

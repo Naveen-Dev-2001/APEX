@@ -1,13 +1,13 @@
 import './App.css'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AppLayout from './layout/AppLayout';
-import RegisterPage from './features/auth/RegisterPage';
 import LoginPage from './features/auth/LoginPage';
 import SelectEntityPage from './features/entity/SelectEntityPage';
 import DashboardPage from './features/dashboard/DashboardPage';
 import MasterDataPage from './features/masterData/MasterDataPage';
 import SettingsPage from './features/settings/SettingsPage';
 import AdminPage from './features/admin/AdminPage';
+import SuperAdminPage from './features/admin/SuperAdminPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
@@ -37,7 +37,6 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/test-date-picker" element={<TestDatePicker />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -56,6 +55,7 @@ function App() {
               <Route path="/master-data" element={<MasterDataPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="/superadmin" element={<SuperAdminPage />} />
             </Route>
           </Route>
         </Routes>

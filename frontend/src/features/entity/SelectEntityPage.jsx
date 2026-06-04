@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/ui.store';
 import '../../layout/AuthLayout.css';
@@ -57,12 +57,18 @@ const SelectEntityPage = () => {
   const setActiveTab = useUIStore((state) => state.setActiveTab);
 
   // Parse user roles
-  const userRoles = user?.role ? user.role.split(',') : [];
+  const userRoles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
+  const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super admin');
   const hasMultipleRoles = userRoles.length > 1;
   const [activeRole, setLocalActiveRole] = useState(
     sessionStorage.getItem('active_role') || userRoles[0] || 'approver'
   );
   const [isRoleSelectOpen, setIsRoleSelectOpen] = useState(false);
+
+  // Super admin should never see the select-entity page
+  if (isSuperAdmin) {
+    return <Navigate to="/admin" replace />;
+  }
 
   // Dynamic dropdown max-height calculations based on remaining screen space
   const roleButtonRef = useRef(null);
@@ -125,6 +131,8 @@ const SelectEntityPage = () => {
       targetRoute = "/coding";
     } else if (roleForRouting === 'approver') {
       targetRoute = "/approvals";
+    } else if (roleForRouting === 'super admin') {
+      targetRoute = "/admin";
     }
 
     navigate(targetRoute);

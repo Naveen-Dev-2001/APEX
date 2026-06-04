@@ -5,7 +5,7 @@ from app.repository.repositories import global_setting_repo
 import json
 
 DEFAULT_SETTINGS = {
-    "roles": ["admin", "coder", "approver", "scanner"],
+    "roles": ["admin", "coder", "approver", "scanner", "super admin"],
     "statuses": ["active", "pending", "rejected"],
     "navigation": [
         {"label": "Dashboard", "path": "/dashboard", "roles": ["admin", "coder", "approver", "scanner"]},
@@ -14,7 +14,7 @@ DEFAULT_SETTINGS = {
         {"label": "Approvals", "path": "/approvals", "roles": ["approver", "admin"]},
         {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
         {"label": "Settings", "path": "/settings", "roles": ["admin"]},
-        {"label": "Admin", "path": "/admin", "roles": ["admin"]}
+        {"label": "Admin", "path": "/admin", "roles": ["admin", "super admin"]}
     ]
 }
 
@@ -67,6 +67,15 @@ def get_app_settings(db: Session = None):
         if "roles" in merged_settings and isinstance(merged_settings["roles"], list):
             if "scanner" not in merged_settings["roles"]:
                 merged_settings["roles"].append("scanner")
+            if "super admin" not in merged_settings["roles"]:
+                merged_settings["roles"].append("super admin")
+                
+        # Ensure super admin has access to Admin nav if it was missing from DB
+        if "navigation" in merged_settings and isinstance(merged_settings["navigation"], list):
+            for nav in merged_settings["navigation"]:
+                if nav.get("label") == "Admin":
+                    if "roles" in nav and "super admin" not in nav["roles"]:
+                        nav["roles"].append("super admin")
         
         return merged_settings
     finally:

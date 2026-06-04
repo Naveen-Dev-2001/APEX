@@ -47,25 +47,13 @@ async def send_otp(request: SendOTPRequest, background_tasks: BackgroundTasks, d
         if not user:
             raise HTTPException(status_code=404, detail="Email not found")
 
-    # If purpose is registration, check if email already exists
-    if request.purpose == "registration":
-        user = user_repo.get_multi(
-            db, filters={"email": request.email}, limit=1)
-        if user:
-            raise HTTPException(
-                status_code=400, detail="Email already registered")
-
     otp = otp_service.create_otp_record(db, request.email, request.purpose)
 
-    if request.purpose == "registration":
-        background_tasks.add_task(
-            email_service.send_registration_otp, request.email, otp)
-    else:
-        user_list = user_repo.get_multi(
-            db, filters={"email": request.email}, limit=1)
-        user = user_list[0] if user_list else None
-        background_tasks.add_task(email_service.send_forgot_password_otp,
-                                  request.email, user.username if user else "User", otp)
+    user_list = user_repo.get_multi(
+        db, filters={"email": request.email}, limit=1)
+    user = user_list[0] if user_list else None
+    background_tasks.add_task(email_service.send_forgot_password_otp,
+                              request.email, user.username if user else "User", otp)
 
     return {"message": "OTP sent successfully"}
 
@@ -79,92 +67,7 @@ async def verify_otp(request: VerifyOTPRequest, db: Session = Depends(get_db)):
     return {"message": "OTP verified successfully"}
 
 
-@router.post("/register", response_model=UserResponse)
-async def register(user: UserPydantic, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    # Check if OTP was verified
-    if not otp_service.is_verified(db, user.email, "registration"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email not verified. Please verify OTP first."
-        )
 
-    # Check if user already exists (redundant but safe)
-    existing_email = user_repo.get_multi(
-        db, filters={"email": user.email}, limit=1)
-    if existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-
-    # Hash password
-    hashed_password = get_password_hash(user.password)
-
-    # Create new user with pending status
-    new_user_data = {
-        "username": user.username,
-        "email": user.email,
-        "password": hashed_password,
-        "status": "pending",
-        "role": "coder",
-        "department": user.department or "finance team",
-        "isCreatedByUser": True,
-        "createdby": "self",
-        "ispasswordchange": True,
-        "created_at": get_ist_now()
-    }
-
-    new_user = user_repo.create(db, obj_in=new_user_data)
-
-    if user.department:
-        new_user_data["department"] = user.department
-
-    # Notify all Admins and the user
-    admins = db.query(UserDB).filter(UserDB.role == "admin").all()
-
-    # Filter out reserved/example emails from admin list
-    reserved_domains = ["example.com", "example.net",
-                        "example.org", ".example", ".test", ".invalid", ".localhost"]
-    filtered_admins = [
-        admin for admin in admins
-        if admin.email.lower() != "admin@example.com" and
-        not any(admin.email.lower().endswith(domain)
-                for domain in reserved_domains)
-    ]
-
-    for admin in filtered_admins:
-        background_tasks.add_task(email_service.send_admin_new_user_notification,
-                                  admin.email, new_user.email, new_user.username)
-
-    # If no valid admins found in DB, fallback to settings default admin email
-    # but only if the default itself is not a reserved address
-    if not filtered_admins:
-        admin_email = settings.ADMIN_EMAIL
-        admin_email_lower = admin_email.lower()
-        is_reserved = (
-            admin_email_lower == "admin@example.com" or
-            any(admin_email_lower.endswith(domain)
-                for domain in reserved_domains)
-        )
-        if not is_reserved:
-            background_tasks.add_task(email_service.send_admin_new_user_notification,
-                                      admin_email, new_user.email, new_user.username)
-        else:
-            logger.info(
-                f"Skipping admin notification as default ADMIN_EMAIL ({admin_email}) is a reserved address")
-
-    # NEW: Send confirmation to the user that their account is pending approval
-    background_tasks.add_task(
-        email_service.send_user_pending_approval, new_user.email, new_user.username)
-
-    return UserResponse(
-        id=str(new_user.id),
-        username=new_user.username,
-        email=new_user.email,
-        role=new_user.role,
-        status=new_user.status,
-        created_at=new_user.created_at
-    )
 
 
 @router.post("/login", response_model=Token)

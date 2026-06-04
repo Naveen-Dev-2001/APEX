@@ -46,7 +46,8 @@ export default function SSOCallback() {
                 setStatus("Redirecting...");
                 toast.success("SSO Login Successful");
 
-                navigate("/select-entity", { replace: true });
+                const isSuperAdmin = (res.role || '').toLowerCase().split(',').map(r => r.trim()).includes('super admin');
+                navigate(isSuperAdmin ? "/superadmin" : "/select-entity", { replace: true });
 
             } catch (err) {
                 console.error("SSO exchange failed:", err);

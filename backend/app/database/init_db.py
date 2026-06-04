@@ -92,7 +92,7 @@ def create_admin_user(db):
             username=settings.ADMIN_USERNAME,
             email=settings.ADMIN_EMAIL,
             password=get_password_hash(settings.ADMIN_PASSWORD),
-            role="admin",
+            role="super admin",
             status="active",
             created_at=datetime.utcnow()
         )
@@ -129,16 +129,17 @@ def create_default_currencies(db):
 def create_default_settings(db):
     """Create default global settings if not exists"""
     default_settings = {
-        "roles": ["admin", "coder", "approver", "scanner"],
+        "roles": ["admin", "coder", "approver", "scanner", "super admin"],
         "statuses": ["active", "pending", "rejected"],
         "navigation": [
-            {"label": "Dashboard", "path": "/dashboard", "roles": ["all"]},
+            {"label": "Dashboard", "path": "/dashboard", "roles": ["admin", "coder", "approver", "scanner"]},
             {"label": "Invoices", "path": "/invoices", "roles": ["coder", "approver", "scanner"]},
             {"label": "Coding", "path": "/coding", "roles": ["coder"]},
             {"label": "Approvals", "path": "/approvals", "roles": ["approver"]},
             {"label": "Master Data", "path": "/master-data", "roles": ["admin","scanner","coder"]},
             {"label": "Settings", "path": "/settings", "roles": ["admin"]},
-            {"label": "Admin", "path": "/admin", "roles": ["admin"]}
+            {"label": "Admin", "path": "/admin", "roles": ["admin"]},
+            {"label": "Super Admin", "path": "/superadmin", "roles": ["super admin"]}
         ]
     }
     

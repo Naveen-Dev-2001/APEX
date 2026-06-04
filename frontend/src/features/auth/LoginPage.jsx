@@ -57,13 +57,27 @@ const LoginPage = () => {
                     toast.info('Please change your password to continue');
                     navigate('/change-password-first-time', { state: { email: response.data.email || email } });
                 } else {
-                    navigate('/select-entity');
+                    const isSuperAdmin = (response.data.role || '').toLowerCase().split(',').map(r => r.trim()).includes('super admin');
+                    if (isSuperAdmin) {
+                        navigate('/superadmin');
+                    } else {
+                        navigate('/select-entity');
+                    }
                 }
             } else {
                 setError('Invalid response from server');
             }
         } catch (err) {
-            const errMsg = err.response?.data?.detail || err.message || 'Login failed';
+            let errMsg = 'Login failed';
+            if (err.response?.data?.detail) {
+                if (Array.isArray(err.response.data.detail)) {
+                    errMsg = err.response.data.detail.map(e => e.msg).join(', ');
+                } else if (typeof err.response.data.detail === 'string') {
+                    errMsg = err.response.data.detail;
+                }
+            } else if (err.message) {
+                errMsg = err.message;
+            }
             setError(errMsg);
             toast.error(errMsg);
         } finally {
@@ -155,9 +169,6 @@ const LoginPage = () => {
                     </button>
                 </div>
 
-                <div className="mt-6 text-center text-sm text-gray-500">
-                    Don't have an account? <Link to="/register" className="text-blue-500 hover:underline">Register</Link>
-                </div>
             </form>
 
             <AlertModal

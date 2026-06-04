@@ -38,6 +38,7 @@ const iconMap = {
     'Master Data': { select: masterDataSelectIcon, unselect: masterDataUnselectIcon },
     'Settings': { select: settingsSelectIcon, unselect: settingsUnselectIcon },
     'Admin': { select: adminSelectIcon, unselect: adminUnselectIcon },
+    'Super Admin': { select: adminSelectIcon, unselect: adminUnselectIcon },
     'Coding': { select: codingSelectIcon, unselect: codingUnselectIcon },
     'Approvals': { select: approvalSelectIcon, unselect: approvalUnselectIcon },
     // Default icons for others if not found
@@ -57,7 +58,7 @@ const Header = () => {
     // Use the display name for UI; fall back to entity_id or a default
     const rawEntityName = sessionStorage.getItem('selected_entity_name');
     const rawEntityId = sessionStorage.getItem('selected_entity');
-    const selectedEntityName = rawEntityName || (rawEntityId ? `${rawEntityId} - ${entity || ''}` : entity) || 'consolidated analytics';
+    const selectedEntityName = rawEntityName || (rawEntityId ? `${rawEntityId} - ${entity || ''}` : entity) || '';
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -95,6 +96,8 @@ const Header = () => {
             targetRoute = '/coding';
         } else if (role === 'approver') {
             targetRoute = '/approvals';
+        } else if (role === 'super admin') {
+            targetRoute = '/superadmin';
         }
         
         navigate(targetRoute);
@@ -110,13 +113,24 @@ const Header = () => {
 
     // Filter navigation based on user role
     useEffect(() => {
+        const currentRole = (activeRole || '').toLowerCase();
+
+        // Super admin only sees the Super Admin tab
+        if (currentRole === 'super admin') {
+            setFilteredTabs([{
+                name: 'Super Admin',
+                route: '/superadmin',
+                selectIcon: iconMap['Super Admin'].select,
+                unselectIcon: iconMap['Super Admin'].unselect
+            }]);
+            return;
+        }
+
         if (!navigation || navigation.length === 0) {
             setFilteredTabs([]);
             return;
         }
 
-        const userRole = user?.role?.toLowerCase() || '';
-        const currentRole = (activeRole || '').toLowerCase();
         const userDept = user?.department?.toLowerCase() || '';
 
         const filtered = navigation
@@ -200,7 +214,7 @@ const Header = () => {
     return (
         <header className="w-full h-[60px] bg-white border-b border-[#e8e8e8] shadow-sm flex items-center px-6 justify-between z-50 fixed top-0 left-0">
             {/* Logo area */}
-            <div className="flex items-center space-x-8 pr-8 border-r border-gray-100 h-full cursor-pointer" onClick={() => navigate('/dashboard')}>
+            <div className="flex items-center space-x-8 pr-8 border-r border-gray-100 h-full cursor-pointer" onClick={() => navigate((activeRole || '').toLowerCase() === 'super admin' ? '/superadmin' : '/dashboard')}>
                 <img
                     src={logo}
                     alt="loanDNA Logo"
@@ -298,22 +312,26 @@ const Header = () => {
 
             {/* Right side controls */}
             <div className="flex items-center space-x-5">
-                {/* Entity Badge */}
-                <div className="hidden md:flex items-center space-x-2 bg-[#f0f8ff] border border-[#a2d5f2] rounded-full px-4 py-1.5">
-                    <svg className="w-4.5 h-4.5 text-[#1e9bd8] shrink-0" style={{width:'18px',height:'18px'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
+                {/* Entity Badge - hidden for super admin */}
+                {(activeRole || '').toLowerCase() !== 'super admin' && (
+                    <>
+                        <div className="hidden md:flex items-center space-x-2 bg-[#f0f8ff] border border-[#a2d5f2] rounded-full px-4 py-1.5">
+                            <svg className="w-4.5 h-4.5 text-[#1e9bd8] shrink-0" style={{width:'18px',height:'18px'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
 
-                    <span 
-                        className="text-[13px] font-medium text-[#1e9bd8] max-w-[160px] truncate leading-none capitalize"
-                        title={selectedEntityName}
-                    >
-                        {selectedEntityName}
-                    </span>
-                </div>
+                            <span 
+                                className="text-[13px] font-medium text-[#1e9bd8] max-w-[160px] truncate leading-none capitalize"
+                                title={selectedEntityName}
+                            >
+                                {selectedEntityName}
+                            </span>
+                        </div>
 
-                {/* Divider */}
-                <div className="hidden md:block h-6 w-px bg-gray-200"></div>
+                        {/* Divider */}
+                        <div className="hidden md:block h-6 w-px bg-gray-200"></div>
+                    </>
+                )}
 
                 {/* Search / Help Button */}
                 {/* <button className="flex items-center space-x-2 px-4 py-[6px] border border-[#a2d5f2] rounded-full text-sm text-gray-600 hover:bg-[#f0f8ff] transition-colors focus:outline-none">
@@ -323,26 +341,28 @@ const Header = () => {
                     <span>How can I help you?</span>
                 </button> */}
 
-                {/* User Guide Icon */}
-                <div 
-                    className="relative cursor-pointer text-gray-500 hover:text-[#1e9bd8] transition-colors p-1"
-                    onClick={() => {
-                        const width = 1200;
-                        const height = 800;
-                        const left = (window.screen.width / 2) - (width / 2);
-                        const top = (window.screen.height / 2) - (height / 2);
-                        window.open(
-                            '/AP_User_Guide_Current_Workflow_updated_1.pdf',
-                            'UserGuide',
-                            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,menubar=no,toolbar=no`
-                        );
-                    }}
-                    title="User Guide"
-                >
-                    <svg className="w-[22px] h-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                </div>
+                {/* User Guide Icon - hidden for super admin */}
+                {(activeRole || '').toLowerCase() !== 'super admin' && (
+                    <div 
+                        className="relative cursor-pointer text-gray-500 hover:text-[#1e9bd8] transition-colors p-1"
+                        onClick={() => {
+                            const width = 1200;
+                            const height = 800;
+                            const left = (window.screen.width / 2) - (width / 2);
+                            const top = (window.screen.height / 2) - (height / 2);
+                            window.open(
+                                '/AP_User_Guide_Current_Workflow_updated_1.pdf',
+                                'UserGuide',
+                                `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,menubar=no,toolbar=no`
+                            );
+                        }}
+                        title="User Guide"
+                    >
+                        <svg className="w-[22px] h-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                    </div>
+                )}
 
                 {/* Divider */}
                 <div className="h-6 w-px bg-gray-200"></div>
@@ -396,24 +416,26 @@ const Header = () => {
                                 {/* Divider */}
                                 <div className="h-[1px] w-full bg-gray-50 mb-4"></div>
 
-                                {/* Change Entity Action */}
-                                <button
-                                    onClick={() => {
-                                        navigate('/select-entity');
-                                        setIsDropdownOpen(false);
-                                    }}
-                                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
-                                >
-                                    <div className="p-1 rounded-lg text-[#3ba5d8] ">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                    </div>
-                                    <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
-                                        Change Entity
-                                    </span>
-                                </button>
+                                {/* Change Entity Action - hidden for super admin */}
+                                {(activeRole || '').toLowerCase() !== 'super admin' && (
+                                    <button
+                                        onClick={() => {
+                                            navigate('/select-entity');
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
+                                    >
+                                        <div className="p-1 rounded-lg text-[#3ba5d8] ">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                                            Change Entity
+                                        </span>
+                                    </button>
+                                )}
 
                                 {/* Change Role Action (only if user has multiple roles and not on select-entity route) */}
                                 {Array.isArray(allRoles) && allRoles.length >= 2 && location.pathname !== '/select-entity' && (

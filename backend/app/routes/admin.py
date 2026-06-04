@@ -19,9 +19,10 @@ class UserRoleUpdate(BaseModel):
     status: str
     department: Optional[str] = None
 
-# Helper to check if user is admin
+# Helper to check if user is admin or super admin
 def get_current_admin(current_user: UserResponse = Depends(get_current_user)):
-    if current_user.role != "admin": 
+    user_roles = [r.strip().lower() for r in (current_user.role or "").split(",")]
+    if not any(r in ("admin", "super admin") for r in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required"
