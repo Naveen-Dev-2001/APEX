@@ -73,6 +73,34 @@ class InvoiceExtractionAgent:
                     
                 result: AnalyzeResult = await poller.result()
             
+            if not result.documents or not any(getattr(doc, 'doc_type', None) == 'invoice' for doc in result.documents):
+                raise ValueError("No invoice found in the document")
+
+            # Validate that it actually has critical invoice fields
+            doc = result.documents[0]
+            fields = doc.fields if hasattr(doc, 'fields') else {}
+            
+            valid_fields = []
+            for name, field in fields.items():
+                val = None
+                if hasattr(field, 'value') and field.value is not None:
+                    val = field.value
+                elif hasattr(field, 'content') and field.content:
+                    val = field.content
+                if val is not None and str(val).strip() != "":
+                    valid_fields.append(name)
+                    
+            has_vendor = "VendorName" in valid_fields
+            has_invoice_id = "InvoiceId" in valid_fields or "InvoiceNumber" in valid_fields
+            has_date = "InvoiceDate" in valid_fields
+            has_total = any(f in valid_fields for f in ["InvoiceTotal", "SubTotal", "AmountDue"])
+            
+            # Require at least two core elements (e.g., Vendor and Total, or Invoice ID and Date)
+            core_elements_count = sum([has_vendor, has_invoice_id, has_date, has_total])
+            
+            if core_elements_count < 2:
+                raise ValueError("No invoice found in the document")
+
             duration = time.time() - start_time
             print(f"Azure Document Intelligence Extraction took {duration:.2f}s")
 
@@ -424,6 +452,9 @@ class InvoiceExtractionAgent:
             enhanced_headers, raw_llm_response = await self._call_llm_for_enhancement(prompt)
             state["llm_raw_response"] = raw_llm_response
 
+            if not enhanced_headers.get("is_invoice", True):
+                raise ValueError("No invoice found in the document")
+
             merged = self._merge_azure_and_llm(azure_data, enhanced_headers)
 
             merged = self._normalize_dates(merged)
@@ -468,7 +499,8 @@ IMPORTANT:
 5. Convert all amounts to plain numbers (no currency symbols; remove commas).
 6. Be very careful with invoice numbers, dates, and amounts.
 7. DO NOT invent or output any line_items array.
-8. Return ONLY valid JSON, no markdown, no comments.
+8. Identify if the document is a commercial invoice or utility/commercial bill. If it is a payslip, salary slip, compensation letter, payroll document, agreement, guideline, user guide or any other non-invoice document, set "is_invoice" to false. Otherwise, set it to true.
+9. Return ONLY valid JSON, no markdown, no comments.
 
 STRUCTURED AZURE FIELDS (headers/amounts, no Items):
 {json.dumps(azure_values, indent=2, ensure_ascii=False)}
@@ -479,6 +511,7 @@ RAW INVOICE CONTEXT (partial):
 Extract and return ALL available information in this EXACT JSON format:
 
 {{
+    "is_invoice": true or false,
     "vendor_info": {{
         "name": "string or null",
         "address": "string or null",

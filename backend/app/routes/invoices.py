@@ -352,6 +352,17 @@ async def upload_invoices(
             # ---- SAVE FILE ----
             save_start = time.time()
             contents = await file.read()
+            is_pdf = clean_name.lower().endswith(".pdf") and contents.startswith(b'%PDF')
+            if not is_pdf:
+                logger.error({
+                    "request_id": request_id,
+                    "event": "invoice_processing_failed",
+                    "filename": clean_name,
+                    "error": "File is not a PDF"
+                })
+                await emit_progress("processing", f"[{index}/{total_files}] Failed processing {clean_name}: File is not a PDF")
+                return {"success": False, "filename": clean_name, "reason": "is not a pdf"}
+
             with open(file_path, "wb") as f:
                 f.write(contents)
             print(f"[Backend] File saved in {time.time() - save_start:.2f}s: {file_path}")
@@ -760,6 +771,13 @@ async def upload_invoices(
                     os.remove(file_path)
                 except:
                     pass
+
+            if 'invoice_id' in locals():
+                try:
+                    invoice_repo.remove(task_db, id=invoice_id)
+                    task_db.commit()
+                except Exception as db_err:
+                    print(f"Failed to clean up failed invoice from DB: {db_err}")
 
             logger.error({
                 "request_id": request_id,
