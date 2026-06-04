@@ -74,6 +74,9 @@ const MasterDataPage = () => {
     const isCurrencyTab = activeTab === 'Currency';
     const isExchangeRateTab = activeTab === 'Exchange Rate Master';
 
+    const isLoading = isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : isCurrencyTab ? currencyLoading : exchangeRateLoading;
+
+
     // Fetch data on mount, tab change, or pagination/search change
     useEffect(() => {
         // Unified fetcher handles all tabs
@@ -478,7 +481,7 @@ const MasterDataPage = () => {
         try {
             await syncMasterData(activeTab);
             toast.dismiss(loadingToast);
-            toast.success(`${activeTab} synced successfully`);
+            toast.success(`${activeTab} sync has started. Refresh the page in a few minutes to see the updated records.`);
         } catch (err) {
             toast.dismiss(loadingToast);
             toast.error('Failed to sync: ' + (err.response?.data?.detail || err.message));
@@ -515,6 +518,18 @@ const MasterDataPage = () => {
                         width="280px"
                         placeholder="Search"
                     />
+
+                    <button
+                        onClick={() => fetchMasterData(activeTab)}
+                        disabled={isLoading}
+                        className={`flex items-center gap-1.5 px-3 h-[36px] text-[13px] font-medium border rounded-[4px] transition-all whitespace-nowrap bg-white
+                            ${isLoading
+                                ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50'
+                                : 'text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                    >
+                        <RefreshCw size={15} className={`${isLoading ? 'text-gray-400 animate-spin' : 'text-gray-500'}`} />
+                        <span>Refresh</span>
+                    </button>
 
                     <input
                         type="file"
@@ -591,7 +606,7 @@ const MasterDataPage = () => {
                     <DataTable
                         columns={columns}
                         data={filteredData}
-                        loading={isEntityTab ? entityLoading : isVendorTab ? vendorLoading : isTDSTab ? tdsLoading : isGLTab ? glLoading : isLOBTab ? lobLoading : isDepartmentTab ? departmentLoading : isCustomerTab ? customerLoading : isItemTab ? itemLoading : isCurrencyTab ? currencyLoading : exchangeRateLoading}
+                        loading={isLoading}
                         skeletonRows={itemsPerPage}
                         totalItems={masters[activeTab]?.total || 0}
                         currentPage={currentPage}
