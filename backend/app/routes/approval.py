@@ -129,24 +129,24 @@ async def send_to_approval(
         else:
             emails = [level_data] if isinstance(level_data, str) else level_data
 
-        # For finance-team levels: merge explicit emails with all finance users,
-        # but exclude anyone who is a threshold or posting approver — they must
-        # only appear at their own designated higher level.
-        if is_finance_level and finance_emails:
-            eligible_finance = [e for e in finance_emails if e not in higher_level_approver_emails]
-            combined = set(e.lower() for e in emails if e) | set(eligible_finance)
+        if is_finance_level:
+            invoice_assigned_approver_repo.create(db, obj_in={
+                "invoice_id": invoice_id,
+                "approver_email": "Finance Team",
+                "sequence_order": idx + 1,
+                "is_finance": True
+            })
         else:
             combined = set(e.lower() for e in emails if e)
-
-        print(f"[APPROVAL]   Level {idx+1}: is_finance={is_finance_level}, emails={combined}")
-        for email in combined:
-            if email:
-                invoice_assigned_approver_repo.create(db, obj_in={
-                    "invoice_id": invoice_id,
-                    "approver_email": email,
-                    "sequence_order": idx + 1,
-                    "is_finance": is_finance_level
-                })
+            print(f"[APPROVAL]   Level {idx+1}: is_finance={is_finance_level}, emails={combined}")
+            for email in combined:
+                if email:
+                    invoice_assigned_approver_repo.create(db, obj_in={
+                        "invoice_id": invoice_id,
+                        "approver_email": email,
+                        "sequence_order": idx + 1,
+                        "is_finance": False
+                    })
     print(f"[APPROVAL] Done writing assigned approvers for invoice {invoice_id}")
     import json
     
@@ -222,10 +222,16 @@ async def send_to_approval(
     if assigned_approvers:
         first_level_data = assigned_approvers[0]
         emails = []
+        is_fin = False
         if isinstance(first_level_data, dict):
             emails = first_level_data.get("emails", [])
+            is_fin = first_level_data.get("is_finance", False)
         else:
             emails = [first_level_data] if isinstance(first_level_data, str) else first_level_data
+        
+        if is_fin and finance_emails:
+            eligible_finance = [e for e in finance_emails if e not in higher_level_approver_emails]
+            emails = list(set(e.lower() for e in emails if e) | set(eligible_finance))
         
         for approver_email in emails:
             if not approver_email: continue

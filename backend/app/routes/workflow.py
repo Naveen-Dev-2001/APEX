@@ -707,32 +707,24 @@ async def save_custom_invoice_workflow(
         is_finance = lvl.get("is_finance", False)
         
         if is_finance:
-            # Fetch active finance department users
-            finance_users = (
-                db.query(User)
-                .filter(
-                    User.department != None,
-                    User.department.ilike("%finance%"),
-                    ~User.department.ilike("%non-finance%"),
-                    User.role.ilike("%approver%"),
-                    User.status == "active"
-                )
-                .all()
-            )
-            finance_emails = [u.email.lower() for u in finance_users if u.email]
-            combined = set(e.strip().lower() for e in emails if e) | set(finance_emails)
+            invoice_assigned_approver_repo.create(db, obj_in={
+                "invoice_id": invoice_id,
+                "approver_email": "Finance Team",
+                "sequence_order": idx + 1,
+                "is_finance": True
+            })
         else:
             combined = set(e.strip().lower() for e in emails if e)
             
-        # Save each email in this level with the sequence order
-        for email in combined:
-            if email:
-                invoice_assigned_approver_repo.create(db, obj_in={
-                    "invoice_id": invoice_id,
-                    "approver_email": email.strip().lower(),
-                    "sequence_order": idx + 1,
-                    "is_finance": is_finance
-                })
+            # Save each email in this level with the sequence order
+            for email in combined:
+                if email:
+                    invoice_assigned_approver_repo.create(db, obj_in={
+                        "invoice_id": invoice_id,
+                        "approver_email": email.strip().lower(),
+                        "sequence_order": idx + 1,
+                        "is_finance": False
+                    })
                 
     # 3. Update Invoice required approvers and breakdown
     invoice.required_approvers = len(approvers)

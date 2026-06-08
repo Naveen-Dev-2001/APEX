@@ -1101,9 +1101,23 @@ async def get_invoices(
                             # Try to match name to email from user table
                             email = user_map_rev.get(val.lower())
                             
-                            # Build the subquery condition
+                            is_fin_user = False
                             if email:
-                                approver_cond = InvoiceAssignedApprover.approver_email == email
+                                u_obj = db.query(User).filter(User.email == email).first()
+                                if u_obj and u_obj.department and "finance" in u_obj.department.lower() and not "non-finance" in u_obj.department.lower():
+                                    is_fin_user = True
+                            
+                            # Build the subquery condition
+                            if val.lower() == "finance team":
+                                approver_cond = InvoiceAssignedApprover.is_finance == True
+                            elif email:
+                                if is_fin_user:
+                                    approver_cond = or_(
+                                        InvoiceAssignedApprover.approver_email == email,
+                                        InvoiceAssignedApprover.is_finance == True
+                                    )
+                                else:
+                                    approver_cond = InvoiceAssignedApprover.approver_email == email
                             else:
                                 # Fallback: match by email prefix (common for auto-generated names)
                                 approver_cond = InvoiceAssignedApprover.approver_email.ilike(f"{val}@%")
@@ -3037,22 +3051,29 @@ async def update_invoice(
                  else:
                      emails = [level_data] if isinstance(level_data, str) else level_data
                      
-                 if is_finance_level and finance_emails:
-                     combined = set(e.lower() for e in emails if e) | set(finance_emails)
+                 if is_finance_level:
+                     if idx == 0 and finance_emails:
+                         level_1_emails = list(set(e.lower() for e in emails if e) | set(finance_emails))
+                     
+                     invoice_assigned_approver_repo.create(db, obj_in={
+                         "invoice_id": invoice_id,
+                         "approver_email": "Finance Team",
+                         "sequence_order": idx + 1,
+                         "is_finance": True
+                     })
                  else:
                      combined = set(e.lower() for e in emails if e)
+                     if idx == 0:
+                         level_1_emails = list(combined)
                      
-                 if idx == 0:
-                     level_1_emails = list(combined)
-    
-                 for email in combined:
-                     if email:
-                         invoice_assigned_approver_repo.create(db, obj_in={
-                             "invoice_id": invoice_id,
-                             "approver_email": email,
-                             "sequence_order": idx + 1,
-                             "is_finance": is_finance_level
-                         })
+                     for email in combined:
+                         if email:
+                             invoice_assigned_approver_repo.create(db, obj_in={
+                                 "invoice_id": invoice_id,
+                                 "approver_email": email,
+                                 "sequence_order": idx + 1,
+                                 "is_finance": False
+                             })
                      
 
     # Update attributes

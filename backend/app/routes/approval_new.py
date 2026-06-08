@@ -235,12 +235,28 @@ def _is_posting_approver_db(db: Session, invoice_id: int, email: str) -> bool:
         if max_seq == 0:
             return False
 
+        # First, check if there's a specific entry matching email
         row = db.query(InvoiceAssignedApprover).filter(
             InvoiceAssignedApprover.invoice_id == invoice_id,
             InvoiceAssignedApprover.approver_email.ilike(email),
             InvoiceAssignedApprover.sequence_order == max_seq
         ).first()
-        return row is not None
+        if row is not None:
+            return True
+
+        # Second, check if the last level is a Finance Team level and if the user belongs to the Finance Team
+        fin_row = db.query(InvoiceAssignedApprover).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id,
+            InvoiceAssignedApprover.sequence_order == max_seq,
+            InvoiceAssignedApprover.is_finance == True
+        ).first()
+        if fin_row is not None:
+            invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+            entity = invoice.entity if invoice else None
+            finance_users = _get_finance_users(db, entity)
+            return email.lower() in [f.lower() for f in finance_users]
+
+        return False
     except Exception as exc:
         logger.warning("_is_posting_approver_db error: %s", exc)
         return False
@@ -259,12 +275,28 @@ def _is_last_level_approver_db(db: Session, invoice_id: int, email: str) -> bool
         if max_seq == 0:
             return False
 
+        # First, check if there's a specific entry matching email
         row = db.query(InvoiceAssignedApprover).filter(
             InvoiceAssignedApprover.invoice_id == invoice_id,
             InvoiceAssignedApprover.approver_email.ilike(email),
             InvoiceAssignedApprover.sequence_order == max_seq
         ).first()
-        return row is not None
+        if row is not None:
+            return True
+
+        # Second, check if the last level is a Finance Team level and if the user belongs to the Finance Team
+        fin_row = db.query(InvoiceAssignedApprover).filter(
+            InvoiceAssignedApprover.invoice_id == invoice_id,
+            InvoiceAssignedApprover.sequence_order == max_seq,
+            InvoiceAssignedApprover.is_finance == True
+        ).first()
+        if fin_row is not None:
+            invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+            entity = invoice.entity if invoice else None
+            finance_users = _get_finance_users(db, entity)
+            return email.lower() in [f.lower() for f in finance_users]
+
+        return False
     except Exception as exc:
         logger.warning("_is_last_level_approver_db error: %s", exc)
         return False
