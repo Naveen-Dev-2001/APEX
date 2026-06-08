@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body, UploadFile, File, Depends
+from fastapi import APIRouter, HTTPException, Body, UploadFile, File, Depends, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import asc, func, Boolean, String, DateTime
@@ -157,6 +157,7 @@ async def trigger_vendor_sync(
 @router.post("/sync/{tab_name}")
 async def trigger_master_sync(
     tab_name: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user)
 ):
@@ -185,11 +186,10 @@ async def trigger_master_sync(
     if not service_class:
         if tab_name in ["Vendor", "Vendor_Master"]:
             from app.services.vendor_sync_service import VendorSyncService
-            return await VendorSyncService(db).sync_vendors()
+            background_tasks.add_task(_run_sync, VendorSyncService(db).sync_vendors)
+            return {"status": "success", "message": "Sync started for Vendor"}
         raise HTTPException(400, f"Sync not supported for {tab_name}")
 
-    sync_service = service_class(db)
-    # Map method names
     method_map = {
         "GL": "sync_gl_accounts",
         "LOB": "sync_lob",
@@ -202,19 +202,23 @@ async def trigger_master_sync(
         "Entity_Master": "sync_entities"
     }
 
-    try:
-        method_name = method_map.get(tab_name)
-        if hasattr(sync_service, method_name):
-            await getattr(sync_service, method_name)()
-            return {"status": "success", "message": f"Sync started for {tab_name}"}
-
+    method_name = method_map.get(tab_name)
+    sync_service = service_class(db)
+    if not hasattr(sync_service, method_name):
         raise HTTPException(500, f"Service method {method_name} not found")
+
+    background_tasks.add_task(_run_sync, getattr(sync_service, method_name))
+    return {"status": "success", "message": f"Sync started for {tab_name}"}
+
+
+async def _run_sync(method):
+    try:
+        await method()
     except Exception as e:
         if "Network issue try again" in str(e):
-            raise HTTPException(
-                status_code=400, detail="Network issue try again")
-        print(f"Sync error: {e}")
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+            logger.error(f"Sync network error: {e}")
+        else:
+            logger.error(f"Sync error: {e}", exc_info=True)
 
 
 @router.get("/entities")

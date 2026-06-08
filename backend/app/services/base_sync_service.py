@@ -52,21 +52,25 @@ class BaseSyncService:
             cls._locks[obj_name] = asyncio.Lock()
         return cls._locks[obj_name]
 
+    @staticmethod
+    def _chunked(lst, size=1000):
+        for i in range(0, len(lst), size):
+            yield lst[i:i + size]
+
     def _bulk_upsert(self, model: Type, items: List[Dict[str, Any]], key_field: str):
         """Executes high-speed bulk upsert for a single batch."""
         if not items: return 0, 0
-        
+
         to_insert = []
         to_update = []
-        
-        # Pre-fetch existing keys for the batch to decide between insert and update
-        # Use optimized repository logic for pre-fetching keys
-        keys = [str(item.get("key")) for item in items if item.get("key")]
-        # For bulk check, we can use a specialized repository check if needed, 
-        # but for now we'll keep it efficient with a direct query if repo doesn't support specific col fetch
+
         col = getattr(model, key_field)
-        existing = self.db.query(col).filter(col.in_(keys)).all()
-        existing_keys = {str(r[0]) for r in existing}
+        keys = list({str(item.get("key")) for item in items if item.get("key")})
+
+        existing_keys: set = set()
+        for chunk in self._chunked(keys):
+            rows = self.db.query(col).filter(col.in_(chunk)).all()
+            existing_keys.update(str(r[0]) for r in rows)
 
         for item in items:
             mapped = self._extract_map(item)
@@ -77,11 +81,12 @@ class BaseSyncService:
 
         if to_insert:
             self.db.bulk_insert_mappings(model, to_insert)
-        
+
         if to_update:
-            # Fetch IDs for the entire update batch
-            existing_records = self.db.query(model.id, col).filter(col.in_(keys)).all()
-            key_to_id = {str(r[1]): r.id for r in existing_records}
+            key_to_id: dict = {}
+            for chunk in self._chunked(keys):
+                rows = self.db.query(model.id, col).filter(col.in_(chunk)).all()
+                key_to_id.update({str(r[1]): r.id for r in rows})
             
             for m in to_update:
                 if m[key_field] in key_to_id:
