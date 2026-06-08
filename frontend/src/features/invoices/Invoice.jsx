@@ -297,7 +297,7 @@ const Invoice = () => {
             setUploadProgress(25);
             const taskId = uuidv4();
             currentTaskIdRef.current = taskId;
-            
+
             const controller = new AbortController();
             uploadAbortControllerRef.current = controller;
 
@@ -375,10 +375,10 @@ const Invoice = () => {
 
             toast.info("Upload discarded");
         }
-        
+
         setIsModalOpen(false);
         setInvoiceSection(1);
-                setUploadLoading(false);
+        setUploadLoading(false);
         setUploadProgress(0);
     };
 
@@ -424,11 +424,11 @@ const Invoice = () => {
                                 { key: "archive", label: "Archived Invoices" },
                             ].map(({ key, label }, index, arr) => {
                                 const isActive = pageTab === key;
-                                    return (
-                                        <button key={key} onClick={() => setPageTab(key)} style={{ padding: "8px 24px", fontSize: 14, fontWeight: isActive ? 700 : 500, color: "black", background: isActive ? "#BAE7FF" : "#FFFFFF", border: "none", borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none", cursor: "pointer", transition: "background-color 0.2s, color 0.2s", outline: "none", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "120px" }} onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }} onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}>
-                                            {label}
-                                        </button>
-                                    );
+                                return (
+                                    <button key={key} onClick={() => setPageTab(key)} style={{ padding: "8px 24px", fontSize: 14, fontWeight: isActive ? 700 : 500, color: "black", background: isActive ? "#BAE7FF" : "#FFFFFF", border: "none", borderRight: index < arr.length - 1 ? "1px solid #D9D9D9" : "none", cursor: "pointer", transition: "background-color 0.2s, color 0.2s", outline: "none", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "120px" }} onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#FAFAFA"; }} onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "#FFFFFF"; }}>
+                                        {label}
+                                    </button>
+                                );
                             })}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
@@ -561,6 +561,36 @@ const Invoice = () => {
                                             </Popconfirm>
                                         )}
 
+                                        {pageTab === 'posted_stage' && ["scanner", "coder"].includes(userRole) && (
+                                            <Popconfirm
+                                                title="Archive Invoices"
+                                                description={`Are you sure you want to archive ${selectedInvoiceIds.length} invoices?`}
+                                                onConfirm={handleBulkArchive}
+                                                okText="Archive"
+                                                cancelText="Cancel"
+                                                okButtonProps={{ type: "primary", loading: bulkActionLoading }}
+                                            >
+                                                <button style={{
+                                                    background: "#10B981",
+                                                    border: "none",
+                                                    color: "white",
+                                                    padding: "8px 20px",
+                                                    borderRadius: "50px",
+                                                    fontSize: "14px",
+                                                    fontWeight: 600,
+                                                    cursor: "pointer",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "8px",
+                                                    transition: "all 0.2s"
+                                                }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+                                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                                                >
+                                                    <InboxOutlined /> Bulk Archive
+                                                </button>
+                                            </Popconfirm>
+                                        )}
 
                                         <button
                                             onClick={() => setSelectedInvoiceIds([])}
@@ -591,26 +621,26 @@ const Invoice = () => {
                                 <div style={{ padding: "0 16px 24px" }}>
                                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4">
                                         {isLoading ? <Skeleton height={400} borderRadius={16} /> : (
-                                            <DataTable 
-                                                columns={columnDefs} 
-                                                data={invoices ?? []} 
-                                                loading={isLoading} 
-                                                totalItems={total} 
-                                                currentPage={(skip / limit) + 1} 
-                                                itemsPerPage={limit} 
-                                                onPageChange={(page) => setSkip((page - 1) * limit)} 
-                                                onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }} 
-                                                sortColumn={sortColumn} 
-                                                sortDirection={sortDirection} 
-                                                onSort={(col, dir) => setSort(col, dir)} 
-                                                maxHeight="calc(100vh - 320px)" 
-                                                stickyHeader={true} 
-                                                enableColumnFilters={true} 
-                                                columnFilters={columnFilters} 
-                                                onColumnFiltersChange={setColumnFilters} 
-                                                selectable={(pageTab === 'in_progress' || pageTab === 'posted_stage') && ["scanner", "coder"].includes(userRole)} 
-                                                selectedRows={selectedInvoiceIds} 
-                                                onSelectionChange={setSelectedInvoiceIds} 
+                                            <DataTable
+                                                columns={columnDefs}
+                                                data={invoices ?? []}
+                                                loading={isLoading}
+                                                totalItems={total}
+                                                currentPage={(skip / limit) + 1}
+                                                itemsPerPage={limit}
+                                                onPageChange={(page) => setSkip((page - 1) * limit)}
+                                                onItemsPerPageChange={(newLimit) => { setLimit(newLimit); setSkip(0); }}
+                                                sortColumn={sortColumn}
+                                                sortDirection={sortDirection}
+                                                onSort={(col, dir) => setSort(col, dir)}
+                                                maxHeight="calc(100vh - 320px)"
+                                                stickyHeader={true}
+                                                enableColumnFilters={true}
+                                                columnFilters={columnFilters}
+                                                onColumnFiltersChange={setColumnFilters}
+                                                selectable={(pageTab === 'in_progress' || pageTab === 'posted_stage') && ["scanner", "coder"].includes(userRole)}
+                                                selectedRows={selectedInvoiceIds}
+                                                onSelectionChange={setSelectedInvoiceIds}
                                                 transparent={true}
                                             />
                                         )}
