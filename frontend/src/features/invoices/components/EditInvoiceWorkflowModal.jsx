@@ -315,7 +315,17 @@ const getFilteredFinanceApprovers = (currentField) => {
                         <Dropdown
                             label="Number of Approval Levels *"
                             value={form.approver_count}
-                            onChange={(val) => setForm(prev => ({ ...prev, approver_count: val }))}
+                            onChange={(val) => setForm(prev => {
+                                const updated = { ...prev, approver_count: val };
+                                // Clear higher-level mandatory approvers and finance flags
+                                for (let i = val + 1; i <= 5; i++) {
+                                    updated[`mandatory_approver_${i}`] = [];
+                                    if (updated.financeFlags) {
+                                        updated.financeFlags[i] = false;
+                                    }
+                                }
+                                return updated;
+                            })}
                             options={[
                                 { value: 1, label: '1 Level' },
                                 { value: 2, label: '2 Levels' },
