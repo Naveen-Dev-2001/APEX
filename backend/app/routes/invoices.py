@@ -2656,6 +2656,11 @@ async def repost_to_sage(
                 entity=invoice.entity
             ))
             
+            # Move file to posted_stage_files
+            new_path = move_invoice_file(invoice.file_path, "posted_stage")
+            if new_path:
+                invoice.file_path = new_path
+                
             db.add(invoice)
             db.commit()
             return {"success": True, "message": "Manual repost to Sage successful", "status": invoice.status.value if hasattr(invoice.status, 'value') else invoice.status}

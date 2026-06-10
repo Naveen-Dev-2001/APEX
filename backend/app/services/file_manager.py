@@ -7,11 +7,13 @@ logger = logging.getLogger("application_trace")
 
 UPLOAD_BASE_DIR = "uploads"
 SUBFOLDERS = {
-    "in_progress": "in_progress_files",
-    "deleted": "deleted_files",
-    "posted_stage": "posted_stage_files",
-    "archive": "archive_files"
+    "in_progress": "inprogress",
+    "deleted": "deleted",
+    "posted_stage": "posted to sage",
+    "archive": "archived"
 }
+
+
 
 def init_upload_folders():
     """Initialize upload base directory and subfolders."""
@@ -32,6 +34,21 @@ def get_folder_path(category: str) -> str:
         raise ValueError(f"Invalid folder category: {category}")
     return os.path.join(UPLOAD_BASE_DIR, folder)
 
+def find_file_in_any_folder(filename: str) -> Optional[str]:
+    """Try to find a file in any of the current subfolders, or root uploads."""
+    # 1. Check in root uploads (legacy)
+    root_path = os.path.join(UPLOAD_BASE_DIR, filename)
+    if os.path.exists(root_path):
+        return root_path
+    
+    # 2. Check in all current subfolders
+    for folder in SUBFOLDERS.values():
+        path = os.path.join(UPLOAD_BASE_DIR, folder, filename)
+        if os.path.exists(path):
+            return path
+            
+    return None
+
 def move_invoice_file(current_path: str, target_category: str) -> Optional[str]:
     """
     Move an invoice file to a new subfolder.
@@ -47,11 +64,11 @@ def move_invoice_file(current_path: str, target_category: str) -> Optional[str]:
         current_abs_path = current_path
         
     if not os.path.exists(current_abs_path):
-        # Try finding it in the root uploads if it was there before migration
+        # Fallback to finding it anywhere
         filename = os.path.basename(current_path)
-        root_path = os.path.join(UPLOAD_BASE_DIR, filename)
-        if os.path.exists(root_path):
-            current_abs_path = os.path.abspath(root_path)
+        found_path = find_file_in_any_folder(filename)
+        if found_path:
+            current_abs_path = os.path.abspath(found_path)
         else:
             logger.warning(f"File not found for moving: {current_path}")
             return None
@@ -73,17 +90,3 @@ def move_invoice_file(current_path: str, target_category: str) -> Optional[str]:
         logger.error(f"Failed to move file {filename} to {target_category}: {e}")
         return None
 
-def find_file_in_any_folder(filename: str) -> Optional[str]:
-    """Try to find a file in any of the 4 subfolders or root uploads."""
-    # 1. Check in root uploads (legacy)
-    root_path = os.path.join(UPLOAD_BASE_DIR, filename)
-    if os.path.exists(root_path):
-        return root_path
-    
-    # 2. Check in all subfolders
-    for folder in SUBFOLDERS.values():
-        path = os.path.join(UPLOAD_BASE_DIR, folder, filename)
-        if os.path.exists(path):
-            return path
-            
-    return None
