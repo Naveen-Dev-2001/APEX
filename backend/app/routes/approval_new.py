@@ -382,6 +382,15 @@ def _record_step(
 def _update_invoice_status(db: Session, invoice: Invoice, new_status: str):
     invoice.status = new_status
     db.add(invoice)
+    if new_status == InvoiceStatus.SAGE_POSTED:
+        try:
+            from app.services.file_manager import move_invoice_file
+            new_path = move_invoice_file(invoice.file_path, "posted_stage")
+            if new_path:
+                invoice.file_path = new_path
+                logger.info(f"Moved invoice {invoice.id} PDF to posted_stage folder: {new_path}")
+        except Exception as e:
+            logger.error(f"Failed to move invoice {invoice.id} PDF on status change to SAGE_POSTED: {e}", exc_info=True)
 
 
 def _advance_level(db: Session, invoice: Invoice, new_level: int):
