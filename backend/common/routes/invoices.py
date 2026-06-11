@@ -2426,7 +2426,8 @@ async def update_invoice_status(
         logger.info(f"[PDF] Final approval detected for invoice {invoice_id}. Starting PDF generation...")
         pdf_path = None
         try:
-            from sage.services.pdf_service import generate_approval_pdf
+            from common.utils.erp_locator import get_erp_function
+            generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
             # Now all steps are committed, PDF will include the final approver
             pdf_path = generate_approval_pdf(db, invoice_id)
             logger.info(f"[PDF] Approval report saved: {pdf_path}")
@@ -2435,7 +2436,8 @@ async def update_invoice_status(
 
         # Post AP Bill to Sage Intacct
         try:
-            from sage.postapbill import post_ap_bill
+            from common.utils.erp_locator import get_erp_function
+            post_ap_bill = get_erp_function("postapbill", "post_ap_bill")
             fresh_invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
             inv = fresh_invoice or invoice
             
@@ -2564,7 +2566,8 @@ async def repost_to_sage(
     # 1. Ensure Approval PDF exists (or regenerate it)
     pdf_path = None
     try:
-        from sage.services.pdf_service import generate_approval_pdf
+        from common.utils.erp_locator import get_erp_function
+        generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
         # This will return the path if it exists, or regenerate it
         pdf_path = generate_approval_pdf(db, invoice_id)
         logger.info(f"[RepostSage] Approval report path: {pdf_path}")
@@ -2585,7 +2588,8 @@ async def repost_to_sage(
 
     # 3. Call Sage Posting Logic
     try:
-        from sage.postapbill import post_ap_bill
+        from common.utils.erp_locator import get_erp_function
+        post_ap_bill = get_erp_function("postapbill", "post_ap_bill")
         
         # Resolve Sage Location ID dynamically
         # Mapping: DEFAULT/None -> "" (Top Level), otherwise use entity ID
@@ -2709,7 +2713,8 @@ async def download_approval_report(
 
     if not pdf_file.exists():
         try:
-            from sage.services.pdf_service import generate_approval_pdf
+            from common.utils.erp_locator import get_erp_function
+            generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
             generate_approval_pdf(db, invoice_id)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {e}")
@@ -3446,7 +3451,8 @@ async def update_invoice(
 
 # @router.get("/{invoice_id}/generate-pdf-debug")
 # async def generate_pdf_debug(invoice_id: int, db: Session = Depends(get_db)):
-#     from sage.services.pdf_service import generate_approval_pdf
+#     from common.utils.erp_locator import get_erp_function
+#     generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
 #     try:
 #         path = generate_approval_pdf(db, invoice_id)
 #         return {"status": "success", "path": path}
@@ -4167,7 +4173,8 @@ def _get_finalized_coding_data(invoice: Invoice):
 
 @router.get("/{invoice_id}/generate-pdf-debug")
 async def generate_pdf_debug(invoice_id: int, db: Session = Depends(get_db)):
-    from sage.services.pdf_service import generate_approval_pdf
+    from common.utils.erp_locator import get_erp_function
+    generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
     try:
         path = generate_approval_pdf(db, invoice_id)
         return {"status": "success", "path": path}

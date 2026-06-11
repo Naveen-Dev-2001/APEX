@@ -674,8 +674,9 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
     Returns {"success": bool, "message": str, "sage_bill_number": str|None}.
     """
     try:
-        from sage.postapbill import post_ap_bill
-        from sage.services.pdf_service import generate_approval_pdf
+        from common.utils.erp_locator import get_erp_function
+        post_ap_bill = get_erp_function("postapbill", "post_ap_bill")
+        generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
 
         # 1. Fetch invoice
         invoice = invoice_repo.get(db, invoice_id)

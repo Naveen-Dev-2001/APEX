@@ -148,7 +148,8 @@ async def trigger_vendor_sync(
     """
     Trigger manual sync of vendors from Sage Intacct.
     """
-    from sage.services.vendor_sync_service import VendorSyncService
+    from common.utils.erp_locator import get_erp_class
+    VendorSyncService = get_erp_class("services.vendor_sync_service", "VendorSyncService")
     sync_service = VendorSyncService(db)
     result = await sync_service.sync_vendors()
     return result
@@ -164,11 +165,14 @@ async def trigger_master_sync(
     """
     Trigger manual sync for specific master data.
     """
-    from sage.services.master_sync_services import (
-        GLSyncService, LOBSyncService, DepartmentSyncService,
-        CustomerSyncService, ItemSyncService, ExchangeRateSyncService,
-        EntitySyncService
-    )
+    from common.utils.erp_locator import get_erp_class
+    GLSyncService = get_erp_class("services.master_sync_services", "GLSyncService")
+    LOBSyncService = get_erp_class("services.master_sync_services", "LOBSyncService")
+    DepartmentSyncService = get_erp_class("services.master_sync_services", "DepartmentSyncService")
+    CustomerSyncService = get_erp_class("services.master_sync_services", "CustomerSyncService")
+    ItemSyncService = get_erp_class("services.master_sync_services", "ItemSyncService")
+    ExchangeRateSyncService = get_erp_class("services.master_sync_services", "ExchangeRateSyncService")
+    EntitySyncService = get_erp_class("services.master_sync_services", "EntitySyncService")
 
     services = {
         "GL": GLSyncService,
@@ -185,7 +189,8 @@ async def trigger_master_sync(
     service_class = services.get(tab_name)
     if not service_class:
         if tab_name in ["Vendor", "Vendor_Master"]:
-            from sage.services.vendor_sync_service import VendorSyncService
+            from common.utils.erp_locator import get_erp_class
+            VendorSyncService = get_erp_class("services.vendor_sync_service", "VendorSyncService")
             background_tasks.add_task(_run_sync, VendorSyncService(db).sync_vendors)
             return {"status": "success", "message": "Sync started for Vendor"}
         raise HTTPException(400, f"Sync not supported for {tab_name}")

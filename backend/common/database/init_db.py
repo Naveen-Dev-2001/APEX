@@ -232,12 +232,16 @@ async def seed_api_master_data(db, force=False):
     If force=True, it syncs regardless of current data.
     Calls sync services for Vendors, GL, LOB, Items, Departments, and Customers.
     """
-    from sage.services.vendor_sync_service import VendorSyncService
-    from sage.services.master_sync_services import (
-        GLSyncService, LOBSyncService, DepartmentSyncService, 
-        CustomerSyncService, ItemSyncService, ExchangeRateSyncService,
-        EntitySyncService
-    )
+    from common.utils.erp_locator import get_erp_class
+    VendorSyncService = get_erp_class("services.vendor_sync_service", "VendorSyncService")
+    
+    GLSyncService = get_erp_class("services.master_sync_services", "GLSyncService")
+    LOBSyncService = get_erp_class("services.master_sync_services", "LOBSyncService")
+    DepartmentSyncService = get_erp_class("services.master_sync_services", "DepartmentSyncService")
+    CustomerSyncService = get_erp_class("services.master_sync_services", "CustomerSyncService")
+    ItemSyncService = get_erp_class("services.master_sync_services", "ItemSyncService")
+    ExchangeRateSyncService = get_erp_class("services.master_sync_services", "ExchangeRateSyncService")
+    EntitySyncService = get_erp_class("services.master_sync_services", "EntitySyncService")
     from common.models.db_models import (
         VendorMaster, GLMaster, LOBMaster, ItemMaster, DepartmentMaster, CustomerMaster, ExchangeRateMaster,
         EntityMaster
