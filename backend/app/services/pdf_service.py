@@ -328,7 +328,7 @@ def generate_approval_pdf(db: Session, invoice_id: int) -> str:
 
     # ── 2. Ensure output directory exists ─────────────────────────────────────
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    pdf_path = OUTPUT_DIR / f"invoice_{invoice_id}_approval.pdf"
+    pdf_path = OUTPUT_DIR / f"{invoice.invoice_number}_approval.pdf"
 
     # ── 3. Extract readable fields ────────────────────────────────────────────
     extracted_str = invoice.extracted_data

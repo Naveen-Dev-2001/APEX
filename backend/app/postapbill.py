@@ -75,7 +75,7 @@ def post_ap_bill(
         # ── 2. Create attachment record ──────────────────────────────────────
         attachment_key, attachment_id = _create_attachment(
             auth_headers,
-            name=f"Invoice_{invoice.id}_{invoice.invoice_number or 'approval'}",
+            name=f"{invoice.invoice_number}_approval"
         )
         logger.info(f"[PostAPBill] Attachment created: key={attachment_key}, id={attachment_id}")
 
@@ -228,7 +228,10 @@ def _create_ap_bill(
     # --------------------------------------------------
     vendor_id = invoice.vendor_id or ""
     invoice_number = invoice.invoice_number
-    description = f"Invoice Id: {invoice.id} - {invoice.vendor_name or vendor_id}"
+
+    # Use memo from Quick View (extracted_data.additional_info.memo.value) as the description.
+    _ed_for_memo = _json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else (invoice.extracted_data or {})
+    description = ((_ed_for_memo.get("additional_info") or {}).get("memo", {}).get("value") or "").strip()
 
     # --------------------------------------------------
     # Date calculation
