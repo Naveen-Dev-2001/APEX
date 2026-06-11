@@ -3053,6 +3053,13 @@ async def update_invoice(
                              "sequence_order": idx + 1,
                              "is_finance": is_finance_level
                          })
+         else:
+             level_1_records = db.query(InvoiceAssignedApprover).filter(
+                 InvoiceAssignedApprover.invoice_id == invoice_id,
+                 InvoiceAssignedApprover.sequence_order == 1
+             ).all()
+             level_1_emails = [r.approver_email.lower() for r in level_1_records if r.approver_email]
+             currency = (deserialize_json_field(invoice.extracted_data) or {}).get("invoice_details", {}).get("currency", {}).get("value", "USD")
                      
 
     # Update attributes
