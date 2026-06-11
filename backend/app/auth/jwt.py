@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.config.settings import settings
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database.database import get_db
@@ -58,6 +58,7 @@ def verify_token(token: str, expected_type: str = "access"):
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 async def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme), 
     db: Session = Depends(get_db),
     x_active_role: Optional[str] = Header(None)
@@ -99,9 +100,11 @@ async def get_current_user(
         
     # Set the thread-local context variable for logging
     from app.middleware.logger import current_user_var
-    current_user_var.set({
+    user_info = {
         "username": user_response.username,
         "email": user_response.email
-    })
+    }
+    current_user_var.set(user_info)
+    request.state.user = user_info
 
     return user_response

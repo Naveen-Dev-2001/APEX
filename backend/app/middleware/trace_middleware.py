@@ -5,6 +5,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 import os
+from app.middleware.logger import UserContextFilter
 
 # Setup trace logger
 trace_logger = logging.getLogger("application_trace")
@@ -14,18 +15,22 @@ trace_logger.setLevel(logging.INFO)
 error_logger = logging.getLogger("application_error")
 error_logger.setLevel(logging.ERROR)
 
+user_filter = UserContextFilter()
+
 # File handler for trace log
 log_file = os.path.join(os.getcwd(), "application_trace.log")
 handler = logging.FileHandler(log_file)
-formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
+formatter = logging.Formatter('%(asctime)s | %(levelname)s | User=%(username)s | Email=%(email)s | %(message)s')
 handler.setFormatter(formatter)
+handler.addFilter(user_filter)
 trace_logger.addHandler(handler)
 
 # File handler for error log
 error_file = os.path.join(os.getcwd(), "application_error.log")
 error_handler = logging.FileHandler(error_file)
-error_formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(name)s | %(message)s')
+error_formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(name)s | User=%(username)s | Email=%(email)s | %(message)s')
 error_handler.setFormatter(error_formatter)
+error_handler.addFilter(user_filter)
 error_logger.addHandler(error_handler)
 
 # Setup GET response logger
@@ -34,8 +39,9 @@ get_logger.setLevel(logging.INFO)
 
 get_log_file = os.path.join(os.getcwd(), "application_get_responses.log")
 get_handler = logging.FileHandler(get_log_file)
-get_formatter = logging.Formatter('%(asctime)s | %(message)s')
+get_formatter = logging.Formatter('%(asctime)s | User=%(username)s | Email=%(email)s | %(message)s')
 get_handler.setFormatter(get_formatter)
+get_handler.addFilter(user_filter)
 get_logger.addHandler(get_handler)
 
 
@@ -63,6 +69,10 @@ class TraceMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
         except Exception as e:
+            from app.middleware.logger import current_user_var
+            if hasattr(request.state, "user"):
+                current_user_var.set(request.state.user)
+                
             import traceback
             error_data = {
                 "method": method,
@@ -101,6 +111,10 @@ class TraceMiddleware(BaseHTTPMiddleware):
 
         # 4. Format and Log Trace Entry
         try:
+            from app.middleware.logger import current_user_var
+            if hasattr(request.state, "user"):
+                current_user_var.set(request.state.user)
+
             req_body_desc = "Binary/Large"
             # Avoid parsing huge bodies (limit to 1MB)
             if len(request_body) < 1000000:
