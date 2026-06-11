@@ -499,7 +499,7 @@ IMPORTANT:
 5. Convert all amounts to plain numbers (no currency symbols; remove commas).
 6. Be very careful with invoice numbers, dates, and amounts.
 7. DO NOT invent or output any line_items array.
-8. Identify if the document is a commercial invoice, utility/commercial bill, check/cheque request, Accounts Payable check request, or cheque. Even if the document is a form, request, or contains instructions, if it is used to request payment or checks (such as an "Accounts Payable Check Request"), set "is_invoice" to true. If it is a payslip, salary slip, compensation letter, payroll document, agreement, guideline, user guide or any other completely unrelated non-invoice document, set "is_invoice" to false. Otherwise, set it to true.
+8. Identify if the document is a commercial invoice or utility/commercial bill. If it is a payslip, salary slip, compensation letter, payroll document, agreement, guideline, user guide or any other non-invoice document, set "is_invoice" to false. Otherwise, set it to true.
 9. Return ONLY valid JSON, no markdown, no comments.
 
 STRUCTURED AZURE FIELDS (headers/amounts, no Items):
