@@ -238,30 +238,26 @@ def _create_ap_bill(
     # --------------------------------------------------
     from dateutil.parser import parse
     current_date = datetime.utcnow()
-    posting_date = invoice.posting_date if invoice.posting_date else (invoice.uploaded_at if invoice.uploaded_at else current_date)
-    posting_date_str = posting_date.strftime("%Y-%m-%d")
+    
     base_date = invoice.uploaded_at if invoice.uploaded_at else current_date
-    due_date = base_date + timedelta(days=30)
     
     try:
         ed = _json.loads(invoice.extracted_data) if isinstance(invoice.extracted_data, str) else (invoice.extracted_data or {})
         inv_details = ed.get("invoice_details", {})
         inv_date_str = inv_details.get("invoice_date", {}).get("value")
-        due_date_str_ext = inv_details.get("due_date", {}).get("value")
         
         if inv_date_str:
             try: base_date = parse(str(inv_date_str), fuzzy=True)
             except: pass
-        if due_date_str_ext:
-            try: due_date = parse(str(due_date_str_ext), fuzzy=True)
-            except: due_date = base_date + timedelta(days=30)
-        else:
-            due_date = base_date + timedelta(days=30)
     except Exception as e:
         logger.warning(f"[PostAPBill] Error parsing dates: {e}")
 
-    base_date_str = base_date.strftime("%Y-%m-%d")
-    due_date_str = due_date.strftime("%Y-%m-%d")
+    base_date_str = base_date.strftime("%m/%d/%Y")
+    
+    # Use exact dates from the frontend (no fallback)
+    posting_date_str = invoice.posting_date.strftime("%m/%d/%Y") if invoice.posting_date else ""
+    due_date_str = invoice.due_date.strftime("%m/%d/%Y") if invoice.due_date else ""
+
 
     # --------------------------------------------------
     # Dimensions Helpers
@@ -346,7 +342,7 @@ def _create_ap_bill(
     bill_payload = {
         "billNumber": f"{invoice_number}",
         "vendor": {"id": str(vendor_id)},
-        "referenceNumber": str(invoice.reference_number or invoice_number),
+        "referenceNumber": str(invoice.reference_number),
         "description": description,
         "createdDate": base_date_str,
         "postingDate": posting_date_str,
