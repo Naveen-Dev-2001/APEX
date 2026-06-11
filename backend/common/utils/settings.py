@@ -1,0 +1,74 @@
+from sqlalchemy.orm import Session
+from common.database.database import get_db
+from common.models.db_models import GlobalSetting
+from common.repository.repositories import global_setting_repo
+import json
+
+DEFAULT_SETTINGS = {
+    "roles": ["admin", "coder", "approver", "scanner"],
+    "statuses": ["active", "pending", "rejected"],
+    "navigation": [
+        {"label": "Dashboard", "path": "/dashboard", "roles": ["admin", "coder", "approver", "scanner"]},
+        {"label": "Invoices", "path": "/invoices", "roles": ["coder", "admin", "approver", "scanner"]},
+        {"label": "Coding", "path": "/coding", "roles": ["coder", "admin"]},
+        {"label": "Approvals", "path": "/approvals", "roles": ["approver", "admin"]},
+        {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
+        {"label": "Settings", "path": "/settings", "roles": ["admin"]},
+        {"label": "Admin", "path": "/admin", "roles": ["admin"]}
+    ]
+}
+
+def get_app_settings(db: Session = None):
+    """
+    Retrieve application settings from the database.
+    Returns default settings if not found in DB.
+    """
+    # Create session if not provided
+    close_session = False
+    if db is None:
+        from common.database.database import SessionLocal
+        db = SessionLocal()
+        close_session = True
+    
+    try:
+        setting_list = global_setting_repo.get_multi(db, filters={"setting_key": "app_settings"}, limit=1)
+        setting = setting_list[0] if setting_list else None
+        
+        if not setting or not setting.setting_value:
+            return DEFAULT_SETTINGS.copy()
+        
+        # Parse JSON value
+        try:
+            settings_data = json.loads(setting.setting_value) if isinstance(setting.setting_value, str) else setting.setting_value
+        except (json.JSONDecodeError, TypeError):
+            return DEFAULT_SETTINGS.copy()
+        
+        # Merge with defaults to ensure all keys exist
+        merged_settings = DEFAULT_SETTINGS.copy()
+        
+        # Special handling for navigation: merge lists by label to ensure defaults are always present
+        if "navigation" in settings_data:
+            db_nav = settings_data["navigation"]
+            default_nav = DEFAULT_SETTINGS["navigation"]
+            
+            nav_dict = {item.get("label"): item for item in default_nav if isinstance(item, dict) and "label" in item}
+            for item in db_nav:
+                # DB item wins if there is a conflict, but defaults fill the gaps
+                if isinstance(item, dict) and "label" in item:
+                    nav_dict[item["label"]] = item
+                
+            merged_settings["navigation"] = list(nav_dict.values())
+        
+        # Update other keys (roles, statuses, etc.)
+        other_settings = {k: v for k, v in settings_data.items() if k != "navigation"}
+        merged_settings.update(other_settings)
+        
+        # Ensure necessary default roles exist
+        if "roles" in merged_settings and isinstance(merged_settings["roles"], list):
+            if "scanner" not in merged_settings["roles"]:
+                merged_settings["roles"].append("scanner")
+        
+        return merged_settings
+    finally:
+        if close_session:
+            db.close()

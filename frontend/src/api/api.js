@@ -1,8 +1,18 @@
 import axios from "axios";
 
-const baseURL =
-    window._env_?.VITE_BACKEND_URL ||
-    import.meta.env.VITE_BACKEND_URL;
+// Change baseURL if frontend host as apex.loandna.com then take VITE_BACKEND_URL else if apex-zoho.loandna.com then take VITE_BACKEND_ZOHO_URL
+const hostConfig = {
+    "localhost:3003": "VITE_BACKEND_URL",
+    "localhost:3004": "VITE_BACKEND_ZOHO_URL",
+    // "apex.loandna.com": "VITE_BACKEND_URL",
+    // "apex-zoho.loandna.com": "VITE_BACKEND_ZOHO_URL",
+};
+
+const envKey = hostConfig[window.location.host];
+
+const baseURL = envKey
+    ? (window._env_?.[envKey] || import.meta.env[envKey])
+    : "";
 
 const API = axios.create({
     baseURL: baseURL,
@@ -52,12 +62,12 @@ API.interceptors.response.use(
                 const res = await axios.post(`${baseURL}/auth/refresh`, {
                     refresh_token: refreshToken
                 });
-                
+
                 if (res.data?.access_token) {
                     const { access_token, refresh_token } = res.data;
                     sessionStorage.setItem('access_token', access_token);
                     if (refresh_token) sessionStorage.setItem('refresh_token', refresh_token);
-                    
+
                     originalRequest.headers.Authorization = `Bearer ${access_token}`;
                     return API(originalRequest);
                 }

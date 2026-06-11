@@ -1,5 +1,9 @@
 import { create } from 'zustand';
 import workflowAPI from '../api/workflowAPI';
+import { REQUIRED_FIELD } from '../config/constants';
+import { getERPSystem } from '../utils/envHelper';
+
+const defaultTab = REQUIRED_FIELD[getERPSystem()]?.["Settings"]?.[0] || 'Vendor Based Workflow';
 
 const useWorkflowStore = create((set, get) => ({
     // Vendor Workflow State
@@ -18,7 +22,7 @@ const useWorkflowStore = create((set, get) => ({
     departmentsList: [],
 
     // Shared UI State
-    activeTab: 'Vendor Based Workflow',
+    activeTab: defaultTab,
     searchQuery: '',
 
     // Actions

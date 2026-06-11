@@ -10,8 +10,8 @@ import toast from '../../utils/toast';
 import { useSettingsStore } from '../../store/settings.store';
 import { formatCurrency } from '../../utils/formatters';
 import ExportButton from '../../shared/components/ExportButton';
-
-const TABS = ['Vendor Based Workflow', 'Codification Based Workflow'];
+import { REQUIRED_FIELD } from '../../config/constants';
+import { getERPSystem } from '../../utils/envHelper';
 
 // Helper: read approver_flags safely regardless of key type (number or string)
 const getFinanceFlag = (data, index) =>
@@ -27,6 +27,15 @@ const Settings = () => {
     const [editRecord, setEditRecord] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
+
+    const erpSystem = getERPSystem();
+    const TABS = REQUIRED_FIELD[erpSystem]?.["Settings"] || [];
+
+    useEffect(() => {
+        if (TABS.length > 0 && !TABS.includes(activeSettingsTab)) {
+            setActiveSettingsTab(TABS[0]);
+        }
+    }, [activeSettingsTab, TABS, setActiveSettingsTab]);
 
     useEffect(() => {
         fetchCodification();

@@ -13,6 +13,8 @@ import RuleModal from './RuleModal';
 import RefreshButton from '../../shared/components/RefreshButton';
 import { formatCurrency } from '../../utils/formatters';
 import ExportButton from '../../shared/components/ExportButton';
+import { REQUIRED_FIELD } from '../../config/constants';
+import { getERPSystem } from '../../utils/envHelper';
 
 const SettingsPage = () => {
     const {
@@ -118,7 +120,7 @@ const SettingsPage = () => {
             </Tooltip>
         );
     }, [approversList]);
-    
+
     const getApproverText = useCallback((email, isFinance = false) => {
         if (isFinance) return "Finance Team";
         if (!email) return "";
@@ -315,20 +317,20 @@ const SettingsPage = () => {
                     {val}
                 </span>
             )
-        // },
-        // {
-        //     header: 'Type',
-        //     accessor: 'is_parallel',
-        //     filterable: true,
-        //     getFilterValue: (row) => row.is_parallel ? 'Parallel' : 'Sequential',
-        //     render: (val) => (
-        //         <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
-        //             ${val
-        //                 ? 'bg-blue-50 text-blue-600 border-blue-100'
-        //                 : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
-        //             {val ? 'Parallel' : 'Sequential'}
-        //         </span>
-        //     )
+            // },
+            // {
+            //     header: 'Type',
+            //     accessor: 'is_parallel',
+            //     filterable: true,
+            //     getFilterValue: (row) => row.is_parallel ? 'Parallel' : 'Sequential',
+            //     render: (val) => (
+            //         <span className={`px-2 py-0.5 rounded-[4px] text-[11px] font-medium border
+            //             ${val
+            //                 ? 'bg-blue-50 text-blue-600 border-blue-100'
+            //                 : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+            //             {val ? 'Parallel' : 'Sequential'}
+            //         </span>
+            //     )
         },
         {
             header: 'Threshold',
@@ -414,15 +416,22 @@ const SettingsPage = () => {
                 </div>
             )
         }] : [])
-    ];
+    ]
+    const erpSystem = getERPSystem();
+    const tabs = REQUIRED_FIELD[erpSystem]?.["Settings"] || [];
 
-    const tabs = ['Vendor Based Workflow', 'Codification Based Workflow'];
+    // Ensure activeTab is valid
+    useEffect(() => {
+        if (tabs.length > 0 && !tabs.includes(activeTab)) {
+            setActiveTab(tabs[0]);
+        }
+    }, [activeTab, tabs, setActiveTab]);
 
     const renderTabContent = () => {
         const columns = activeTab === 'Vendor Based Workflow' ? vendorColumns : codificationColumns;
         const loading = activeTab === 'Vendor Based Workflow' ? vendorLoading : codificationLoading;
         const error = activeTab === 'Vendor Based Workflow' ? vendorError : codificationError;
-        
+
         let data = [...filteredData]; // Create a copy for sorting
 
         // Apply Sorting
@@ -438,7 +447,7 @@ const SettingsPage = () => {
 
                 // String comparison
                 if (typeof aVal === 'string') {
-                    return sortConfig.direction === 'asc' 
+                    return sortConfig.direction === 'asc'
                         ? aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' })
                         : bVal.localeCompare(aVal, undefined, { numeric: true, sensitivity: 'base' });
                 }

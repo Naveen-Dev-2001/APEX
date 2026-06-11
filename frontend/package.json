@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:3003": "vite --port 3003",
+    "dev:3004": "vite --port 3004",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
