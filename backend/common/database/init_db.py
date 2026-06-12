@@ -15,51 +15,49 @@ from datetime import datetime
 import json
 
 
-def create_database_if_not_exists():
+def create_database_if_not_exists(db_url: str):
     """
     Connect to the 'master' database (which always exists in SQL Server)
-    and create the 'accounts_payable' database if it doesn't already exist.
-    This must be done BEFORE SQLAlchemy tries to connect to accounts_payable.
+    and create the target database if it doesn't already exist.
+    This must be done BEFORE SQLAlchemy tries to connect to the target db.
     """
-    db_url = settings.DATABASE_URL
-    # Build a URL that points to 'master' instead of 'accounts_payable'
-    # Handles both formats:
-    #   mssql+pymssql://user:pass@host:port/accounts_payable
-    #   mssql+pymssql://user:pass@host:port/accounts_payable?...
-    if "/accounts_payable" in db_url:
-        master_url = db_url.replace("/accounts_payable", "/master", 1)
-    else:
-        # Fallback: append /master
-        master_url = db_url.rsplit("/", 1)[0] + "/master"
 
-    print(f"Connecting to master DB to ensure 'accounts_payable' exists...")
+    # Extract the database name from the URL
+    parts = db_url.rsplit("/", 1)
+    if len(parts) == 2:
+        db_name = parts[1].split("?")[0]
+        master_url = parts[0] + "/master"
+    else:
+        raise ValueError(f"Could not parse database name from URL: {db_url}")
+
+    print(f"Connecting to master DB to ensure '{db_name}' exists...")
     try:
         # isolation_level=AUTOCOMMIT is required for CREATE DATABASE
         master_engine = create_engine(master_url, isolation_level="AUTOCOMMIT")
         with master_engine.connect() as conn:
             result = conn.execute(
-                text("SELECT COUNT(*) FROM sys.databases WHERE name = 'accounts_payable'")
+                text(f"SELECT COUNT(*) FROM sys.databases WHERE name = '{db_name}'")
             )
             count = result.scalar()
             if count == 0:
-                conn.execute(text("CREATE DATABASE accounts_payable"))
-                print("SUCCESS: Database 'accounts_payable' created successfully")
+                conn.execute(text(f"CREATE DATABASE {db_name}"))
+                print(f"SUCCESS: Database '{db_name}' created successfully")
             else:
-                print("SUCCESS: Database 'accounts_payable' already exists")
+                print(f"SUCCESS: Database '{db_name}' already exists")
         master_engine.dispose()
     except Exception as e:
         print(f"ERROR: Failed to create database: {e}")
         raise
 
 
-def create_tables():
+def create_tables(engine_obj, base_obj):
     """Create all database tables and schema migrations"""
     print("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
+    base_obj.metadata.create_all(bind=engine_obj)
     
     # Run manual migrations if required
     try:
-        with engine.connect() as conn:
+        with engine_obj.connect() as conn:
             # Check if department column exists
             result = conn.execute(text(
                 "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'department'"
@@ -83,24 +81,24 @@ def create_tables():
     print("SUCCESS: All tables created successfully")
 
 
-def create_admin_user(db):
+def create_admin_user(db, settings_obj):
     """Create default admin user if not exists"""
-    existing_admin = db.query(User).filter(User.email == settings.ADMIN_EMAIL).first()
+    existing_admin = db.query(User).filter(User.email == settings_obj.ADMIN_EMAIL).first()
     
     if not existing_admin:
         admin_user = User(
-            username=settings.ADMIN_USERNAME,
-            email=settings.ADMIN_EMAIL,
-            password=get_password_hash(settings.ADMIN_PASSWORD),
+            username=settings_obj.ADMIN_USERNAME,
+            email=settings_obj.ADMIN_EMAIL,
+            password=get_password_hash(settings_obj.ADMIN_PASSWORD),
             role="admin",
             status="active",
             created_at=datetime.utcnow()
         )
         db.add(admin_user)
         db.commit()
-        print(f"SUCCESS: Admin user created: {settings.ADMIN_EMAIL}")
+        print(f"SUCCESS: Admin user created: {settings_obj.ADMIN_EMAIL}")
     else:
-        print(f"SUCCESS: Admin user already exists: {settings.ADMIN_EMAIL}")
+        print(f"SUCCESS: Admin user already exists: {settings_obj.ADMIN_EMAIL}")
 
 
 def create_default_currencies(db):
@@ -187,28 +185,40 @@ def create_default_entity(db):
         print(f"SUCCESS: Entity master already has {existing_count} record(s), skipping default")
 
 
-def init_database():
+def init_database(db_url=None, engine_obj=None, SessionLocal_cls=None, base_obj=None, settings_obj=None):
     """
     Initialize the database with tables and default data.
     This should be called on application startup.
     """
+    # Use defaults if not provided
+    if db_url is None:
+        db_url = settings.DATABASE_URL
+    if engine_obj is None:
+        engine_obj = engine
+    if SessionLocal_cls is None:
+        SessionLocal_cls = SessionLocal
+    if base_obj is None:
+        base_obj = Base
+    if settings_obj is None:
+        settings_obj = settings
+
     print("\n" + "="*50)
-    print("DATABASE INITIALIZATION")
+    print(f"DATABASE INITIALIZATION for {db_url.rsplit('/', 1)[-1].split('?')[0]}")
     print("="*50 + "\n")
 
     # Step 1: Ensure the 'accounts_payable' database exists in SQL Server.
     # SQL Server Docker images only ship with 'master'; we must create our DB
     # BEFORE the main engine (which points to accounts_payable) is first used.
-    create_database_if_not_exists()
+    create_database_if_not_exists(db_url)
 
     # Step 2: Create all ORM tables
-    create_tables()
+    create_tables(engine_obj, base_obj)
     
     # Create session for data insertion
-    db = SessionLocal()
+    db = SessionLocal_cls()
     try:
         # Create default data
-        create_admin_user(db)
+        create_admin_user(db, settings_obj)
         create_default_currencies(db)
         create_default_settings(db)
         create_default_entity(db)

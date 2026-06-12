@@ -7,6 +7,7 @@ class Settings:
     # SQL Server Database URL (sensitive credentials should be configured in .env)
     DATABASE_URL: str = os.getenv("DATABASE_URL")
     
+    
     # SMTP Settings (credentials should be configured in .env)
     SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.office365.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", 587))
