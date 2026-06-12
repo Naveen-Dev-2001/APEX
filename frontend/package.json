@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:sage": "vite --mode sage",
+    "dev:zoho": "vite --mode zoho",
     "dev:3003": "vite --port 3003",
     "dev:3004": "vite --port 3004",
     "build": "vite build",
