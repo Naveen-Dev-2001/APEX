@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import json
 
-from common.services.base_sync_service import BaseSyncService
+from sage.services.base_sync_service import BaseSyncService
 from common.models.db_models import (
     GLMaster, LOBMaster, DepartmentMaster, CustomerMaster, ItemMaster, ExchangeRateMaster, EntityMaster
 )
