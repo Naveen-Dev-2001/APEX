@@ -13,6 +13,11 @@
 <body>
   <div id="root"></div>
   <script src="/config.js"></script>
+  <script>
+    // Set page title based on the running port — mirrors api.js host detection logic.
+    // port 3003 (or default) → Apex-Sage | port 3004 → Apex-Zoho
+    document.title = window.location.port === '3004' ? 'Apex-Zoho' : 'Apex-Sage';
+  </script>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 
