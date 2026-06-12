@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import axios from "axios";
-import { useAuthStore } from "../../store/authStore"; // ← add this
+import { useAuthStore } from "../../store/authStore";
+import { getBackendURL } from "../../utils/getBackendURL";
 
 export default function SSOCallback() {
     const navigate = useNavigate();
-    const setAuth = useAuthStore((state) => state.setAuth); // ← add this
+    const setAuth = useAuthStore((state) => state.setAuth);
     const [status, setStatus] = useState("Processing...");
     const hasProcessed = useRef(false);
-    const baseURL = window._env_?.VITE_BACKEND_URL;
+    const baseURL = getBackendURL();
 
     useEffect(() => {
         if (hasProcessed.current) return;

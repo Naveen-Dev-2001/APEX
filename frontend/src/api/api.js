@@ -1,18 +1,8 @@
 import axios from "axios";
+import { getBackendURL } from "../utils/getBackendURL";
 
-// Change baseURL if frontend host as apex.loandna.com then take VITE_BACKEND_URL else if apex-zoho.loandna.com then take VITE_BACKEND_ZOHO_URL
-const hostConfig = {
-    "localhost:3003": "VITE_BACKEND_URL",
-    "localhost:3004": "VITE_BACKEND_ZOHO_URL",
-    // "apex.loandna.com": "VITE_BACKEND_URL",
-    // "apex-zoho.loandna.com": "VITE_BACKEND_ZOHO_URL",
-};
+const baseURL = getBackendURL();
 
-const envKey = hostConfig[window.location.host];
-
-const baseURL = envKey
-    ? (window._env_?.[envKey] || import.meta.env[envKey])
-    : "";
 
 const API = axios.create({
     baseURL: baseURL,

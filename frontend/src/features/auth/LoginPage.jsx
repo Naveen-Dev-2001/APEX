@@ -8,6 +8,7 @@ import { useAuthStore } from '../../store/authStore';
 import toast from '../../utils/toast';
 import { icons } from '../../file';
 import AlertModal from '../../shared/components/AlertModal';
+import { getBackendURL } from '../../utils/getBackendURL';
 
 const LoginPage = () => {
     const navigate = useNavigate();
@@ -72,9 +73,7 @@ const LoginPage = () => {
     };
 
     const handleMicrosoftLogin = () => {
-        const baseURL = window._env_?.VITE_BACKEND_URL
-        let url = `${baseURL}/ValidateAzureAD`
-        window.location.href = url;
+        window.location.href = `${getBackendURL()}/ValidateAzureAD`;
     }
 
     return (
