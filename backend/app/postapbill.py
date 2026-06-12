@@ -252,11 +252,11 @@ def _create_ap_bill(
     except Exception as e:
         logger.warning(f"[PostAPBill] Error parsing dates: {e}")
 
-    base_date_str = base_date.strftime("%m/%d/%Y")
+    base_date_str = base_date.strftime("%Y-%m-%d")
     
     # Use exact dates from the frontend (no fallback)
-    posting_date_str = invoice.posting_date.strftime("%m/%d/%Y") if invoice.posting_date else ""
-    due_date_str = invoice.due_date.strftime("%m/%d/%Y") if invoice.due_date else ""
+    posting_date_str = invoice.posting_date.strftime("%Y-%m-%d") if invoice.posting_date else ""
+    due_date_str = invoice.due_date.strftime("%Y-%m-%d") if invoice.due_date else ""
 
 
     # --------------------------------------------------
