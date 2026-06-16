@@ -301,7 +301,7 @@ async def upload_invoices(
     upload_dir = get_folder_path("in_progress")
     os.makedirs(upload_dir, exist_ok=True)
     
-    # 🔁 Sequential Processing: invoices are processed one at a time
+    #  Sequential Processing: invoices are processed one at a time
 
     duplicates = []  # Track duplicate files
     saved_invoices = []  # Track successfully uploaded invoices
@@ -314,7 +314,7 @@ async def upload_invoices(
             await queue.put({"status": status, "message": message, "data": data, "progress": progress})
 
     async def _process_single_file(file: UploadFile, index: int, total_files: int):
-        # ⚡️ Isolated DB Session per Task
+        #  Isolated DB Session per Task
         task_db = SessionLocal()
         request_id = str(uuid.uuid4())
         clean_name = file.filename.replace("\\", "/").split("/")[-1]
@@ -352,6 +352,17 @@ async def upload_invoices(
             # ---- SAVE FILE ----
             save_start = time.time()
             contents = await file.read()
+            is_pdf = clean_name.lower().endswith(".pdf") and contents.startswith(b'%PDF')
+            if not is_pdf:
+                logger.error({
+                    "request_id": request_id,
+                    "event": "invoice_processing_failed",
+                    "filename": clean_name,
+                    "error": "File is not a PDF"
+                })
+                await emit_progress("processing", f"[{index}/{total_files}] Failed processing {clean_name}: File is not a PDF")
+                return {"success": False, "filename": clean_name, "reason": "is not a pdf"}
+
             with open(file_path, "wb") as f:
                 f.write(contents)
             print(f"[Backend] File saved in {time.time() - save_start:.2f}s: {file_path}")
@@ -707,7 +718,7 @@ async def upload_invoices(
                 print(f"[Backend] Registered in fast lookup registry in {time.time() - reg_start:.2f}s")
 
             print(f"[Backend] TOTAL processing for {invoice_id} completed in {time.time() - total_start:.2f}s")
-            # ✅ 6️⃣ SUCCESS LOGGER (ADD HERE)
+            #  SUCCESS LOGGER (ADD HERE)
             total_time = round(time.time() - total_start, 2)
 
             logger.info({
@@ -755,11 +766,30 @@ async def upload_invoices(
             import traceback
             traceback.print_exc()
             
-            if file_path and os.path.exists(file_path):
+            # Check if this is a "not an invoice" error
+            error_msg = str(e.detail) if isinstance(e, HTTPException) else str(e)
+            is_non_invoice = "No invoice found in the document" in error_msg
+
+            if is_non_invoice:
+                print(f"[Backend] File {clean_name} is not an invoice. Moving to non_invoices folder.")
+                if file_path and os.path.exists(file_path):
+                    try:
+                        move_invoice_file(file_path, "non_invoices")
+                    except Exception as move_err:
+                        print(f"Failed to move non-invoice file: {move_err}")
+            else:
+                if file_path and os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                    except:
+                        pass
+
+            if 'invoice_id' in locals():
                 try:
-                    os.remove(file_path)
-                except:
-                    pass
+                    invoice_repo.remove(task_db, id=invoice_id)
+                    task_db.commit()
+                except Exception as db_err:
+                    print(f"Failed to clean up failed invoice from DB: {db_err}")
 
             logger.error({
                 "request_id": request_id,
@@ -780,7 +810,7 @@ async def upload_invoices(
 
     await emit_progress("processing", f"Starting upload for {len(files)} files...")
 
-    # 🔁 Sequential Processing: process one invoice at a time
+    #  Sequential Processing: process one invoice at a time
     total_files = len(files)
     try:
         for idx, file in enumerate(files):

@@ -10,7 +10,8 @@ SUBFOLDERS = {
     "in_progress": "in_progress_files",
     "deleted": "deleted_files",
     "posted_stage": "posted_stage_files",
-    "archive": "archive_files"
+    "archive": "archive_files",
+    "non_invoices": "non_invoices_files"
 }
 
 def init_upload_folders():
