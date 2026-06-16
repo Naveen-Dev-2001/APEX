@@ -492,18 +492,21 @@ You will receive Azure prebuilt-invoice fields (header/amount fields) and raw te
 CRITICAL: DO NOT extract or modify line items. They are handled separately by Azure Document Intelligence.
 
 IMPORTANT:
-1. Use the structured Azure fields as the PRIMARY evidence.
-2. Use the raw text only to FILL missing fields or to NORMALIZE formats.
-3. If a field is not found, use null.
-4. Standardize date formats to YYYY-MM-DD.
-5. Convert all amounts to plain numbers (no currency symbols; remove commas).
-6. Be very careful with invoice numbers, dates, and amounts.
-7. DO NOT invent or output any line_items array.
-8. Identify if the document is a commercial invoice or utility/commercial bill.
+1. Carefully check if the document itself is actually a commercial invoice or utility/commercial bill.
+   - You MUST read the RAW INVOICE CONTEXT first to classify the document type.
+   - If the raw text indicates it is a user guide, training document, manual, guideline, tutorial, walkthrough, payslip, salary slip, payroll document, agreement, or other non-invoice document, set "is_invoice" to false. Do this even if the structured Azure fields contain extracted data.
+2. If and only if the document is classified as a valid invoice/bill ("is_invoice": true), use the structured Azure fields as the PRIMARY evidence for extracting the other fields.
+3. Use the raw text to FILL missing fields or to NORMALIZE formats.
+4. If a field is not found, use null.
+5. Standardize date formats to YYYY-MM-DD.
+6. Convert all amounts to plain numbers (no currency symbols; remove commas).
+7. Be very careful with invoice numbers, dates, and amounts.
+8. DO NOT invent or output any line_items array.
+9. Identify if the document is a commercial invoice or utility/commercial bill.
    - If the document is an accounts payable cheque, bank cheque, check, or cheque request / check request document, set "is_invoice" to false.
    - IMPORTANT: If the document is a multi-page commercial invoice/bill, and one or more pages contain cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check" in the text, but the overall document is still a valid commercial invoice/bill, set "is_invoice" to true. Do NOT classify a multi-page invoice as a non-invoice (cheque) just because one of its pages contains cheque payment instructions, details, or a payment slip.
    - If it is a payslip, salary slip, compensation letter, payroll document, agreement, guideline, user guide or any other non-invoice document, set "is_invoice" to false. Otherwise, set it to true.
-9. Return ONLY valid JSON, no markdown, no comments.
+10. Return ONLY valid JSON, no markdown, no comments.
 
 STRUCTURED AZURE FIELDS (headers/amounts, no Items):
 {json.dumps(azure_values, indent=2, ensure_ascii=False)}
