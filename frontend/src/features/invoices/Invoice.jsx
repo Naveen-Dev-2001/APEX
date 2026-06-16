@@ -335,10 +335,34 @@ const Invoice = () => {
                 }
             }, controller.signal);
             setUploadProgress(100);
-            toast.success(`${response?.data?.count ?? files.length} file(s) processed successfully!`);
+            
+            const savedCount = response?.data?.count ?? 0;
+            const failed = response?.data?.failed ?? [];
+            const invoicesList = response?.data?.invoices ?? [];
+
             await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
             await refetch();
-            if (files.length === 1 && response?.data?.invoices?.length > 0) handleView(response.data.invoices[0]);
+
+            if (failed.length > 0) {
+                if (files.length === 1) {
+                    toast.error("The Uploaded PDF is not an Invoice");
+                } else {
+                    let alertMsg = "";
+                    const pdfFailures = failed.filter(f => f.reason === "is not a pdf");
+                    if (pdfFailures.length > 0) {
+                        const names = pdfFailures.map(f => f.filename).join(", ");
+                        alertMsg = `${names} is not a pdf, other all processed successfully`;
+                    } else {
+                        const names = failed.map(f => f.filename).join(", ");
+                        alertMsg = `${names} could not be processed, other all processed successfully`;
+                    }
+                    toast.error(alertMsg);
+                }
+            } else {
+                toast.success(`${savedCount} file(s) processed successfully!`);
+            }
+
+            if (files.length === 1 && invoicesList.length > 0) handleView(invoicesList[0]);
             else setInvoiceSection(1);
             setIsModalOpen(false);
         } catch (error) {
