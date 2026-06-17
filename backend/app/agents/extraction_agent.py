@@ -128,6 +128,7 @@ class InvoiceExtractionAgent:
                 "api_version": getattr(result, 'api_version', None),
                 "model_id": getattr(result, 'model_id', None),
                 "content": getattr(result, 'content', '')[:50000] + "..." if getattr(result, 'content', '') else '',
+                "page_count": len(result.pages) if hasattr(result, 'pages') else 1,
             }
 
             if hasattr(result, 'documents') and result.documents:
@@ -441,8 +442,9 @@ class InvoiceExtractionAgent:
 
             azure_data = state["extracted_data"]
             raw_content = state["raw_azure_response"].get("content", "") if state["raw_azure_response"] else ""
+            page_count = state["raw_azure_response"].get("page_count", 1) if state["raw_azure_response"] else 1
 
-            prompt = self._create_header_enhancement_prompt(azure_data, raw_content)
+            prompt = self._create_header_enhancement_prompt(azure_data, raw_content, page_count)
             state["llm_prompt"] = prompt
             
             # Check cancellation before calling LLM
@@ -477,7 +479,7 @@ class InvoiceExtractionAgent:
             state["processing_steps"].append(error_msg)
             return state
 
-    def _create_header_enhancement_prompt(self, azure_data: Dict, raw_content: str) -> str:
+    def _create_header_enhancement_prompt(self, azure_data: Dict, raw_content: str, page_count: int = 1) -> str:
         azure_values: Dict[str, Any] = {}
         for field_name, field_data in azure_data.items():
             if field_name == "Items":
@@ -491,10 +493,13 @@ You will receive Azure prebuilt-invoice fields (header/amount fields) and raw te
 
 CRITICAL: DO NOT extract or modify line items. They are handled separately by Azure Document Intelligence.
 
-IMPORTANT:
+DOCUMENT PAGE COUNT: {page_count}
+
+IMPORTANT CLASSIFICATION RULES:
 1. Carefully check if the document itself is actually a commercial invoice or utility/commercial bill.
    - You MUST read the RAW INVOICE CONTEXT first to classify the document type.
-   - If the document contains multiple pages (multi-page PDF) and any page contains a cheque, accounts payable cheque, bank cheque, check, cheque request / check request, cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check", you MUST set "is_invoice" to true and allow the document. Do NOT classify a multi-page document as a non-invoice just because one or more of its pages contains a cheque.
+   - If the document is a SINGLE-PAGE document (DOCUMENT PAGE COUNT: 1) and contains a check, cheque, accounts payable cheque, bank cheque, check request / cheque request, cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check" as part of a check form/request, you MUST set "is_invoice" to false and restrict it.
+   - If the document contains MULTIPLE pages (DOCUMENT PAGE COUNT > 1) and any page contains a cheque, accounts payable cheque, bank cheque, check, cheque request / check request, cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check", you MUST set "is_invoice" to true and allow/process the document. Do NOT classify a multi-page document as a non-invoice just because one or more of its pages contains a cheque.
    - If the raw text indicates it is a user guide, training document, manual, guideline, tutorial, walkthrough, payslip, salary slip, payroll document, agreement, blood report, medical report, lab report, clinical report, or other non-invoice document (and does not contain multiple pages with a cheque), set "is_invoice" to false. Do this even if the structured Azure fields contain extracted data.
 2. If and only if the document is classified as a valid invoice/bill ("is_invoice": true), use the structured Azure fields as the PRIMARY evidence for extracting the other fields.
 3. Use the raw text to FILL missing fields or to NORMALIZE formats.
@@ -504,8 +509,8 @@ IMPORTANT:
 7. Be very careful with invoice numbers, dates, and amounts.
 8. DO NOT invent or output any line_items array.
 9. Identify if the document is a commercial invoice or utility/commercial bill.
-   - If the document is a single-page document and is an accounts payable cheque, bank cheque, check, or cheque request / check request document, set "is_invoice" to false.
-   - IMPORTANT: If the document contains multiple pages (multi-page PDF) and any page contains a cheque, accounts payable cheque, bank cheque, check, cheque request / check request, cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check", you MUST set "is_invoice" to true and allow it. Do NOT classify a multi-page document as a non-invoice just because one or more of its pages contains a cheque.
+   - If the document is a single-page document (DOCUMENT PAGE COUNT: 1) and is an accounts payable cheque, bank cheque, check, or cheque request / check request document, set "is_invoice" to false.
+   - IMPORTANT: If the document contains multiple pages (DOCUMENT PAGE COUNT > 1) and any page contains a cheque, accounts payable cheque, bank cheque, check, cheque request / check request, cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check", you MUST set "is_invoice" to true and allow it. Do NOT classify a multi-page document as a non-invoice just because one or more of its pages contains a cheque.
    - If it is a payslip, salary slip, compensation letter, payroll document, agreement, blood report, medical report, lab report, clinical report, guideline, user guide or any other non-invoice document, set "is_invoice" to false. Otherwise, set it to true.
 10. Return ONLY valid JSON, no markdown, no comments.
 
