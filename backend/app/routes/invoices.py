@@ -1010,9 +1010,6 @@ async def get_invoices(
                         )
                     )
 
-                    # Combine: Hide if...
-                    # - We are NOT at the last stage AND user has acted at any level
-                    # - OR we ARE at the last stage AND user has already done a Posting Approval
                     hide_condition = and_(
                         Invoice.status != InvoiceStatusEnum.SAGE_POST_FAILED,
                         or_(
@@ -1022,7 +1019,10 @@ async def get_invoices(
                             ),
                             and_(
                                 Invoice.current_approver_level == is_last_stage_subquery,
-                                user_acted_posting_subquery
+                                or_(
+                                    and_(has_posting_cond, user_acted_posting_subquery),
+                                    and_(~has_posting_cond, user_acted_any_subquery)
+                                )
                             )
                         )
                     )
@@ -1371,7 +1371,10 @@ async def get_invoice_filter_options(
                             ),
                             and_(
                                 Invoice.current_approver_level == is_last_stage_subquery,
-                                user_acted_posting_subquery
+                                or_(
+                                    and_(has_posting_cond, user_acted_posting_subquery),
+                                    and_(~has_posting_cond, user_acted_any_subquery)
+                                )
                             )
                         )
                     )
