@@ -69,7 +69,7 @@ TAB_SEARCH_FIELDS = {
     "Vendor_Master": ["vendor_id", "vendor_name", "address_line1", "city", "primary_email_address"],
     "Line_Items": ["item_id", "name", "gl_group"],
     "TDS_Rates": ["section", "nature_of_payment"],
-    "GL": ["account_number", "title"],
+    "GL": ["account_number", "title", "account_name", "account_code", "account_type"],
     "LOB": ["lob_id", "name"],
     "Department": ["department_id", "department_name"],
     "Customer": ["customer_id", "customer_name"],
@@ -407,12 +407,49 @@ async def upload_master_file(
                         record["workflow_applicable"] = True
                     if record.get("line_grouping") is None:
                         record["line_grouping"] = False
+                    
+                    # Zoho compatibility: Map display_name / company_name to vendor_name / vendor_id if they are missing
+                    if not record.get("vendor_name"):
+                        record["vendor_name"] = (record.get("display_name") or record.get("company_name") or "Unknown")[:200]
+                    if not record.get("vendor_id"):
+                        record["vendor_id"] = record["vendor_name"][:100]
 
                 if tab_name == "Entity_Master" or tab_name == "entity_master":
                     if record.get("gst_applicable") is None:
                         record["gst_applicable"] = True
 
+                if tab_name in ["GL", "GL_Master", "gl_master", "master_data_GL", "master_data_GL_Master"]:
+                    if not record.get("title"):
+                        record["title"] = (record.get("account_name") or "Unknown")[:200]
+                    if not record.get("account_name"):
+                        record["account_name"] = record.get("title")
+                    if not record.get("account_number"):
+                        record["account_number"] = (record.get("account_code") or "Unknown")[:100]
+                    if not record.get("account_code"):
+                        record["account_code"] = record.get("account_number")
+
                 records_to_insert.append(record)
+
+        # Deduplicate records based on unique key to prevent db IntegrityErrors
+        if tab_name in ["GL", "GL_Master", "gl_master", "master_data_GL", "master_data_GL_Master"]:
+            seen_acc_nums = set()
+            deduped_records = []
+            for r in records_to_insert:
+                acc_num = r.get("account_number")
+                if acc_num not in seen_acc_nums:
+                    seen_acc_nums.add(acc_num)
+                    deduped_records.append(r)
+            records_to_insert = deduped_records
+
+        if tab_name in ["Vendor_Master", "vendor_master", "Vendor", "master_data_Vendor_Master"]:
+            seen_vendor_ids = set()
+            deduped_records = []
+            for r in records_to_insert:
+                v_id = r.get("vendor_id")
+                if v_id not in seen_vendor_ids:
+                    seen_vendor_ids.add(v_id)
+                    deduped_records.append(r)
+            records_to_insert = deduped_records
 
         # Clear existing and insert (except for Entity Master which skips duplicates)
         repo = TAB_REPO_MAP.get(tab_name)
@@ -796,6 +833,22 @@ def add_row(
 
         final_data[m_col] = v
 
+    if identifier in ["Vendor_Master", "vendor_master", "Vendor"]:
+        if not final_data.get("vendor_name"):
+            final_data["vendor_name"] = (final_data.get("display_name") or final_data.get("company_name") or "Unknown")[:200]
+        if not final_data.get("vendor_id"):
+            final_data["vendor_id"] = final_data["vendor_name"][:100]
+
+    if identifier in ["GL", "GL_Master", "gl_master", "master_data_GL", "master_data_GL_Master"]:
+        if not final_data.get("title"):
+            final_data["title"] = (final_data.get("account_name") or "Unknown")[:200]
+        if not final_data.get("account_name"):
+            final_data["account_name"] = final_data.get("title")
+        if not final_data.get("account_number"):
+            final_data["account_number"] = (final_data.get("account_code") or "Unknown")[:100]
+        if not final_data.get("account_code"):
+            final_data["account_code"] = final_data.get("account_number")
+
 
     repo = TAB_REPO_MAP.get(identifier)
     if not repo:
@@ -818,7 +871,7 @@ def add_row(
         error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
         if "FOREIGN KEY constraint" in error_msg:
             raise HTTPException(400, "Validation Error: A provided key (e.g., Entity ID, Vendor ID) does not exist in its parent master list. Please verify your data and try again.")
-        elif "UNIQUE KEY constraint" in error_msg or "Violation of UNIQUE KEY" in error_msg:
+        elif any(term in error_msg for term in ["UNIQUE KEY constraint", "Violation of UNIQUE KEY", "unique index", "duplicate key"]):
             raise HTTPException(400, "Validation Error: A record with this unique identifier already exists.")
         else:
             raise HTTPException(400, f"Database Integrity Error: {error_msg}")
@@ -877,6 +930,25 @@ def edit_row(
                 
             valid_update_data[m_col] = v
 
+    if identifier in ["Vendor_Master", "vendor_master", "Vendor"]:
+        # If we updated display_name or company_name, sync vendor_name
+        if "display_name" in valid_update_data or "company_name" in valid_update_data:
+            new_name = valid_update_data.get("display_name") or valid_update_data.get("company_name") or getattr(record, "display_name") or getattr(record, "company_name")
+            if new_name:
+                valid_update_data["vendor_name"] = new_name[:200]
+
+    if identifier in ["GL", "GL_Master", "gl_master", "master_data_GL", "master_data_GL_Master"]:
+        if "account_name" in valid_update_data or "title" in valid_update_data:
+            new_name = valid_update_data.get("account_name") or valid_update_data.get("title") or getattr(record, "account_name") or getattr(record, "title")
+            if new_name:
+                valid_update_data["account_name"] = new_name[:200]
+                valid_update_data["title"] = new_name[:200]
+        if "account_code" in valid_update_data or "account_number" in valid_update_data:
+            new_code = valid_update_data.get("account_code") or valid_update_data.get("account_number") or getattr(record, "account_code") or getattr(record, "account_number")
+            if new_code:
+                valid_update_data["account_code"] = new_code[:100]
+                valid_update_data["account_number"] = new_code[:100]
+
 
     try:
         repo.update(db, db_obj=record, obj_in=valid_update_data)
@@ -886,7 +958,7 @@ def edit_row(
         error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
         if "FOREIGN KEY constraint" in error_msg:
             raise HTTPException(400, "Validation Error: A provided key (e.g., Entity ID, Vendor ID) does not exist in its parent master list. Please verify your data and try again.")
-        elif "UNIQUE KEY constraint" in error_msg or "Violation of UNIQUE KEY" in error_msg:
+        elif any(term in error_msg for term in ["UNIQUE KEY constraint", "Violation of UNIQUE KEY", "unique index", "duplicate key"]):
             raise HTTPException(400, "Validation Error: A record with this unique identifier already exists.")
         else:
             raise HTTPException(400, f"Database Integrity Error: {error_msg}")

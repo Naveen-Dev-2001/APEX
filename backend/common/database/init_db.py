@@ -64,7 +64,6 @@ def create_tables(engine_obj, base_obj):
             ))
             if result.scalar() == 0:
                 conn.execute(text("ALTER TABLE users ADD department NVARCHAR(100) NULL"))
-                conn.execute(text("COMMIT"))
                 print("SUCCESS: Added department column to users table")
             
             # Check if email_notifications column exists
@@ -73,8 +72,31 @@ def create_tables(engine_obj, base_obj):
             ))
             if result.scalar() == 0:
                 conn.execute(text("ALTER TABLE users ADD email_notifications BIT NOT NULL DEFAULT 1"))
-                conn.execute(text("COMMIT"))
                 print("SUCCESS: Added email_notifications column to users table")
+
+            # Check if account_name column exists
+            result = conn.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'gl_master' AND COLUMN_NAME = 'account_name'"
+            ))
+            if result.scalar() == 0:
+                conn.execute(text("ALTER TABLE gl_master ADD account_name NVARCHAR(200) NULL"))
+                print("SUCCESS: Added account_name column to gl_master table")
+
+            # Check if account_code column exists
+            result = conn.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'gl_master' AND COLUMN_NAME = 'account_code'"
+            ))
+            if result.scalar() == 0:
+                conn.execute(text("ALTER TABLE gl_master ADD account_code NVARCHAR(100) NULL"))
+                print("SUCCESS: Added account_code column to gl_master table")
+
+            # Check if account_type column exists
+            result = conn.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'gl_master' AND COLUMN_NAME = 'account_type'"
+            ))
+            if result.scalar() == 0:
+                conn.execute(text("ALTER TABLE gl_master ADD account_type NVARCHAR(100) NULL"))
+                print("SUCCESS: Added account_type column to gl_master table")
     except Exception as e:
         print(f"Migration error (might be expected if table newly created): {e}")
 

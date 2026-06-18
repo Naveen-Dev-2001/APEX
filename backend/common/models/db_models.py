@@ -428,11 +428,20 @@ class VendorMaster(Base):
     workflow_applicable = Column(Boolean, nullable=True, default=True)
     line_grouping = Column(Boolean, nullable=True, default=False)
 
+    # Zoho specific fields
+    company_name = Column(String(200), nullable=True)
+    display_name = Column(String(200), nullable=True)
+    email_id = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    currency_code = Column(String(10), nullable=True)
+    payment_terms_label = Column(String(100), nullable=True)
+    billing_address = Column(Text, nullable=True)
+
     # Suggested Foreign Key to Entity
     entity_id = Column(String(100), ForeignKey(
         "entity_master.entity_id"), nullable=True, index=True)
 
-    # Sage Intacct Sync Fields
+    # Sage/Zoho Intacct Sync Fields
     vendor_key = Column(String(100), index=True, nullable=True)
     status = Column(String(50), nullable=True)
     raw_data = Column(Text, nullable=True)  # Full JSON response
@@ -469,6 +478,11 @@ class GLMaster(Base):
     normal_balance = Column(String(20), nullable=True)  # Debit/Credit
     require_department = Column(Boolean, default=False)
     require_location = Column(Boolean, default=False)
+
+    # Zoho specific columns
+    account_name = Column(String(200), nullable=True)
+    account_code = Column(String(100), nullable=True)
+    account_type = Column(String(100), nullable=True)
     period_end_closing_type = Column(String(50), nullable=True)
     close_into_account = Column(String(50), nullable=True)
     disallow_direct_posting = Column(Boolean, default=False)
