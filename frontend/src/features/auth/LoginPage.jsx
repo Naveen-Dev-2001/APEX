@@ -9,6 +9,9 @@ import toast from '../../utils/toast';
 import { icons } from '../../file';
 import AlertModal from '../../shared/components/AlertModal';
 import { getBackendURL } from '../../utils/getBackendURL';
+import { getERPSystem } from '../../utils/envHelper';
+import { useCommonStore } from '../../store/common.store';
+import { useInvoiceStore } from '../../store/invoice.store';
 
 const LoginPage = () => {
     const navigate = useNavigate();
@@ -58,7 +61,31 @@ const LoginPage = () => {
                     toast.info('Please change your password to continue');
                     navigate('/change-password-first-time', { state: { email: response.data.email || email } });
                 } else {
-                    navigate('/select-entity');
+                    if (getERPSystem() === 'Zoho') {
+                        const entityId = 'DEFAULT';
+                        const entityName = 'Consolidated Analytics';
+                        const entityDisplayName = `${entityId} - ${entityName}`;
+                        
+                        // Set the active role (similar to SelectEntityPage default behavior)
+                        const userRoles = userObj.role ? userObj.role.split(',') : [];
+                        const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
+                        useAuthStore.getState().setActiveRole(activeRole);
+                        
+                        useCommonStore.getState().setEntity(entityId);
+                        sessionStorage.setItem('selected_entity', entityId);
+                        sessionStorage.setItem('selected_entity_name', entityDisplayName);
+
+                        const rawEntity = {
+                            entity_id: entityId,
+                            entity_name: entityName,
+                            id: 0
+                        };
+                        useInvoiceStore.getState().setEntityMaster(rawEntity);
+
+                        navigate('/dashboard');
+                    } else {
+                        navigate('/select-entity');
+                    }
                 }
             } else {
                 setError('Invalid response from server');

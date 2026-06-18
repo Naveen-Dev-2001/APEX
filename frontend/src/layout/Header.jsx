@@ -23,6 +23,7 @@ import invoiceUnselectIcon from '../assets/header-icons/invoics-icon-unselect.pn
 import useAdminStore from '../store/useAdminStore';
 import { useInvoiceStore } from '../store/invoice.store';
 import API from '../api/api';
+import { getERPSystem } from '../utils/envHelper';
 
 const tabs = [
     { name: 'Dashboard', route: '/dashboard', selectIcon: dashboardSelectIcon, unselectIcon: dashboardUnselectIcon },
@@ -81,12 +82,12 @@ const Header = () => {
         return allRoles.find(r => r.toLowerCase().trim() !== current) || allRoles[0] || 'admin';
     };
     const targetRole = getTargetRole();
-    
+
     const handleConfirmRoleChange = () => {
         setActiveRole(targetRole);
         setShowChangeRoleModal(false);
         setIsDropdownOpen(false);
-        
+
         let targetRoute = '/dashboard';
         const role = targetRole.toLowerCase();
         if (role === 'scanner') {
@@ -96,7 +97,7 @@ const Header = () => {
         } else if (role === 'approver') {
             targetRoute = '/approvals';
         }
-        
+
         navigate(targetRoute);
     };
 
@@ -124,7 +125,7 @@ const Header = () => {
                 // Check if role has access
                 const roles = nav.roles || [];
                 const roleAccess = roles.some(r => r.toLowerCase() === 'all' || r.toLowerCase() === currentRole);
-                
+
                 // Show Master Data and Settings for scanner and coder as well
                 if ((nav.label === 'Master Data' || nav.label === 'Settings') && (currentRole === 'scanner' || currentRole === 'coder')) {
                     return true;
@@ -134,7 +135,7 @@ const Header = () => {
                 if (nav.label === 'Dashboard' && currentRole === 'approver' && userDept === 'non-finance') {
                     return false;
                 }
-                
+
                 return roleAccess;
             })
             .map(nav => ({
@@ -300,11 +301,11 @@ const Header = () => {
             <div className="flex items-center space-x-5">
                 {/* Entity Badge */}
                 <div className="hidden md:flex items-center space-x-2 bg-[#f0f8ff] border border-[#a2d5f2] rounded-full px-4 py-1.5">
-                    <svg className="w-4.5 h-4.5 text-[#1e9bd8] shrink-0" style={{width:'18px',height:'18px'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4.5 h-4.5 text-[#1e9bd8] shrink-0" style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
 
-                    <span 
+                    <span
                         className="text-[13px] font-medium text-[#1e9bd8] max-w-[160px] truncate leading-none capitalize"
                         title={selectedEntityName}
                     >
@@ -324,7 +325,7 @@ const Header = () => {
                 </button> */}
 
                 {/* User Guide Icon */}
-                <div 
+                <div
                     className="relative cursor-pointer text-gray-500 hover:text-[#1e9bd8] transition-colors p-1"
                     onClick={() => {
                         const width = 1200;
@@ -364,7 +365,7 @@ const Header = () => {
                             <div className="relative z-10 p-4">
                                 {/* Dropdown Header */}
                                 <div className="flex justify-between items-center mb-4">
-                                    <span 
+                                    <span
                                         className="text-[11px] font-bold text-[#333] tracking-tighter uppercase opacity-60 truncate mr-2"
                                         title={selectedEntityName}
                                     >
@@ -397,23 +398,25 @@ const Header = () => {
                                 <div className="h-[1px] w-full bg-gray-50 mb-4"></div>
 
                                 {/* Change Entity Action */}
-                                <button
-                                    onClick={() => {
-                                        navigate('/select-entity');
-                                        setIsDropdownOpen(false);
-                                    }}
-                                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
-                                >
-                                    <div className="p-1 rounded-lg text-[#3ba5d8] ">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                    </div>
-                                    <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
-                                        Change Entity
-                                    </span>
-                                </button>
+                                {getERPSystem() !== 'Zoho' && (
+                                    <button
+                                        onClick={() => {
+                                            navigate('/select-entity');
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
+                                    >
+                                        <div className="p-1 rounded-lg text-[#3ba5d8] ">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                                            Change Entity
+                                        </span>
+                                    </button>
+                                )}
 
                                 {/* Change Role Action (only if user has multiple roles and not on select-entity route) */}
                                 {Array.isArray(allRoles) && allRoles.length >= 2 && location.pathname !== '/select-entity' && (
