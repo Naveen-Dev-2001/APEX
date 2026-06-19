@@ -26,6 +26,7 @@ import {
 import { fetchCodingSuggestions } from "../../../api/invoiceApi";
 import { useWorkflowDataSync } from "../../hooks/useWorkflow";
 import { useQueryClient } from "@tanstack/react-query";
+import { getERPSystem } from "../../../utils/envHelper";
 
 const LINE_TYPE_OPTIONS = [
     { label: "Expense", value: "Expense" },
@@ -270,23 +271,33 @@ const CodingTab = ({ isActive = false }) => {
     }, [lineItems]);
 
     const handleExportExcel = useCallback(() => {
+        const isZoho = getERPSystem() === "Zoho";
         const dataToExport = (lineItems || [])
             .filter(item => !item.isSystemRow)
-            .map((item, index) => ({
-                "S.No": index + 1,
-                "Description": item.description || "",
-                "Qty": item.qty || 0,
-                "Unit Price": item.unitPrice || 0,
-                "Discount": item.discount || 0,
-                "Net Amount": item.netAmount || 0,
-                "Tax Amt": item.taxAmt || 0,
-                "Line Type": item.lineType || "",
-                "GL Code": item.glCode || "",
-                "LOB": item.lob || "",
-                "Department": item.department || "",
-                "Customer": item.customer || "",
-                "Item": item.item || "",
-            }));
+            .map((item, index) => {
+                const rowData = {
+                    "S.No": index + 1,
+                    "Description": item.description || "",
+                    "Qty": item.qty || 0,
+                    "Unit Price": item.unitPrice || 0,
+                    "Discount": item.discount || 0,
+                    "Net Amount": item.netAmount || 0,
+                    "Tax Amt": item.taxAmt || 0,
+                    "Line Type": item.lineType || "",
+                    "GL Code": item.glCode || "",
+                };
+                if (!isZoho) {
+                    rowData["LOB"] = item.lob || "";
+                    rowData["Department"] = item.department || "";
+                }
+                if (!isZoho) {
+                    rowData["Customer"] = item.customer || "";
+                }
+                if (!isZoho) {
+                    rowData["Item"] = item.item || "";
+                }
+                return rowData;
+            });
 
         if (dataToExport.length === 0) return;
 
@@ -305,6 +316,7 @@ const CodingTab = ({ isActive = false }) => {
             const worksheet = workbook.Sheets[sheetName];
             const json = XLSX.utils.sheet_to_json(worksheet);
 
+            const isZoho = getERPSystem() === "Zoho";
             const newItems = json.map(row => ({
                 id: Date.now() + Math.random(),
                 description: row["Description"] || "",
@@ -315,10 +327,10 @@ const CodingTab = ({ isActive = false }) => {
                 taxAmt: parseFloat(row["Tax Amt"]) || 0,
                 lineType: row["Line Type"] || "",
                 glCode: row["GL Code"] || "",
-                lob: row["LOB"] || "",
-                department: row["Department"] || "",
-                customer: row["Customer"] || "",
-                item: row["Item"] || "",
+                lob: isZoho ? "" : (row["LOB"] || ""),
+                department: isZoho ? "" : (row["Department"] || ""),
+                customer: isZoho ? "" : (row["Customer"] || ""),
+                item: isZoho ? "" : (row["Item"] || ""),
                 isSystemRow: false,
                 isNetAmountOverridden: true
             }));
@@ -359,6 +371,7 @@ const CodingTab = ({ isActive = false }) => {
 
     const { user, activeRole } = useAuthStore();
     const userRole = (activeRole || user?.role || "").toLowerCase();
+    const isZoho = useMemo(() => getERPSystem() === "Zoho", []);
 
     const { workflowData } = useWorkflowDataSync(viewInvoiceId);
 
@@ -539,25 +552,25 @@ const CodingTab = ({ isActive = false }) => {
     });
     const lob = useRemoteMasterData("LOB", {
         mapOption: i => ({ label: `${i.lob_id} - ${i.name}`, value: i.lob_id }),
-        enabled: loadMasterData,
+        enabled: loadMasterData && !isZoho,
         preload: true,
         initialValues: initialLobValues
     });
     const dept = useRemoteMasterData("Department", {
         mapOption: i => ({ label: `${i.department_id} - ${i.department_name}`, value: i.department_id }),
-        enabled: loadMasterData,
+        enabled: loadMasterData && !isZoho,
         preload: true,
         initialValues: initialDepartmentValues
     });
     const customer = useRemoteMasterData("Customer", {
         mapOption: i => ({ label: `${i.customer_id} - ${i.customer_name}`, value: i.customer_id }),
-        enabled: loadMasterData,
+        enabled: loadMasterData && !isZoho,
         preload: true,
         initialValues: initialCustomerValues
     });
     const item = useRemoteMasterData("Item", {
         mapOption: i => ({ label: `${i.item_id} - ${i.name}`, value: i.item_id }),
-        enabled: loadMasterData,
+        enabled: loadMasterData && !isZoho,
         preload: true,
         initialValues: initialItemValues
     });
@@ -847,10 +860,10 @@ const CodingTab = ({ isActive = false }) => {
                                     <col style={{ width: 110 }} />   {/* unit price */}
                                     <col style={{ width: 120 }} />   {/* net amount */}
                                     <col />                          {/* GL code */}
-                                    <col />                          {/* LOB */}
-                                    <col />                          {/* department */}
-                                    <col />                          {/* customer */}
-                                    <col />                          {/* item */}
+                                    {!isZoho && <col />}             {/* LOB */}
+                                    {!isZoho && <col />}             {/* department */}
+                                    {!isZoho && <col />}             {/* customer */}
+                                    {!isZoho && <col />}             {/* item */}
                                     <col style={{ width: 56 }} />    {/* action */}
                                 </colgroup>
 
@@ -876,10 +889,10 @@ const CodingTab = ({ isActive = false }) => {
                                         <th className="p-2 text-right text-[12px] font-medium border-r border-[#ffffff1a]">Unit Price</th>
                                         <th className="p-2 text-right text-[12px] font-medium border-r border-[#ffffff1a]">Net Amount</th>
                                         <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>GL Code</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>LOB</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Department</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Customer</th>
-                                        <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Item</th>
+                                        {!isZoho && <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>LOB</th>}
+                                        {!isZoho && <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Department</th>}
+                                        {!isZoho && <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Customer</th>}
+                                        {!isZoho && <th className="p-2 text-left text-[12px] font-medium border-r border-[#ffffff1a]" style={{ minWidth: 280 }}>Item</th>}
                                         <th className="p-2 text-center text-[12px] font-medium">Action</th>
                                     </tr>
                                 </thead>
@@ -939,50 +952,58 @@ const CodingTab = ({ isActive = false }) => {
                                                         onOpen={gl.onDropdownOpen}
                                                     />
                                                 </td>
-                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
-                                                    <DropdownCell
-                                                        disabled={isViewOnly}
-                                                        value={row.lob}
-                                                        onChange={(v) => handleUpdate(row.id, "lob", v)}
-                                                        options={lob.options}
-                                                        isLoading={lob.loading}
-                                                        onSearch={lob.handleSearch}
-                                                        onOpen={lob.onDropdownOpen}
-                                                    />
-                                                </td>
-                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
-                                                    <DropdownCell
-                                                        disabled={isViewOnly}
-                                                        value={row.department}
-                                                        onChange={(v) => handleUpdate(row.id, "department", v)}
-                                                        options={dept.options}
-                                                        isLoading={dept.loading}
-                                                        onSearch={dept.handleSearch}
-                                                        onOpen={dept.onDropdownOpen}
-                                                    />
-                                                </td>
-                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
-                                                    <DropdownCell
-                                                        disabled={isViewOnly}
-                                                        value={row.customer}
-                                                        onChange={(v) => handleUpdate(row.id, "customer", v)}
-                                                        options={customer.options}
-                                                        isLoading={customer.loading}
-                                                        onSearch={customer.handleSearch}
-                                                        onOpen={customer.onDropdownOpen}
-                                                    />
-                                                </td>
-                                                <td className="p-2 border-r border-gray-100 whitespace-nowrap">
-                                                    <DropdownCell
-                                                        disabled={isViewOnly}
-                                                        value={row.item}
-                                                        onChange={(v) => handleUpdate(row.id, "item", v)}
-                                                        options={item.options}
-                                                        isLoading={item.loading}
-                                                        onSearch={item.handleSearch}
-                                                        onOpen={item.onDropdownOpen}
-                                                    />
-                                                </td>
+                                                {!isZoho && (
+                                                    <td className="p-2 border-r border-gray-100 whitespace-nowrap">
+                                                        <DropdownCell
+                                                            disabled={isViewOnly}
+                                                            value={row.lob}
+                                                            onChange={(v) => handleUpdate(row.id, "lob", v)}
+                                                            options={lob.options}
+                                                            isLoading={lob.loading}
+                                                            onSearch={lob.handleSearch}
+                                                            onOpen={lob.onDropdownOpen}
+                                                        />
+                                                    </td>
+                                                )}
+                                                {!isZoho && (
+                                                    <td className="p-2 border-r border-gray-100 whitespace-nowrap">
+                                                        <DropdownCell
+                                                            disabled={isViewOnly}
+                                                            value={row.department}
+                                                            onChange={(v) => handleUpdate(row.id, "department", v)}
+                                                            options={dept.options}
+                                                            isLoading={dept.loading}
+                                                            onSearch={dept.handleSearch}
+                                                            onOpen={dept.onDropdownOpen}
+                                                        />
+                                                    </td>
+                                                )}
+                                                {!isZoho && (
+                                                    <td className="p-2 border-r border-gray-100 whitespace-nowrap">
+                                                        <DropdownCell
+                                                            disabled={isViewOnly}
+                                                            value={row.customer}
+                                                            onChange={(v) => handleUpdate(row.id, "customer", v)}
+                                                            options={customer.options}
+                                                            isLoading={customer.loading}
+                                                            onSearch={customer.handleSearch}
+                                                            onOpen={customer.onDropdownOpen}
+                                                        />
+                                                    </td>
+                                                )}
+                                                {!isZoho && (
+                                                    <td className="p-2 border-r border-gray-100 whitespace-nowrap">
+                                                        <DropdownCell
+                                                            disabled={isViewOnly}
+                                                            value={row.item}
+                                                            onChange={(v) => handleUpdate(row.id, "item", v)}
+                                                            options={item.options}
+                                                            isLoading={item.loading}
+                                                            onSearch={item.handleSearch}
+                                                            onOpen={item.onDropdownOpen}
+                                                        />
+                                                    </td>
+                                                )}
                                                 <td className="p-2 text-center whitespace-nowrap" style={{ overflow: "visible" }}>
                                                     {!isViewOnly && (
                                                         <button

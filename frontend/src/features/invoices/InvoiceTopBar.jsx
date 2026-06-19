@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import DelegateModal from "./DelegateModal";
 import { QUICK_VIEW_CONFIG } from "./Fields";
 import { getInvoiceHeuristics } from "../../utils/invoiceCalculations";
+import { getERPSystem } from "../../utils/envHelper";
 
 
 
@@ -236,11 +237,21 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
     const handleSendToApproval = async () => {
         if (!validateRequiredFields()) return;
 
+        const isZoho = getERPSystem() === "Zoho";
         const hasMissingCoding = lineItems
-            .some(item => !item.glCode || !item.lob || !item.department);
+            .some(item => {
+                if (isZoho) {
+                    return !item.glCode;
+                }
+                return !item.glCode || !item.lob || !item.department;
+            });
 
         if (hasMissingCoding) {
-            toast.error("GL, LOB, and Department are mandatory for all line items.");
+            if (isZoho) {
+                toast.error("GL Code is mandatory for all line items.");
+            } else {
+                toast.error("GL, LOB, and Department are mandatory for all line items.");
+            }
             return;
         }
 
