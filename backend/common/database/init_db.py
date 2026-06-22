@@ -50,6 +50,17 @@ def create_database_if_not_exists(db_url: str):
         raise
 
 
+def _add_column_if_not_exists(conn, table_name: str, column_name: str, column_def: str):
+    """Check if column exists in the table, if not, add it."""
+    result = conn.execute(text(
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+        "WHERE LOWER(TABLE_NAME) = :table_name AND LOWER(COLUMN_NAME) = :column_name"
+    ), {"table_name": table_name.lower(), "column_name": column_name.lower()})
+    if result.scalar() == 0:
+        conn.execute(text(f"ALTER TABLE {table_name} ADD {column_name} {column_def}"))
+        print(f"SUCCESS: Added column '{column_name}' ({column_def}) to table '{table_name}'")
+
+
 def create_tables(engine_obj, base_obj):
     """Create all database tables and schema migrations"""
     print("Creating database tables...")
@@ -58,45 +69,27 @@ def create_tables(engine_obj, base_obj):
     # Run manual migrations if required
     try:
         with engine_obj.connect() as conn:
-            # Check if department column exists
-            result = conn.execute(text(
-                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'department'"
-            ))
-            if result.scalar() == 0:
-                conn.execute(text("ALTER TABLE users ADD department NVARCHAR(100) NULL"))
-                print("SUCCESS: Added department column to users table")
-            
-            # Check if email_notifications column exists
-            result = conn.execute(text(
-                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'email_notifications'"
-            ))
-            if result.scalar() == 0:
-                conn.execute(text("ALTER TABLE users ADD email_notifications BIT NOT NULL DEFAULT 1"))
-                print("SUCCESS: Added email_notifications column to users table")
+            # Check users columns
+            _add_column_if_not_exists(conn, "users", "department", "NVARCHAR(100) NULL")
+            _add_column_if_not_exists(conn, "users", "email_notifications", "BIT NOT NULL DEFAULT 1")
 
-            # Check if account_name column exists
-            result = conn.execute(text(
-                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'gl_master' AND COLUMN_NAME = 'account_name'"
-            ))
-            if result.scalar() == 0:
-                conn.execute(text("ALTER TABLE gl_master ADD account_name NVARCHAR(200) NULL"))
-                print("SUCCESS: Added account_name column to gl_master table")
+            # Check gl_master columns
+            _add_column_if_not_exists(conn, "gl_master", "account_name", "NVARCHAR(200) NULL")
+            _add_column_if_not_exists(conn, "gl_master", "account_code", "NVARCHAR(100) NULL")
+            _add_column_if_not_exists(conn, "gl_master", "account_type", "NVARCHAR(100) NULL")
 
-            # Check if account_code column exists
-            result = conn.execute(text(
-                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'gl_master' AND COLUMN_NAME = 'account_code'"
-            ))
-            if result.scalar() == 0:
-                conn.execute(text("ALTER TABLE gl_master ADD account_code NVARCHAR(100) NULL"))
-                print("SUCCESS: Added account_code column to gl_master table")
+            # Check vendor_master columns (Zoho specific and new fields)
+            _add_column_if_not_exists(conn, "vendor_master", "company_name", "NVARCHAR(200) NULL")
+            _add_column_if_not_exists(conn, "vendor_master", "display_name", "NVARCHAR(200) NULL")
+            _add_column_if_not_exists(conn, "vendor_master", "email_id", "NVARCHAR(255) NULL")
+            _add_column_if_not_exists(conn, "vendor_master", "phone", "NVARCHAR(50) NULL")
+            _add_column_if_not_exists(conn, "vendor_master", "currency_code", "NVARCHAR(10) NULL")
+            _add_column_if_not_exists(conn, "vendor_master", "payment_terms_label", "NVARCHAR(100) NULL")
+            _add_column_if_not_exists(conn, "vendor_master", "billing_address", "NVARCHAR(MAX) NULL")
 
-            # Check if account_type column exists
-            result = conn.execute(text(
-                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'gl_master' AND COLUMN_NAME = 'account_type'"
-            ))
-            if result.scalar() == 0:
-                conn.execute(text("ALTER TABLE gl_master ADD account_type NVARCHAR(100) NULL"))
-                print("SUCCESS: Added account_type column to gl_master table")
+            # Explicitly commit the changes
+            conn.commit()
+            print("SUCCESS: Database schema migrations completed successfully")
     except Exception as e:
         print(f"Migration error (might be expected if table newly created): {e}")
 
