@@ -1,3 +1,5 @@
+import { getERPSystem } from "../../utils/envHelper";
+
 export const QUICK_VIEW_CONFIG = [
     {
         section: "Header",
@@ -6,10 +8,10 @@ export const QUICK_VIEW_CONFIG = [
             { key: "vendorId", label: "Vendor ID", type: "input", editable: true, required: true },
             { key: "vendorName", label: "Vendor Name", type: "input", editable: true, required: true },
             { key: "invoiceNumber", label: "Invoice Number", type: "input", editable: true, required: true },
-            { key: "referenceNumber", label: "Reference Number", type: "input", editable: true, required: true },
-            { key: "invoiceDate", label: "Invoice Date", type: "date", editable: true, required: true },
-            { key: "dueDate", label: "Due Date", type: "date", editable: true, required: true },
-            { key: "postingDate", label: "Posting Date", type: "date", editable: true, required: true },
+            { key: "referenceNumber", label: "Reference Number", type: "input", editable: true, required: getERPSystem() !== "Zoho" },
+            { key: "invoiceDate", label: "Invoice Date", type: "date", editable: true, required: getERPSystem() !== "Zoho" },
+            { key: "dueDate", label: "Due Date", type: "date", editable: true, required: getERPSystem() !== "Zoho" },
+            { key: "postingDate", label: "Posting Date", type: "date", editable: true, required: getERPSystem() !== "Zoho" },
             { key: "paymentTerms", label: "Payment Terms", type: "input", editable: true },
             {
                 key: "invoiceCurrency", label: "Invoice Currency", type: "dropdown", editable: true
@@ -19,9 +21,9 @@ export const QUICK_VIEW_CONFIG = [
                 key: "exchangeRate", label: "Exchange Rate", type: "input", editable: true,
                 visible: (f) => f.invoiceCurrency !== "USD"
             },
-            { key: "totalAmount", label: "Total Amount", type: "input", editable: true, required: true },
-            { key: "totalPayable", label: "Total Payable", type: "input", editable: true, required: true },
-            { key: "memo", label: "Memo", type: "input", editable: true },
+            { key: "totalAmount", label: "Total Amount", type: "input", editable: true, required: getERPSystem() !== "Zoho" },
+            { key: "totalPayable", label: "Total Payable", type: "input", editable: true, required: getERPSystem() !== "Zoho" },
+            { key: "memo", label: getERPSystem() === "Zoho" ? "Subject" : "Memo", type: "input", editable: true },
             {
                 key: "gstEligibility", label: "GST Eligibility", type: "dropdown", editable: true,
                 options: [
