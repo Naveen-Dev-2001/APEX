@@ -72,7 +72,7 @@ TAB_SEARCH_FIELDS = {
     "GL": ["account_number", "title", "account_name", "account_code", "account_type"],
     "LOB": ["lob_id", "name"],
     "Department": ["department_id", "department_name"],
-    "Customer": ["customer_id", "customer_name"],
+    "Customer": ["customer_id", "customer_name", "company_name", "display_name", "email_id"],
     "Exchange_Rate": ["base_currency", "target_currency", "rate_key", "rate_type", "exchange_rate", "effective_date"],
     "Currency": ["code", "name"],
     "Entity": ["entity_id", "entity_name"],
@@ -114,7 +114,8 @@ def normalize_column(col_name: str) -> str:
         "tds_section_code_and_description": "tds_section_code",
         "workflow_applicability_configuration": "workflow_applicable",
         "line_grouping": "line_grouping",
-        "gst_applicable": "gst_applicable"
+        "gst_applicable": "gst_applicable",
+        "emailid": "email_id"
     }
     return mapping.get(name, name)
 
@@ -414,6 +415,13 @@ async def upload_master_file(
                     if not record.get("vendor_id"):
                         record["vendor_id"] = record["vendor_name"][:100]
 
+                if tab_name in ["Customer", "Customer_Master", "customer_master", "master_data_Customer", "master_data_Customer_Master"]:
+                    # Zoho compatibility: Map display_name / company_name to customer_name / customer_id if they are missing
+                    if not record.get("customer_name"):
+                        record["customer_name"] = (record.get("display_name") or record.get("company_name") or "Unknown")[:200]
+                    if not record.get("customer_id"):
+                        record["customer_id"] = (record.get("customer_name") or "Unknown")[:100]
+
                 if tab_name == "Entity_Master" or tab_name == "entity_master":
                     if record.get("gst_applicable") is None:
                         record["gst_applicable"] = True
@@ -448,6 +456,16 @@ async def upload_master_file(
                 v_id = r.get("vendor_id")
                 if v_id not in seen_vendor_ids:
                     seen_vendor_ids.add(v_id)
+                    deduped_records.append(r)
+            records_to_insert = deduped_records
+
+        if tab_name in ["Customer", "Customer_Master", "customer_master", "master_data_Customer", "master_data_Customer_Master"]:
+            seen_customer_ids = set()
+            deduped_records = []
+            for r in records_to_insert:
+                c_id = r.get("customer_id")
+                if c_id not in seen_customer_ids:
+                    seen_customer_ids.add(c_id)
                     deduped_records.append(r)
             records_to_insert = deduped_records
 

@@ -552,6 +552,16 @@ class CustomerMaster(Base):
     customer_id = Column(String(100), unique=True, nullable=False, index=True)
     customer_name = Column(String(200), nullable=False, index=True)
 
+    # Zoho specific fields
+    company_name = Column(String(200), nullable=True)
+    display_name = Column(String(200), nullable=True)
+    email_id = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    currency_code = Column(String(10), nullable=True)
+    billing_address = Column(Text, nullable=True)
+    billing_street2 = Column(String(255), nullable=True)
+    billing_city = Column(String(100), nullable=True)
+
     # Sage Intacct Sync Fields
     customer_key = Column(String(100), index=True, nullable=True)
     status = Column(String(50), nullable=True, default="active")

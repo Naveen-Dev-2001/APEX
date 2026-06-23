@@ -642,7 +642,7 @@ const DataTable = ({
         <>
             <div className={`w-full flex flex-col ${transparent ? 'bg-transparent' : 'bg-white rounded-md border border-gray-200 shadow-sm'} overflow-hidden`}>
                 <div
-                    className="w-full overflow-x-auto overflow-y-auto"
+                    className="w-full overflow-x-auto overflow-y-auto pb-3"
                     style={maxHeight ? { maxHeight } : {}}
                 >
                     <table className="w-full text-left text-[13px] text-gray-700 border-separate border-spacing-0">

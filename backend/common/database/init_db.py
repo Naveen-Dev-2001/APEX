@@ -87,6 +87,16 @@ def create_tables(engine_obj, base_obj):
             _add_column_if_not_exists(conn, "vendor_master", "payment_terms_label", "NVARCHAR(100) NULL")
             _add_column_if_not_exists(conn, "vendor_master", "billing_address", "NVARCHAR(MAX) NULL")
 
+            # Check customer_master columns (Zoho specific and new fields)
+            _add_column_if_not_exists(conn, "customer_master", "company_name", "NVARCHAR(200) NULL")
+            _add_column_if_not_exists(conn, "customer_master", "display_name", "NVARCHAR(200) NULL")
+            _add_column_if_not_exists(conn, "customer_master", "email_id", "NVARCHAR(255) NULL")
+            _add_column_if_not_exists(conn, "customer_master", "phone", "NVARCHAR(50) NULL")
+            _add_column_if_not_exists(conn, "customer_master", "currency_code", "NVARCHAR(10) NULL")
+            _add_column_if_not_exists(conn, "customer_master", "billing_address", "NVARCHAR(MAX) NULL")
+            _add_column_if_not_exists(conn, "customer_master", "billing_street2", "NVARCHAR(255) NULL")
+            _add_column_if_not_exists(conn, "customer_master", "billing_city", "NVARCHAR(100) NULL")
+
             # Explicitly commit the changes
             conn.commit()
             print("SUCCESS: Database schema migrations completed successfully")

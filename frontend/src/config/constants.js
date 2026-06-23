@@ -71,6 +71,19 @@ export const MASTER_DATA_COLUMNS = {
             { header: 'Account Type', accessor: 'account_type', sortable: true, filterable: true },
             { header: 'Actions', accessor: 'actions', sortable: false },
         ],
+        "Customer Master": [
+            { header: 'Customer ID', accessor: 'customer_id', sortable: true, filterable: true },
+            { header: 'Customer Name', accessor: 'customer_name', sortable: true, filterable: true },
+            { header: 'Company Name', accessor: 'company_name', sortable: true, filterable: true },
+            { header: 'Display Name', accessor: 'display_name', sortable: true, filterable: true },
+            { header: 'Email ID', accessor: 'email_id', sortable: true, filterable: true },
+            { header: 'Phone', accessor: 'phone', sortable: true, filterable: true },
+            { header: 'Currency Code', accessor: 'currency_code', sortable: true, filterable: true },
+            { header: 'Billing Address', accessor: 'billing_address', sortable: true, filterable: true },
+            { header: 'Billing Street2', accessor: 'billing_street2', sortable: true, filterable: true },
+            { header: 'Billing City', accessor: 'billing_city', sortable: true, filterable: true },
+            { header: 'Actions', accessor: 'actions', sortable: false },
+        ],
     },
     "Sage": {
         "Entity Master": [

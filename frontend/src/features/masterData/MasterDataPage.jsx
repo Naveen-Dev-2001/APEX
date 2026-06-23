@@ -593,7 +593,7 @@ const MasterDataPage = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 w-full max-w-full overflow-hidden">
                 {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) || (currencyError && isCurrencyTab) || (exchangeRateError && isExchangeRateTab) ? (
                     <div className="flex items-center justify-center p-12 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">
