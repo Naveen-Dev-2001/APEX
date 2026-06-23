@@ -5,6 +5,7 @@ export const REQUIRED_FIELD = {
             "Vendor Master",
             "GL Master",
             "Currency",
+            "Customer Master"
         ],
         "Settings": [
             "Vendor Based Workflow",
