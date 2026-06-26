@@ -1032,3 +1032,11 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
             return "medium"
         else:
             return "low"
+
+    async def close(self):
+        try:
+            if hasattr(self, "doc_intel_client") and self.doc_intel_client:
+                await self.doc_intel_client.close()
+                print("Azure Document Intelligence Client closed successfully")
+        except Exception as e:
+            print(f"Failed to close doc_intel_client: {e}")

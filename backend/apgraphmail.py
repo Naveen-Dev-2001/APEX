@@ -137,16 +137,33 @@ def get_token() -> str:
 
 
 def _graph_get(url: str, token: str) -> dict:
-    resp = requests.get(
-        url,
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=60,
-    )
-    if resp.status_code >= 400:
-        log.error("Graph GET failed | status=%s | url=%s | body=%.500s",
-                  resp.status_code, url, resp.text)
-        resp.raise_for_status()
-    return resp.json()
+    import time
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = requests.get(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=60,
+            )
+            # Retry on transient server errors (502, 503, 504)
+            if resp.status_code in (502, 503, 504) and attempt < max_retries:
+                log.warning("Graph GET transient error %s. Retrying in %ds... (Attempt %d/%d)", 
+                            resp.status_code, attempt * 2, attempt, max_retries)
+                time.sleep(attempt * 2)
+                continue
+
+            if resp.status_code >= 400:
+                log.error("Graph GET failed | status=%s | url=%s | body=%.500s",
+                          resp.status_code, url, resp.text)
+                resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.RequestException as e:
+            if attempt == max_retries:
+                raise
+            log.warning("Graph GET failed with exception: %s. Retrying in %ds... (Attempt %d/%d)", 
+                        e, attempt * 2, attempt, max_retries)
+            time.sleep(attempt * 2)
 
 
 def _graph_patch(url: str, token: str, payload: dict) -> None:
@@ -229,6 +246,7 @@ async def process_and_save_invoice_async(unread_filepath: Path, filename: str, o
     in_progress_filepath = Path("uploads/in_progress_files") / filename
     
     invoice_id = None
+    processor = None
     try:
         # Create initial DB record
         new_invoice = Invoice(
@@ -411,6 +429,11 @@ async def process_and_save_invoice_async(unread_filepath: Path, filename: str, o
             raise e
     finally:
         db.close()
+        if processor:
+            try:
+                await processor.close()
+            except Exception as close_err:
+                log.error(f"Failed to close processor: {close_err}")
 
 
 async def download_invoice_attachments() -> None:

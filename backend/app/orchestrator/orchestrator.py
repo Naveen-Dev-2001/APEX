@@ -121,3 +121,7 @@ class InvoiceOrchestrator:
                 print(f"  - {pdf}: {err}")
 
         return results
+
+    async def close(self):
+        if hasattr(self, "extraction_agent") and self.extraction_agent:
+            await self.extraction_agent.close()
