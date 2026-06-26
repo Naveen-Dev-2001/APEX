@@ -445,146 +445,190 @@ async def download_invoice_attachments() -> None:
 
     log.info("Unread emails with attachments found: %d", len(messages))
 
-    if not messages:
-        log.info("Nothing to process. Exiting.")
-        return
+    pdf_queue = []
 
     total_downloaded = 0
     total_skipped = 0
     total_failed = 0
 
-    for msg in messages:
-        msg_id = msg["id"]
-        subject = msg.get("subject") or "No Subject"
-        sender = (msg.get("from") or {}).get("emailAddress", {}).get("address", "unknown")
-        received = msg.get("receivedDateTime", "unknown")
+    if messages:
+        for msg in messages:
+            msg_id = msg["id"]
+            subject = msg.get("subject") or "No Subject"
+            sender = (msg.get("from") or {}).get("emailAddress", {}).get("address", "unknown")
+            received = msg.get("receivedDateTime", "unknown")
 
-        log.info("-" * 50)
-        log.info("Email | from=%s | subject=%s | received=%s", sender, subject, received)
+            log.info("-" * 50)
+            log.info("Email | from=%s | subject=%s | received=%s", sender, subject, received)
 
-        # Refresh token before each message so long runs never hit expiry.
-        token = get_token()
-
-        try:
-            att_list_url = (
-                f"{GRAPH}/users/{MAILBOX}/messages/{msg_id}/attachments"
-                "?$select=id,name,contentType,size"
-            )
-            attachments = _graph_get(att_list_url, token).get("value", [])
-        except Exception as exc:
-            log.error("Failed to list attachments | subject=%s | error=%s", subject, exc)
-            total_failed += 1
-            continue
-
-        log.info("Attachments in this email: %d", len(attachments))
-
-        # Keeps duplicate attachment names deterministic within this email.
-        per_message_name_count: dict[str, int] = {}
-
-        msg_downloaded = 0
-        msg_failed = 0
-        msg_skipped = 0
-
-        for att in attachments:
-            att_type = att.get("@odata.type")
-            if att_type and att_type != "#microsoft.graph.fileAttachment":
-                log.debug("Skipped (not a file attachment) | type=%s", att_type)
-                continue
-
-            att_id = att["id"]
-            filename = safe_filename(att.get("name") or "attachment")
-            att_size = att.get("size", 0)
-
-            datestamp = _format_datestamp(received)
-            unique_key = f"{Path(filename).stem.lower()}|{datestamp}|{safe_filename(subject).lower()}"
-            per_message_name_count[unique_key] = per_message_name_count.get(unique_key, 0) + 1
-
-            output_name = _build_output_filename(
-                original_name=filename,
-                datestamp=datestamp,
-                subject=subject,
-                duplicate_index=per_message_name_count[unique_key],
-            )
-            unread_filepath = UNREAD_DIR / output_name
-
-            if unread_filepath.exists() or (READ_DIR / output_name).exists() or (NON_INVOICE_DIR / output_name).exists():
-                log.info("Already exists in staging folders, skipping download | file=%s", output_name)
-                msg_downloaded += 1
-                total_downloaded += 1
-                continue
-
-            log.debug("Downloading to unread folder | file=%s | size=%d bytes", output_name, att_size)
+            # Refresh token before each message so long runs never hit expiry.
+            token = get_token()
 
             try:
-                content = _fetch_attachment_bytes(msg_id, att_id, filename, token)
+                att_list_url = (
+                    f"{GRAPH}/users/{MAILBOX}/messages/{msg_id}/attachments"
+                    "?$select=id,name,contentType,size"
+                )
+                attachments = _graph_get(att_list_url, token).get("value", [])
+            except Exception as exc:
+                log.error("Failed to list attachments | subject=%s | error=%s", subject, exc)
+                total_failed += 1
+                continue
 
-                if content is None:
-                    msg_failed += 1
-                    total_failed += 1
+            log.info("Attachments in this email: %d", len(attachments))
+
+            # Keeps duplicate attachment names deterministic within this email.
+            per_message_name_count: dict[str, int] = {}
+
+            msg_downloaded = 0
+            msg_failed = 0
+            msg_skipped = 0
+
+            for att in attachments:
+                att_type = att.get("@odata.type")
+                if att_type and att_type != "#microsoft.graph.fileAttachment":
+                    log.debug("Skipped (not a file attachment) | type=%s", att_type)
                     continue
 
-                with open(unread_filepath, "wb") as fh:
-                    fh.write(content)
+                att_id = att["id"]
+                filename = safe_filename(att.get("name") or "attachment")
+                att_size = att.get("size", 0)
 
-                log.info("Downloaded to UNREAD | file=%s", unread_filepath)
+                datestamp = _format_datestamp(received)
+                unique_key = f"{Path(filename).stem.lower()}|{datestamp}|{safe_filename(subject).lower()}"
+                per_message_name_count[unique_key] = per_message_name_count.get(unique_key, 0) + 1
 
-                if output_name.lower().endswith(".pdf"):
-                    is_invoice = await process_and_save_invoice_async(
-                        unread_filepath=unread_filepath,
-                        filename=output_name,
-                        original_filename=filename,
-                        entity_id=ENTITY_ID,
-                        sender=sender,
-                        subject=subject
-                    )
-                    if is_invoice:
+                output_name = _build_output_filename(
+                    original_name=filename,
+                    datestamp=datestamp,
+                    subject=subject,
+                    duplicate_index=per_message_name_count[unique_key],
+                )
+                unread_filepath = UNREAD_DIR / output_name
+
+                if unread_filepath.exists() or (READ_DIR / output_name).exists() or (NON_INVOICE_DIR / output_name).exists():
+                    log.info("Already exists in staging folders, skipping download | file=%s", output_name)
+                    msg_downloaded += 1
+                    total_downloaded += 1
+                    
+                    # Queue for processing if it is a PDF and exists in the unread folder
+                    if unread_filepath.exists() and output_name.lower().endswith(".pdf"):
+                        pdf_queue.append({
+                            "unread_filepath": unread_filepath,
+                            "filename": output_name,
+                            "original_filename": filename,
+                            "entity_id": ENTITY_ID,
+                            "sender": sender,
+                            "subject": subject
+                        })
+                    continue
+
+                log.debug("Downloading to unread folder | file=%s | size=%d bytes", output_name, att_size)
+
+                try:
+                    content = _fetch_attachment_bytes(msg_id, att_id, filename, token)
+
+                    if content is None:
+                        msg_failed += 1
+                        total_failed += 1
+                        continue
+
+                    with open(unread_filepath, "wb") as fh:
+                        fh.write(content)
+
+                    log.info("Downloaded to UNREAD | file=%s", unread_filepath)
+
+                    if output_name.lower().endswith(".pdf"):
+                        pdf_queue.append({
+                            "unread_filepath": unread_filepath,
+                            "filename": output_name,
+                            "original_filename": filename,
+                            "entity_id": ENTITY_ID,
+                            "sender": sender,
+                            "subject": subject
+                        })
                         msg_downloaded += 1
                         total_downloaded += 1
                     else:
+                        # Non-PDF: move to non_invoice directly
+                        non_invoice_filepath = NON_INVOICE_DIR / output_name
+                        shutil.move(str(unread_filepath), str(non_invoice_filepath))
+                        log.info("Non-PDF file moved to non_invoice | file=%s", non_invoice_filepath)
+                        
+                        # Upload to Azure Blob Storage under 'non_invoice/'
+                        from app.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
+                        blob_name = get_blob_name_from_path(str(non_invoice_filepath))
+                        try:
+                            upload_file_to_blob(str(non_invoice_filepath), blob_name)
+                            log.info(f"Uploaded non-pdf file to Azure Blob: {blob_name}")
+                        except Exception as upload_err:
+                            log.error(f"Failed to upload non-pdf file to Azure Blob: {upload_err}")
+                            
                         msg_skipped += 1
                         total_skipped += 1
-                else:
-                    # Non-PDF: move to non_invoice directly
-                    non_invoice_filepath = NON_INVOICE_DIR / output_name
-                    shutil.move(str(unread_filepath), str(non_invoice_filepath))
-                    log.info("Non-PDF file moved to non_invoice | file=%s", non_invoice_filepath)
-                    
-                    # Upload to Azure Blob Storage under 'non_invoice/'
-                    from app.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
-                    blob_name = get_blob_name_from_path(str(non_invoice_filepath))
-                    try:
-                        upload_file_to_blob(str(non_invoice_filepath), blob_name)
-                        log.info(f"Uploaded non-pdf file to Azure Blob: {blob_name}")
-                    except Exception as upload_err:
-                        log.error(f"Failed to upload non-pdf file to Azure Blob: {upload_err}")
-                        
-                    msg_skipped += 1
-                    total_skipped += 1
 
-            except Exception as exc:
-                log.error(
-                    "Download/Processing failed | file=%s | from=%s | subject=%s | error=%s",
-                    filename, sender, subject, exc,
+                except Exception as exc:
+                    log.error(
+                        "Download failed | file=%s | from=%s | subject=%s | error=%s",
+                        filename, sender, subject, exc,
+                    )
+                    msg_failed += 1
+                    total_failed += 1
+
+            # Only mark as read when every eligible attachment succeeded/handled.
+            if msg_failed > 0:
+                log.warning(
+                    "NOT marking as read (%d failures) — will retry next run | subject=%s",
+                    msg_failed, subject,
                 )
-                msg_failed += 1
-                total_failed += 1
+            else:
+                try:
+                    _graph_patch(
+                        f"{GRAPH}/users/{MAILBOX}/messages/{msg_id}",
+                        token,
+                        {"isRead": True},
+                    )
+                    log.info("Marked as read | subject=%s | from=%s", subject, sender)
+                except Exception as exc:
+                    log.error("Failed to mark as read | subject=%s | error=%s", subject, exc)
 
-        # Only mark as read when every eligible attachment succeeded/handled.
-        if msg_failed > 0:
-            log.warning(
-                "NOT marking as read (%d failures) — will retry next run | subject=%s",
-                msg_failed, subject,
-            )
-        else:
+    # Scan unread directory for any other leftover PDF files from previous aborted runs
+    import glob
+    existing_pdfs = glob.glob(os.path.join(str(UNREAD_DIR), "*.pdf"))
+    queued_paths = {str(item["unread_filepath"]) for item in pdf_queue}
+    for pdf_path_str in existing_pdfs:
+        pdf_path = Path(pdf_path_str)
+        if pdf_path_str not in queued_paths:
+            log.info("Found leftover PDF in UNREAD folder, queueing for processing: %s", pdf_path.name)
+            pdf_queue.append({
+                "unread_filepath": pdf_path,
+                "filename": pdf_path.name,
+                "original_filename": pdf_path.name,
+                "entity_id": ENTITY_ID,
+                "sender": "unknown",
+                "subject": "leftover"
+            })
+
+    # Phase 2: Process queued files sequentially
+    if pdf_queue:
+        log.info("=" * 60)
+        log.info("Starting processing of %d queued invoice files...", len(pdf_queue))
+        for item in pdf_queue:
+            log.info("Processing file: %s", item["filename"])
             try:
-                _graph_patch(
-                    f"{GRAPH}/users/{MAILBOX}/messages/{msg_id}",
-                    token,
-                    {"isRead": True},
+                await process_and_save_invoice_async(
+                    unread_filepath=item["unread_filepath"],
+                    filename=item["filename"],
+                    original_filename=item["original_filename"],
+                    entity_id=item["entity_id"],
+                    sender=item["sender"],
+                    subject=item["subject"]
                 )
-                log.info("Marked as read | subject=%s | from=%s", subject, sender)
-            except Exception as exc:
-                log.error("Failed to mark as read | subject=%s | error=%s", subject, exc)
+            except Exception as e:
+                log.error(
+                    "Processing failed | file=%s | error=%s",
+                    item["filename"], e
+                )
 
     log.info("=" * 60)
     log.info(
