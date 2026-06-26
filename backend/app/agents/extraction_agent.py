@@ -61,17 +61,31 @@ class InvoiceExtractionAgent:
 
             print(f"Processing file: {file_path}")
 
-            with open(file_path, "rb") as document:
-                poller = await self.doc_intel_client.begin_analyze_document(
-                    "prebuilt-invoice",
-                    AnalyzeDocumentRequest(bytes_source=document.read())
-                )
+            if os.path.exists(file_path):
+                with open(file_path, "rb") as document:
+                    doc_bytes = document.read()
+            else:
+                from app.services.azure_blob import container_client, get_blob_name_from_path
+                blob_name = get_blob_name_from_path(file_path)
+                try:
+                    print(f"File {file_path} not found locally. Fetching bytes from Azure Blob: {blob_name}")
+                    blob_client = container_client.get_blob_client(blob_name)
+                    doc_bytes = blob_client.download_blob().readall()
+                except Exception as blob_err:
+                    raise FileNotFoundError(
+                        f"File {file_path} not found locally, and download failed from Azure Blob '{blob_name}': {blob_err}"
+                    )
+
+            poller = await self.doc_intel_client.begin_analyze_document(
+                "prebuilt-invoice",
+                AnalyzeDocumentRequest(bytes_source=doc_bytes)
+            )
+            
+            # Check cancellation before waiting for poller result
+            if is_cancelled_callback and is_cancelled_callback():
+                raise Exception("cancelled")
                 
-                # Check cancellation before waiting for poller result
-                if is_cancelled_callback and is_cancelled_callback():
-                    raise Exception("cancelled")
-                    
-                result: AnalyzeResult = await poller.result()
+            result: AnalyzeResult = await poller.result()
             
             if not result.documents or not any(getattr(doc, 'doc_type', None) == 'invoice' for doc in result.documents):
                 raise ValueError("No invoice found in the document")

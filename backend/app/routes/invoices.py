@@ -366,6 +366,16 @@ async def upload_invoices(
             with open(file_path, "wb") as f:
                 f.write(contents)
             print(f"[Backend] File saved in {time.time() - save_start:.2f}s: {file_path}")
+
+            # Upload to Azure Blob Storage
+            try:
+                from app.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
+                blob_name = get_blob_name_from_path(file_path)
+                upload_file_to_blob(file_path, blob_name)
+                print(f"[Backend] Uploaded to Azure Blob: {blob_name}")
+            except Exception as blob_err:
+                print(f"[Backend] Azure Blob upload failed: {blob_err}")
+
             await emit_progress("processing", f"[{index}/{total_files}] Processing file...", progress=50)
 
 
@@ -493,7 +503,9 @@ async def upload_invoices(
             try:
                 raw_start = time.time()
                 # Read PDF binary
-                with open(file_path, "rb") as f:
+                from app.services.file_manager import ensure_local_file
+                local_pdf_path = ensure_local_file(file_path)
+                with open(local_pdf_path, "rb") as f:
                     pdf_bytes = f.read()
                 
                 raw_record = RawExtractionData(
@@ -1792,7 +1804,8 @@ async def get_deleted_invoice(
             extracted_data["is_coded"] = True
 
     res = {
-        "id": record.id,
+        "id": record.original_invoice_id,
+        "archive_id": record.id,
         "original_invoice_id": record.original_invoice_id,
         "filename": record.filename,
         "original_filename": record.original_filename,
@@ -1930,6 +1943,31 @@ async def get_raw_invoice(invoice_id: int, db: Session = Depends(get_db)):
     return invoice_to_dict(invoice, user_map=user_map)
 
 
+
+@router.get("/{invoice_id}/pdf-link")
+async def get_invoice_pdf_link(
+    invoice_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        archived = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
+        if not archived:
+             archived = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
+        if archived:
+            invoice = archived
+        else:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+    from app.services.azure_blob import get_pdf_link, get_blob_name_from_path
+    blob_name = get_blob_name_from_path(invoice.file_path)
+    pdf_link = get_pdf_link(blob_name)
+    if not pdf_link:
+        raise HTTPException(status_code=500, detail="Failed to generate SAS link")
+    return {"pdf_link": pdf_link}
+
+
 @router.get("/{invoice_id}/file")
 async def get_invoice_pdf(
     invoice_id: int,
@@ -1951,6 +1989,27 @@ async def get_invoice_pdf(
 
     file_path = invoice.file_path
     
+    # Try streaming from Azure Blob directly to avoid CORS preflight issues
+    from app.services.azure_blob import container_client, get_blob_name_from_path
+    blob_name = get_blob_name_from_path(file_path)
+    try:
+        blob_client = container_client.get_blob_client(blob_name)
+        if blob_client.exists():
+            def stream_blob():
+                download_stream = blob_client.download_blob()
+                for chunk in download_stream.chunks():
+                    yield chunk
+            return StreamingResponse(
+                stream_blob(),
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"inline; filename=\"{invoice.original_filename or 'invoice.pdf'}\""
+                }
+            )
+    except Exception as e:
+        logger.error(f"Failed to stream blob {blob_name} from Azure: {e}")
+    
+    # Fallback to serving local file if blob stream fails
     # Ensure path is absolute/resolvable
     if file_path and not os.path.isabs(file_path):
         base_dir = os.getcwd()
