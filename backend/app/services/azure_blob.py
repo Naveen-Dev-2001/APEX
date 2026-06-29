@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 import os
 
 # Azure Connection Details
-CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=ldnaapex;AccountKey=P7EkK/Mk2KtIUVTrAXi+HVrvpni/k3o45AVrJF/wGXviCrILkcsZr/4osxho8zpqjZmdaH4foVbV+AStXpPI0g==;EndpointSuffix=core.windows.net"
-CONTAINER_NAME = "apex-testing"
+CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+CONTAINER_NAME = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
 
 blob_service_client = BlobServiceClient.from_connection_string(CONNECTION_STRING)
 container_client = blob_service_client.get_container_client(CONTAINER_NAME)

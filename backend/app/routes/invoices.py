@@ -1995,12 +1995,10 @@ async def get_invoice_pdf(
     try:
         blob_client = container_client.get_blob_client(blob_name)
         if blob_client.exists():
-            def stream_blob():
-                download_stream = blob_client.download_blob()
-                for chunk in download_stream.chunks():
-                    yield chunk
-            return StreamingResponse(
-                stream_blob(),
+            from fastapi import Response
+            blob_data = blob_client.download_blob().readall()
+            return Response(
+                content=blob_data,
                 media_type="application/pdf",
                 headers={
                     "Content-Disposition": f"inline; filename=\"{invoice.original_filename or 'invoice.pdf'}\""
