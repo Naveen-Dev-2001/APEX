@@ -467,7 +467,7 @@ async def download_invoice_attachments() -> None:
             try:
                 att_list_url = (
                     f"{GRAPH}/users/{MAILBOX}/messages/{msg_id}/attachments"
-                    "?$select=id,name,contentType,size"
+                    "?$select=id,name,contentType,size,isInline"
                 )
                 attachments = _graph_get(att_list_url, token).get("value", [])
             except Exception as exc:
@@ -488,6 +488,11 @@ async def download_invoice_attachments() -> None:
                 att_type = att.get("@odata.type")
                 if att_type and att_type != "#microsoft.graph.fileAttachment":
                     log.debug("Skipped (not a file attachment) | type=%s", att_type)
+                    continue
+
+                is_inline = att.get("isInline", False)
+                if is_inline:
+                    log.info("Skipped inline attachment (signature image/logo) | file=%s", att.get("name"))
                     continue
 
                 att_id = att["id"]
