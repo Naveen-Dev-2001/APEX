@@ -636,6 +636,27 @@ async def download_invoice_attachments() -> None:
         total_downloaded, total_skipped, total_failed,
     )
 
+async def main():
+    # Load interval in minutes from env file, default to 2 minutes
+    interval_str = os.getenv("MAIL_CHECK_INTERVAL_MINUTES", "2")
+    try:
+        interval_minutes = float(interval_str)
+    except ValueError:
+        interval_minutes = 2.0
+
+    log.info("Starting periodic mail check. Interval: %s minutes", interval_minutes)
+    while True:
+        start_time = asyncio.get_event_loop().time()
+        try:
+            await download_invoice_attachments()
+        except Exception as e:
+            log.error("Unhandled error in download_invoice_attachments: %s", e)
+        
+        elapsed = asyncio.get_event_loop().time() - start_time
+        sleep_time = max(1.0, (interval_minutes * 60) - elapsed)
+        log.info("Sleeping for %.2f seconds before next check...", sleep_time)
+        await asyncio.sleep(sleep_time)
+
 
 if __name__ == "__main__":
-    asyncio.run(download_invoice_attachments())
+    asyncio.run(main())

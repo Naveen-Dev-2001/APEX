@@ -44,7 +44,6 @@ const CURRENCY_KEYS = [
 // ─────────────────────────────────────────────────────────────────────────────
 const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filterVendors, onVendorSelect, onHover, onLeave, isDuplicate, duplicateMessage, isAmountMismatch, forceDisabled = false, currencyOptions, fetchCurrencyOptions, currencyLoading, onSearch, searchLoading, options: dynamicOptions, loading: dynamicLoading, onOpenChange: dynamicOnOpenChange }) => {
     const isCurrencyField = CURRENCY_KEYS.includes(field.key);
-    const [prevStoreValue, setPrevStoreValue] = useState(storeValue);
     const [localValue, setLocalValue] = useState(() => {
         let val = storeValue ?? "";
         if (isCurrencyField && typeof val === "string") {
@@ -59,8 +58,7 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
     const [isFocused, setIsFocused] = useState(false);
     const debounceRef = useRef(null);
 
-    if (storeValue !== prevStoreValue) {
-        setPrevStoreValue(storeValue);
+    useEffect(() => {
         let val = storeValue ?? "";
         if (isCurrencyField && typeof val === "string") {
             val = val.replace(/[^\d.-]/g, '');
@@ -70,7 +68,7 @@ const FieldRenderer = memo(({ field, storeValue, onCommit, vendorOptions, filter
             }
         }
         setLocalValue(val);
-    }
+    }, [storeValue, isCurrencyField]);
 
 
     const handleChange = useCallback((value) => {

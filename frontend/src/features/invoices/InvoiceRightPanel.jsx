@@ -74,13 +74,14 @@ const InvoiceRightPanel = () => {
     // Keep track of which tabs have been rendered to avoid mounting them until needed
     const [renderedTabs, setRenderedTabs] = useState(() => new Set([validActiveTab]));
 
-    if (!renderedTabs.has(validActiveTab)) {
+    useEffect(() => {
         setRenderedTabs(prev => {
+            if (prev.has(validActiveTab)) return prev;
             const next = new Set(prev);
             next.add(validActiveTab);
             return next;
         });
-    }
+    }, [validActiveTab]);
 
     return (
         <div className="h-full flex flex-col">

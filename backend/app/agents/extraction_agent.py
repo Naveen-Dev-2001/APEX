@@ -625,8 +625,8 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
             print(f"Failed to parse LLM response as JSON: {e}")
             return self._create_fallback_structure(), response_text if 'response_text' in locals() else ""
         except Exception as e:
-            print(f"LLM call failed: {e}")
-            return self._create_fallback_structure(), response_text if 'response_text' in locals() else ""
+            print(f"LLM call failed with exception: {e}")
+            raise e
 
     def _create_fallback_structure(self) -> Dict[str, Any]:
         return {
@@ -703,11 +703,22 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
     def _merge_azure_and_llm(self, azure_data: Dict[str, Any], enhanced_headers: Dict[str, Any]) -> Dict[str, Any]:
         final: Dict[str, Any] = {}
 
+        section_fields = {
+            "vendor_info": ["name", "address", "tax_id", "phone", "country", "contact_email", "bank_name", "bank_account_number", "bank_details", "contact_person", "website"],
+            "client_info": ["name", "billing_address", "shipping_address", "tax_id", "phone", "email", "contact_person"],
+            "invoice_details": ["invoice_number", "invoice_date", "due_date", "po_number", "payment_terms", "currency", "type", "payment_method", "cost_center"],
+            "service_period": ["start_date", "end_date"],
+            "amounts": ["subtotal", "total_tax_amount", "total_invoice_amount", "amount_due", "previous_unpaid_balance", "shipping_handling_fees", "surcharges", "tax_type_breakdown", "CGST", "SGST", "IGST", "withholding_tax", "amount_paid"],
+            "additional_info": ["notes_terms", "qr_code_irn", "company_registration_number"]
+        }
+
         def merge_section(section: str):
             section_plain = enhanced_headers.get(section, {}) or {}
             final[section] = {}
 
-            for field, llm_value in section_plain.items():
+            fields = section_fields.get(section, [])
+            for field in fields:
+                llm_value = section_plain.get(field)
                 az_field_name = self._get_azure_field_for_section_field(section, field)
                 azure_entry = azure_data.get(az_field_name) if az_field_name else None
                 azure_value = azure_entry.get("value") if azure_entry else None
