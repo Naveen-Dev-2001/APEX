@@ -642,12 +642,12 @@ async def download_invoice_attachments() -> None:
     )
 
 async def main():
-    # Load interval in minutes from env file, default to 2 minutes
-    interval_str = os.getenv("MAIL_CHECK_INTERVAL_MINUTES", "2")
+    # Load interval in minutes from env file, default to 15 minutes
+    interval_str = os.getenv("MAIL_CHECK_INTERVAL_MINUTES", "15")
     try:
         interval_minutes = float(interval_str)
     except ValueError:
-        interval_minutes = 2.0
+        interval_minutes = 15.0
 
     log.info("Starting periodic mail check. Interval: %s minutes", interval_minutes)
     while True:
