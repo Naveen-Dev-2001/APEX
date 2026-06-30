@@ -46,7 +46,7 @@ export default function SSOCallback() {
                 setStatus("Redirecting...");
                 toast.success("SSO Login Successful");
 
-                navigate("/select-entity", { replace: true });
+                navigate("/module-select", { replace: true });
 
             } catch (err) {
                 console.error("SSO exchange failed:", err);

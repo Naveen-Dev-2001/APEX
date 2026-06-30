@@ -5,6 +5,7 @@ from app.database.init_db import init_database, seed_api_master_data
 from app.database.database import engine, Base
 from app.routes import master_data, workflow, approval, admin, settings as settings_route, workflow_config, delegation, audit
 from app.routes import auth, invoices, coding, dashboard, currency
+from app.routes.bank_reconciliation import router as bank_reconciliation_router
 from app.routes.auth import sso_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends
@@ -61,6 +62,8 @@ app.include_router(delegation.router, prefix="/delegations",
                    tags=["delegation"], dependencies=[Depends(get_current_user)])
 app.include_router(audit.router, prefix="/api/audit",
                    tags=["audit"], dependencies=[Depends(get_current_user)])
+app.include_router(bank_reconciliation_router,
+                   tags=["bank-reconciliation"], dependencies=[Depends(get_current_user)])
 
 app.include_router(
     approval_new_router,

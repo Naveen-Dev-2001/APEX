@@ -77,6 +77,42 @@ def create_tables():
                 conn.execute(text("ALTER TABLE users ADD email_notifications BIT NOT NULL DEFAULT 1"))
                 conn.execute(text("COMMIT"))
                 print("SUCCESS: Added email_notifications column to users table")
+
+            # ── Bank Reconciliation migrations ──────────────────────────────
+            # Add account_number column to bank_statements if it doesn't exist
+            result = conn.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE TABLE_NAME = 'bank_statements' AND COLUMN_NAME = 'account_number'"
+            ))
+            if result.scalar() == 0:
+                conn.execute(text("ALTER TABLE bank_statements ADD account_number NVARCHAR(100) NULL"))
+                conn.execute(text("COMMIT"))
+                print("SUCCESS: Added account_number column to bank_statements table")
+
+            # Add SageGLTransactionCache extra columns if they don't exist
+            columns_to_add = [
+                ("entry_date", "DATE NULL"),
+                ("doc_number", "NVARCHAR(100) NULL"),
+                ("vendor", "NVARCHAR(200) NULL"),
+                ("customer", "NVARCHAR(200) NULL"),
+                ("record_type", "NVARCHAR(100) NULL"),
+                ("cleared", "NVARCHAR(50) NULL"),
+                ("tr_type", "NVARCHAR(50) NULL"),
+                ("bank", "NVARCHAR(100) NULL")
+            ]
+            for col_name, col_type in columns_to_add:
+                result = conn.execute(text(
+                    f"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                    f"WHERE TABLE_NAME = 'sage_gl_transaction_cache' AND COLUMN_NAME = '{col_name}'"
+                ))
+                if result.scalar() == 0:
+                    conn.execute(text(f"ALTER TABLE sage_gl_transaction_cache ADD {col_name} {col_type}"))
+                    try:
+                        conn.execute(text("COMMIT"))
+                    except Exception:
+                        pass
+                    print(f"SUCCESS: Added {col_name} column to sage_gl_transaction_cache table")
+
     except Exception as e:
         print(f"Migration error (might be expected if table newly created): {e}")
 

@@ -57,7 +57,7 @@ const LoginPage = () => {
                     toast.info('Please change your password to continue');
                     navigate('/change-password-first-time', { state: { email: response.data.email || email } });
                 } else {
-                    navigate('/select-entity');
+                    navigate('/module-select');
                 }
             } else {
                 setError('Invalid response from server');

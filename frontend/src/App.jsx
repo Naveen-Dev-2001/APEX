@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AppLayout from './layout/AppLayout';
 import RegisterPage from './features/auth/RegisterPage';
 import LoginPage from './features/auth/LoginPage';
+import ModuleSelectionPage from './features/auth/ModuleSelectionPage';
 import SelectEntityPage from './features/entity/SelectEntityPage';
 import DashboardPage from './features/dashboard/DashboardPage';
 import MasterDataPage from './features/masterData/MasterDataPage';
@@ -13,6 +14,7 @@ import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
 import ChangePasswordFirstTimePage from './features/auth/ChangePasswordFirstTimePage';
 import SSOCallback from './features/auth/SSOCallback';
+import BankReconciliationPage from './features/reconciliation/BankReconciliationPage';
 
 import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
@@ -45,8 +47,10 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/module-select" element={<ModuleSelectionPage />} />
             <Route path="/select-entity" element={<SelectEntityPage />} />
             <Route path="/change-password-first-time" element={<ChangePasswordFirstTimePage />} />
+            <Route path="/bank-reconciliation" element={<BankReconciliationPage />} />
 
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />

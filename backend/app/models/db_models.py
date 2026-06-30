@@ -874,3 +874,128 @@ class InvoiceApprovalLog(Base):
     __table_args__ = (
         Index("ix_approval_logs_invoice_action", "invoice_id", "action"),
     )
+
+# ==================== BANK RECONCILIATION MODELS ====================
+
+class BankStatement(Base):
+    __tablename__ = "bank_statements"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    filename = Column(String(255), nullable=False)
+    account_number = Column(String(100), nullable=True, index=True)  # GL account this statement belongs to
+    upload_date = Column(DateTime, nullable=False, default=get_ist_now)
+    status = Column(String(50), nullable=False, default="uploaded") # uploaded, reconciled
+    entity = Column(String(100), nullable=True)
+    uploaded_by = Column(String(255), nullable=True)
+
+    transactions = relationship("BankStatementTransaction", back_populates="statement", cascade="all, delete-orphan")
+
+
+# class BankStatementTransaction(Base):
+#     __tablename__ = "bank_statement_transactions"
+
+#     id = Column(Integer, primary_key=True, autoincrement=True)
+#     statement_id = Column(Integer, ForeignKey("bank_statements.id"), nullable=False)
+#     date = Column(Date, nullable=False)
+#     description = Column(String(500), nullable=True)
+#     reference = Column(String(255), nullable=True)
+#     amount = Column(DECIMAL(18, 2), nullable=False)
+#     transaction_type = Column(String(20), nullable=False) # debit, credit
+#     is_matched = Column(Boolean, default=False)
+    
+#     statement = relationship("BankStatement", back_populates="transactions")
+#     reconciliation_results = relationship("ReconciliationResult", back_populates="bank_transaction")
+
+
+class BankStatementTransaction(Base):
+    __tablename__ = "bank_statement_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    statement_id = Column(
+        Integer,
+        ForeignKey("bank_statements.id"),
+        nullable=False
+    )
+
+    # Existing
+    date = Column(Date, nullable=False)
+    description = Column(String(500), nullable=True)
+    reference = Column(String(255), nullable=True)
+
+    # New columns
+    account_number = Column(String(100), nullable=True)
+    account_name = Column(String(255), nullable=True)
+
+    debit = Column(DECIMAL(18, 2), nullable=True)
+    credit = Column(DECIMAL(18, 2), nullable=True)
+
+    check_number = Column(String(100), nullable=True)
+
+    transaction_type = Column(
+        String(20),
+        nullable=True
+    )  # debit / credit
+
+    status = Column(
+        String(50),
+        default="Pending"
+    )  # Pending / Matched / Unmatched
+
+    amount = Column(
+        DECIMAL(18, 2),
+        nullable=False
+    )
+
+    is_matched = Column(
+        Boolean,
+        default=False
+    )
+
+    statement = relationship(
+        "BankStatement",
+        back_populates="transactions"
+    )
+
+    reconciliation_results = relationship(
+        "ReconciliationResult",
+        back_populates="bank_transaction"
+    )
+
+class SageGLTransactionCache(Base):
+    __tablename__ = "sage_gl_transaction_cache"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sage_key = Column(String(100), nullable=False, unique=True, index=True)
+    date = Column(Date, nullable=False)
+    description = Column(String(500), nullable=True)
+    account = Column(String(100), nullable=True)
+    amount = Column(DECIMAL(18, 2), nullable=False)
+    transaction_type = Column(String(20), nullable=False) # debit, credit
+    is_matched = Column(Boolean, default=False)
+    fetch_date = Column(DateTime, nullable=False, default=get_ist_now)
+    
+    # Extra columns extracted from Sage
+    entry_date = Column(Date, nullable=True)
+    doc_number = Column(String(100), nullable=True)
+    vendor = Column(String(200), nullable=True)
+    customer = Column(String(200), nullable=True)
+    record_type = Column(String(100), nullable=True)
+    cleared = Column(String(50), nullable=True)
+    tr_type = Column(String(50), nullable=True)
+    bank = Column(String(100), nullable=True)
+    
+    reconciliation_results = relationship("ReconciliationResult", back_populates="sage_transaction")
+
+
+class ReconciliationResult(Base):
+    __tablename__ = "reconciliation_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bank_transaction_id = Column(Integer, ForeignKey("bank_statement_transactions.id"), nullable=True)
+    sage_transaction_id = Column(Integer, ForeignKey("sage_gl_transaction_cache.id"), nullable=True)
+    match_status = Column(String(50), nullable=False) # matched, unmatched
+    matched_at = Column(DateTime, default=get_ist_now)
+
+    bank_transaction = relationship("BankStatementTransaction", back_populates="reconciliation_results")
+    sage_transaction = relationship("SageGLTransactionCache", back_populates="reconciliation_results")
