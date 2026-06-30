@@ -758,6 +758,14 @@ async def upload_invoices(
             new_invoice.status_history.append(processed_history)
             task_db.commit()
 
+            # ---- DELETE LOCAL FILE (already safely in Azure Blob) ----
+            try:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"[Backend] Deleted local file after successful processing: {file_path}")
+            except Exception as del_err:
+                print(f"[Backend] Warning: Could not delete local file {file_path}: {del_err}")
+
             await emit_progress("processing", f"[{index}/{total_files}] Completed processing {clean_name}!", progress=100)
 
             return {"success": True, "data": invoice_to_dict(new_invoice)}
