@@ -435,8 +435,16 @@ async def process_and_save_invoice_async(unread_filepath: Path, filename: str, o
             except Exception as close_err:
                 log.error(f"Failed to close processor: {close_err}")
 
+async def download_invoice_attachments(start_time: float, processing_window_seconds: float) -> None:
+    """Download all unread invoice attachments and process PDFs within the allowed window.
 
-async def download_invoice_attachments() -> None:
+    Args:
+        start_time: Loop reference time from asyncio event-loop clock.
+        processing_window_seconds: Hard deadline (in seconds) after start_time by which
+            no NEW file processing must be started.  Any file already running is allowed
+            to finish.  Files not started before the deadline stay in the unread folder
+            and will be picked up on the next cycle.
+    """
     log.info("=" * 60)
     log.info("Invoice download run started")
 
@@ -614,12 +622,42 @@ async def download_invoice_attachments() -> None:
                 "subject": "leftover"
             })
 
-    # Phase 2: Process queued files sequentially
+    # ---------------------------------------------------------------------------
+    # Phase 2: Process queued PDFs — hard deadline enforced BEFORE each new file
+    # ---------------------------------------------------------------------------
+    # Rule: once elapsed >= processing_window_seconds we must NOT start any new
+    # file.  The current file (if any) is allowed to finish naturally.
+    # Files not started will remain in the unread folder and be picked up next
+    # cycle automatically.
     if pdf_queue:
         log.info("=" * 60)
-        log.info("Starting processing of %d queued invoice files...", len(pdf_queue))
-        for item in pdf_queue:
-            log.info("Processing file: %s", item["filename"])
+        log.info(
+            "Starting processing of %d queued invoice file(s). "
+            "Hard cutoff in %.0f s.",
+            len(pdf_queue), processing_window_seconds,
+        )
+
+        loop = asyncio.get_event_loop()
+        skipped_count = 0
+
+        for index, item in enumerate(pdf_queue):
+            elapsed = loop.time() - start_time
+
+            if elapsed >= processing_window_seconds:
+                # Hard stop — do NOT start this file or any that follow.
+                skipped_count = len(pdf_queue) - index
+                log.warning(
+                    "Processing window expired (elapsed: %.1fs / %.1fs). "
+                    "Skipping %d remaining file(s) — they will be processed next cycle.",
+                    elapsed, processing_window_seconds, skipped_count,
+                )
+                break
+
+            log.info(
+                "Processing file %d/%d: %s (elapsed: %.1fs / %.1fs)",
+                index + 1, len(pdf_queue), item["filename"],
+                elapsed, processing_window_seconds,
+            )
             try:
                 await process_and_save_invoice_async(
                     unread_filepath=item["unread_filepath"],
@@ -642,24 +680,56 @@ async def download_invoice_attachments() -> None:
     )
 
 async def main():
-    # Load interval in minutes from env file, default to 15 minutes
+    """Periodic entry-point.
+
+    Timing model (example: interval=15 min, margin=4 min)
+    ─────────────────────────────────────────────────────
+    T+00:00  Run starts  → download emails + begin processing
+    T+11:00  Hard cutoff → do NOT start any new file (11 = interval − margin)
+    T+11:xx  Last in-flight file finishes naturally
+    T+15:00  Rest period ends → next run starts (sleep fills remaining time)
+
+    Environment variables
+    ─────────────────────
+    MAIL_CHECK_INTERVAL_MINUTES  Total cycle length in minutes  (default 15)
+    MAIL_CHECK_MARGIN_MINUTES    Mandatory rest period in minutes (default 4)
+    """
     interval_str = os.getenv("MAIL_CHECK_INTERVAL_MINUTES", "15")
     try:
         interval_minutes = float(interval_str)
     except ValueError:
         interval_minutes = 15.0
 
-    log.info("Starting periodic mail check. Interval: %s minutes", interval_minutes)
+    margin_minutes = float(os.getenv("MAIL_CHECK_MARGIN_MINUTES", "4.0"))
+
+    # Hard processing window: no new file must be STARTED after this many seconds.
+    processing_window_seconds = max(0.0, (interval_minutes - margin_minutes) * 60.0)
+    interval_seconds = interval_minutes * 60.0
+
+    log.info(
+        "Starting periodic mail check | cycle=%.1f min | processing window=%.1f min | rest=%.1f min",
+        interval_minutes, interval_minutes - margin_minutes, margin_minutes,
+    )
+
+    loop = asyncio.get_event_loop()
+
     while True:
-        start_time = asyncio.get_event_loop().time()
+        start_time = loop.time()
+
         try:
-            await download_invoice_attachments()
+            await download_invoice_attachments(start_time, processing_window_seconds)
         except Exception as e:
             log.error("Unhandled error in download_invoice_attachments: %s", e)
-        
-        elapsed = asyncio.get_event_loop().time() - start_time
-        sleep_time = max(1.0, (interval_minutes * 60) - elapsed)
-        log.info("Sleeping for %.2f seconds before next check...", sleep_time)
+
+        # Always sleep whatever time remains to reach the full interval boundary.
+        # This guarantees the mandatory rest period is always honoured even if
+        # processing finished early.
+        elapsed = loop.time() - start_time
+        sleep_time = max(1.0, interval_seconds - elapsed)
+        log.info(
+            "Cycle finished (elapsed: %.1fs). Resting for %.1fs (%.2f min) before next run.",
+            elapsed, sleep_time, sleep_time / 60.0,
+        )
         await asyncio.sleep(sleep_time)
 
 
