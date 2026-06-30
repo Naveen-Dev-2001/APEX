@@ -113,6 +113,128 @@ def create_tables():
                         pass
                     print(f"SUCCESS: Added {col_name} column to sage_gl_transaction_cache table")
 
+            # Bank accounts schema migration
+            table_exists = conn.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'bank_accounts'"
+            )).scalar()
+
+            if table_exists:
+                # Drop old constraint/index that depend on entity before dropping the column
+                old_constraint_exists = conn.execute(text(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS "
+                    "WHERE TABLE_NAME = 'bank_accounts' AND CONSTRAINT_NAME = 'uq_bank_accounts_entity_account'"
+                )).scalar()
+                if old_constraint_exists:
+                    conn.execute(text("ALTER TABLE bank_accounts DROP CONSTRAINT uq_bank_accounts_entity_account"))
+                    try:
+                        conn.execute(text("COMMIT"))
+                    except Exception:
+                        pass
+                    print("SUCCESS: Dropped uq_bank_accounts_entity_account constraint")
+
+                old_index_exists = conn.execute(text(
+                    "SELECT COUNT(*) FROM sys.indexes "
+                    "WHERE object_id = OBJECT_ID('bank_accounts') AND name = 'ix_bank_accounts_bank_entity'"
+                )).scalar()
+                if old_index_exists:
+                    conn.execute(text("DROP INDEX ix_bank_accounts_bank_entity ON bank_accounts"))
+                    try:
+                        conn.execute(text("COMMIT"))
+                    except Exception:
+                        pass
+                    print("SUCCESS: Dropped ix_bank_accounts_bank_entity index")
+
+                legacy_entity_index_exists = conn.execute(text(
+                    "SELECT COUNT(*) FROM sys.indexes "
+                    "WHERE object_id = OBJECT_ID('bank_accounts') AND name = 'ix_bank_accounts_entity'"
+                )).scalar()
+                if legacy_entity_index_exists:
+                    conn.execute(text("DROP INDEX ix_bank_accounts_entity ON bank_accounts"))
+                    try:
+                        conn.execute(text("COMMIT"))
+                    except Exception:
+                        pass
+                    print("SUCCESS: Dropped ix_bank_accounts_entity index")
+
+                # Remove deprecated columns if they exist
+                for old_col in ["entity", "raw_data"]:
+                    old_col_exists = conn.execute(text(
+                        f"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                        f"WHERE TABLE_NAME = 'bank_accounts' AND COLUMN_NAME = '{old_col}'"
+                    )).scalar()
+                    if old_col_exists:
+                        if old_col == "entity":
+                            fk_rows = conn.execute(text(
+                                "SELECT fk.name "
+                                "FROM sys.foreign_keys fk "
+                                "JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id "
+                                "JOIN sys.columns c ON fkc.parent_object_id = c.object_id AND fkc.parent_column_id = c.column_id "
+                                "WHERE fkc.parent_object_id = OBJECT_ID('bank_accounts') AND c.name = 'entity'"
+                            )).fetchall()
+
+                            for fk_row in fk_rows:
+                                fk_name = fk_row[0]
+                                conn.execute(text(f"ALTER TABLE bank_accounts DROP CONSTRAINT [{fk_name}]"))
+                                try:
+                                    conn.execute(text("COMMIT"))
+                                except Exception:
+                                    pass
+                                print(f"SUCCESS: Dropped {fk_name} foreign key constraint")
+
+                        conn.execute(text(f"ALTER TABLE bank_accounts DROP COLUMN {old_col}"))
+                        try:
+                            conn.execute(text("COMMIT"))
+                        except Exception:
+                            pass
+                        print(f"SUCCESS: Dropped {old_col} column from bank_accounts table")
+
+                # Add requested columns if they don't exist
+                new_columns = [
+                    ("bank_id", "NVARCHAR(100) NULL"),
+                    ("gl_account", "NVARCHAR(100) NULL"),
+                    ("gl_account_title", "NVARCHAR(255) NULL"),
+                ]
+                for col_name, col_type in new_columns:
+                    col_exists = conn.execute(text(
+                        f"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                        f"WHERE TABLE_NAME = 'bank_accounts' AND COLUMN_NAME = '{col_name}'"
+                    )).scalar()
+                    if col_exists == 0:
+                        conn.execute(text(f"ALTER TABLE bank_accounts ADD {col_name} {col_type}"))
+                        try:
+                            conn.execute(text("COMMIT"))
+                        except Exception:
+                            pass
+                        print(f"SUCCESS: Added {col_name} column to bank_accounts table")
+
+                # Ensure new constraint/index exist
+                new_constraint_exists = conn.execute(text(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS "
+                    "WHERE TABLE_NAME = 'bank_accounts' AND CONSTRAINT_NAME = 'uq_bank_accounts_bank_account'"
+                )).scalar()
+                if new_constraint_exists == 0:
+                    conn.execute(text(
+                        "ALTER TABLE bank_accounts "
+                        "ADD CONSTRAINT uq_bank_accounts_bank_account UNIQUE (bank_id, account_number)"
+                    ))
+                    try:
+                        conn.execute(text("COMMIT"))
+                    except Exception:
+                        pass
+                    print("SUCCESS: Added uq_bank_accounts_bank_account constraint")
+
+                new_index_exists = conn.execute(text(
+                    "SELECT COUNT(*) FROM sys.indexes "
+                    "WHERE object_id = OBJECT_ID('bank_accounts') AND name = 'ix_bank_accounts_bank_gl'"
+                )).scalar()
+                if new_index_exists == 0:
+                    conn.execute(text("CREATE INDEX ix_bank_accounts_bank_gl ON bank_accounts (bank_id, gl_account)"))
+                    try:
+                        conn.execute(text("COMMIT"))
+                    except Exception:
+                        pass
+                    print("SUCCESS: Added ix_bank_accounts_bank_gl index")
+
     except Exception as e:
         print(f"Migration error (might be expected if table newly created): {e}")
 

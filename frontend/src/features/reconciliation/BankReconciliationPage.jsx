@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+﻿import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { reconciliationApi } from '../../api/reconciliationApi';
@@ -6,7 +6,7 @@ import logo from '../../assets/loandna_logo_dark.png';
 import '../../layout/AuthLayout.css';
 import toast from '../../utils/toast';
 
-/* ────────────── helpers ────────────── */
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 const fmt = (v) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(v ?? 0);
 
@@ -61,15 +61,25 @@ const AccountBanner = ({ accountNumber, extra }) => {
   );
 };
 
-/* ────────────── Tab: Bank Statement ────────────── */
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ Tab: Bank Statement ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 const BankStatementTab = () => {
-  const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [accountInput, setAccountInput] = useState('');
   const [statements, setStatements] = useState([]);
+  const [selectedBank, setSelectedBank] = useState('all');
   const [selectedStatement, setSelectedStatement] = useState(null);
   const [transactions, setTransactions] = useState(null);
   const fileRef = useRef();
+
+  const bankOptions = React.useMemo(() => {
+    return Array.from(
+      new Set(statements.map((s) => s.account_number).filter(Boolean))
+    ).sort();
+  }, [statements]);
+
+  const filteredStatements = React.useMemo(() => {
+    if (selectedBank === 'all') return statements;
+    return statements.filter((s) => s.account_number === selectedBank);
+  }, [selectedBank, statements]);
 
   const loadStatements = async () => {
     try {
@@ -86,12 +96,10 @@ const BankStatementTab = () => {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
-    if (accountInput.trim()) formData.append('account_number', accountInput.trim());
     setUploading(true);
     try {
       await reconciliationApi.uploadStatement(formData);
       toast.success('Bank statement uploaded successfully!');
-      setAccountInput('');
       await loadStatements();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Upload failed');
@@ -133,66 +141,53 @@ const BankStatementTab = () => {
     <div className="space-y-6">
       {/* Upload Zone */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-50">
-          <h3 className="font-semibold text-gray-700">Upload Bank Statement</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Link this statement to a GL account number for accurate reconciliation</p>
-        </div>
-        <div className="p-6 space-y-4">
-          {/* Account number input */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-              GL Account Number <span className="text-gray-400 font-normal">(optional but recommended)</span>
+        <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <label htmlFor="bank-statement-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+              Bank:
             </label>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#1e9bd8]">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <rect x="2" y="5" width="20" height="14" rx="2" strokeWidth={1.8} />
-                    <line x1="2" y1="10" x2="22" y2="10" strokeWidth={1.8} />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={accountInput}
-                  onChange={(e) => setAccountInput(e.target.value)}
-                  placeholder="e.g. 5313774449"
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#1e9bd8] focus:ring-2 focus:ring-[#1e9bd8]/10 transition-all"
-                />
-              </div>
-            </div>
+            <select
+              id="bank-statement-filter"
+              value={selectedBank}
+              onChange={(e) => setSelectedBank(e.target.value)}
+              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-52 p-2.5 transition-colors cursor-pointer"
+            >
+              <option value="all">All Banks</option>
+              {bankOptions.map((bank) => (
+                <option key={bank} value={bank}>{bank}</option>
+              ))}
+            </select>
           </div>
-
-          {/* Drop zone */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => { e.preventDefault(); setDragging(false); handleFileUpload(e.dataTransfer.files[0]); }}
-            onClick={() => fileRef.current.click()}
-            className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all duration-200
-              ${dragging ? 'border-[#1e9bd8] bg-[#1e9bd8]/5' : 'border-gray-200 hover:border-[#1e9bd8] hover:bg-[#1e9bd8]/3'}`}
-          >
-            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(e) => handleFileUpload(e.target.files[0])} />
-            <div className="w-12 h-12 rounded-full bg-[#1e9bd8]/10 flex items-center justify-center mb-3">
-              <svg className="w-6 h-6 text-[#1e9bd8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-            {uploading
-              ? <div className="flex items-center gap-2 text-[#1e9bd8] font-medium text-sm">
-                  <div className="w-4 h-4 border-2 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" />
-                  Uploading…
-                </div>
-              : <>
-                  <p className="font-semibold text-gray-700 text-sm">Drop your bank statement here</p>
-                  <p className="text-xs text-gray-400 mt-1">or click to browse — CSV or Excel supported</p>
-                </>
-            }
+          <div className="flex-shrink-0">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e.target.files[0])}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
+            >
+              {uploading
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
+                : <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Upload Bank Statement
+                  </>
+              }
+            </button>
           </div>
         </div>
       </div>
 
       {/* Statements list */}
-      {statements.length > 0 && (
+      {filteredStatements.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-50">
             <h3 className="font-semibold text-gray-700">Uploaded Statements</h3>
@@ -201,7 +196,7 @@ const BankStatementTab = () => {
             <thead className="bg-gray-50 text-gray-400 text-xs uppercase">
               <tr>
                 <th className="text-left px-6 py-3">File</th>
-                <th className="text-left px-6 py-3">GL Account</th>
+                <th className="text-left px-6 py-3">Account Number</th>
                 <th className="text-left px-6 py-3">Uploaded</th>
                 <th className="text-left px-6 py-3">Transactions</th>
                 <th className="text-left px-6 py-3">Status</th>
@@ -209,7 +204,7 @@ const BankStatementTab = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {statements.map((s) => (
+              {filteredStatements.map((s) => (
                 <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-700 flex items-center gap-2">
                     <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -245,53 +240,229 @@ const BankStatementTab = () => {
 
       {/* Transaction detail */}
       {transactions && selectedStatement && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-50">
-            <AccountBanner
-              accountNumber={selectedStatement.account_number}
-              extra={`${transactions.total} transactions · ${new Date(selectedStatement.upload_date).toLocaleDateString()}`}
-            />
-            <div className="flex items-center justify-between mt-2">
-              <h3 className="font-semibold text-gray-700 text-sm">{selectedStatement.filename}</h3>
-              <div className="flex gap-3">
-                <SummaryCard label="Debits" value={fmt(transactions.debits)} color="text-red-600" />
-                <SummaryCard label="Credits" value={fmt(transactions.credits)} color="text-green-600" />
-                <SummaryCard label="Total" value={transactions.total} color="text-[#1e9bd8]" />
+        <div className="fixed inset-0 z-[2100] bg-black/40 backdrop-blur-[1px] p-4 md:p-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xl h-full flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-50">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <AccountBanner
+                  accountNumber={selectedStatement.account_number}
+                  extra={`${transactions.total} transactions ┬╖ ${new Date(selectedStatement.upload_date).toLocaleDateString()}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => { setSelectedStatement(null); setTransactions(null); }}
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                  title="Close"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <h3 className="font-semibold text-gray-700 text-sm">{selectedStatement.filename}</h3>
+                <div className="flex gap-3">
+                  <SummaryCard label="Debits" value={fmt(transactions.debits)} color="text-red-600" />
+                  <SummaryCard label="Credits" value={fmt(transactions.credits)} color="text-green-600" />
+                  <SummaryCard label="Total" value={transactions.total} color="text-[#1e9bd8]" />
+                </div>
               </div>
             </div>
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left px-6 py-3">Account Number</th>
+                    <th className="text-left px-6 py-3">Date</th>
+                    <th className="text-left px-6 py-3">Description</th>
+                    <th className="text-left px-6 py-3">Account Name</th>
+                    <th className="text-left px-6 py-3">Debit</th>
+                    <th className="text-left px-6 py-3">Credit</th>
+                    <th className="text-left px-6 py-3">Check Number</th>
+                    <th className="text-left px-6 py-3">Transaction Type</th>
+                    <th className="text-left px-6 py-3">Reference</th>
+                    <th className="text-right px-6 py-3">Amount</th>
+                    <th className="text-left px-6 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {transactions.transactions.map((t) => (
+                    <tr key={t.id} className="hover:bg-gray-50/50">
+                      <td className="px-6 py-3 text-gray-500 font-mono text-xs">{t.account_number || selectedStatement.account_number || ''}</td>
+                      <td className="px-6 py-3 text-gray-500">{t.date}</td>
+                      <td className="px-6 py-3 text-gray-700 max-w-[220px] truncate">{t.description || ''}</td>
+                      <td className="px-6 py-3 text-gray-500">{t.account_name || ''}</td>
+                      <td className="px-6 py-3 text-red-600 font-medium">{t.debit != null ? fmt(t.debit) : ''}</td>
+                      <td className="px-6 py-3 text-green-600 font-medium">{t.credit != null ? fmt(t.credit) : ''}</td>
+                      <td className="px-6 py-3 text-gray-700 font-mono text-xs">{t.check_number || ''}</td>
+                      <td className="px-6 py-3"><Badge type={t.transaction_type} /></td>
+                      <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.reference || ''}</td>
+                      <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
+                      <td className="px-6 py-3 text-gray-500 text-xs">{t.status || 'Pending'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="overflow-auto max-h-80">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
-                <tr>
-                  <th className="text-left px-6 py-3">Account Number</th>
-                  <th className="text-left px-6 py-3">Date</th>
-                  <th className="text-left px-6 py-3">Description</th>
-                  <th className="text-left px-6 py-3">Account Name</th>
-                  <th className="text-left px-6 py-3">Debit</th>
-                  <th className="text-left px-6 py-3">Credit</th>
-                  <th className="text-left px-6 py-3">Check Number</th>
-                  <th className="text-left px-6 py-3">Transaction Type</th>
-                  <th className="text-left px-6 py-3">Reference</th>
-                  <th className="text-right px-6 py-3">Amount</th>
-                  <th className="text-left px-6 py-3">Status</th>
+        </div>
+      )}
 
+      {filteredStatements.length === 0 && !uploading && (
+        <EmptyState icon="≡ƒôä" title="No statements yet" subtitle="Upload your first bank statement above to get started" />
+      )}
+    </div>
+  );
+};
+
+/* Tab: Bank Accounts */
+const BankAccountsTab = () => {
+  const [uploading, setUploading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const fileRef = useRef();
+
+  const loadBankAccounts = async () => {
+    setLoading(true);
+    try {
+      const res = await reconciliationApi.getBankAccounts();
+      setAccounts(res.data?.items || []);
+    } catch {
+      toast.error('Failed to load bank accounts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadBankAccounts();
+  }, []);
+
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setUploading(true);
+    try {
+      await reconciliationApi.uploadBankAccounts(formData);
+      toast.success('Bank accounts file uploaded successfully');
+      await loadBankAccounts();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) {
+        fileRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSyncFromSage = async () => {
+    setSyncing(true);
+    try {
+      const res = await reconciliationApi.syncBankAccounts();
+      toast.success(res.data?.message || 'Synced from Sage successfully');
+      await loadBankAccounts();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to sync from Sage');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-800">Bank Accounts</h3>
+            <p className="text-sm text-gray-400 mt-1">Upload Excel or CSV and sync account data from Sage.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
+            >
+              {uploading
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
+                : <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Upload File
+                  </>
+              }
+            </button>
+            <button
+              type="button"
+              onClick={handleSyncFromSage}
+              disabled={syncing}
+              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
+            >
+              {syncing
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Syncing...</>
+                : <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Sync from Sage
+                  </>
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" /></div>
+      )}
+
+      {!loading && accounts.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-50">
+            <h3 className="font-semibold text-gray-700">Bank Accounts Master</h3>
+          </div>
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-400 text-xs uppercase">
+                <tr>
+                  <th className="text-left px-6 py-3">Bank ID</th>
+                  <th className="text-left px-6 py-3">Bank Name</th>
+                  <th className="text-left px-6 py-3">Account Number</th>
+                  <th className="text-left px-6 py-3">Account Name</th>
+                  <th className="text-left px-6 py-3">GL Account</th>
+                  <th className="text-left px-6 py-3">GL Account Title</th>
+                  <th className="text-left px-6 py-3">Currency</th>
+                  <th className="text-left px-6 py-3">Source</th>
+                  <th className="text-left px-6 py-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {transactions.transactions.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-3 text-gray-500 font-mono text-xs">{t.account_number || selectedStatement.account_number || '—'}</td>
-                    <td className="px-6 py-3 text-gray-500">{t.date}</td>
-                    <td className="px-6 py-3 text-gray-700 max-w-[220px] truncate">{t.description || '—'}</td>
-                    <td className="px-6 py-3 text-gray-500">{t.account_name || '—'}</td>
-                    <td className="px-6 py-3 text-red-600 font-medium">{t.debit != null ? fmt(t.debit) : '—'}</td>
-                    <td className="px-6 py-3 text-green-600 font-medium">{t.credit != null ? fmt(t.credit) : '—'}</td>
-                    <td className="px-6 py-3 text-gray-700 font-mono text-xs">{t.check_number || '—'}</td>
-                    <td className="px-6 py-3"><Badge type={t.transaction_type} /></td>
-                    <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.reference || '—'}</td>
-                    <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
-                    <td className="px-6 py-3 text-gray-500 text-xs">{t.status || 'Pending'}</td>
+                {accounts.map((a) => (
+                  <tr key={a.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-3 text-gray-700 font-mono text-xs">{a.bank_id || ''}</td>
+                    <td className="px-6 py-3 text-gray-700">{a.bank_name || ''}</td>
+                    <td className="px-6 py-3 text-gray-700 font-mono text-xs">{a.account_number || ''}</td>
+                    <td className="px-6 py-3 text-gray-700">{a.account_name || ''}</td>
+                    <td className="px-6 py-3 text-gray-700 font-mono text-xs">{a.gl_account || ''}</td>
+                    <td className="px-6 py-3 text-gray-700">{a.gl_account_title || ''}</td>
+                    <td className="px-6 py-3 text-gray-700">{a.currency_code || ''}</td>
+                    <td className="px-6 py-3 text-gray-500 text-xs">{a.source || ''}</td>
+                    <td className="px-6 py-3">
+                      <StatusPill matched={Boolean(a.is_active)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -300,24 +471,25 @@ const BankStatementTab = () => {
         </div>
       )}
 
-      {statements.length === 0 && !uploading && (
-        <EmptyState icon="📄" title="No statements yet" subtitle="Upload your first bank statement above to get started" />
+      {!loading && accounts.length === 0 && (
+        <EmptyState icon="" title="No bank accounts yet" subtitle="Upload a bank accounts file or sync from Sage to populate this table" />
       )}
     </div>
   );
 };
 
-/* ────────────── Tab: Sage GL Transactions ────────────── */
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ Tab: Sage GL Transactions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 const SageGLTab = () => {
   const [data, setData] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState('');
+  const [selectedBank, setSelectedBank] = useState('all');
+  const [viewingBankSummary, setViewingBankSummary] = useState(null);
 
-  const load = async (acct) => {
+  const load = async () => {
     setLoading(true);
     try {
-      const res = await reconciliationApi.getSageTransactions(acct);
+      const res = await reconciliationApi.getSageTransactions();
       setData(res.data);
     } catch {
       toast.error('Failed to load Sage transactions');
@@ -326,14 +498,25 @@ const SageGLTab = () => {
     }
   };
 
-  React.useEffect(() => { load(''); }, []);
+  React.useEffect(() => { load(); }, []);
 
   const handleFetch = async () => {
     setFetching(true);
     try {
-      const res = await reconciliationApi.fetchSageTransactions(selectedAccount || null);
+      const accountNumber = selectedBank === 'all'
+        ? null
+        : Array.from(
+          new Set(
+            (data?.transactions || [])
+              .filter((t) => (t.bank || t.financial_entity) === selectedBank)
+              .map((t) => t.account)
+              .filter(Boolean)
+          )
+        ).sort()[0] || null;
+      const financialEntity = selectedBank === 'all' ? null : selectedBank;
+      const res = await reconciliationApi.fetchSageTransactions(accountNumber, financialEntity);
       toast.success(res.data.message);
-      await load(selectedAccount);
+      await load();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed to fetch from Sage');
     } finally {
@@ -341,18 +524,79 @@ const SageGLTab = () => {
     }
   };
 
-  const handleAccountFilter = (acct) => {
-    setSelectedAccount(acct);
-    load(acct);
-  };
+  const bankOptions = React.useMemo(() => {
+    return Array.from(
+      new Set((data?.transactions || []).map((t) => t.bank || t.financial_entity).filter(Boolean))
+    ).sort();
+  }, [data]);
+
+  const filteredTransactions = React.useMemo(() => {
+    const txns = data?.transactions || [];
+    if (selectedBank === 'all') return txns;
+    return txns.filter((t) => (t.bank || t.financial_entity) === selectedBank);
+  }, [data, selectedBank]);
+
+  const filteredDebits = filteredTransactions
+    .filter((t) => String(t.transaction_type || '').toLowerCase() === 'debit')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const filteredCredits = filteredTransactions
+    .filter((t) => String(t.transaction_type || '').toLowerCase() === 'credit')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const bankSummaries = React.useMemo(() => {
+    const grouped = new Map();
+
+    filteredTransactions.forEach((t) => {
+      const bankName = t.bank || t.financial_entity || 'Unknown Bank';
+      if (!grouped.has(bankName)) {
+        grouped.set(bankName, {
+          bank: bankName,
+          transactions: [],
+          transactionCount: 0,
+          debitTotal: 0,
+          creditTotal: 0,
+          totalAmount: 0,
+        });
+      }
+
+      const item = grouped.get(bankName);
+      const amount = Number(t.amount || 0);
+      item.transactions.push(t);
+      item.transactionCount += 1;
+      item.totalAmount += amount;
+
+      if (String(t.transaction_type || '').toLowerCase() === 'debit') {
+        item.debitTotal += amount;
+      }
+
+      if (String(t.transaction_type || '').toLowerCase() === 'credit') {
+        item.creditTotal += amount;
+      }
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => a.bank.localeCompare(b.bank));
+  }, [filteredTransactions]);
 
   return (
     <div className="space-y-6">
       {/* Action bar */}
       <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4">
-        <div>
-          <h3 className="font-semibold text-gray-700">Sage GL Transactions</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Pull the latest GL entries from Sage Intacct</p>
+        <div className="flex items-center gap-2">
+          <label htmlFor="sage-bank-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+            Bank:
+          </label>
+          <select
+            id="sage-bank-filter"
+            value={selectedBank}
+            onChange={(e) => setSelectedBank(e.target.value)}
+            className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-52 p-2.5 transition-colors cursor-pointer"
+          >
+            <option value="all">All Banks</option>
+            {bankOptions.map((bank) => (
+              <option key={bank} value={bank}>{bank}</option>
+            ))}
+          </select>
         </div>
         <button
           onClick={handleFetch}
@@ -360,50 +604,22 @@ const SageGLTab = () => {
           className="flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
         >
           {fetching
-            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Fetching…</>
+            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> FetchingΓÇª</>
             : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Sync from Sage</>
           }
         </button>
       </div>
 
-      {/* Account filter chips */}
-      {data?.accounts?.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => handleAccountFilter('')}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-              selectedAccount === '' ? 'bg-[#1e9bd8] text-white border-[#1e9bd8]' : 'bg-white text-gray-500 border-gray-200 hover:border-[#1e9bd8] hover:text-[#1e9bd8]'
-            }`}
-          >
-            All Accounts
-          </button>
-          {data.accounts.map((acct) => (
-            <button
-              key={acct}
-              onClick={() => handleAccountFilter(acct)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border font-mono transition-all ${
-                selectedAccount === acct ? 'bg-[#1e9bd8] text-white border-[#1e9bd8]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#1e9bd8] hover:text-[#1e9bd8]'
-              }`}
-            >
-              {acct}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Account banner */}
-      {selectedAccount && <AccountBanner accountNumber={selectedAccount} />}
-
       {loading && (
         <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" /></div>
       )}
 
-      {!loading && data && data.transactions.length > 0 && (
+      {!loading && data && filteredTransactions.length > 0 && (
         <>
           <div className="grid grid-cols-3 gap-4">
-            <SummaryCard label="Total Transactions" value={data.total} />
-            <SummaryCard label="Total Debits" value={fmt(data.debits)} color="text-red-600" />
-            <SummaryCard label="Total Credits" value={fmt(data.credits)} color="text-green-600" />
+            <SummaryCard label="Total Transactions" value={filteredTransactions.length} />
+            <SummaryCard label="Total Debits" value={fmt(filteredDebits)} color="text-red-600" />
+            <SummaryCard label="Total Credits" value={fmt(filteredCredits)} color="text-green-600" />
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-auto max-h-[450px]">
@@ -411,10 +627,72 @@ const SageGLTab = () => {
                 <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
                   <tr>
                     <th className="text-left px-6 py-3">Bank</th>
+                    <th className="text-right px-6 py-3">Transactions</th>
+                    <th className="text-right px-6 py-3">Debits</th>
+                    <th className="text-right px-6 py-3">Credits</th>
+                    <th className="text-right px-6 py-3">Total Amount</th>
+                    <th className="text-right px-6 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {bankSummaries.map((bankRow) => (
+                    <tr key={bankRow.bank} className="hover:bg-gray-50/50">
+                      <td className="px-6 py-3 text-gray-700 font-semibold">{bankRow.bank}</td>
+                      <td className="px-6 py-3 text-right text-gray-600 font-medium">{bankRow.transactionCount}</td>
+                      <td className="px-6 py-3 text-right text-red-600 font-medium">{fmt(bankRow.debitTotal)}</td>
+                      <td className="px-6 py-3 text-right text-green-600 font-medium">{fmt(bankRow.creditTotal)}</td>
+                      <td className="px-6 py-3 text-right text-gray-800 font-semibold">{fmt(bankRow.totalAmount)}</td>
+                      <td className="px-6 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setViewingBankSummary(bankRow)}
+                          className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {viewingBankSummary && (
+        <div className="fixed inset-0 z-[2100] bg-black/40 backdrop-blur-[1px] p-4 md:p-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xl h-full flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-800 text-base">{viewingBankSummary.bank}</h3>
+                <p className="text-xs text-gray-400 mt-1">{viewingBankSummary.transactionCount} transactions</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingBankSummary(null)}
+                className="inline-flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="px-6 py-3 border-b border-gray-50 bg-gray-50/60">
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryCard label="Debits" value={fmt(viewingBankSummary.debitTotal)} color="text-red-600" />
+                <SummaryCard label="Credits" value={fmt(viewingBankSummary.creditTotal)} color="text-green-600" />
+                <SummaryCard label="Total" value={fmt(viewingBankSummary.totalAmount)} color="text-[#1e9bd8]" />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0 z-10">
+                  <tr>
                     <th className="text-left px-6 py-3">Txn Date</th>
                     <th className="text-left px-6 py-3">Entry Date</th>
                     <th className="text-left px-6 py-3">Check No</th>
-                    <th className="text-left px-6 py-3">GL Account</th>
+                    <th className="text-left px-6 py-3">Account Number</th>
                     <th className="text-left px-6 py-3">Type</th>
                     <th className="text-left px-6 py-3">Txn Type</th>
                     <th className="text-right px-6 py-3">Txn Amount</th>
@@ -427,23 +705,22 @@ const SageGLTab = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {data.transactions.map((t) => (
+                  {viewingBankSummary.transactions.map((t) => (
                     <tr key={t.id} className="hover:bg-gray-50/50">
-                      <td className="px-6 py-3 text-gray-500 font-medium">{t.bank || t.financial_entity || '—'}</td>
                       <td className="px-6 py-3 text-gray-500">{t.date}</td>
-                      <td className="px-6 py-3 text-gray-500">{t.entry_date || '—'}</td>
-                      <td className="px-6 py-3 text-gray-700 font-mono text-xs">{t.doc_number || t.check_no || '—'}</td>
+                      <td className="px-6 py-3 text-gray-500">{t.entry_date || ''}</td>
+                      <td className="px-6 py-3 text-gray-700 font-mono text-xs">{t.doc_number || t.check_no || ''}</td>
                       <td className="px-6 py-3">
-                        <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold font-mono">{t.account || '—'}</span>
+                        <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold font-mono">{t.account || ''}</span>
                       </td>
                       <td className="px-6 py-3"><Badge type={t.transaction_type} /></td>
-                      <td className="px-6 py-3 text-gray-400 text-xs font-mono">{t.tr_type || t.txn_type || '—'}</td>
+                      <td className="px-6 py-3 text-gray-400 text-xs font-mono">{t.tr_type || t.txn_type || ''}</td>
                       <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
-                      <td className="px-6 py-3 text-gray-700 max-w-[120px] truncate" title={t.vendor}>{t.vendor || '—'}</td>
-                      <td className="px-6 py-3 text-gray-700 max-w-[120px] truncate" title={t.customer}>{t.customer || '—'}</td>
-                      <td className="px-6 py-3 text-gray-500 text-xs">{t.record_type || '—'}</td>
-                      <td className="px-6 py-3 text-gray-400 text-xs">{t.cleared || '—'}</td>
-                      <td className="px-6 py-3 text-gray-700 max-w-[200px] truncate" title={t.description}>{t.description || '—'}</td>
+                      <td className="px-6 py-3 text-gray-700 max-w-[120px] truncate" title={t.vendor}>{t.vendor || ''}</td>
+                      <td className="px-6 py-3 text-gray-700 max-w-[120px] truncate" title={t.customer}>{t.customer || ''}</td>
+                      <td className="px-6 py-3 text-gray-500 text-xs">{t.record_type || ''}</td>
+                      <td className="px-6 py-3 text-gray-400 text-xs">{t.cleared || ''}</td>
+                      <td className="px-6 py-3 text-gray-700 max-w-[220px] truncate" title={t.description}>{t.description || ''}</td>
                       <td className="px-6 py-3"><StatusPill matched={t.is_matched} /></td>
                     </tr>
                   ))}
@@ -451,17 +728,17 @@ const SageGLTab = () => {
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {!loading && (!data || data.transactions.length === 0) && (
-        <EmptyState icon="🔄" title="No Sage transactions yet" subtitle="Click 'Sync from Sage' to pull the latest GL entries" />
+      {!loading && (!data || filteredTransactions.length === 0) && (
+        <EmptyState icon="≡ƒöä" title="No Sage transactions yet" subtitle="Click 'Sync from Sage' to pull the latest GL entries" />
       )}
     </div>
   );
 };
 
-/* ────────────── Tab: Match & Compare (grouped by account) ────────────── */
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ Tab: Match & Compare (grouped by account) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 const MatchCompareTab = ({ onGoToUnmatched }) => {
   const disableGlAccountFilter = true;
   const [results, setResults] = useState(null);
@@ -473,11 +750,23 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
   const [selectedAccount, setSelectedAccount] = useState('');
   const [selectedBankIds, setSelectedBankIds] = useState([]);
   const [selectedSageIds, setSelectedSageIds] = useState([]);
+  const [expandedSageGroups, setExpandedSageGroups] = useState([]);
   const allAccounts = results?.accounts || [];
 
   const bankOptions = Array.from(new Set(
     allAccounts.flatMap((g) => (g.sage_transactions || []).map((t) => t.bank).filter(Boolean))
   )).sort();
+
+  const selectedBankAccounts = React.useMemo(() => {
+    if (selectedBank === 'all') return null;
+
+    return new Set(
+      allAccounts
+        .filter((g) => (g.sage_transactions || []).some((t) => t.bank === selectedBank))
+        .map((g) => g.account)
+        .filter(Boolean)
+    );
+  }, [allAccounts, selectedBank]);
 
   const filteredAccounts = allAccounts.filter((g) => {
     const byStatus =
@@ -559,20 +848,97 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
       }
     : orderedFilteredAccounts.find((g) => g.account === selectedAccount);
   const matchedItems = (selectedGroup?.matched || []).filter((m) => selectedBank === 'all' || m.sage?.bank === selectedBank);
-  const unmatchedBankItems = (selectedGroup?.bank_transactions || []).filter((t) => !t.is_matched);
+  const filteredBankItemsByBank = (selectedGroup?.bank_transactions || []).filter((t) => {
+    if (selectedBank === 'all') return true;
+
+    const accountNumber = t?.account_number || t?.account;
+    return accountNumber ? selectedBankAccounts?.has(accountNumber) : false;
+  });
+
+  const unmatchedBankItems = filteredBankItemsByBank.filter((t) => !t.is_matched);
   const unmatchedSageItems = (selectedGroup?.sage_transactions || []).filter((t) => !t.is_matched && (selectedBank === 'all' || t.bank === selectedBank));
-  const allBankItems = selectedGroup?.bank_transactions || [];
+  const allBankItems = filteredBankItemsByBank;
   const allSageItems = (selectedGroup?.sage_transactions || []).filter((t) => selectedBank === 'all' || t.bank === selectedBank);
+
+  const uniqueById = (items = []) => {
+    const seen = new Set();
+    return items.filter((item) => {
+      if (!item?.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  };
+
+  const groupByCheckNo = (items = []) => {
+    const grouped = new Map();
+
+    items.forEach((item) => {
+      const checkNo = String(item?.check_number || item?.reference || '').trim();
+      const key = checkNo || `single-${item?.id}`;
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          groupKey: key,
+          checkNumber: checkNo || '',
+          totalAmount: 0,
+          items: [],
+        });
+      }
+
+      const g = grouped.get(key);
+      g.items.push(item);
+      g.totalAmount += Number(item?.amount || 0);
+    });
+
+    return Array.from(grouped.values());
+  };
+
+  const bankDisplayItems = statusFilter === 'matched'
+    ? matchedItems.map((m) => m.bank)
+    : statusFilter === 'unmatched'
+      ? unmatchedBankItems
+      : allBankItems;
+
+  const uniqueBankDisplayItems = uniqueById(bankDisplayItems);
+
+  const sageDisplayItems = statusFilter === 'matched'
+    ? matchedItems.map((m) => m.sage)
+    : statusFilter === 'unmatched'
+      ? unmatchedSageItems
+      : allSageItems;
+
+  const groupedSageDisplay = groupByCheckNo(sageDisplayItems);
 
   React.useEffect(() => {
     setSelectedBankIds([]);
     setSelectedSageIds([]);
+    setExpandedSageGroups([]);
   }, [statusFilter, selectedBank, selectedAccount, results]);
 
   const toggleSelection = (id, selectedIds, setSelectedIds) => {
     setSelectedIds(selectedIds.includes(id)
       ? selectedIds.filter((x) => x !== id)
       : [...selectedIds, id]);
+  };
+
+  const isGroupSelected = (groupItems, selectedIds) =>
+    groupItems.every((row) => selectedIds.includes(row.id));
+
+  const toggleGroupSelection = (groupItems, selectedIds, setSelectedIds) => {
+    const ids = groupItems.map((x) => x.id);
+    const fullySelected = ids.every((id) => selectedIds.includes(id));
+
+    if (fullySelected) {
+      setSelectedIds(selectedIds.filter((id) => !ids.includes(id)));
+    } else {
+      setSelectedIds(Array.from(new Set([...selectedIds, ...ids])));
+    }
+  };
+
+  const toggleExpandedSageGroup = (groupKey) => {
+    setExpandedSageGroups((prev) =>
+      prev.includes(groupKey) ? prev.filter((k) => k !== groupKey) : [...prev, groupKey]
+    );
   };
 
   const handleManualMarkMatched = async () => {
@@ -605,31 +971,67 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
   return (
     <div className="space-y-6">
       {/* Action bar */}
-      <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4">
-        <div>
-          <h3 className="font-semibold text-gray-700">Match & Compare</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Select a GL account to compare its Bank and Sage transactions</p>
-        </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          <div className="flex items-center gap-2 w-full xl:max-w-md">
+            <label htmlFor="bank-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+              Bank:
+            </label>
+            <div className="relative flex-1">
+              <select
+                id="bank-filter"
+                value={selectedBank}
+                onChange={(e) => setSelectedBank(e.target.value)}
+                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 pr-8 transition-colors cursor-pointer"
+              >
+                <option value="all">All Banks</option>
+                {bankOptions.map((bank) => (
+                  <option key={bank} value={bank}>{bank}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full xl:max-w-4xl">
+          <div className="flex items-center gap-2 w-full">
+            <label htmlFor="status-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+              Show:
+            </label>
+            <div className="relative flex-1">
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 pr-3 transition-colors cursor-pointer"
+              >
+                <option value="matched">Matched</option>
+                <option value="unmatched">Unmatched</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          </div>
         <button
           onClick={handleMatch}
           disabled={matching}
-          className="flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-60"
+          className="flex items-center justify-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-60 w-full"
         >
           {matching
-            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Matching…</>
+            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> MatchingΓÇª</>
             : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> Run Matching</>
           }
         </button>
         <button
           onClick={handleManualMarkMatched}
           disabled={manualMarking || !selectedBankIds.length || !selectedSageIds.length}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-60"
+          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-60 w-full"
         >
           {manualMarking
-            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Marking…</>
+            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> MarkingΓÇª</>
             : <>Mark as Matched</>
           }
         </button>
+        </div>
+        </div>
       </div>
 
       {loading && <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" /></div>}
@@ -637,84 +1039,48 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
       {!loading && results && (
         <>
           {/* Summary */}
-          <div className="grid grid-cols-4 gap-4">
-            <SummaryCard label="GL Accounts" value={results?.summary?.total_accounts ?? 0} color="text-[#1e9bd8]" />
+          <div className="grid grid-cols-3 gap-4">
             <SummaryCard label="Matched" value={results?.summary?.total_matched ?? 0} color="text-green-600" />
             <SummaryCard label="Unmatched Bank" value={results?.summary?.total_unmatched_bank ?? 0} color="text-amber-600" />
             <SummaryCard label="Unmatched Sage" value={results?.summary?.total_unmatched_sage ?? 0} color="text-red-600" />
           </div>
 
           {/* Filters */}
-          {orderedFilteredAccounts.length > 0 && (
+          {orderedFilteredAccounts.length > 0 && !disableGlAccountFilter && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mt-4 flex items-center gap-4 flex-wrap">
-              <label htmlFor="status-filter" className="text-sm font-semibold text-gray-700">
-                Show:
+              <label htmlFor="gl-account-select" className="text-sm font-semibold text-gray-700">
+                Select GL Account:
               </label>
               <div className="relative">
                 <select
-                  id="status-filter"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-40 p-2.5 pr-8 transition-colors cursor-pointer"
+                  id="gl-account-select"
+                  value={selectedAccount}
+                  onChange={(e) => setSelectedAccount(e.target.value)}
+                  className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-64 p-2.5 pr-8 transition-colors cursor-pointer"
                 >
-                  <option value="matched">Matched</option>
-                  <option value="unmatched">Unmatched</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-
-              <label htmlFor="bank-filter" className="text-sm font-semibold text-gray-700">
-                Bank:
-              </label>
-              <div className="relative">
-                <select
-                  id="bank-filter"
-                  value={selectedBank}
-                  onChange={(e) => setSelectedBank(e.target.value)}
-                  className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-48 p-2.5 pr-8 transition-colors cursor-pointer"
-                >
-                  <option value="all">All Banks</option>
-                  {bankOptions.map((bank) => (
-                    <option key={bank} value={bank}>{bank}</option>
+                  {orderedFilteredAccounts.map((acct) => (
+                    <option key={acct.account} value={acct.account}>
+                      {acct.account}
+                    </option>
                   ))}
                 </select>
-              </div>
-
-              {!disableGlAccountFilter && (
-                <>
-                  <label htmlFor="gl-account-select" className="text-sm font-semibold text-gray-700">
-                    Select GL Account:
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="gl-account-select"
-                      value={selectedAccount}
-                      onChange={(e) => setSelectedAccount(e.target.value)}
-                      className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-64 p-2.5 pr-8 transition-colors cursor-pointer"
-                    >
-                      {orderedFilteredAccounts.map((acct) => (
-                        <option key={acct.account} value={acct.account}>
-                          {acct.account}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-                </>
-              )}
+              </div>
             </div>
           )}
 
           {/* Selected Account Comparison */}
           {selectedGroup ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-              <div className="px-6 py-4 border-b border-gray-50">
-                <AccountBanner accountNumber={selectedGroup.account} extra={`${statusFilter.charAt(0).toUpperCase()}${statusFilter.slice(1)} view`} />
-              </div>
+              {selectedGroup.account !== 'All Accounts' && (
+                <div className="px-6 py-4 border-b border-gray-50">
+                  <AccountBanner accountNumber={selectedGroup.account} extra={`${statusFilter.charAt(0).toUpperCase()}${statusFilter.slice(1)} view`} />
+                </div>
+              )}
               
               {(statusFilter === 'matched' && matchedItems.length > 0)
                 || (statusFilter === 'unmatched' && (unmatchedBankItems.length > 0 || unmatchedSageItems.length > 0))
@@ -730,7 +1096,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                       </span>
                     </div>
                     <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                      {(statusFilter === 'matched' ? matchedItems.map((m) => m.bank) : statusFilter === 'unmatched' ? unmatchedBankItems : allBankItems).map((t, idx) => (
+                      {uniqueBankDisplayItems.map((t, idx) => (
                         <div key={`bank-${t?.id ?? idx}`} className={`border rounded-xl p-3 flex justify-between items-start transition-colors ${statusFilter === 'unmatched' ? 'bg-amber-50/30 border-amber-100/60 hover:bg-amber-50/50' : statusFilter === 'matched' ? 'bg-green-50/40 border-green-100/50 hover:bg-green-50' : 'bg-white border-gray-100 hover:bg-gray-50'}`}>
                           {statusFilter === 'unmatched' && (
                             <div className="pr-3 pt-1">
@@ -744,13 +1110,17 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                           )}
                           <div>
                             <div className="font-semibold text-gray-800 text-sm">
-                              {t?.description || '—'}
+                              {t?.description }
                             </div>
-                            <div className="text-xs text-gray-400 mt-1">
-                              {t?.date}
+                            <div className="text-[11px] text-gray-500 mt-1 space-y-0.5">
+                              <div><span className="text-gray-400">Check No:</span> {t?.check_number || t?.reference || ''}</div>
+                              <div><span className="text-gray-400">Txn Type:</span> {t?.type || t?.transaction_type || ''}</div>
+                              <div><span className="text-gray-400">Account No:</span> {t?.account_number || t?.account || selectedGroup?.account || ''}</div>
+                              <div><span className="text-gray-400">Date:</span> {t?.date || ''}</div>
                             </div>
                           </div>
                           <div className="text-right">
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Amount Paid</div>
                             <div className={`font-bold ${statusFilter === 'unmatched' ? 'text-amber-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-700'}`}>{fmt(t?.amount)}</div>
                             <div className={`text-[10px] mt-1 uppercase tracking-wider font-semibold inline-block px-1.5 py-0.5 rounded ${statusFilter === 'unmatched' ? 'bg-amber-100/60 text-amber-700' : statusFilter === 'matched' ? 'bg-green-100/50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
                               {statusFilter === 'all' ? (t?.is_matched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
@@ -767,39 +1137,74 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                       <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                       <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sage GL Transactions</span>
                       <span className="text-xs text-gray-400 ml-1">
-                        {statusFilter === 'matched' ? `${matchedItems.length} matched` : statusFilter === 'unmatched' ? `${unmatchedSageItems.length} unmatched` : `${allSageItems.length} items`}
+                        {statusFilter === 'matched' ? `${groupedSageDisplay.length} grouped` : statusFilter === 'unmatched' ? `${groupedSageDisplay.length} grouped` : `${groupedSageDisplay.length} groups`}
                       </span>
                     </div>
                     <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                      {(statusFilter === 'matched' ? matchedItems.map((m) => m.sage) : statusFilter === 'unmatched' ? unmatchedSageItems : allSageItems).map((t, idx) => (
-                        <div key={`sage-${t?.id ?? idx}`} className={`border rounded-xl p-3 flex justify-between items-start transition-colors ${statusFilter === 'unmatched' ? 'bg-red-50/30 border-red-100/60 hover:bg-red-50/50' : statusFilter === 'matched' ? 'bg-green-50/40 border-green-100/50 hover:bg-green-50' : 'bg-white border-gray-100 hover:bg-gray-50'}`}>
+                      {groupedSageDisplay.map((g, idx) => {
+                        const t = g.items[0];
+                        const groupMatched = g.items.every((item) => item?.is_matched);
+                        const isExpanded = expandedSageGroups.includes(g.groupKey);
+                        return (
+                        <div key={`sage-${g.groupKey}-${idx}`} className={`border rounded-xl p-3 transition-colors ${statusFilter === 'unmatched' ? 'bg-red-50/30 border-red-100/60 hover:bg-red-50/50' : statusFilter === 'matched' ? 'bg-green-50/40 border-green-100/50 hover:bg-green-50' : 'bg-white border-gray-100 hover:bg-gray-50'}`}>
+                          <div className="flex justify-between items-start">
                           {statusFilter === 'unmatched' && (
                             <div className="pr-3 pt-1">
                               <input
                                 type="checkbox"
-                                checked={selectedSageIds.includes(t?.id)}
-                                onChange={() => t?.id && toggleSelection(t.id, selectedSageIds, setSelectedSageIds)}
+                                checked={isGroupSelected(g.items, selectedSageIds)}
+                                onChange={() => toggleGroupSelection(g.items, selectedSageIds, setSelectedSageIds)}
                                 className="w-4 h-4 accent-[#1e9bd8]"
                               />
                             </div>
                           )}
                           <div>
                             <div className="font-semibold text-gray-800 text-sm">
-                              {t?.description || '—'}
+                              {g.items.length > 1 ? `${g.items.length} transactions` : (t?.description || '')}
                             </div>
-                            <div className="text-xs text-gray-400 mt-1">
-                              {t?.date}
+                            <div className="text-[11px] text-gray-500 mt-1 space-y-0.5">
+                              <div><span className="text-gray-400">Check No:</span> {g.checkNumber}</div>
+                              <div><span className="text-gray-400">Txn Type:</span> {t?.type || t?.transaction_type || ''}</div>
+                              <div><span className="text-gray-400">Account No:</span> {t?.account || t?.account_number || selectedGroup?.account || ''}</div>
+                              <div><span className="text-gray-400">Date:</span> {t?.date || ''}</div>
                             </div>
                             {t?.bank && <div className="text-[10px] text-gray-400 mt-1">Bank: {t.bank}</div>}
                           </div>
                           <div className="text-right">
-                            <div className={`font-bold ${statusFilter === 'unmatched' ? 'text-red-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-700'}`}>{fmt(t?.amount)}</div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Amount Paid</div>
+                            <div className={`font-bold ${statusFilter === 'unmatched' ? 'text-red-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-700'}`}>{fmt(g.totalAmount)}</div>
+                            {g.items.length > 1 && (
+                              <button
+                                onClick={() => toggleExpandedSageGroup(g.groupKey)}
+                                className="text-[11px] text-[#1e9bd8] hover:underline mt-1"
+                              >
+                                {isExpanded ? 'Hide entries' : `View entries (${g.items.length})`}
+                              </button>
+                            )}
                             <div className={`text-[10px] mt-1 uppercase tracking-wider font-semibold inline-block px-1.5 py-0.5 rounded ${statusFilter === 'unmatched' ? 'bg-red-100/60 text-red-700' : statusFilter === 'matched' ? 'bg-green-100/50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-                              {statusFilter === 'all' ? (t?.is_matched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
+                              {statusFilter === 'all' ? (groupMatched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
                             </div>
                           </div>
+                          </div>
+
+                          {isExpanded && g.items.length > 1 && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                              {g.items.map((entry) => (
+                                <div key={`sage-entry-${entry.id}`} className="bg-white/60 border border-gray-100 rounded-lg px-3 py-2 text-[11px] text-gray-600 flex justify-between gap-3">
+                                  <div className="space-y-0.5">
+                                    <div><span className="text-gray-400">Date:</span> {entry.date || ''}</div>
+                                    <div><span className="text-gray-400">Txn Type:</span> {entry.type || entry.transaction_type || ''}</div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-semibold text-gray-700">{fmt(entry.amount)}</div>
+                                    <div className="text-gray-400">ID: {entry.id}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      )})}
                     </div>
                   </div>
                 </div>
@@ -817,7 +1222,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
             </div>
           ) : (
             orderedFilteredAccounts.length === 0 && (
-              <EmptyState icon="🔍" title="No records for selected filters" subtitle="Try a different Status/Bank filter or run matching to create matched records" />
+              <EmptyState icon="≡ƒöì" title="No records for selected filters" subtitle="Try a different Status/Bank filter or run matching to create matched records" />
             )
           )}
         </>
@@ -826,15 +1231,35 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
   );
 };
 
-/* ────────────── Tab: Unmatched ────────────── */
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ Tab: Unmatched ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 const UnmatchedTab = () => {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [manualMarking, setManualMarking] = useState(false);
+  const [selectedBank, setSelectedBank] = useState('all');
   const [selectedBankIds, setSelectedBankIds] = useState([]);
   const [selectedSageIds, setSelectedSageIds] = useState([]);
   const [expandedBankGroups, setExpandedBankGroups] = useState([]);
   const [expandedSageGroups, setExpandedSageGroups] = useState([]);
+
+  const allAccounts = results?.accounts || [];
+
+  const bankOptions = React.useMemo(() => {
+    return Array.from(new Set(
+      allAccounts.flatMap((g) => (g.sage_transactions || []).map((t) => t.bank).filter(Boolean))
+    )).sort();
+  }, [allAccounts]);
+
+  const selectedBankAccounts = React.useMemo(() => {
+    if (selectedBank === 'all') return null;
+
+    return new Set(
+      allAccounts
+        .filter((g) => (g.sage_transactions || []).some((t) => t.bank === selectedBank))
+        .map((g) => g.account)
+        .filter(Boolean)
+    );
+  }, [allAccounts, selectedBank]);
 
   const load = async () => {
     setLoading(true);
@@ -859,7 +1284,7 @@ const UnmatchedTab = () => {
       if (!grouped.has(key)) {
         grouped.set(key, {
           groupKey: key,
-          checkNumber: checkNo || '—',
+          checkNumber: checkNo || '',
           totalAmount: 0,
           items: [],
         });
@@ -892,7 +1317,34 @@ const UnmatchedTab = () => {
       : [...expanded, groupKey]);
   };
 
-  const groupedUnmatchedBank = groupByCheckNumber(results?.unmatched_bank || []);
+  const filteredUnmatchedBank = React.useMemo(() => {
+    const bankRows = results?.unmatched_bank || [];
+    if (selectedBank === 'all') return bankRows;
+
+    return bankRows.filter((t) => {
+      const accountNumber = t?.account_number || t?.account;
+      return accountNumber ? selectedBankAccounts?.has(accountNumber) : false;
+    });
+  }, [results, selectedBank, selectedBankAccounts]);
+
+  const unmatchedSageGroups = React.useMemo(() => {
+    const groups = (results?.accounts || []).filter((g) => g.unmatched_sage_count > 0);
+    if (selectedBank === 'all') return groups;
+
+    return groups.filter((group) =>
+      (group.unmatched_sage || []).some((t) => t.bank === selectedBank)
+      || (group.sage_transactions || []).some((t) => t.bank === selectedBank)
+    );
+  }, [results, selectedBank]);
+
+  const groupedUnmatchedBank = groupByCheckNumber(filteredUnmatchedBank);
+
+  const filteredUnmatchedSageCount = unmatchedSageGroups.reduce((sum, group) => {
+    const unmatchedRows = selectedBank === 'all'
+      ? (group.unmatched_sage || [])
+      : (group.unmatched_sage || []).filter((t) => t.bank === selectedBank);
+    return sum + unmatchedRows.length;
+  }, 0);
 
   const toggleSelection = (id, selectedIds, setSelectedIds) => {
     setSelectedIds(selectedIds.includes(id)
@@ -929,6 +1381,13 @@ const UnmatchedTab = () => {
     }
   };
 
+  React.useEffect(() => {
+    setSelectedBankIds([]);
+    setSelectedSageIds([]);
+    setExpandedBankGroups([]);
+    setExpandedSageGroups([]);
+  }, [selectedBank]);
+
   return (
     <div className="space-y-6">
       {loading && <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>}
@@ -936,7 +1395,7 @@ const UnmatchedTab = () => {
       {!loading && results && (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-2 gap-4">
             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
                 <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -944,7 +1403,7 @@ const UnmatchedTab = () => {
                 </svg>
               </div>
               <div>
-                <div className="text-2xl font-bold text-amber-700">{results.summary?.total_unmatched_bank ?? 0}</div>
+                <div className="text-2xl font-bold text-amber-700">{filteredUnmatchedBank.length}</div>
                 <div className="text-xs text-amber-600 font-medium">Unmatched in Bank Statement</div>
               </div>
             </div>
@@ -955,15 +1414,28 @@ const UnmatchedTab = () => {
                 </svg>
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-700">{results.summary?.total_unmatched_sage ?? 0}</div>
+                <div className="text-2xl font-bold text-red-700">{filteredUnmatchedSageCount}</div>
                 <div className="text-xs text-red-600 font-medium">Unmatched in Sage GL</div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
-            <div className="text-xs text-gray-500">
-              Selected: <span className="font-semibold text-amber-700">Bank {selectedBankIds.length}</span> · <span className="font-semibold text-red-700">Sage {selectedSageIds.length}</span>
+            <div className="flex items-center gap-2">
+              <label htmlFor="unmatched-bank-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+                Bank:
+              </label>
+              <select
+                id="unmatched-bank-filter"
+                value={selectedBank}
+                onChange={(e) => setSelectedBank(e.target.value)}
+                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-52 p-2.5 transition-colors cursor-pointer"
+              >
+                <option value="all">All Banks</option>
+                {bankOptions.map((bank) => (
+                  <option key={bank} value={bank}>{bank}</option>
+                ))}
+              </select>
             </div>
             <button
               onClick={handleManualMarkMatched}
@@ -971,19 +1443,44 @@ const UnmatchedTab = () => {
               className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
             >
               {manualMarking
-                ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Marking…</>
+                ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> MarkingΓÇª</>
                 : <>Mark as Matched</>
               }
             </button>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-amber-700">{filteredUnmatchedBank.length}</div>
+                <div className="text-xs text-amber-600 font-medium">Unmatched in Bank Statement</div>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-red-700">{filteredUnmatchedSageCount}</div>
+                <div className="text-xs text-red-600 font-medium">Unmatched in Sage GL</div>
+              </div>
+            </div>
+          </div>
+
           {/* Unmatched Bank */}
-          {results.unmatched_bank?.length > 0 && (
+          {filteredUnmatchedBank.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
                 <h3 className="font-semibold text-gray-700">Unmatched Bank Transactions</h3>
-                <span className="ml-auto text-xs text-amber-600 font-semibold">{results.unmatched_bank.length} items</span>
+                <span className="ml-auto text-xs text-amber-600 font-semibold">{filteredUnmatchedBank.length} items</span>
               </div>
               <div className="overflow-auto max-h-64">
                 <table className="w-full text-sm">
@@ -1012,8 +1509,8 @@ const UnmatchedTab = () => {
                         </td>
                         <td className="px-6 py-3 text-gray-700 font-mono text-xs">{g.checkNumber}</td>
                         <td className="px-6 py-3 text-gray-500">{g.items[0]?.date}</td>
-                        <td className="px-6 py-3 text-gray-700 max-w-[240px] truncate">{g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '—')}</td>
-                        <td className="px-6 py-3 text-gray-400 font-mono text-xs">{g.items[0]?.reference || '—'}</td>
+                        <td className="px-6 py-3 text-gray-700 max-w-[240px] truncate">{g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '')}</td>
+                        <td className="px-6 py-3 text-gray-400 font-mono text-xs">{g.items[0]?.reference || ''}</td>
                         <td className="px-6 py-3"><Badge type={g.items[0]?.type} /></td>
                         <td className="px-6 py-3 text-right font-medium text-gray-800">
                           {fmt(g.totalAmount)}
@@ -1037,10 +1534,10 @@ const UnmatchedTab = () => {
                               className="w-4 h-4 accent-[#1e9bd8]"
                             />
                           </td>
-                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.check_number || t.reference || '—'}</td>
+                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.check_number || t.reference || ''}</td>
                           <td className="px-6 py-3 text-gray-500">{t.date}</td>
-                          <td className="px-6 py-3 text-gray-700 max-w-[240px] truncate">{t.description || '—'}</td>
-                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.reference || '—'}</td>
+                          <td className="px-6 py-3 text-gray-700 max-w-[240px] truncate">{t.description || ''}</td>
+                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.reference || ''}</td>
                           <td className="px-6 py-3"><Badge type={t.type} /></td>
                           <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
                         </tr>
@@ -1053,11 +1550,28 @@ const UnmatchedTab = () => {
             </div>
           )}
 
-          {/* Unmatched Sage — grouped by account */}
-          {results.accounts?.filter((g) => g.unmatched_sage_count > 0).map((group) => (
+          {/* Unmatched Sage  grouped by account */}
+          {/* {unmatchedSageGroups.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                <h3 className="font-semibold text-gray-700">Unmatched Sage Transactions</h3>
+                <span className="ml-auto text-xs text-red-600 font-semibold">{filteredUnmatchedSageCount} items</span>
+              </div>
+            </div>
+          )} */}
+          {unmatchedSageGroups.map((group) => {
+            const groupUnmatchedSage = selectedBank === 'all'
+              ? (group.unmatched_sage || [])
+              : (group.unmatched_sage || []).filter((t) => t.bank === selectedBank);
+
+            return (
             <div key={group.account} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-50">
-                <AccountBanner accountNumber={group.account} extra={`${group.unmatched_sage_count} unmatched`} />
+              <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                <h3 className="font-semibold text-gray-700">Unmatched Sage Transactions</h3>
+                <span className="ml-auto text-xs text-red-600 font-semibold">{filteredUnmatchedSageCount} items</span>
+                             {/* <AccountBanner accountNumber={group.account} extra={`${groupUnmatchedSage.length} unmatched`} /> */}
               </div>
               <div className="overflow-auto max-h-64">
                 <table className="w-full text-sm">
@@ -1072,7 +1586,7 @@ const UnmatchedTab = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {groupByCheckNumber(group.unmatched_sage).map((g) => (
+                    {groupByCheckNumber(groupUnmatchedSage).map((g) => (
                       <React.Fragment key={`sage-group-${group.account}-${g.groupKey}`}>
                       <tr className="hover:bg-red-50/20">
                         <td className="px-6 py-3">
@@ -1085,7 +1599,7 @@ const UnmatchedTab = () => {
                         </td>
                         <td className="px-6 py-3 text-gray-700 font-mono text-xs">{g.checkNumber}</td>
                         <td className="px-6 py-3 text-gray-500">{g.items[0]?.date}</td>
-                        <td className="px-6 py-3 text-gray-700 max-w-[280px] truncate">{g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '—')}</td>
+                        <td className="px-6 py-3 text-gray-700 max-w-[280px] truncate">{g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '')}</td>
                         <td className="px-6 py-3"><Badge type={g.items[0]?.type} /></td>
                         <td className="px-6 py-3 text-right font-medium text-gray-800">
                           {fmt(g.totalAmount)}
@@ -1109,9 +1623,9 @@ const UnmatchedTab = () => {
                               className="w-4 h-4 accent-[#1e9bd8]"
                             />
                           </td>
-                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.check_number || '—'}</td>
+                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.check_number || ''}</td>
                           <td className="px-6 py-3 text-gray-500">{t.date}</td>
-                          <td className="px-6 py-3 text-gray-700 max-w-[280px] truncate">{t.description || '—'}</td>
+                          <td className="px-6 py-3 text-gray-700 max-w-[280px] truncate">{t.description || ''}</td>
                           <td className="px-6 py-3"><Badge type={t.type} /></td>
                           <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
                         </tr>
@@ -1122,10 +1636,11 @@ const UnmatchedTab = () => {
                 </table>
               </div>
             </div>
-          ))}
+            );
+          })}
 
-          {results.summary?.total_unmatched_bank === 0 && results.summary?.total_unmatched_sage === 0 && (
-            <EmptyState icon="✅" title="All transactions matched!" subtitle="No unmatched transactions found. Reconciliation is complete." />
+          {filteredUnmatchedBank.length === 0 && filteredUnmatchedSageCount === 0 && (
+            <EmptyState icon="" title="All transactions matched!" subtitle="No unmatched transactions found. Reconciliation is complete." />
           )}
         </>
       )}
@@ -1133,11 +1648,15 @@ const UnmatchedTab = () => {
   );
 };
 
-/* ────────────── Sidebar Tabs ────────────── */
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ Sidebar Tabs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 const TABS = [
   {
     id: 'bank-statement', label: 'Bank Statement',
     icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>,
+  },
+  {
+    id: 'bank-accounts', label: 'Bank Accounts',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M5 7l1 12h12l1-12M9 11v5m6-5v5" /></svg>,
   },
   {
     id: 'sage-gl', label: 'Sage GL Transactions',
@@ -1153,7 +1672,7 @@ const TABS = [
   },
 ];
 
-/* ────────────── Main Page ────────────── */
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ Main Page ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 const BankReconciliationPage = () => {
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
@@ -1171,10 +1690,12 @@ const BankReconciliationPage = () => {
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
+
   const subtitles = {
     'bank-statement': 'Upload and review your bank statement transactions',
+    'bank-accounts': 'Upload bank account files and sync account data from Sage',
     'sage-gl': 'View GL transactions pulled from Sage Intacct, grouped by account',
-    'match-compare': 'Auto-match bank and Sage transactions side by side — grouped by GL account',
+    'match-compare': 'Auto-match bank and Sage transactions side by side',
     'unmatched': 'Review transactions that could not be automatically matched',
   };
 
@@ -1231,8 +1752,8 @@ const BankReconciliationPage = () => {
                 </svg>
               </div>
               <div>
-                <p className="font-bold text-gray-800 text-sm">Reconciliation</p>
-                <p className="text-xs text-gray-400">Bank ↔ Sage GL</p>
+                <p className="font-bold text-gray-800 text-sm">Bank Reconciliation</p>
+                {/* <p className="text-xs text-gray-400">Bank Γåö Sage GL</p> */}
               </div>
             </div>
           </div>
@@ -1263,6 +1784,7 @@ const BankReconciliationPage = () => {
               <p className="text-sm text-gray-400 mt-1">{subtitles[activeTab]}</p>
             </div>
             {activeTab === 'bank-statement'  && <BankStatementTab />}
+            {activeTab === 'bank-accounts'   && <BankAccountsTab />}
             {activeTab === 'sage-gl'         && <SageGLTab />}
             {activeTab === 'match-compare'   && <MatchCompareTab onGoToUnmatched={() => setActiveTab('unmatched')} />}
             {activeTab === 'unmatched'       && <UnmatchedTab />}

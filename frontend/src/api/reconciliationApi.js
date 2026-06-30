@@ -17,9 +17,11 @@ export const reconciliationApi = {
   getStatementTransactions: (statementId) =>
     API.get(`/reconciliation/statements/${statementId}/transactions`),
 
-  // Fetch Sage GL transactions (optionally scoped to an account)
-  fetchSageTransactions: (accountNumber = null) => {
-    const params = accountNumber ? { account_number: accountNumber } : {};
+  // Fetch Sage GL transactions (optionally scoped to account and financial entity)
+  fetchSageTransactions: (accountNumber = null, financialEntity = null) => {
+    const params = {};
+    if (accountNumber) params.account_number = accountNumber;
+    if (financialEntity) params.financial_entity = financialEntity;
     return API.post('/reconciliation/fetch-sage-transactions', null, { params });
   },
 
@@ -49,4 +51,16 @@ export const reconciliationApi = {
     const params = accountNumber ? { account_number: accountNumber } : {};
     return API.get('/reconciliation/results', { params });
   },
+
+  // Upload bank accounts master file
+  uploadBankAccounts: (formData) =>
+    API.post('/reconciliation/bank-accounts/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+  // List bank accounts
+  getBankAccounts: () => API.get('/reconciliation/bank-accounts'),
+
+  // Sync bank accounts from cached Sage transactions
+  syncBankAccounts: () => API.post('/reconciliation/bank-accounts/sync'),
 };

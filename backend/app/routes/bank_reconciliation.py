@@ -7,7 +7,7 @@ from app.auth.jwt import get_current_user
 from app.services.bank_reconciliation_service import BankReconciliationService
 from app.models.db_models import (
     BankStatement, BankStatementTransaction,
-    SageGLTransactionCache, ReconciliationResult
+    SageGLTransactionCache, ReconciliationResult, BankAccount
 )
 import logging
 
@@ -19,6 +19,54 @@ router = APIRouter(prefix="/reconciliation", tags=["bank-reconciliation"])
 class ManualMatchRequest(BaseModel):
     bank_transaction_ids: list[int]
     sage_transaction_ids: list[int]
+
+
+@router.post("/bank-accounts/upload")
+async def upload_bank_accounts(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Upload bank accounts master file (CSV/Excel) into bank_accounts."""
+    if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Only CSV and Excel files are supported.")
+
+    uploader = getattr(current_user, "email", "unknown")
+    service = BankReconciliationService(db)
+    try:
+        count = await service.process_bank_accounts_file(file=file, uploader=uploader)
+        return {"message": f"Uploaded {count} bank account row(s).", "count": count}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Bank accounts upload failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to process bank accounts file: {str(e)}")
+
+
+@router.get("/bank-accounts")
+def get_bank_accounts(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Get all bank accounts."""
+    service = BankReconciliationService(db)
+    rows = service.get_bank_accounts()
+    return {"items": rows, "total": len(rows)}
+
+
+@router.post("/bank-accounts/sync")
+def sync_bank_accounts_from_sage(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Sync bank accounts table from cached Sage GL transactions."""
+    service = BankReconciliationService(db)
+    try:
+        count = service.sync_bank_accounts_from_sage_cache()
+        return {"message": f"Synced {count} bank account row(s) from Sage cache.", "count": count}
+    except Exception as e:
+        logger.error(f"Bank accounts sync failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to sync bank accounts: {str(e)}")
 
 
 @router.post("/upload")
@@ -148,17 +196,22 @@ def get_statement_transactions(
 @router.post("/fetch-sage-transactions")
 async def fetch_sage_transactions(
     account_number: Optional[str] = Query(None, description="Filter by GL account number"),
+    financial_entity: Optional[str] = Query(None, description="Filter by financial entity/bank"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    """Fetch GL transactions from Sage Intacct and cache them, optionally filtered by account."""
+    """Fetch GL transactions from Sage Intacct and cache them, optionally filtered by account and financial entity."""
     service = BankReconciliationService(db)
     try:
-        count = await service.fetch_sage_gl_transactions(account_filter=account_number)
+        count = await service.fetch_sage_gl_transactions(
+            account_filter=account_number,
+            financial_entity_filter=financial_entity,
+        )
         return {
             "message": f"Fetched and cached {count} new Sage GL transactions.",
             "count": count,
-            "account_number": account_number
+            "account_number": account_number,
+            "financial_entity": financial_entity,
         }
     except Exception as e:
         logger.error(f"Sage fetch failed: {e}", exc_info=True)

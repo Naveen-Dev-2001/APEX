@@ -13,7 +13,7 @@ import re
 
 from app.models.db_models import (
     BankStatement, BankStatementTransaction, 
-    SageGLTransactionCache, ReconciliationResult
+    SageGLTransactionCache, ReconciliationResult, BankAccount, GLMaster
 )
 from app.services.base_sync_service import BaseSyncService
 from app.utils.date_utils import get_ist_now
@@ -282,17 +282,187 @@ class BankReconciliationService:
             logger.error(f"Error deleting statement: {e}")
             return False
 
-    async def fetch_sage_gl_transactions(self, account_filter: str = None) -> int:
-        """Fetch GL transactions from Sage. Optionally filter by account number."""
+    async def process_bank_accounts_file(self, file: UploadFile, uploader: str) -> int:
+        """Upload a bank accounts master file and upsert rows into bank_accounts."""
+        content = await file.read()
+        filename = (file.filename or "").lower()
+
+        if filename.endswith('.csv'):
+            df = pd.read_csv(BytesIO(content))
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            df = pd.read_excel(BytesIO(content))
+        else:
+            raise ValueError("Unsupported file format. Please upload CSV or Excel.")
+
+        cols = [str(c).lower().strip() for c in df.columns]
+        df.columns = cols
+
+        bank_id_col = next((c for c in cols if c in ("bank_id", "bank id", "bankid")), None)
+        bank_name_col = next((c for c in cols if c in ("bank_name", "bank name", "bank")), None)
+        account_number_col = next((c for c in cols if c in ("account_number", "account number", "account_no", "account no", "accountno")), None)
+        account_name_col = next((c for c in cols if c in ("account_name", "account name")), None)
+        gl_account_col = next((c for c in cols if c in ("gl_account", "gl account", "gl_account_number", "gl account number", "gl")), None)
+        gl_account_title_col = next((c for c in cols if c in ("gl_account_title", "gl account title", "gl_title", "gl title")), None)
+        currency_col = next((c for c in cols if c in ("currency", "currency_code", "currency code")), None)
+        is_active_col = next((c for c in cols if c in ("is_active", "active", "status")), None)
+
+        if not account_number_col:
+            raise ValueError("Could not find Account Number column in uploaded file.")
+
+        def _to_bool(value: Any) -> bool:
+            if value is None or (isinstance(value, float) and pd.isna(value)):
+                return True
+            text = str(value).strip().lower()
+            if text in ("1", "true", "yes", "active", "y"):
+                return True
+            if text in ("0", "false", "no", "inactive", "n"):
+                return False
+            return True
+
+        upserted = 0
+        try:
+            for _, row in df.iterrows():
+                account_number = str(row.get(account_number_col)).strip() if account_number_col and not pd.isna(row.get(account_number_col, None)) else ""
+                if not account_number:
+                    continue
+
+                bank_id = str(row.get(bank_id_col)).strip() if bank_id_col and not pd.isna(row.get(bank_id_col, None)) else ""
+                bank_name = str(row.get(bank_name_col)).strip() if bank_name_col and not pd.isna(row.get(bank_name_col, None)) else ""
+                if not bank_id and bank_name:
+                    bank_id = bank_name
+
+                account_name = str(row.get(account_name_col)).strip() if account_name_col and not pd.isna(row.get(account_name_col, None)) else None
+                gl_account = str(row.get(gl_account_col)).strip() if gl_account_col and not pd.isna(row.get(gl_account_col, None)) else None
+                gl_account_title = str(row.get(gl_account_title_col)).strip() if gl_account_title_col and not pd.isna(row.get(gl_account_title_col, None)) else None
+                currency_code = str(row.get(currency_col)).strip() if currency_col and not pd.isna(row.get(currency_col, None)) else None
+                is_active = _to_bool(row.get(is_active_col, None)) if is_active_col else True
+
+                existing_query = self.db.query(BankAccount).filter(BankAccount.account_number == account_number)
+                if bank_id:
+                    existing_query = existing_query.filter(BankAccount.bank_id == bank_id)
+                existing = existing_query.first()
+
+                if existing:
+                    existing.account_name = account_name or existing.account_name
+                    existing.bank_name = bank_name or existing.bank_name
+                    existing.gl_account = gl_account or existing.gl_account
+                    existing.gl_account_title = gl_account_title or existing.gl_account_title
+                    existing.currency_code = currency_code or existing.currency_code
+                    existing.is_active = is_active
+                    existing.source = "upload"
+                    existing.updated_at = get_ist_now()
+                else:
+                    self.db.add(BankAccount(
+                        bank_id=bank_id or None,
+                        account_number=account_number,
+                        account_name=account_name,
+                        bank_name=bank_name or None,
+                        gl_account=gl_account,
+                        gl_account_title=gl_account_title,
+                        currency_code=currency_code,
+                        is_active=is_active,
+                        source="upload",
+                    ))
+
+                upserted += 1
+
+            self.db.commit()
+            return upserted
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def get_bank_accounts(self) -> List[Dict[str, Any]]:
+        rows = self.db.query(BankAccount).order_by(BankAccount.updated_at.desc(), BankAccount.id.desc()).all()
+        return [
+            {
+                "id": r.id,
+                "bank_id": r.bank_id,
+                "bank_name": r.bank_name,
+                "account_number": r.account_number,
+                "account_name": r.account_name,
+                "gl_account": r.gl_account,
+                "gl_account_title": r.gl_account_title,
+                "currency_code": r.currency_code,
+                "is_active": r.is_active,
+                "source": r.source,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+
+    def sync_bank_accounts_from_sage_cache(self) -> int:
+        """Build/refresh bank_accounts from existing Sage cache + GL master."""
+        gl_title_by_acct = {
+            g.account_number: g.title
+            for g in self.db.query(GLMaster).all()
+            if g.account_number
+        }
+
+        source_rows = self.db.query(SageGLTransactionCache).filter(
+            SageGLTransactionCache.account != None
+        ).all()
+
+        upserted = 0
+        try:
+            seen = set()
+            for row in source_rows:
+                account_number = (row.account or "").strip()
+                if not account_number:
+                    continue
+
+                bank_name = (row.bank or "").strip() or None
+                bank_id = bank_name
+                key = (bank_id or "", account_number)
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                gl_title = gl_title_by_acct.get(account_number)
+
+                existing_query = self.db.query(BankAccount).filter(BankAccount.account_number == account_number)
+                if bank_id:
+                    existing_query = existing_query.filter(BankAccount.bank_id == bank_id)
+                existing = existing_query.first()
+
+                if existing:
+                    existing.bank_name = bank_name or existing.bank_name
+                    existing.gl_account = account_number
+                    existing.gl_account_title = gl_title or existing.gl_account_title
+                    existing.source = existing.source or "sage_cache"
+                    existing.updated_at = get_ist_now()
+                else:
+                    self.db.add(BankAccount(
+                        bank_id=bank_id,
+                        bank_name=bank_name,
+                        account_number=account_number,
+                        gl_account=account_number,
+                        gl_account_title=gl_title,
+                        is_active=True,
+                        source="sage_cache",
+                    ))
+
+                upserted += 1
+
+            self.db.commit()
+            return upserted
+        except Exception:
+            self.db.rollback()
+            raise
+
+    async def fetch_sage_gl_transactions(self, account_filter: str = None, financial_entity_filter: str = None) -> int:
+        """Fetch GL transactions from Sage. Optionally filter by account number and financial entity."""
         try:
             from scripts.bank_recon import get_session_id, fetch_all_gldetail, normalize_records
             
             session_id = await get_session_id()
             acct = account_filter or "10012"
+            financial_entity = financial_entity_filter or "FFB_4449"
             
             records = await fetch_all_gldetail(
                 session_id=session_id,
-                financial_entity="FFB_4449",
+                financial_entity=financial_entity,
                 account_no=acct,
                 after_date="09/30/2023"
             )
@@ -321,7 +491,7 @@ class BankReconciliationService:
                     json.dump(
                         {
                             "total": len(normalized),
-                            "financial_entity": "FFB_4449",
+                            "financial_entity": financial_entity,
                             "gl_account": acct,
                             "fetched_at": get_ist_now().isoformat(),
                             "transactions": normalized,
@@ -352,7 +522,7 @@ class BankReconciliationService:
                     item.get("financial_entity"),
                     item.get("bank"),
                     self._pick_key(raw, "FINANCIALENTITY", "BANK"),
-                    "FFB_4449",
+                    financial_entity,
                 )
 
                 sage_key = str(item.get("record_no") or f"{item.get('txn_date')}_{item.get('check_no')}_{item.get('txn_amount')}_{item.get('account_no')}")
@@ -472,31 +642,134 @@ class BankReconciliationService:
 
         unmatched_bank = bank_query.all()
         unmatched_sage = sage_query.all()
+
+        candidate_bank_ids = [b.id for b in unmatched_bank]
+        candidate_sage_ids = [s.id for s in unmatched_sage]
+
+        def to_cents(value: Any) -> int:
+            amount = _to_decimal(value)
+            return int((amount * Decimal("100")).quantize(Decimal("1")))
+
+        def find_subset_sum_candidates(candidates: List[SageGLTransactionCache], target_cents: int) -> Optional[List[SageGLTransactionCache]]:
+            """Return a subset (size >= 2) whose amount sum equals target_cents."""
+            if target_cents <= 0:
+                return None
+
+            sums: Dict[int, List[int]] = {0: []}
+
+            for idx, txn in enumerate(candidates):
+                amt = to_cents(txn.amount)
+                if amt <= 0:
+                    continue
+
+                # Snapshot prevents reusing the same transaction multiple times in one path.
+                existing = list(sums.items())
+                for partial, path in existing:
+                    new_total = partial + amt
+                    if new_total > target_cents:
+                        continue
+
+                    if new_total not in sums:
+                        sums[new_total] = path + [idx]
+
+                    if new_total == target_cents and len(sums[new_total]) >= 2:
+                        return [candidates[i] for i in sums[new_total]]
+
+            return None
+
+        # Index unmatched Sage transactions by (normalized_check_no, transaction_type).
+        sage_by_check_and_type: Dict[tuple[str, str], List[SageGLTransactionCache]] = {}
+        for s_txn in unmatched_sage:
+            check_no = self._normalize_check_number(s_txn.doc_number)
+            txn_type = (s_txn.transaction_type or "").strip().lower()
+            if not check_no or not txn_type:
+                continue
+            key = (check_no, txn_type)
+            sage_by_check_and_type.setdefault(key, []).append(s_txn)
         
         matches_found = 0
         
         for b_txn in unmatched_bank:
-            for s_txn in unmatched_sage:
-                if not s_txn.is_matched:
-                    if b_txn.amount == s_txn.amount and b_txn.transaction_type == s_txn.transaction_type:
-                        bank_check = self._normalize_check_number(b_txn.check_number)
-                        sage_check = self._normalize_check_number(s_txn.doc_number)
+            if b_txn.is_matched:
+                continue
 
-                        # Exact match rule: amount + type + check number must match.
-                        check_number_match = bool(bank_check and sage_check and bank_check == sage_check)
+            bank_check = self._normalize_check_number(b_txn.check_number)
+            bank_type = (b_txn.transaction_type or "").strip().lower()
+            if not bank_check or not bank_type:
+                continue
 
-                        if check_number_match:
-                            b_txn.is_matched = True
-                            s_txn.is_matched = True
-                            
-                            result = ReconciliationResult(
-                                bank_transaction_id=b_txn.id,
-                                sage_transaction_id=s_txn.id,
-                                match_status="matched"
-                            )
-                            self.db.add(result)
-                            matches_found += 1
-                            break
+            key = (bank_check, bank_type)
+            candidates = [s for s in sage_by_check_and_type.get(key, []) if not s.is_matched]
+            if not candidates:
+                continue
+
+            bank_amount_cents = to_cents(b_txn.amount)
+
+            # 1) Exact one-to-one match first.
+            exact = next((s for s in candidates if to_cents(s.amount) == bank_amount_cents), None)
+            if exact:
+                b_txn.is_matched = True
+                exact.is_matched = True
+                self.db.add(ReconciliationResult(
+                    bank_transaction_id=b_txn.id,
+                    sage_transaction_id=exact.id,
+                    match_status="matched"
+                ))
+                matches_found += 1
+                continue
+
+            # 2) One-to-many: sum of many Sage rows with same check/type equals Bank amount.
+            subset = find_subset_sum_candidates(candidates, bank_amount_cents)
+            if subset:
+                b_txn.is_matched = True
+                for s_txn in subset:
+                    s_txn.is_matched = True
+                    self.db.add(ReconciliationResult(
+                        bank_transaction_id=b_txn.id,
+                        sage_transaction_id=s_txn.id,
+                        match_status="matched"
+                    ))
+                    matches_found += 1
+
+        # Refresh unmatched snapshots after applying matches in-memory.
+        remaining_unmatched_bank_ids = [b.id for b in unmatched_bank if not b.is_matched]
+        remaining_unmatched_sage_ids = [s.id for s in unmatched_sage if not s.is_matched]
+
+        # Clear old unmatched rows for this run scope to avoid duplicates/stale entries.
+        if candidate_bank_ids or candidate_sage_ids:
+            stale_unmatched_query = self.db.query(ReconciliationResult).filter(
+                ReconciliationResult.match_status == "unmatched"
+            )
+            if candidate_bank_ids and candidate_sage_ids:
+                stale_unmatched_query = stale_unmatched_query.filter(
+                    (ReconciliationResult.bank_transaction_id.in_(candidate_bank_ids)) |
+                    (ReconciliationResult.sage_transaction_id.in_(candidate_sage_ids))
+                )
+            elif candidate_bank_ids:
+                stale_unmatched_query = stale_unmatched_query.filter(
+                    ReconciliationResult.bank_transaction_id.in_(candidate_bank_ids)
+                )
+            else:
+                stale_unmatched_query = stale_unmatched_query.filter(
+                    ReconciliationResult.sage_transaction_id.in_(candidate_sage_ids)
+                )
+            stale_unmatched_query.delete(synchronize_session=False)
+
+        # Persist unmatched bank-only rows.
+        for bank_id in remaining_unmatched_bank_ids:
+            self.db.add(ReconciliationResult(
+                bank_transaction_id=bank_id,
+                sage_transaction_id=None,
+                match_status="unmatched"
+            ))
+
+        # Persist unmatched sage-only rows.
+        for sage_id in remaining_unmatched_sage_ids:
+            self.db.add(ReconciliationResult(
+                bank_transaction_id=None,
+                sage_transaction_id=sage_id,
+                match_status="unmatched"
+            ))
                             
         self.db.commit()
         return matches_found
@@ -528,27 +801,63 @@ class BankReconciliationService:
             raise ValueError("Some selected transactions were not found.")
 
         pairs: List[tuple[int, int]] = []
+        pairing_mode = "pairwise"
 
         if len(bank_transaction_ids) == len(sage_transaction_ids):
             pairs = list(zip(bank_transaction_ids, sage_transaction_ids))
         elif len(bank_transaction_ids) == 1:
+            pairing_mode = "one-to-many"
             bank_id = bank_transaction_ids[0]
             bank_total = _to_decimal(bank_by_id[bank_id].amount)
             sage_total = sum((_to_decimal(sage_by_id[sid].amount) for sid in sage_transaction_ids), Decimal("0"))
             if bank_total != sage_total:
-                raise ValueError("Selected Sage total must equal the selected Bank amount.")
+                raise ValueError("Amount does not match.")
+
+            bank_check = self._normalize_check_number(bank_by_id[bank_id].check_number)
+            if not bank_check:
+                raise ValueError("Check no is wrong.")
+
+            for sid in sage_transaction_ids:
+                sage_check = self._normalize_check_number(sage_by_id[sid].doc_number)
+                if not sage_check or sage_check != bank_check:
+                    raise ValueError("Check no is wrong.")
+
             pairs = [(bank_id, sid) for sid in sage_transaction_ids]
         elif len(sage_transaction_ids) == 1:
+            pairing_mode = "many-to-one"
             sage_id = sage_transaction_ids[0]
             sage_total = _to_decimal(sage_by_id[sage_id].amount)
             bank_total = sum((_to_decimal(bank_by_id[bid].amount) for bid in bank_transaction_ids), Decimal("0"))
             if bank_total != sage_total:
-                raise ValueError("Selected Bank total must equal the selected Sage amount.")
+                raise ValueError("Amount does not match.")
+
+            sage_check = self._normalize_check_number(sage_by_id[sage_id].doc_number)
+            if not sage_check:
+                raise ValueError("Check no is wrong.")
+
+            for bid in bank_transaction_ids:
+                bank_check = self._normalize_check_number(bank_by_id[bid].check_number)
+                if not bank_check or bank_check != sage_check:
+                    raise ValueError("Check no is wrong.")
+
             pairs = [(bid, sage_id) for bid in bank_transaction_ids]
         else:
             raise ValueError(
                 "For manual matching, select equal counts or use one-to-many / many-to-one selection."
             )
+
+        if pairing_mode == "pairwise":
+            for bank_id, sage_id in pairs:
+                bank_txn = bank_by_id[bank_id]
+                sage_txn = sage_by_id[sage_id]
+
+                if _to_decimal(bank_txn.amount) != _to_decimal(sage_txn.amount):
+                    raise ValueError("Amount does not match.")
+
+                bank_check = self._normalize_check_number(bank_txn.check_number)
+                sage_check = self._normalize_check_number(sage_txn.doc_number)
+                if not bank_check or not sage_check or bank_check != sage_check:
+                    raise ValueError("Check no is wrong.")
 
         marked = 0
         for bank_id, sage_id in pairs:
@@ -652,13 +961,16 @@ class BankReconciliationService:
                             "date": r.bank_transaction.date.isoformat(),
                             "description": r.bank_transaction.description,
                             "reference": r.bank_transaction.reference,
+                            "check_number": r.bank_transaction.check_number,
                             "amount": float(r.bank_transaction.amount),
                             "type": r.bank_transaction.transaction_type,
+                            "account_number": r.bank_transaction.account_number,
                         },
                         "sage": {
                             "id": r.sage_transaction.id,
                             "date": r.sage_transaction.date.isoformat(),
                             "description": r.sage_transaction.description,
+                            "check_number": r.sage_transaction.doc_number,
                             "amount": float(r.sage_transaction.amount),
                             "type": r.sage_transaction.transaction_type,
                             "account": r.sage_transaction.account,
@@ -689,6 +1001,7 @@ class BankReconciliationService:
                         "description": t.description,
                         "reference": t.reference,
                         "check_number": t.check_number,
+                        "account_number": t.account_number,
                         "amount": float(t.amount),
                         "type": t.transaction_type,
                         "is_matched": t.is_matched,
@@ -725,6 +1038,7 @@ class BankReconciliationService:
                     "description": t.description,
                     "reference": t.reference,
                     "check_number": t.check_number,
+                    "account_number": t.account_number,
                     "amount": float(t.amount),
                     "type": t.transaction_type,
                     "source": "bank",
