@@ -656,7 +656,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 ? (vendor?.tds_section_code ?? "NA")
                 : (prev?.tdsSection || vendor?.tds_section_code || "NA"),
             // Always sync payment terms and due date
-            paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || "",
+            paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || vendor?.payment_terms_label || "",
             dueDate: computedDueDate,
             // Keep internal flags in sync
             gst_eligibility: useVendorDefaults ? vendor?.gst_eligibility : prev?.gst_eligibility,
