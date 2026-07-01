@@ -73,5 +73,13 @@ class Settings:
     SAGE_USERNAME: str = os.getenv("SAGE_USERNAME")
     ATTACHMENT_FOLDER_KEY: str = os.getenv("ATTACHMENT_FOLDER_KEY")
 
+    # Zoho Books API — only used when TOOL=zoho (configured via .env.zoho)
+    ZOHO_CLIENT_ID: str = os.getenv("ZOHO_CLIENT_ID")
+    ZOHO_CLIENT_SECRET: str = os.getenv("ZOHO_CLIENT_SECRET")
+    ZOHO_REFRESH_TOKEN: str = os.getenv("ZOHO_REFRESH_TOKEN")
+    ZOHO_ORG_ID: str = os.getenv("ZOHO_ORG_ID")
+    ZOHO_TOKEN_URL: str = os.getenv("ZOHO_TOKEN_URL", "https://accounts.zoho.com/oauth/v2/token")
+    ZOHO_API_BASE: str = os.getenv("ZOHO_API_BASE", "https://www.zohoapis.com/books/v3")
+
 
 settings = Settings()

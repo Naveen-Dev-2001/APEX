@@ -9,7 +9,7 @@ export const QUICK_VIEW_CONFIG = [
             { key: "vendorName", label: "Vendor Name", type: "input", editable: true, required: true },
             { key: "invoiceNumber", label: "Invoice Number", type: "input", editable: true, required: true },
             { key: "referenceNumber", label: "Reference Number", type: "input", editable: true, required: getERPSystem() !== "Zoho" },
-            { key: "invoiceDate", label: "Invoice Date", type: "date", editable: true, required: getERPSystem() !== "Zoho" },
+            { key: "invoiceDate", label: "Invoice Date", type: "date", editable: true, required: true },
             { key: "dueDate", label: "Due Date", type: "date", editable: true, required: getERPSystem() !== "Zoho" },
             { key: "postingDate", label: "Posting Date", type: "date", editable: true, required: getERPSystem() !== "Zoho" },
             { key: "paymentTerms", label: "Payment Terms", type: "input", editable: true },
