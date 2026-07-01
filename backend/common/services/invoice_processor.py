@@ -58,3 +58,7 @@ class InvoiceProcessor:
                 path.unlink()
         except Exception as e:
             print(f"Warning: Could not cleanup file {file_path}: {e}")
+
+    async def close(self):
+        if hasattr(self, "orchestrator") and self.orchestrator:
+            await self.orchestrator.close()

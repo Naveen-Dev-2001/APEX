@@ -61,18 +61,60 @@ class InvoiceExtractionAgent:
 
             print(f"Processing file: {file_path}")
 
-            with open(file_path, "rb") as document:
-                poller = await self.doc_intel_client.begin_analyze_document(
-                    "prebuilt-invoice",
-                    AnalyzeDocumentRequest(bytes_source=document.read())
-                )
-                
-                # Check cancellation before waiting for poller result
-                if is_cancelled_callback and is_cancelled_callback():
-                    raise Exception("cancelled")
-                    
-                result: AnalyzeResult = await poller.result()
+            if os.path.exists(file_path):
+                with open(file_path, "rb") as document:
+                    doc_bytes = document.read()
+            else:
+                from app.services.azure_blob import container_client, get_blob_name_from_path
+                blob_name = get_blob_name_from_path(file_path)
+                try:
+                    print(f"File {file_path} not found locally. Fetching bytes from Azure Blob: {blob_name}")
+                    blob_client = container_client.get_blob_client(blob_name)
+                    doc_bytes = blob_client.download_blob().readall()
+                except Exception as blob_err:
+                    raise FileNotFoundError(
+                        f"File {file_path} not found locally, and download failed from Azure Blob '{blob_name}': {blob_err}"
+                    )
+
+            poller = await self.doc_intel_client.begin_analyze_document(
+                "prebuilt-invoice",
+                AnalyzeDocumentRequest(bytes_source=doc_bytes)
+            )
             
+            # Check cancellation before waiting for poller result
+            if is_cancelled_callback and is_cancelled_callback():
+                raise Exception("cancelled")
+                
+            result: AnalyzeResult = await poller.result()
+            
+            if not result.documents or not any(getattr(doc, 'doc_type', None) == 'invoice' for doc in result.documents):
+                raise ValueError("No invoice found in the document")
+
+            # Validate that it actually has critical invoice fields
+            doc = result.documents[0]
+            fields = doc.fields if hasattr(doc, 'fields') else {}
+            
+            valid_fields = []
+            for name, field in fields.items():
+                val = None
+                if hasattr(field, 'value') and field.value is not None:
+                    val = field.value
+                elif hasattr(field, 'content') and field.content:
+                    val = field.content
+                if val is not None and str(val).strip() != "":
+                    valid_fields.append(name)
+                    
+            has_vendor = "VendorName" in valid_fields
+            has_invoice_id = "InvoiceId" in valid_fields or "InvoiceNumber" in valid_fields
+            has_date = "InvoiceDate" in valid_fields
+            has_total = any(f in valid_fields for f in ["InvoiceTotal", "SubTotal", "AmountDue"])
+            
+            # Require at least two core elements (e.g., Vendor and Total, or Invoice ID and Date)
+            core_elements_count = sum([has_vendor, has_invoice_id, has_date, has_total])
+            
+            if core_elements_count < 2:
+                raise ValueError("No invoice found in the document")
+
             duration = time.time() - start_time
             print(f"Azure Document Intelligence Extraction took {duration:.2f}s")
 
@@ -99,7 +141,8 @@ class InvoiceExtractionAgent:
             serialized: Dict[str, Any] = {
                 "api_version": getattr(result, 'api_version', None),
                 "model_id": getattr(result, 'model_id', None),
-                "content": getattr(result, 'content', '')[:4000] + "..." if getattr(result, 'content', '') else '',
+                "content": getattr(result, 'content', '')[:50000] + "..." if getattr(result, 'content', '') else '',
+                "page_count": len(result.pages) if hasattr(result, 'pages') else 1,
             }
 
             if hasattr(result, 'documents') and result.documents:
@@ -413,8 +456,9 @@ class InvoiceExtractionAgent:
 
             azure_data = state["extracted_data"]
             raw_content = state["raw_azure_response"].get("content", "") if state["raw_azure_response"] else ""
+            page_count = state["raw_azure_response"].get("page_count", 1) if state["raw_azure_response"] else 1
 
-            prompt = self._create_header_enhancement_prompt(azure_data, raw_content)
+            prompt = self._create_header_enhancement_prompt(azure_data, raw_content, page_count)
             state["llm_prompt"] = prompt
             
             # Check cancellation before calling LLM
@@ -423,6 +467,9 @@ class InvoiceExtractionAgent:
                 
             enhanced_headers, raw_llm_response = await self._call_llm_for_enhancement(prompt)
             state["llm_raw_response"] = raw_llm_response
+
+            if not enhanced_headers.get("is_invoice", True):
+                raise ValueError("No invoice found in the document")
 
             merged = self._merge_azure_and_llm(azure_data, enhanced_headers)
 
@@ -446,7 +493,7 @@ class InvoiceExtractionAgent:
             state["processing_steps"].append(error_msg)
             return state
 
-    def _create_header_enhancement_prompt(self, azure_data: Dict, raw_content: str) -> str:
+    def _create_header_enhancement_prompt(self, azure_data: Dict, raw_content: str, page_count: int = 1) -> str:
         azure_values: Dict[str, Any] = {}
         for field_name, field_data in azure_data.items():
             if field_name == "Items":
@@ -460,25 +507,37 @@ You will receive Azure prebuilt-invoice fields (header/amount fields) and raw te
 
 CRITICAL: DO NOT extract or modify line items. They are handled separately by Azure Document Intelligence.
 
-IMPORTANT:
-1. Use the structured Azure fields as the PRIMARY evidence.
-2. Use the raw text only to FILL missing fields or to NORMALIZE formats.
-3. If a field is not found, use null.
-4. Standardize date formats to YYYY-MM-DD.
-5. Convert all amounts to plain numbers (no currency symbols; remove commas).
-6. Be very careful with invoice numbers, dates, and amounts.
-7. DO NOT invent or output any line_items array.
-8. Return ONLY valid JSON, no markdown, no comments.
+DOCUMENT PAGE COUNT: {page_count}
+
+IMPORTANT CLASSIFICATION RULES:
+1. Carefully check if the document itself is actually a commercial invoice or utility/commercial bill.
+   - You MUST read the RAW INVOICE CONTEXT first to classify the document type.
+   - If the document is a SINGLE-PAGE document (DOCUMENT PAGE COUNT: 1) and contains a check, cheque, accounts payable cheque, bank cheque, check request / cheque request, cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check" as part of a check form/request, you MUST set "is_invoice" to false and restrict it.
+   - If the document contains MULTIPLE pages (DOCUMENT PAGE COUNT > 1) and any page contains a cheque, accounts payable cheque, bank cheque, check, cheque request / check request, cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check", you MUST set "is_invoice" to true and allow/process the document. Do NOT classify a multi-page document as a non-invoice just because one or more of its pages contains a cheque.
+   - If the raw text indicates it is a user guide, training document, manual, guideline, tutorial, walkthrough, payslip, salary slip, payroll document, agreement, blood report, medical report, lab report, clinical report, or other non-invoice document (and does not contain multiple pages with a cheque), set "is_invoice" to false. Do this even if the structured Azure fields contain extracted data.
+2. If and only if the document is classified as a valid invoice/bill ("is_invoice": true), use the structured Azure fields as the PRIMARY evidence for extracting the other fields.
+3. Use the raw text to FILL missing fields or to NORMALIZE formats.
+4. If a field is not found, use null.
+5. Standardize date formats to YYYY-MM-DD.
+6. Convert all amounts to plain numbers (no currency symbols; remove commas).
+7. Be very careful with invoice numbers, dates, and amounts.
+8. DO NOT invent or output any line_items array.
+9. Identify if the document is a commercial invoice or utility/commercial bill.
+   - If the document is a single-page document (DOCUMENT PAGE COUNT: 1) and is an accounts payable cheque, bank cheque, check, or cheque request / check request document, set "is_invoice" to false.
+   - IMPORTANT: If the document contains multiple pages (DOCUMENT PAGE COUNT > 1) and any page contains a cheque, accounts payable cheque, bank cheque, check, cheque request / check request, cheque payment details, payment instructions, a cheque payment slip, or the word "cheque" / "check", you MUST set "is_invoice" to true and allow it. Do NOT classify a multi-page document as a non-invoice just because one or more of its pages contains a cheque.
+   - If it is a payslip, salary slip, compensation letter, payroll document, agreement, blood report, medical report, lab report, clinical report, guideline, user guide or any other non-invoice document, set "is_invoice" to false. Otherwise, set it to true.
+10. Return ONLY valid JSON, no markdown, no comments.
 
 STRUCTURED AZURE FIELDS (headers/amounts, no Items):
 {json.dumps(azure_values, indent=2, ensure_ascii=False)}
 
 RAW INVOICE CONTEXT (partial):
-{raw_content[:2500]}
+{raw_content[:25000]}
 
 Extract and return ALL available information in this EXACT JSON format:
 
 {{
+    "is_invoice": true or false,
     "vendor_info": {{
         "name": "string or null",
         "address": "string or null",
@@ -566,8 +625,8 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
             print(f"Failed to parse LLM response as JSON: {e}")
             return self._create_fallback_structure(), response_text if 'response_text' in locals() else ""
         except Exception as e:
-            print(f"LLM call failed: {e}")
-            return self._create_fallback_structure(), response_text if 'response_text' in locals() else ""
+            print(f"LLM call failed with exception: {e}")
+            raise e
 
     def _create_fallback_structure(self) -> Dict[str, Any]:
         return {
@@ -644,11 +703,22 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
     def _merge_azure_and_llm(self, azure_data: Dict[str, Any], enhanced_headers: Dict[str, Any]) -> Dict[str, Any]:
         final: Dict[str, Any] = {}
 
+        section_fields = {
+            "vendor_info": ["name", "address", "tax_id", "phone", "country", "contact_email", "bank_name", "bank_account_number", "bank_details", "contact_person", "website"],
+            "client_info": ["name", "billing_address", "shipping_address", "tax_id", "phone", "email", "contact_person"],
+            "invoice_details": ["invoice_number", "invoice_date", "due_date", "po_number", "payment_terms", "currency", "type", "payment_method", "cost_center"],
+            "service_period": ["start_date", "end_date"],
+            "amounts": ["subtotal", "total_tax_amount", "total_invoice_amount", "amount_due", "previous_unpaid_balance", "shipping_handling_fees", "surcharges", "tax_type_breakdown", "CGST", "SGST", "IGST", "withholding_tax", "amount_paid"],
+            "additional_info": ["notes_terms", "qr_code_irn", "company_registration_number"]
+        }
+
         def merge_section(section: str):
             section_plain = enhanced_headers.get(section, {}) or {}
             final[section] = {}
 
-            for field, llm_value in section_plain.items():
+            fields = section_fields.get(section, [])
+            for field in fields:
+                llm_value = section_plain.get(field)
                 az_field_name = self._get_azure_field_for_section_field(section, field)
                 azure_entry = azure_data.get(az_field_name) if az_field_name else None
                 azure_value = azure_entry.get("value") if azure_entry else None
@@ -973,3 +1043,11 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
             return "medium"
         else:
             return "low"
+
+    async def close(self):
+        try:
+            if hasattr(self, "doc_intel_client") and self.doc_intel_client:
+                await self.doc_intel_client.close()
+                print("Azure Document Intelligence Client closed successfully")
+        except Exception as e:
+            print(f"Failed to close doc_intel_client: {e}")

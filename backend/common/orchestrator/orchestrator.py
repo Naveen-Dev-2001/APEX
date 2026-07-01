@@ -47,6 +47,9 @@ class InvoiceOrchestrator:
             state = await self.extraction_agent.extract_with_azure_doc_intel(initial_state, is_cancelled_callback=is_cancelled_callback)
             print(f"[Orchestrator] Azure extraction step completed in {time.time() - step_start:.2f}s")
             
+            if state["errors"]:
+                raise Exception(state["errors"][-1])
+            
             # Check after Azure
             check_cancel()
 
@@ -54,6 +57,9 @@ class InvoiceOrchestrator:
             step_start = time.time()
             state = await self.extraction_agent.enhance_with_llm(state, is_cancelled_callback=is_cancelled_callback)
             print(f"[Orchestrator] LLM enhancement step completed in {time.time() - step_start:.2f}s")
+            
+            if state["errors"]:
+                raise Exception(state["errors"][-1])
             
             # Check after LLM
             check_cancel()
@@ -115,3 +121,7 @@ class InvoiceOrchestrator:
                 print(f"  - {pdf}: {err}")
 
         return results
+
+    async def close(self):
+        if hasattr(self, "extraction_agent") and self.extraction_agent:
+            await self.extraction_agent.close()

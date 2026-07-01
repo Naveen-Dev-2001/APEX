@@ -301,7 +301,7 @@ async def upload_invoices(
     upload_dir = get_folder_path("in_progress")
     os.makedirs(upload_dir, exist_ok=True)
     
-    # 🔁 Sequential Processing: invoices are processed one at a time
+    #  Sequential Processing: invoices are processed one at a time
 
     duplicates = []  # Track duplicate files
     saved_invoices = []  # Track successfully uploaded invoices
@@ -314,7 +314,7 @@ async def upload_invoices(
             await queue.put({"status": status, "message": message, "data": data, "progress": progress})
 
     async def _process_single_file(file: UploadFile, index: int, total_files: int):
-        # ⚡️ Isolated DB Session per Task
+        #  Isolated DB Session per Task
         task_db = SessionLocal()
         request_id = str(uuid.uuid4())
         clean_name = file.filename.replace("\\", "/").split("/")[-1]
@@ -352,9 +352,30 @@ async def upload_invoices(
             # ---- SAVE FILE ----
             save_start = time.time()
             contents = await file.read()
+            is_pdf = clean_name.lower().endswith(".pdf") and contents.startswith(b'%PDF')
+            if not is_pdf:
+                logger.error({
+                    "request_id": request_id,
+                    "event": "invoice_processing_failed",
+                    "filename": clean_name,
+                    "error": "File is not a PDF"
+                })
+                await emit_progress("processing", f"[{index}/{total_files}] Failed processing {clean_name}: File is not a PDF")
+                return {"success": False, "filename": clean_name, "reason": "is not a pdf"}
+
             with open(file_path, "wb") as f:
                 f.write(contents)
             print(f"[Backend] File saved in {time.time() - save_start:.2f}s: {file_path}")
+
+            # Upload to Azure Blob Storage
+            try:
+                from common.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
+                blob_name = get_blob_name_from_path(file_path)
+                upload_file_to_blob(file_path, blob_name)
+                print(f"[Backend] Uploaded to Azure Blob: {blob_name}")
+            except Exception as blob_err:
+                print(f"[Backend] Azure Blob upload failed: {blob_err}")
+
             await emit_progress("processing", f"[{index}/{total_files}] Processing file...", progress=50)
 
 
@@ -482,7 +503,9 @@ async def upload_invoices(
             try:
                 raw_start = time.time()
                 # Read PDF binary
-                with open(file_path, "rb") as f:
+                from common.services.file_manager import ensure_local_file
+                local_pdf_path = ensure_local_file(file_path)
+                with open(local_pdf_path, "rb") as f:
                     pdf_bytes = f.read()
                 
                 raw_record = RawExtractionData(
@@ -735,6 +758,14 @@ async def upload_invoices(
             new_invoice.status_history.append(processed_history)
             task_db.commit()
 
+            # ---- DELETE LOCAL FILE (already safely in Azure Blob) ----
+            try:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"[Backend] Deleted local file after successful processing: {file_path}")
+            except Exception as del_err:
+                print(f"[Backend] Warning: Could not delete local file {file_path}: {del_err}")
+
             await emit_progress("processing", f"[{index}/{total_files}] Completed processing {clean_name}!", progress=100)
 
             return {"success": True, "data": invoice_to_dict(new_invoice)}
@@ -755,11 +786,30 @@ async def upload_invoices(
             import traceback
             traceback.print_exc()
             
-            if file_path and os.path.exists(file_path):
+            # Check if this is a "not an invoice" error
+            error_msg = str(e.detail) if isinstance(e, HTTPException) else str(e)
+            is_non_invoice = "No invoice found in the document" in error_msg
+
+            if is_non_invoice:
+                print(f"[Backend] File {clean_name} is not an invoice. Moving to non_invoices folder.")
+                if file_path and os.path.exists(file_path):
+                    try:
+                        move_invoice_file(file_path, "non_invoices")
+                    except Exception as move_err:
+                        print(f"Failed to move non-invoice file: {move_err}")
+            else:
+                if file_path and os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                    except:
+                        pass
+
+            if 'invoice_id' in locals():
                 try:
-                    os.remove(file_path)
-                except:
-                    pass
+                    invoice_repo.remove(task_db, id=invoice_id)
+                    task_db.commit()
+                except Exception as db_err:
+                    print(f"Failed to clean up failed invoice from DB: {db_err}")
 
             logger.error({
                 "request_id": request_id,
@@ -1900,6 +1950,31 @@ async def get_raw_invoice(invoice_id: int, db: Session = Depends(get_db)):
     return invoice_to_dict(invoice, user_map=user_map)
 
 
+
+@router.get("/{invoice_id}/pdf-link")
+async def get_invoice_pdf_link(
+    invoice_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        archived = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
+        if not archived:
+             archived = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
+        if archived:
+            invoice = archived
+        else:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+    from common.services.azure_blob import get_pdf_link, get_blob_name_from_path
+    blob_name = get_blob_name_from_path(invoice.file_path)
+    pdf_link = get_pdf_link(blob_name)
+    if not pdf_link:
+        raise HTTPException(status_code=500, detail="Failed to generate SAS link")
+    return {"pdf_link": pdf_link}
+
+
 @router.get("/{invoice_id}/file")
 async def get_invoice_pdf(
     invoice_id: int,
@@ -1921,6 +1996,25 @@ async def get_invoice_pdf(
 
     file_path = invoice.file_path
     
+    # Try streaming from Azure Blob directly to avoid CORS preflight issues
+    from common.services.azure_blob import container_client, get_blob_name_from_path
+    blob_name = get_blob_name_from_path(file_path)
+    try:
+        blob_client = container_client.get_blob_client(blob_name)
+        if blob_client.exists():
+            from fastapi import Response
+            blob_data = blob_client.download_blob().readall()
+            return Response(
+                content=blob_data,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"inline; filename=\"{invoice.original_filename or 'invoice.pdf'}\""
+                }
+            )
+    except Exception as e:
+        logger.error(f"Failed to stream blob {blob_name} from Azure: {e}")
+    
+    # Fallback to serving local file if blob stream fails
     # Ensure path is absolute/resolvable
     if file_path and not os.path.isabs(file_path):
         base_dir = os.getcwd()
