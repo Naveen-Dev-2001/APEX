@@ -951,15 +951,15 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             .filter(item => !item.isSystemRow)
             .map((item, index) => {
                 const rowData = {
-                    "S.No": index + 1,
-                    "Description": item.description || "",
-                    "Qty": item.qty || 0,
-                    "Unit Price": item.unitPrice || 0,
-                    "Discount": item.discount || 0,
-                    "Net Amount": item.netAmount || 0,
-                    "Tax Amt": item.taxAmt || 0,
-                    "Line Type": item.lineType || "",
-                    "GL Code": item.glCode || "",
+                "S.No": index + 1,
+                "Description": item.description || "",
+                "Qty": item.qty || 0,
+                "Unit Price": item.unitPrice || 0,
+                "Discount": item.discount || 0,
+                "Net Amount": item.netAmount || 0,
+                "Tax Amt": item.taxAmt || 0,
+                "Line Type": item.lineType || "",
+                "GL Code": item.glCode || "",
                 };
                 if (!isZoho) {
                     rowData["LOB"] = item.lob || "";
