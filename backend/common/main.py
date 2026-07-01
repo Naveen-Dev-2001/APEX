@@ -79,6 +79,11 @@ async def startup_event():
         # Initialize database (create tables and default data)
         init_database()
         print("✓ Database initialized successfully")
+
+        # Ensure Azure Blob Storage container and folders exist
+        from common.services.azure_blob import ensure_container_and_folders
+        ensure_container_and_folders()
+        print("✓ Azure Blob Storage container and folders initialized successfully")
     except Exception as e:
         print(f"✗ Startup initialization error: {e}")
         import traceback

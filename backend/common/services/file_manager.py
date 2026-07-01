@@ -6,10 +6,12 @@ from typing import Optional
 logger = logging.getLogger("application_trace")
 
 UPLOAD_BASE_DIR = "uploads"
+from common.config.config import TOOL
+
 SUBFOLDERS = {
     "in_progress": "in_progress_files",
     "deleted": "deleted_files",
-    "posted_stage": "posted_to_sage_files",
+    "posted_stage": "posted_to_sage_files" if TOOL == "sage" else "posted_to_zoho_files",
     "archive": "archived_files",
     "non_invoices": "non_invoice"
 }
@@ -91,12 +93,19 @@ def move_invoice_file(current_path: str, target_category: str) -> Optional[str]:
         
         # Robust lookup: if source blob does not exist directly, search other known prefixes in Azure
         if not source_blob_client.exists():
-            for folder_prefix in ["in_progress_files", "deleted_files", "posted_to_sage_files", "archived_files", "non_invoice", "read", "unread"]:
-                candidate_blob = f"{folder_prefix}/{filename}"
-                candidate_client = container_client.get_blob_client(candidate_blob)
-                if candidate_client.exists():
-                    source_blob = candidate_blob
-                    source_blob_client = candidate_client
+            from common.config.config import TOOL
+            search_folders = ["in_progress_files", "deleted_files", "posted_to_sage_files", "posted_to_zoho_files", "archived_files", "non_invoice", "read", "unread"]
+            found = False
+            for folder_prefix in search_folders:
+                for prefix in [f"{TOOL}/", "sage/", "zoho/", ""]:
+                    candidate_blob = f"{prefix}{folder_prefix}/{filename}"
+                    candidate_client = container_client.get_blob_client(candidate_blob)
+                    if candidate_client.exists():
+                        source_blob = candidate_blob
+                        source_blob_client = candidate_client
+                        found = True
+                        break
+                if found:
                     break
         
         target_blob_client = container_client.get_blob_client(target_blob)

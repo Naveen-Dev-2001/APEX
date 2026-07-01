@@ -347,7 +347,7 @@ async def process_and_save_invoice_async(unread_filepath: Path, filename: str, o
         log.info(f"Moved file locally to: {read_filepath}")
 
         # Upload the file to Azure Blob Storage under 'in_progress_files/'
-        from app.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
+        from common.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
         blob_name = get_blob_name_from_path(str(in_progress_filepath))
         upload_file_to_blob(str(read_filepath), blob_name)
         log.info(f"Uploaded successfully to Azure Blob: {blob_name}")
@@ -417,7 +417,7 @@ async def process_and_save_invoice_async(unread_filepath: Path, filename: str, o
                 log.info(f"Moved non-invoice file locally to: {non_invoice_filepath}")
                 
                 # Upload to Azure Blob Storage under 'non_invoice/'
-                from app.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
+                from common.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
                 blob_name = get_blob_name_from_path(str(non_invoice_filepath))
                 upload_file_to_blob(str(non_invoice_filepath), blob_name)
                 log.info(f"Uploaded non-invoice file to Azure Blob: {blob_name}")
@@ -569,7 +569,7 @@ async def download_invoice_attachments(start_time: float, processing_window_seco
                         log.info("Non-PDF file moved to non_invoice | file=%s", non_invoice_filepath)
                         
                         # Upload to Azure Blob Storage under 'non_invoice/'
-                        from app.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
+                        from common.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
                         blob_name = get_blob_name_from_path(str(non_invoice_filepath))
                         try:
                             upload_file_to_blob(str(non_invoice_filepath), blob_name)
@@ -694,6 +694,13 @@ async def main():
     MAIL_CHECK_INTERVAL_MINUTES  Total cycle length in minutes  (default 15)
     MAIL_CHECK_MARGIN_MINUTES    Mandatory rest period in minutes (default 4)
     """
+    # Ensure Azure Blob Storage container and folders exist
+    try:
+        from common.services.azure_blob import ensure_container_and_folders
+        ensure_container_and_folders()
+    except Exception as e:
+        log.error(f"Failed to initialize Azure container/folders: {e}")
+
     interval_str = os.getenv("MAIL_CHECK_INTERVAL_MINUTES", "15")
     try:
         interval_minutes = float(interval_str)

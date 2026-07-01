@@ -54,6 +54,7 @@ def delete_blob(blob_name: str) -> None:
 
 def get_blob_name_from_path(file_path: str) -> str:
     """Standardize a file path to its relative blob name prefix."""
+    from common.config.config import TOOL
     # Standardize separators
     normalized = file_path.replace("\\", "/")
     # Remove leading backend/ if present
@@ -62,4 +63,39 @@ def get_blob_name_from_path(file_path: str) -> str:
     # Remove leading uploads/ if present
     if normalized.startswith("uploads/"):
         normalized = normalized[len("uploads/"):]
-    return normalized
+        
+    # If the path already has the tool prefix, don't prepend it again
+    if normalized.startswith("sage/") or normalized.startswith("zoho/"):
+        return normalized
+        
+    # Prepend the active tool directory (sage/zoho) to separate their paths in the container
+    return f"{TOOL}/{normalized}"
+
+def ensure_container_and_folders() -> None:
+    """Ensure the container exists and the five default folders are created in Azure Blob Storage for the active tool."""
+    if not CONNECTION_STRING or not CONTAINER_NAME:
+        return
+    try:
+        if not container_client.exists():
+            container_client.create_container()
+            print(f"Created container: {CONTAINER_NAME}")
+        
+        from common.config.config import TOOL
+        folders = [
+            "in_progress_files",
+            "deleted_files",
+            "posted_to_sage_files" if TOOL == "sage" else "posted_to_zoho_files",
+            "archived_files",
+            "non_invoice"
+        ]
+        
+        for folder in folders:
+            placeholder_blob = f"{TOOL}/{folder}/.placeholder"
+            blob_client = container_client.get_blob_client(placeholder_blob)
+            if not blob_client.exists():
+                blob_client.upload_blob(b"", overwrite=True)
+                print(f"Created folder placeholder: {placeholder_blob} in container {CONTAINER_NAME}")
+    except Exception as e:
+        import logging
+        logger = logging.getLogger("application_trace")
+        logger.error(f"Error ensuring container/folders for {CONTAINER_NAME}: {str(e)}")
