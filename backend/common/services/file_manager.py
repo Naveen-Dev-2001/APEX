@@ -5,8 +5,8 @@ from typing import Optional
 
 logger = logging.getLogger("application_trace")
 
-UPLOAD_BASE_DIR = "uploads"
 from common.config.config import TOOL
+UPLOAD_BASE_DIR = f"uploads/{TOOL}"
 
 SUBFOLDERS = {
     "in_progress": "in_progress_files",

@@ -11,9 +11,10 @@ from common.orchestrator.orchestrator import InvoiceOrchestrator
 
 class InvoiceProcessor:
     def __init__(self):
-        self.upload_dir = Path("uploads")
+        from common.config.config import TOOL
+        self.upload_dir = Path(f"uploads/{TOOL}")
         self.output_dir = Path("output")
-        self.upload_dir.mkdir(exist_ok=True)
+        self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(exist_ok=True)
         self.orchestrator = InvoiceOrchestrator()
 
