@@ -1,4 +1,5 @@
 import os
+import sys
 import base64
 import re
 import logging
@@ -702,6 +703,7 @@ async def main():
         ensure_container_and_folders()
     except Exception as e:
         log.error(f"Failed to initialize Azure container/folders: {e}")
+        sys.exit(1)
 
     interval_str = os.getenv("MAIL_CHECK_INTERVAL_MINUTES", "15")
     try:
@@ -713,33 +715,27 @@ async def main():
 
     # Hard processing window: no new file must be STARTED after this many seconds.
     processing_window_seconds = max(0.0, (interval_minutes - margin_minutes) * 60.0)
-    interval_seconds = interval_minutes * 60.0
 
     log.info(
-        "Starting periodic mail check | cycle=%.1f min | processing window=%.1f min | rest=%.1f min",
+        "Starting mail check | cycle=%.1f min | processing window=%.1f min | rest=%.1f min",
         interval_minutes, interval_minutes - margin_minutes, margin_minutes,
     )
 
     loop = asyncio.get_event_loop()
+    start_time = loop.time()
 
-    while True:
-        start_time = loop.time()
+    try:
+        await download_invoice_attachments(start_time, processing_window_seconds)
+    except Exception as e:
+        log.error("Unhandled error in download_invoice_attachments: %s", e)
+        sys.exit(1)
 
-        try:
-            await download_invoice_attachments(start_time, processing_window_seconds)
-        except Exception as e:
-            log.error("Unhandled error in download_invoice_attachments: %s", e)
-
-        # Always sleep whatever time remains to reach the full interval boundary.
-        # This guarantees the mandatory rest period is always honoured even if
-        # processing finished early.
-        elapsed = loop.time() - start_time
-        sleep_time = max(1.0, interval_seconds - elapsed)
-        log.info(
-            "Cycle finished (elapsed: %.1fs). Resting for %.1fs (%.2f min) before next run.",
-            elapsed, sleep_time, sleep_time / 60.0,
-        )
-        await asyncio.sleep(sleep_time)
+    elapsed = loop.time() - start_time
+    log.info(
+        "Run finished (elapsed: %.1fs). Exiting cleanly.",
+        elapsed,
+    )
+    sys.exit(0)
 
 
 if __name__ == "__main__":
