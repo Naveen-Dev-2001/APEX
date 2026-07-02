@@ -62,4 +62,8 @@ def get_blob_name_from_path(file_path: str) -> str:
     # Remove leading uploads/ if present
     if normalized.startswith("uploads/"):
         normalized = normalized[len("uploads/"):]
+    
+    # Prepend sage/ if not already present
+    if not normalized.startswith("sage/"):
+        normalized = f"sage/{normalized}"
     return normalized

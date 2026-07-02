@@ -57,7 +57,7 @@ def migrate():
                 
                 for local_file in files:
                     filename = local_file.name
-                    target_blob = f"{azure_prefix}/{filename}"
+                    target_blob = f"sage/{azure_prefix}/{filename}"
                     print(f"Uploading {local_file} to Azure Blob: {target_blob}...")
                     
                     try:
