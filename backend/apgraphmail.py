@@ -18,12 +18,14 @@ TENANT_ID = os.getenv("TENANT_ID")
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 
+TOOL = os.getenv("TOOL", "sage")
+
 MAILBOX_ENV = os.getenv("MAILBOX", "")
-if "|" in MAILBOX_ENV:
+if "|" in MAILBOX_ENV and TOOL == "sage":
     MAILBOX, ENTITY_ID = MAILBOX_ENV.split("|", 1)
 else:
     MAILBOX = MAILBOX_ENV
-    ENTITY_ID = "201"
+    ENTITY_ID = "201" if TOOL == "sage" else "DEFAULT"
 
 UNREAD_DIR = Path("uploads/unread")
 READ_DIR = Path("uploads/read")
