@@ -223,18 +223,18 @@ def _fetch_attachment_bytes(msg_id: str, att_id: str, att_name: str, token: str)
 
 
 async def process_and_save_invoice_async(unread_filepath: Path, filename: str, original_filename: str, entity_id: str, sender: str, subject: str) -> bool:
-    from app.database.database import SessionLocal
-    from app.models.db_models import Invoice, InvoiceStatusEnum, InvoiceStatusHistory, WorkflowStep, WorkflowStepTypeEnum, WorkflowStepStatusEnum, RawExtractionData
-    from app.repository.repositories import invoice_repo, workflow_step_repo, raw_extraction_repo
-    from app.services.invoice_processor import InvoiceProcessor
-    from app.utils.date_utils import get_ist_now
-    from app.database.db_utils import serialize_json_field
-    from app.services.audit_service import audit_service
-    from app.models.audit_log import AuditAction
-    from app.ai.duplicate_detector import get_vendor_id_from_master
-    from app.utils.invoice_registry import check_registry_duplicate, register_invoice
-    from app.utils.currency_utils import remove_currency_format
-    from app.routes.invoices import parse_date_safely
+    from common.database.database import SessionLocal
+    from common.models.db_models import Invoice, InvoiceStatusEnum, InvoiceStatusHistory, WorkflowStep, WorkflowStepTypeEnum, WorkflowStepStatusEnum, RawExtractionData
+    from common.repository.repositories import invoice_repo, workflow_step_repo, raw_extraction_repo
+    from common.services.invoice_processor import InvoiceProcessor
+    from common.utils.date_utils import get_ist_now
+    from common.database.db_utils import serialize_json_field
+    from common.services.audit_service import audit_service
+    from common.models.audit_log import AuditAction
+    from common.ai.duplicate_detector import get_vendor_id_from_master
+    from common.utils.invoice_registry import check_registry_duplicate, register_invoice
+    from common.utils.currency_utils import remove_currency_format
+    from common.routes.invoices import parse_date_safely
     import uuid
     import time
 
