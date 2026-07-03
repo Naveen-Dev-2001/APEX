@@ -7,15 +7,11 @@
  *
  * @returns {string} The backend base URL (e.g. "http://localhost:8015")
  */
+import { getEnvValue } from './envHelper';
+
 export function getBackendURL() {
     const env = window._env_ || {};
-    const hostConfig = env.HOST_CONFIG || {};
-    const envKey = hostConfig[window.location.host];
-
-    if (envKey) {
-        return env[envKey] || import.meta.env[envKey] || "";
-    }
-
-    // Fallback to the Sage backend if the host is not in HOST_CONFIG
-    return env.VITE_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || "";
+    return getEnvValue(env, 'VITE_BACKEND_URL') || 
+           getEnvValue(import.meta.env, 'VITE_BACKEND_URL') || 
+           "";
 }

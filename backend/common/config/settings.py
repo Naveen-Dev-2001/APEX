@@ -12,13 +12,20 @@ from dotenv import load_dotenv
 #      or the user's shell) → use that value.
 #   2. Default to "sage".
 # ---------------------------------------------------------------------------
-_tool_name = os.getenv("TOOL", "sage")
-_env_file = Path(__file__).resolve().parents[2] / f".env.{_tool_name}"
+# Preserve pre-existing TOOL from OS environment if set
+_pre_existing_tool = os.getenv("TOOL") or os.getenv("Tool")
 
+# Directly load the common .env file from the backend directory
+_env_file = Path(__file__).resolve().parents[2] / ".env"
 if _env_file.exists():
     load_dotenv(dotenv_path=_env_file, override=True)
 else:
-    load_dotenv()   # fallback to plain .env
+    load_dotenv()
+
+# Read active TOOL, preferring pre-existing OS environment variable
+_tool_name = _pre_existing_tool or os.getenv("TOOL") or os.getenv("Tool") or "sage"
+_tool_name = _tool_name.lower()
+os.environ["TOOL"] = _tool_name
 
 # Now that env vars are populated, import the tool config.
 from common.config.config import TOOL, ACTIVE_CONFIG  # noqa: E402
@@ -30,14 +37,15 @@ class Settings:
     # Port and DB name are resolved via ACTIVE_CONFIG from config.py.
     # -----------------------------------------------------------------------
     TOOL: str = TOOL
-    FRONTEND_PORT: int = ACTIVE_CONFIG["frontend_port"]
-    BACKEND_PORT: int = ACTIVE_CONFIG["backend_port"]
-    ERP_NAME: str = ACTIVE_CONFIG["erp_name"]
 
-    # SQL Server Database URL — set per tool in .env.sage / .env.zoho
-    # .env.sage  → DATABASE_URL
-    # .env.zoho  → ZOHO_DATABASE_URL (fallback when DATABASE_URL is absent)
-    DATABASE_URL: str = os.getenv("DATABASE_URL") or os.getenv("ZOHO_DATABASE_URL")
+    # SQL Server Database URL — selected based on active tool
+    if os.getenv("TOOL", "sage").lower() == "zoho":
+        _db_url = os.getenv("ZOHO_DATABASE_URL") or os.getenv("DATABASE_URL")
+        if _db_url and _db_url.endswith("/accounts_payable"):
+            _db_url = _db_url + "_zoho"
+        DATABASE_URL: str = _db_url
+    else:
+        DATABASE_URL: str = os.getenv("DATABASE_URL")
 
     # SMTP Settings (credentials should be configured in .env)
     SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.office365.com")
@@ -59,11 +67,6 @@ class Settings:
     ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "admin123")
     ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
 
-    # App Settings — BASE_URL should match the frontend origin for the active tool
-    BASE_URL: str = os.getenv(
-        "BASE_URL",
-        f"http://localhost:{ACTIVE_CONFIG['frontend_port']}"
-    )
 
     # Sage Intacct API — only used when TOOL=sage (configured via .env.sage)
     SAGE_TOKEN_URL: str = os.getenv("SAGE_TOKEN_URL", "https://api.intacct.com/ia/api/v1/oauth2/token")
