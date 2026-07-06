@@ -548,6 +548,34 @@ async def fetch_all_gldetail(
 #         })
 #     return normalized
 
+def _normalize_txn_type_label(value):
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+
+    if text in ("-1", "dr", "debit", "withdrawal", "out", "outflow"):
+        return "debit"
+    if text in ("1", "cr", "credit", "deposit", "in", "inflow"):
+        return "credit"
+
+    # Preserve Sage-native labels like ACH/WIRE/etc.
+    return text
+
+
+def _resolve_sage_txn_type(source: dict):
+    preferred = (
+        source.get("TRX_TYPE")
+        or source.get("TRANSACTIONTYPE")
+        or source.get("TRANSACTION_TYPE")
+        or source.get("TYPE")
+    )
+    if preferred not in (None, ""):
+        return _normalize_txn_type_label(preferred)
+
+    fallback = source.get("TR_TYPE") or source.get("TRTYPE")
+    return _normalize_txn_type_label(fallback)
+
+
 def normalize_records(records: list[dict]):
 
     normalized = []
@@ -579,7 +607,7 @@ def normalize_records(records: list[dict]):
 
             # TRANSACTION TYPE
             "txn_type":
-                source.get("TR_TYPE"),
+                _resolve_sage_txn_type(source),
 
             # TRANSACTION DATE
             "txn_date":
@@ -655,8 +683,8 @@ async def run_standalone():
         print("\nFetching uncleared transactions...")
         records    = await fetch_all_gldetail(
             session_id=session_id,
-            financial_entity="FFB_4449",
-            account_no="10012",
+            financial_entity="",
+            account_no="",
             after_date="09/30/2023"
         )
         normalized = normalize_records(records)
@@ -666,11 +694,13 @@ async def run_standalone():
         print(f"{'='*60}\n")
 
         for txn in normalized[:10]:
-            direction = "💸 OUT" if str(txn.get("txn_type")) in ("-1",) else "💰 IN"
+            txn_type = str(txn.get("txn_type") or "").lower()
+            direction = "💸 OUT" if txn_type in ("debit",) else "💰 IN"
             print(f"{direction}  {txn.get('txn_date')}  "
                   f"Check: {str(txn.get('check_no') or ''):<8}  "
                   f"${txn.get('txn_amount', 0):>10,.2f}  "
-                  f"Account: {txn.get('account_no', '')}")
+                f"Type: {txn.get('txn_type', '')}  "
+                f"Account: {txn.get('account_no', '')}")
 
         if len(normalized) > 10:
             print(f"\n  ... and {len(normalized) - 10} more records")

@@ -27,6 +27,11 @@ def _to_decimal(value: Any) -> Decimal:
     except Exception:
         return Decimal("0")
 
+
+def _to_cents(value: Any) -> int:
+    amount = _to_decimal(value)
+    return int((amount * Decimal("100")).quantize(Decimal("1")))
+
 class BankReconciliationService:
     def __init__(self, db: Session):
         self.db = db
@@ -73,6 +78,119 @@ class BankReconciliationService:
             text = text.split(".")[0]
         return re.sub(r"\s+", "", text).lower()
 
+    @staticmethod
+    def _normalize_text(value: Any) -> str:
+        if value is None:
+            return ""
+        text = str(value).strip().lower()
+        text = re.sub(r"\s+", " ", text)
+        return text
+
+    @staticmethod
+    def _normalize_date(value: Any):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if hasattr(value, "isoformat") and not isinstance(value, str):
+            try:
+                return value
+            except Exception:
+                return None
+        text = str(value).strip()
+        if not text:
+            return None
+
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y"):
+            try:
+                return datetime.strptime(text, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    @staticmethod
+    def _normalize_txn_type_label(value: Any) -> str:
+        text = str(value or "").strip().lower()
+        if not text:
+            return ""
+
+        if text in ("-1", "dr", "debit", "withdrawal", "out", "outflow"):
+            return "debit"
+        if text in ("1", "cr", "credit", "deposit", "in", "inflow"):
+            return "credit"
+
+        # Preserve Sage-native labels like ACH/WIRE/etc.
+        return text
+
+    def _resolve_sage_txn_type(self, source: Dict[str, Any]) -> str:
+        # Prefer textual type fields from Sage. Fall back to TR_TYPE mapping.
+        preferred = self._as_text(
+            self._pick_key(source, "TRX_TYPE", "TRANSACTIONTYPE", "TRANSACTION_TYPE", "TYPE")
+        )
+        if preferred not in (None, ""):
+            return self._normalize_txn_type_label(preferred)
+
+        fallback = self._as_text(self._pick_key(source, "TR_TYPE", "TRTYPE"))
+        return self._normalize_txn_type_label(fallback)
+
+    def _is_ach_debit(self, bank_txn: BankStatementTransaction) -> bool:
+        bank_type = self._normalize_text(bank_txn.transaction_type)
+        description = self._normalize_text(bank_txn.description)
+        reference = self._normalize_text(bank_txn.reference)
+        return bank_type == "debit" and ("ach" in description or "ach" in reference)
+
+    def _pair_matches_criteria(self, bank_txn: BankStatementTransaction, sage_txn: SageGLTransactionCache) -> bool:
+        bank_type = self._normalize_text(bank_txn.transaction_type)
+        sage_type = self._normalize_text(sage_txn.transaction_type)
+
+        bank_amount_cents = _to_cents(bank_txn.amount)
+        sage_amount_cents = _to_cents(sage_txn.amount)
+        if bank_amount_cents != sage_amount_cents:
+            return False
+
+        if self._is_ach_debit(bank_txn):
+            if bank_type != "debit" or sage_type != "debit":
+                return False
+
+            bank_date = self._normalize_date(bank_txn.date)
+            # Sage posting date is represented by entry_date; fallback to date if missing.
+            sage_date = self._normalize_date(sage_txn.entry_date or sage_txn.date)
+            if not bank_date or not sage_date or bank_date != sage_date:
+                return False
+
+            bank_desc = self._normalize_text(bank_txn.description)
+            sage_desc = self._normalize_text(sage_txn.description)
+            return bool(bank_desc and sage_desc and bank_desc == sage_desc)
+
+        if bank_type == "debit":
+            if sage_type != "debit":
+                return False
+
+            bank_check = self._normalize_check_number(bank_txn.check_number)
+            sage_check = self._normalize_check_number(sage_txn.doc_number)
+            return bool(bank_check and sage_check and bank_check == sage_check)
+
+        if bank_type == "credit":
+            if sage_type != "credit":
+                return False
+
+            bank_reference = self._normalize_check_number(bank_txn.reference or bank_txn.check_number)
+            sage_reference = self._normalize_check_number(sage_txn.doc_number)
+            if not bank_reference or not sage_reference or bank_reference != sage_reference:
+                return False
+
+            bank_date = self._normalize_date(bank_txn.date)
+            # Sage posting date is represented by entry_date; fallback to date if missing.
+            sage_posting_date = self._normalize_date(sage_txn.entry_date or sage_txn.date)
+            if not bank_date or not sage_posting_date or bank_date != sage_posting_date:
+                return False
+
+            bank_desc = self._normalize_text(bank_txn.description)
+            sage_desc = self._normalize_text(sage_txn.description)
+            return bool(bank_desc and sage_desc and bank_desc == sage_desc)
+
+        return False
+
     def _normalize_raw_sage_record(self, raw_record: Dict[str, Any]) -> Dict[str, Any]:
         # Some XML parser paths can nest actual row data under GLDETAIL.
         source = raw_record.get("GLDETAIL") if isinstance(raw_record.get("GLDETAIL"), dict) else raw_record
@@ -88,7 +206,7 @@ class BankReconciliationService:
         return {
             "record_no": self._as_text(self._pick_key(source, "RECORDNO")),
             "check_no": self._as_text(self._pick_key(source, "DOCNUMBER", "DOCNO", "DOCUMENTNO", "DOCUMENT")),
-            "txn_type": self._as_text(self._pick_key(source, "TR_TYPE", "TRX_TYPE", "TRTYPE")),
+            "txn_type": self._resolve_sage_txn_type(source),
             "txn_date": self._as_text(self._pick_key(source, "ENTRY_DATE", "BATCH_DATE")),
             "txn_amount": amount,
             "account_no": self._as_text(self._pick_key(source, "ACCOUNTNO", "ACCOUNT")),
@@ -578,7 +696,14 @@ class BankReconciliationService:
                 entry_date_obj = date_obj # default to txn_date
 
                 amount = Decimal(str(item.get("txn_amount", 0)))
-                t_type = "debit" if str(item.get("txn_type")) in ("1", "-1") else "credit"
+                normalized_txn_type = self._normalize_txn_type_label(item.get("txn_type"))
+                if normalized_txn_type == "debit":
+                    t_type = "debit"
+                elif normalized_txn_type == "credit":
+                    t_type = "credit"
+                else:
+                    # Keep matching behavior stable: unknown Sage labels default by amount sign.
+                    t_type = "debit" if amount < 0 else "credit"
                 
                 cache_item = SageGLTransactionCache(
                     sage_key=sage_key,
@@ -594,7 +719,7 @@ class BankReconciliationService:
                     customer=item.get("customer"),
                     record_type=item.get("record_type"),
                     cleared=item.get("cleared"),
-                    tr_type=str(tr_type) if tr_type is not None else None,
+                    tr_type=str(item.get("txn_type") or tr_type) if (item.get("txn_type") or tr_type) is not None else None,
                     bank=str(bank) if bank is not None else None,
                 )
                 to_save.append(cache_item)
@@ -646,90 +771,32 @@ class BankReconciliationService:
         candidate_bank_ids = [b.id for b in unmatched_bank]
         candidate_sage_ids = [s.id for s in unmatched_sage]
 
-        def to_cents(value: Any) -> int:
-            amount = _to_decimal(value)
-            return int((amount * Decimal("100")).quantize(Decimal("1")))
-
-        def find_subset_sum_candidates(candidates: List[SageGLTransactionCache], target_cents: int) -> Optional[List[SageGLTransactionCache]]:
-            """Return a subset (size >= 2) whose amount sum equals target_cents."""
-            if target_cents <= 0:
-                return None
-
-            sums: Dict[int, List[int]] = {0: []}
-
-            for idx, txn in enumerate(candidates):
-                amt = to_cents(txn.amount)
-                if amt <= 0:
-                    continue
-
-                # Snapshot prevents reusing the same transaction multiple times in one path.
-                existing = list(sums.items())
-                for partial, path in existing:
-                    new_total = partial + amt
-                    if new_total > target_cents:
-                        continue
-
-                    if new_total not in sums:
-                        sums[new_total] = path + [idx]
-
-                    if new_total == target_cents and len(sums[new_total]) >= 2:
-                        return [candidates[i] for i in sums[new_total]]
-
-            return None
-
-        # Index unmatched Sage transactions by (normalized_check_no, transaction_type).
-        sage_by_check_and_type: Dict[tuple[str, str], List[SageGLTransactionCache]] = {}
-        for s_txn in unmatched_sage:
-            check_no = self._normalize_check_number(s_txn.doc_number)
-            txn_type = (s_txn.transaction_type or "").strip().lower()
-            if not check_no or not txn_type:
-                continue
-            key = (check_no, txn_type)
-            sage_by_check_and_type.setdefault(key, []).append(s_txn)
-        
         matches_found = 0
         
         for b_txn in unmatched_bank:
             if b_txn.is_matched:
                 continue
 
-            bank_check = self._normalize_check_number(b_txn.check_number)
-            bank_type = (b_txn.transaction_type or "").strip().lower()
-            if not bank_check or not bank_type:
-                continue
+            # Per current business rules:
+            # - Debit: check no + debit amount + transaction type
+            # - Credit: reference no + posting date + description + amount
+            # - ACH debit: date + amount + description
+            for s_txn in unmatched_sage:
+                if s_txn.is_matched:
+                    continue
 
-            key = (bank_check, bank_type)
-            candidates = [s for s in sage_by_check_and_type.get(key, []) if not s.is_matched]
-            if not candidates:
-                continue
+                if not self._pair_matches_criteria(b_txn, s_txn):
+                    continue
 
-            bank_amount_cents = to_cents(b_txn.amount)
-
-            # 1) Exact one-to-one match first.
-            exact = next((s for s in candidates if to_cents(s.amount) == bank_amount_cents), None)
-            if exact:
                 b_txn.is_matched = True
-                exact.is_matched = True
+                s_txn.is_matched = True
                 self.db.add(ReconciliationResult(
                     bank_transaction_id=b_txn.id,
-                    sage_transaction_id=exact.id,
+                    sage_transaction_id=s_txn.id,
                     match_status="matched"
                 ))
                 matches_found += 1
-                continue
-
-            # 2) One-to-many: sum of many Sage rows with same check/type equals Bank amount.
-            subset = find_subset_sum_candidates(candidates, bank_amount_cents)
-            if subset:
-                b_txn.is_matched = True
-                for s_txn in subset:
-                    s_txn.is_matched = True
-                    self.db.add(ReconciliationResult(
-                        bank_transaction_id=b_txn.id,
-                        sage_transaction_id=s_txn.id,
-                        match_status="matched"
-                    ))
-                    matches_found += 1
+                break
 
         # Refresh unmatched snapshots after applying matches in-memory.
         remaining_unmatched_bank_ids = [b.id for b in unmatched_bank if not b.is_matched]
@@ -808,6 +875,13 @@ class BankReconciliationService:
         elif len(bank_transaction_ids) == 1:
             pairing_mode = "one-to-many"
             bank_id = bank_transaction_ids[0]
+            bank_txn = bank_by_id[bank_id]
+
+            if self._normalize_text(bank_txn.transaction_type) != "debit":
+                raise ValueError("Grouped matching is allowed only for debit transactions.")
+            if self._is_ach_debit(bank_txn):
+                raise ValueError("ACH debit must be matched one-to-one.")
+
             bank_total = _to_decimal(bank_by_id[bank_id].amount)
             sage_total = sum((_to_decimal(sage_by_id[sid].amount) for sid in sage_transaction_ids), Decimal("0"))
             if bank_total != sage_total:
@@ -818,6 +892,8 @@ class BankReconciliationService:
                 raise ValueError("Check no is wrong.")
 
             for sid in sage_transaction_ids:
+                if self._normalize_text(sage_by_id[sid].transaction_type) != "debit":
+                    raise ValueError("Grouped matching is allowed only for debit transactions.")
                 sage_check = self._normalize_check_number(sage_by_id[sid].doc_number)
                 if not sage_check or sage_check != bank_check:
                     raise ValueError("Check no is wrong.")
@@ -826,6 +902,11 @@ class BankReconciliationService:
         elif len(sage_transaction_ids) == 1:
             pairing_mode = "many-to-one"
             sage_id = sage_transaction_ids[0]
+            sage_txn = sage_by_id[sage_id]
+
+            if self._normalize_text(sage_txn.transaction_type) != "debit":
+                raise ValueError("Grouped matching is allowed only for debit transactions.")
+
             sage_total = _to_decimal(sage_by_id[sage_id].amount)
             bank_total = sum((_to_decimal(bank_by_id[bid].amount) for bid in bank_transaction_ids), Decimal("0"))
             if bank_total != sage_total:
@@ -836,6 +917,10 @@ class BankReconciliationService:
                 raise ValueError("Check no is wrong.")
 
             for bid in bank_transaction_ids:
+                if self._normalize_text(bank_by_id[bid].transaction_type) != "debit":
+                    raise ValueError("Grouped matching is allowed only for debit transactions.")
+                if self._is_ach_debit(bank_by_id[bid]):
+                    raise ValueError("ACH debit must be matched one-to-one.")
                 bank_check = self._normalize_check_number(bank_by_id[bid].check_number)
                 if not bank_check or bank_check != sage_check:
                     raise ValueError("Check no is wrong.")
@@ -851,13 +936,8 @@ class BankReconciliationService:
                 bank_txn = bank_by_id[bank_id]
                 sage_txn = sage_by_id[sage_id]
 
-                if _to_decimal(bank_txn.amount) != _to_decimal(sage_txn.amount):
-                    raise ValueError("Amount does not match.")
-
-                bank_check = self._normalize_check_number(bank_txn.check_number)
-                sage_check = self._normalize_check_number(sage_txn.doc_number)
-                if not bank_check or not sage_check or bank_check != sage_check:
-                    raise ValueError("Check no is wrong.")
+                if not self._pair_matches_criteria(bank_txn, sage_txn):
+                    raise ValueError("Selected pair does not meet matching criteria.")
 
         marked = 0
         for bank_id, sage_id in pairs:
