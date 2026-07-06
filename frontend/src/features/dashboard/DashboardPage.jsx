@@ -8,6 +8,7 @@ import { useDashboardData } from '../hooks/useDashboardData';
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { Spin } from "antd";
+import { getERPSystem } from '../../utils/envHelper';
 
 const CARD_SKELETONS = Array(4).fill(0);
 const CHART_SKELETONS = Array(2).fill(0);
@@ -31,6 +32,7 @@ const DashboardPage = React.memo(() => {
     }, []);
 
     const mapStatusData = useCallback((data = {}) => {
+        const erp = getERPSystem();
         const labelMap = {
             processed: "Processed",
             waiting_coding: "Waiting For Coding",
@@ -39,8 +41,8 @@ const DashboardPage = React.memo(() => {
             rejected: "Rejected",
             reworked: "Reworked",
             uploading: "Uploading",
-            sage_posted: "Sage Posted",
-            sage_post_failed: "Sage Post Failed",
+            sage_posted: `${erp} Posted`,
+            sage_post_failed: `${erp} Post Failed`,
             archived: "Archived",
             deleted: "Deleted",
         };
@@ -130,7 +132,7 @@ const DashboardPage = React.memo(() => {
                             title="Total Overdue"
                             value={formatCurrency(summary?.total_due || 0)}
                         />
-                        <Card icon={icons.approved} title="Posted to Sage" value={summary?.sage_posted} />
+                        <Card icon={icons.approved} title={`Posted to ${getERPSystem()}`} value={summary?.sage_posted} />
                         <Card icon={icons.pending} title="Pending Approval" value={summary?.waiting_approval} />
                     </>
                 )}

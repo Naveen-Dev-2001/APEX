@@ -605,7 +605,7 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                 }`} />
                             <span className="text-[11px] font-bold uppercase tracking-wider custom-font-creato leading-none">
                                 {(currentStatus || "").toLowerCase() === "sage_posted"
-                                    ? "Posted to Sage"
+                                    ? `Posted to ${getERPSystem()}`
                                     : (currentStatus || "").toLowerCase() === "rejected"
                                         ? "Rejected"
                                         : (currentStatus || "").toLowerCase() === "archived"

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, BackgroundTasks
+from common.config.settings import settings
 from common.utils.currency_utils import remove_currency_format
 import logging
 from fastapi.responses import FileResponse
@@ -193,6 +194,8 @@ def _apply_status_label_filters(status_vals, expressions, db):
             reverse_map = {
                 "Posted to Sage": "sage_posted",
                 "Sage Post Failed": "sage_post_failed",
+                "Posted to Zoho": "sage_posted",
+                "Zoho Post Failed": "sage_post_failed",
                 "Waiting For Coding": "waiting_coding",
                 "Reworked": "reworked",
                 "Archived": "archived",
@@ -2583,10 +2586,11 @@ async def update_invoice_status(
                     details={"sage_response": sage_response},
                     sage_bill_number=sage_bill_no
                 )
+                erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
                 # Create/Update Workflow Step
                 db.add(WorkflowStep(
                     invoice_id=invoice_id,
-                    step_name="Posted to Sage",
+                    step_name=f"Posted to {erp_name}",
                     step_type=WorkflowStepTypeEnum.SAGE_POSTED,
                     user=current_user.username,
                     status=WorkflowStepStatusEnum.COMPLETED,
@@ -2652,9 +2656,10 @@ async def repost_to_sage(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     if invoice.status not in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.SAGE_POST_FAILED]:
+        erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
         raise HTTPException(
             status_code=400,
-            detail=f"Invoice {invoice_id} is in status {invoice.status}. Only approved or failed-to-post invoices can be reposted to Sage."
+            detail=f"Invoice {invoice_id} is in status {invoice.status}. Only approved or failed-to-post invoices can be reposted to {erp_name}."
         )
 
     # 1. Ensure Approval PDF exists (or regenerate it)
@@ -2729,10 +2734,11 @@ async def repost_to_sage(
                 sage_bill_number=sage_bill_no
             )
             
+            erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
             # Create/Update Workflow Step
             db.add(WorkflowStep(
                 invoice_id=invoice_id,
-                step_name="Posted to Sage",
+                step_name=f"Posted to {erp_name}",
                 step_type=WorkflowStepTypeEnum.SAGE_POSTED,
                 user=current_user.username,
                 status=WorkflowStepStatusEnum.COMPLETED,
@@ -2742,7 +2748,7 @@ async def repost_to_sage(
             
             db.add(invoice)
             db.commit()
-            return {"success": True, "message": "Manual repost to Sage successful", "status": invoice.status.value if hasattr(invoice.status, 'value') else invoice.status}
+            return {"success": True, "message": f"Manual repost to {erp_name} successful", "status": invoice.status.value if hasattr(invoice.status, 'value') else invoice.status}
         else:
             invoice.status = InvoiceStatusEnum.SAGE_POST_FAILED
             db.commit()

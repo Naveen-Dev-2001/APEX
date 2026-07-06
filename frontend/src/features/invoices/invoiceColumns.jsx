@@ -1,6 +1,7 @@
 import { EyeOutlined, LoadingOutlined, InboxOutlined } from "@ant-design/icons";
 import { Trash2 } from "lucide-react";
 import { formatCurrency, formatIST } from "../../utils/formatters";
+import { getERPSystem } from "../../utils/envHelper";
 
 // ─── Status badge helper ──────────────────────────────────────────────────────
 const getStatusLabel = (value, level, row = null) => {
@@ -9,6 +10,7 @@ const getStatusLabel = (value, level, row = null) => {
         return value;
     }
 
+    const erp = getERPSystem();
     const labelMap = {
         approved: "Approved",
         pending: "Pending",
@@ -16,8 +18,8 @@ const getStatusLabel = (value, level, row = null) => {
         processed: "Processed",
         waiting_approval: "Waiting Approval",
         waiting_coding: "Waiting For Coding",
-        sage_posted: "Posted to Sage",
-        sage_post_failed: "Sage Post Failed",
+        sage_posted: `Posted to ${erp}`,
+        sage_post_failed: `${erp} Post Failed`,
         reworked: "Reworked",
         archived: "Archived",
         deleted: "Deleted",

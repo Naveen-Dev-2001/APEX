@@ -12,7 +12,7 @@ from common.models.db_models import (
     Invoice, InvoiceStatusHistory, InvoiceApprovedBy, 
     InvoiceAssignedApprover, User, InvoiceStatusEnum
 )
-from common.repository.repositories import user_repo
+from common.config.settings import settings
 
 
 def get_status_label(invoice: Invoice, db: Session = None) -> str:
@@ -21,14 +21,15 @@ def get_status_label(invoice: Invoice, db: Session = None) -> str:
     level = invoice.current_approver_level
 
     if status != "waiting_approval":
+        erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
         label_map = {
             "approved": "Approved",
             "pending": "Pending",
             "rejected": "Rejected",
             "processed": "Processed",
             "waiting_coding": "Waiting For Coding",
-            "sage_posted": "Posted to Sage",
-            "sage_post_failed": "Sage Post Failed",
+            "sage_posted": f"Posted to {erp_name}",
+            "sage_post_failed": f"{erp_name} Post Failed",
             "reworked": "Reworked",
             "archived": "Archived",
         }
