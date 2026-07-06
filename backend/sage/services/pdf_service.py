@@ -601,4 +601,14 @@ def generate_approval_pdf(db: Session, invoice_id: int) -> str:
     doc.build(story, onFirstPage=_page_template, onLaterPages=_page_template)
 
     print(f"[PDFService] Approval PDF saved → {pdf_path}")
+
+    # Upload to Azure Blob Storage under sage/create_reports/
+    try:
+        from common.services.azure_blob import upload_file_to_blob
+        blob_name = f"sage/create_reports/{pdf_path.name}"
+        upload_file_to_blob(str(pdf_path), blob_name)
+        logger.info(f"[PDFService] Successfully uploaded PDF to Azure Blob Storage: {blob_name}")
+    except Exception as blob_err:
+        logger.error(f"[PDFService] Failed to upload PDF to Azure Blob Storage: {blob_err}", exc_info=True)
+
     return str(pdf_path)

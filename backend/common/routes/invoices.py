@@ -2519,125 +2519,135 @@ async def update_invoice_status(
     # GENERATE APPROVAL PDF ON FINAL APPROVAL
     # =====================================================
     sage_status = None
+    pdf_path = None
     if main_status == InvoiceStatusEnum.APPROVED:
         logger.info(f"[PDF] Final approval detected for invoice {invoice_id}. Starting PDF generation...")
-        pdf_path = None
         try:
-            from common.utils.erp_locator import get_erp_function
-            generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
-            # Now all steps are committed, PDF will include the final approver
-            pdf_path = generate_approval_pdf(db, invoice_id)
-            logger.info(f"[PDF] Approval report saved: {pdf_path}")
-        except Exception as pdf_err:
-            logger.error(f"[PDF] Error generating approval PDF: {pdf_err}", exc_info=True)
+            try:
+                from common.utils.erp_locator import get_erp_function
+                generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
+                # Now all steps are committed, PDF will include the final approver
+                pdf_path = generate_approval_pdf(db, invoice_id)
+                logger.info(f"[PDF] Approval report saved: {pdf_path}")
+            except Exception as pdf_err:
+                logger.error(f"[PDF] Error generating approval PDF: {pdf_err}", exc_info=True)
 
-        # Post AP Bill to Sage Intacct
-        try:
-            from common.utils.erp_locator import get_erp_function
-            post_ap_bill = get_erp_function("postapbill", "post_ap_bill")
-            fresh_invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-            inv = fresh_invoice or invoice
-            
-            # 3. Extract finalized coding details (Capture at approval)
-            hc, line_items = _get_finalized_coding_data(inv)
-            
-            # Synchronously update the coding record
-            if inv.coding:
-                inv.coding.header_coding = json.dumps(hc) if hc else None
-                inv.coding.line_items = json.dumps(line_items) if line_items else None
-                db.add(inv.coding)
-                db.flush()
-                logger.info(f"[SagePost] Finalized coding captured and saved for invoice {invoice_id}")
-
-            # Resolve Sage Location ID dynamically
-            # Mapping: DEFAULT/None -> "" (Top Level), otherwise use entity ID
-            raw_entity = str(inv.entity).strip() if inv.entity else ""
-            sage_location = raw_entity if raw_entity.upper() != "DEFAULT" else ""
-
-            # Compute the intended bill number upfront (matches what postapbill.py sends to Sage)
-            intended_bill_no = f"{inv.invoice_number}-{inv.id}"
-
-            post_result = post_ap_bill(
-                inv, 
-                pdf_path or "",
-                gl_account=hc.get("gl_code") or hc.get("glAccount"),
-                location=sage_location,
-                dept=hc.get("department") or hc.get("department_id"),
-                vendor_dim=inv.vendor_id,
-                item=hc.get("item") or hc.get("item_id"),
-                class_lob=hc.get("lob") or hc.get("class") or hc.get("class_id"),
-                line_items=line_items if line_items else None
-            )
-            
-            if post_result and post_result.get("success"):
-                sage_status = "success"
-                invoice.status = InvoiceStatusEnum.SAGE_POSTED
-                sage_response = post_result.get("data", {})
-                sage_bill_no = sage_response.get("billNumber") or intended_bill_no
-                # Persist the bill number on the invoice record
-                invoice.sage_bill_number = sage_bill_no
+            # Post AP Bill to Sage Intacct
+            try:
+                from common.utils.erp_locator import get_erp_function
+                post_ap_bill = get_erp_function("postapbill", "post_ap_bill")
+                fresh_invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+                inv = fresh_invoice or invoice
                 
-                await audit_service.log_action(
-                    db=db,
-                    invoice_id=invoice_id,
-                    action=AuditAction.SAGE_POSTED.value,
-                    user=current_user.username,
-                    entity=invoice.entity,
-                    details={"sage_response": sage_response},
-                    sage_bill_number=sage_bill_no
+                # 3. Extract finalized coding details (Capture at approval)
+                hc, line_items = _get_finalized_coding_data(inv)
+                
+                # Synchronously update the coding record
+                if inv.coding:
+                    inv.coding.header_coding = json.dumps(hc) if hc else None
+                    inv.coding.line_items = json.dumps(line_items) if line_items else None
+                    db.add(inv.coding)
+                    db.flush()
+                    logger.info(f"[SagePost] Finalized coding captured and saved for invoice {invoice_id}")
+
+                # Resolve Sage Location ID dynamically
+                # Mapping: DEFAULT/None -> "" (Top Level), otherwise use entity ID
+                raw_entity = str(inv.entity).strip() if inv.entity else ""
+                sage_location = raw_entity if raw_entity.upper() != "DEFAULT" else ""
+
+                # Compute the intended bill number upfront (matches what postapbill.py sends to Sage)
+                intended_bill_no = f"{inv.invoice_number}-{inv.id}"
+
+                post_result = post_ap_bill(
+                    inv, 
+                    pdf_path or "",
+                    gl_account=hc.get("gl_code") or hc.get("glAccount"),
+                    location=sage_location,
+                    dept=hc.get("department") or hc.get("department_id"),
+                    vendor_dim=inv.vendor_id,
+                    item=hc.get("item") or hc.get("item_id"),
+                    class_lob=hc.get("lob") or hc.get("class") or hc.get("class_id"),
+                    line_items=line_items if line_items else None
                 )
-                erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
-                # Create/Update Workflow Step
-                db.add(WorkflowStep(
-                    invoice_id=invoice_id,
-                    step_name=f"Posted to {erp_name}",
-                    step_type=WorkflowStepTypeEnum.SAGE_POSTED,
-                    user=current_user.username,
-                    status=WorkflowStepStatusEnum.COMPLETED,
-                    timestamp=get_ist_now(),
-                    entity=invoice.entity
-                ))
                 
-                # Move file to posted_stage_files
-                new_path = move_invoice_file(invoice.file_path, "posted_stage")
-                if new_path:
-                    invoice.file_path = new_path
-                    db.commit()
-            else:
-                sage_status = "failure"
+                if post_result and post_result.get("success"):
+                    sage_status = "success"
+                    invoice.status = InvoiceStatusEnum.SAGE_POSTED
+                    sage_response = post_result.get("data", {})
+                    sage_bill_no = sage_response.get("billNumber") or intended_bill_no
+                    # Persist the bill number on the invoice record
+                    invoice.sage_bill_number = sage_bill_no
+                    
+                    await audit_service.log_action(
+                        db=db,
+                        invoice_id=invoice_id,
+                        action=AuditAction.SAGE_POSTED.value,
+                        user=current_user.username,
+                        entity=invoice.entity,
+                        details={"sage_response": sage_response},
+                        sage_bill_number=sage_bill_no
+                    )
+                    erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+                    # Create/Update Workflow Step
+                    db.add(WorkflowStep(
+                        invoice_id=invoice_id,
+                        step_name=f"Posted to {erp_name}",
+                        step_type=WorkflowStepTypeEnum.SAGE_POSTED,
+                        user=current_user.username,
+                        status=WorkflowStepStatusEnum.COMPLETED,
+                        timestamp=get_ist_now(),
+                        entity=invoice.entity
+                    ))
+                    
+                    # Move file to posted_stage_files
+                    new_path = move_invoice_file(invoice.file_path, "posted_stage")
+                    if new_path:
+                        invoice.file_path = new_path
+                        db.commit()
+                else:
+                    sage_status = "failure"
+                    invoice.status = InvoiceStatusEnum.SAGE_POST_FAILED
+                    error_msg = post_result.get("error") if post_result else "Unknown error"
+                    
+                    # Log to application_error.log
+                    error_logger.error(f"[Sage Post Failure] Invoice {invoice_id} ({invoice.entity}): {error_msg}")
+                    
+                    await audit_service.log_action(
+                        db=db,
+                        invoice_id=invoice_id,
+                        action=AuditAction.SAGE_POST_FAILED.value,
+                        user=current_user.username,
+                        entity=invoice.entity,
+                        details={"error": error_msg},
+                        sage_bill_number=intended_bill_no
+                    )
+            except Exception as bill_err:
+                logger.error(f"[PostAPBill] Error: {bill_err}", exc_info=True)
+                error_logger.error(f"[PostAPBill Critical Error] Invoice {invoice_id} ({invoice.entity}): {str(bill_err)}", exc_info=True)
+                sage_status = "error"
                 invoice.status = InvoiceStatusEnum.SAGE_POST_FAILED
-                error_msg = post_result.get("error") if post_result else "Unknown error"
-                
-                # Log to application_error.log
-                error_logger.error(f"[Sage Post Failure] Invoice {invoice_id} ({invoice.entity}): {error_msg}")
-                
+                # Compute intended bill number for exception path too
+                intended_bill_no_exc = f"{invoice.invoice_number}-{invoice.id}"
                 await audit_service.log_action(
                     db=db,
                     invoice_id=invoice_id,
                     action=AuditAction.SAGE_POST_FAILED.value,
                     user=current_user.username,
                     entity=invoice.entity,
-                    details={"error": error_msg},
-                    sage_bill_number=intended_bill_no
+                    details={"error": str(bill_err)},
+                    sage_bill_number=intended_bill_no_exc
                 )
-        except Exception as bill_err:
-            logger.error(f"[PostAPBill] Error: {bill_err}", exc_info=True)
-            error_logger.error(f"[PostAPBill Critical Error] Invoice {invoice_id} ({invoice.entity}): {str(bill_err)}", exc_info=True)
-            sage_status = "error"
-            invoice.status = InvoiceStatusEnum.SAGE_POST_FAILED
-            # Compute intended bill number for exception path too
-            intended_bill_no_exc = f"{invoice.invoice_number}-{invoice.id}"
-            await audit_service.log_action(
-                db=db,
-                invoice_id=invoice_id,
-                action=AuditAction.SAGE_POST_FAILED.value,
-                user=current_user.username,
-                entity=invoice.entity,
-                details={"error": str(bill_err)},
-                sage_bill_number=intended_bill_no_exc
-            )
-        
-        db.commit()
+            
+            db.commit()
+        finally:
+            if pdf_path:
+                try:
+                    import os
+                    if os.path.exists(pdf_path):
+                        os.remove(pdf_path)
+                        logger.info(f"[PDF] Deleted local PDF file: {pdf_path}")
+                except Exception as e:
+                    logger.warning(f"[PDF] Failed to delete local PDF {pdf_path}: {e}")
 
     return {"message": "Status updated", "main_status": main_status, "sage_post_status": sage_status}
 
@@ -2665,38 +2675,39 @@ async def repost_to_sage(
     # 1. Ensure Approval PDF exists (or regenerate it)
     pdf_path = None
     try:
-        from common.utils.erp_locator import get_erp_function
-        generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
-        # This will return the path if it exists, or regenerate it
-        pdf_path = generate_approval_pdf(db, invoice_id)
-        logger.info(f"[RepostSage] Approval report path: {pdf_path}")
-    except Exception as pdf_err:
-        logger.error(f"[RepostSage] Error ensuring approval PDF: {pdf_err}", exc_info=True)
-        # We can still try to post even if PDF generation fails, but it's better to have it
+        try:
+            from common.utils.erp_locator import get_erp_function
+            generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
+            # This will return the path if it exists, or regenerate it
+            pdf_path = generate_approval_pdf(db, invoice_id)
+            logger.info(f"[RepostSage] Approval report path: {pdf_path}")
+        except Exception as pdf_err:
+            logger.error(f"[RepostSage] Error ensuring approval PDF: {pdf_err}", exc_info=True)
+            # We can still try to post even if PDF generation fails, but it's better to have it
 
-    # 2. Extract finalized coding details (Capture at approval)
-    hc, line_items = _get_finalized_coding_data(invoice)
-    
-    # Synchronously update the coding record
-    if invoice.coding:
-        invoice.coding.header_coding = json.dumps(hc) if hc else None
-        invoice.coding.line_items = json.dumps(line_items) if line_items else None
-        db.add(invoice.coding)
-        db.flush()
-        logger.info(f"[SageRepost] Finalized coding captured and saved for invoice {invoice_id}")
-
-    # 3. Call Sage Posting Logic
-    try:
-        from common.utils.erp_locator import get_erp_function
-        post_ap_bill = get_erp_function("postapbill", "post_ap_bill")
+        # 2. Extract finalized coding details FIRST (Capture at approval)
+        # This must happen before PDF generation so the PDF reads the correct per-item coding.
+        hc, line_items = _get_finalized_coding_data(invoice)
         
-        # Resolve Sage Location ID dynamically
+        # Synchronously update the coding record so the DB is consistent
+        if invoice.coding:
+            invoice.coding.header_coding = json.dumps(hc) if hc else None
+            invoice.coding.line_items = json.dumps(line_items) if line_items else None
+            db.add(invoice.coding)
+            db.flush()
+            logger.info(f"[SageRepost] Finalized coding captured and saved for invoice {invoice_id}")
+
+        # 3. Resolve Sage Location ID dynamically
         # Mapping: DEFAULT/None -> "" (Top Level), otherwise use entity ID
         raw_entity = str(invoice.entity).strip() if invoice.entity else ""
         sage_location = raw_entity if raw_entity.upper() != "DEFAULT" else ""
 
-        # Compute the intended bill number upfront
+        # Compute the intended bill number upfront (matches what postapbill.py sends to Sage)
         intended_bill_no = f"{invoice.invoice_number}-{invoice.id}"
+
+        # 4. Call Sage Posting Logic
+        from common.utils.erp_locator import get_erp_function
+        post_ap_bill = get_erp_function("postapbill", "post_ap_bill")
 
         post_result = post_ap_bill(
             invoice, 
@@ -2783,35 +2794,55 @@ async def repost_to_sage(
             sage_bill_number=f"{invoice.invoice_number}-{invoice.id}"
         )
         return {"success": False, "error": str(bill_err), "status": invoice.status}
+    finally:
+        if pdf_path:
+            try:
+                import os
+                if os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+                    logger.info(f"[RepostSage] Deleted local PDF file: {pdf_path}")
+            except Exception as e:
+                logger.warning(f"[RepostSage] Failed to delete local PDF {pdf_path}: {e}")
 
 
 @router.get("/{invoice_id}/approval-report")
 async def download_approval_report(
     invoice_id: int,
+    background_tasks: BackgroundTasks,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Download (or regenerate) the approval PDF report for a fully-approved invoice.
-    Serves the PDF from the local output/ folder.
-    If the file does not exist yet it is regenerated on the fly.
+    Serves the PDF by downloading it from Azure Blob Storage to a temporary file.
     """
     from fastapi.responses import FileResponse as FR
+    from common.config.config import TOOL
+    from common.services.azure_blob import download_blob_to_file, container_client
+    import os
+    import tempfile
+
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    if invoice.status != InvoiceStatusEnum.APPROVED:
+    if invoice.status != InvoiceStatusEnum.APPROVED and invoice.status != InvoiceStatusEnum.SAGE_POSTED:
         raise HTTPException(
             status_code=400,
             detail=f"Invoice {invoice_id} is not fully approved (current status: {invoice.status})."
         )
 
-    from pathlib import Path
-    output_dir = Path(__file__).resolve().parent.parent.parent / "output"
-    pdf_file = output_dir / f"invoice_{invoice_id}_approval.pdf"
+    safe_invoice_number = str(invoice.invoice_number or "invoice").replace("/", "_").replace("\\", "_")
+    blob_name = f"{TOOL}/create_reports/{safe_invoice_number}_approval.pdf"
 
-    if not pdf_file.exists():
+    # We will download the blob to a temporary file, serve it, and then delete the temp file.
+    temp_dir = tempfile.gettempdir()
+    local_temp_path = os.path.join(temp_dir, f"invoice_{invoice_id}_approval_report.pdf")
+
+    # Let's check if the blob exists in Azure Blob Storage
+    blob_client = container_client.get_blob_client(blob_name)
+    if not blob_client.exists():
+        # If not, regenerate it (this will automatically upload it to Azure Blob Storage and delete local file)
         try:
             from common.utils.erp_locator import get_erp_function
             generate_approval_pdf = get_erp_function("services.pdf_service", "generate_approval_pdf")
@@ -2819,15 +2850,29 @@ async def download_approval_report(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {e}")
 
-    if not pdf_file.exists():
-        raise HTTPException(status_code=404, detail="PDF report could not be generated.")
+    # Now download the blob to local_temp_path
+    try:
+        download_blob_to_file(blob_name, local_temp_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download PDF from Azure Blob: {e}")
+
+    # Add background task to delete the temporary file after sending
+    def cleanup_file(path: str):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+
+    background_tasks.add_task(cleanup_file, local_temp_path)
 
     return FR(
-        path=str(pdf_file),
+        path=local_temp_path,
         media_type="application/pdf",
         filename=f"invoice_{invoice_id}_approval_report.pdf",
         headers={"Content-Disposition": f'attachment; filename="invoice_{invoice_id}_approval_report.pdf"'}
     )
+
 
 
 @router.put("/{invoice_id}")

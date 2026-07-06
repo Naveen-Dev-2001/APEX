@@ -675,6 +675,7 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
     Call the Sage posting logic.
     Returns {"success": bool, "message": str, "sage_bill_number": str|None}.
     """
+    pdf_path = None
     try:
         from common.utils.erp_locator import get_erp_function
         post_ap_bill = get_erp_function("postapbill", "post_ap_bill")
@@ -699,7 +700,6 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
             logger.info(f"[SagePost] Finalized coding captured and saved for invoice {invoice_id}")
 
         # 3. Generate Approval PDF AFTER coding is flushed to DB
-        pdf_path = None
         try:
              pdf_path = generate_approval_pdf(db, invoice_id)
              logger.info(f"[SagePost] Approval report path: {pdf_path}")
@@ -757,6 +757,16 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
             "message": str(exc),
             "sage_bill_number": None,
         }
+    finally:
+        if pdf_path:
+            try:
+                import os
+                if os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+                    logger.info(f"[SagePost] Deleted local PDF file: {pdf_path}")
+            except Exception as e:
+                logger.warning(f"[SagePost] Failed to delete local PDF {pdf_path}: {e}")
+
 
 
 def _get_finalized_coding_data(invoice: Invoice):

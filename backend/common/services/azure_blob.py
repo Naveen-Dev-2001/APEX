@@ -86,7 +86,8 @@ def ensure_container_and_folders() -> None:
             "deleted_files",
             "posted_to_sage_files" if TOOL == "sage" else "posted_to_zoho_files",
             "archived_files",
-            "non_invoice"
+            "non_invoice",
+            "create_reports"
         ]
         
         for folder in folders:
