@@ -79,29 +79,44 @@ def post_ap_bill(
         )
         logger.info(f"[PostAPBill] Attachment created: key={attachment_key}, id={attachment_id}")
 
-        # ── 3. Build PDF file list ───────────────────────────────────────────
-        #  • The original invoice PDF (invoice.file_path)
-        #  • The generated approval PDF (pdf_path)
-        pdf_files = []
-        if invoice.file_path and os.path.exists(invoice.file_path):
-            pdf_files.append(invoice.file_path)
-        else:
-            logger.warning(
-                f"[PostAPBill] Original invoice file not found at '{invoice.file_path}'; skipping."
-            )
+        # ── 3. Build file attachment list in memory ──────────────────────────
+        #  • The original invoice PDF (fetched from Azure Blob into memory, or read locally)
+        #  • The generated approval PDF (read locally)
+        attachment_files = []
+        if invoice.file_path:
+            try:
+                from common.services.azure_blob import get_blob_name_from_path, container_client
+                blob_name = get_blob_name_from_path(invoice.file_path)
+                blob_client = container_client.get_blob_client(blob_name)
+                if blob_client.exists():
+                    logger.info(f"[PostAPBill] Downloading original invoice '{blob_name}' from Azure Blob into memory.")
+                    invoice_bytes = blob_client.download_blob().readall()
+                    attachment_files.append((os.path.basename(invoice.file_path), invoice_bytes))
+                elif os.path.exists(invoice.file_path):
+                    logger.info(f"[PostAPBill] Reading original invoice '{invoice.file_path}' from local disk.")
+                    with open(invoice.file_path, "rb") as f:
+                        attachment_files.append((os.path.basename(invoice.file_path), f.read()))
+                else:
+                    logger.warning(f"[PostAPBill] Original invoice file not found in blob or locally: {invoice.file_path}")
+            except Exception as e:
+                logger.error(f"[PostAPBill] Failed to fetch original invoice from blob or locally: {e}")
+
         if pdf_path and os.path.exists(pdf_path):
-            pdf_files.append(pdf_path)
+            try:
+                logger.info(f"[PostAPBill] Reading approval PDF '{pdf_path}' from local disk.")
+                with open(pdf_path, "rb") as f:
+                    attachment_files.append((os.path.basename(pdf_path), f.read()))
+            except Exception as e:
+                logger.error(f"[PostAPBill] Failed to read approval PDF '{pdf_path}': {e}")
         else:
-            logger.warning(
-                f"[PostAPBill] Approval PDF not found at '{pdf_path}'; skipping."
-            )
+            logger.warning(f"[PostAPBill] Approval PDF not found at '{pdf_path}'; skipping.")
 
         # ── 4. Upload files to attachment ────────────────────────────────────
-        if pdf_files:
-            _upload_files(auth_headers, attachment_key, pdf_files)
-            logger.info(f"[PostAPBill] Uploaded {len(pdf_files)} file(s) to attachment {attachment_key}")
+        if attachment_files:
+            _upload_files(auth_headers, attachment_key, attachment_files)
+            logger.info(f"[PostAPBill] Uploaded {len(attachment_files)} file(s) to attachment {attachment_key}")
         else:
-            logger.warning("[PostAPBill] No PDF files to attach.")
+            logger.warning("[PostAPBill] No files to attach.")
 
         # ── 5. Create AP Bill ────────────────────────────────────────────────
         bill_response = _create_ap_bill(
@@ -173,13 +188,12 @@ def _create_attachment(auth_headers: dict, name: str) -> tuple:
     return result["key"], result["id"]
 
 
-def _upload_files(auth_headers: dict, attachment_key: str, file_paths: list) -> None:
-    """Base64-encode and upload PDF files to an existing attachment."""
+def _upload_files(auth_headers: dict, attachment_key: str, files: list) -> None:
+    """Base64-encode and upload PDF files (given as name, bytes tuples) to an existing attachment."""
     files_payload = []
-    for fp in file_paths:
-        with open(fp, "rb") as f:
-            encoded = base64.b64encode(f.read()).decode("utf-8")
-        files_payload.append({"name": os.path.basename(fp), "data": encoded})
+    for name, content in files:
+        encoded = base64.b64encode(content).decode("utf-8")
+        files_payload.append({"name": name, "data": encoded})
 
     url = f"{BASE_URL}/objects/company-config/attachment/{attachment_key}"
     resp = requests.patch(url, json={"files": files_payload}, headers=auth_headers, timeout=60)
