@@ -189,14 +189,10 @@ async def process_and_save_invoice_async(unread_filepath: Path, filename: str, o
             except (ValueError, TypeError):
                 pass
 
-        # Move file locally from unread to read folder
-        shutil.move(str(unread_filepath), str(read_filepath))
-        log.info(f"Moved file locally to: {read_filepath}")
-
         # Upload the file to Azure Blob Storage under 'in_progress_files/'
         from common.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
         blob_name = get_blob_name_from_path(str(in_progress_filepath))
-        upload_file_to_blob(str(read_filepath), blob_name)
+        upload_file_to_blob(str(unread_filepath), blob_name)
         log.info(f"Uploaded successfully to Azure Blob: {blob_name}")
 
         # Create workflow step
@@ -242,6 +238,14 @@ async def process_and_save_invoice_async(unread_filepath: Path, filename: str, o
         )
         new_invoice.status_history.append(processed_history)
         db.commit()
+
+        # Move file locally from unread to read folder ONLY after successful commit
+        try:
+            shutil.move(str(unread_filepath), str(read_filepath))
+            log.info(f"Moved file locally to: {read_filepath}")
+        except Exception as move_err:
+            log.error(f"Failed to move file locally to read folder: {move_err}")
+
         return True
 
     except Exception as e:
