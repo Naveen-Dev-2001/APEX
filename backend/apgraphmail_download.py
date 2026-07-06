@@ -22,8 +22,9 @@ CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 TOOL = os.getenv("TOOL", "sage")
 
 MAILBOX_ENV = os.getenv("MAILBOX", "")
-if "|" in MAILBOX_ENV and TOOL == "sage":
-    MAILBOX, ENTITY_ID = MAILBOX_ENV.split("|", 1)
+if "|" in MAILBOX_ENV:
+    MAILBOX, parsed_entity = MAILBOX_ENV.split("|", 1)
+    ENTITY_ID = parsed_entity if TOOL == "sage" else "DEFAULT"
 else:
     MAILBOX = MAILBOX_ENV
     ENTITY_ID = "201" if TOOL == "sage" else "DEFAULT"
