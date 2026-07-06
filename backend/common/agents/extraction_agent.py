@@ -42,7 +42,8 @@ class InvoiceExtractionAgent:
                 api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
                 azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
                 temperature=0.1,
-                max_tokens=4000
+                max_tokens=4000,
+                request_timeout=60
             )
 
             print("Azure clients initialized successfully")
@@ -85,7 +86,11 @@ class InvoiceExtractionAgent:
             if is_cancelled_callback and is_cancelled_callback():
                 raise Exception("cancelled")
                 
-            result: AnalyzeResult = await poller.result()
+            import asyncio
+            result: AnalyzeResult = await asyncio.wait_for(
+                poller.result(),
+                timeout=120
+            )
             
             if not result.documents or not any(getattr(doc, 'doc_type', None) == 'invoice' for doc in result.documents):
                 raise ValueError("No invoice found in the document")
@@ -608,7 +613,11 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
                 HumanMessage(content=prompt)
             ]
 
-            response = await self.llm.ainvoke(messages)
+            import asyncio
+            response = await asyncio.wait_for(
+                self.llm.ainvoke(messages),
+                timeout=60
+            )
             response_text = response.content.strip()
 
             filtered_text = response_text
@@ -621,6 +630,9 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
             enhanced_data = json.loads(filtered_text)
             return enhanced_data, response_text
 
+        except asyncio.TimeoutError:
+            print("LLM call timed out after 60 seconds")
+            return self._create_fallback_structure(), ""
         except json.JSONDecodeError as e:
             print(f"Failed to parse LLM response as JSON: {e}")
             return self._create_fallback_structure(), response_text if 'response_text' in locals() else ""
