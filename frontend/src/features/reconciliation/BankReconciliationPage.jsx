@@ -12,6 +12,14 @@ const fmt = (v) =>
 
 const normalizeSearchValue = (value) => String(value ?? '').toLowerCase();
 
+const formatStatementMonthLabel = (value) => {
+  const text = String(value || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(text)) return text;
+  const [year, month] = text.split('-').map(Number);
+  const dt = new Date(year, month - 1, 1);
+  return dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+};
+
 const formatBankAccountOptionLabel = (bankName, accountNumber) => {
   const rawAccount = String(accountNumber ?? '').trim();
   const resolvedBankName = String(bankName ?? '').trim() || 'Unknown Bank';
@@ -78,11 +86,49 @@ const BankStatementTab = () => {
   const [statements, setStatements] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedBank, setSelectedBank] = useState('all');
+  const [uploadStatementMonth, setUploadStatementMonth] = useState('');
+  const [uploadStatementYear, setUploadStatementYear] = useState('');
   const [statementSearch, setStatementSearch] = useState('');
   const [transactionSearch, setTransactionSearch] = useState('');
   const [selectedStatement, setSelectedStatement] = useState(null);
   const [transactions, setTransactions] = useState(null);
   const fileRef = useRef();
+
+  const monthDropdownOptions = React.useMemo(() => ([
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' },
+  ]), []);
+
+  const yearDropdownOptions = React.useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let year = currentYear; year >= currentYear - 10; year -= 1) {
+      years.push(String(year));
+    }
+    return years;
+  }, []);
+
+  const availableMonthDropdownOptions = React.useMemo(() => {
+    const now = new Date();
+    const currentYear = String(now.getFullYear());
+    const currentMonth = now.getMonth() + 1;
+
+    if (uploadStatementYear === currentYear) {
+      return monthDropdownOptions.filter((option) => Number(option.value) <= currentMonth);
+    }
+
+    return monthDropdownOptions;
+  }, [monthDropdownOptions, uploadStatementYear]);
 
   const bankOptions = React.useMemo(() => {
     const dedupedByAccount = new Map();
@@ -109,6 +155,8 @@ const BankStatementTab = () => {
     return byBank.filter((s) => (
       normalizeSearchValue(s.filename).includes(query)
       || normalizeSearchValue(s.account_number).includes(query)
+      || normalizeSearchValue(formatStatementMonthLabel(s.statement_month)).includes(query)
+      || normalizeSearchValue(s.statement_month).includes(query)
       || normalizeSearchValue(s.status).includes(query)
       || normalizeSearchValue(s.transaction_count).includes(query)
       || normalizeSearchValue(new Date(s.upload_date).toLocaleDateString()).includes(query)
@@ -159,8 +207,14 @@ const BankStatementTab = () => {
 
   const handleFileUpload = async (file) => {
     if (!file) return;
+    if (!uploadStatementMonth || !uploadStatementYear) {
+      toast.error('Please select statement month');
+      return;
+    }
+    const statementMonthValue = `${uploadStatementYear}-${uploadStatementMonth}`;
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('statement_month', statementMonthValue);
     setUploading(true);
     try {
       await reconciliationApi.uploadStatement(formData);
@@ -233,6 +287,33 @@ const BankStatementTab = () => {
               className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="upload-statement-month" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+              Statement Month:
+            </label>
+            <select
+              id="upload-statement-month"
+              value={uploadStatementMonth}
+              onChange={(e) => setUploadStatementMonth(e.target.value)}
+              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5 min-w-[140px]"
+            >
+              <option value="">Month</option>
+              {availableMonthDropdownOptions.map((monthOption) => (
+                <option key={monthOption.value} value={monthOption.value}>{monthOption.label}</option>
+              ))}
+            </select>
+            <select
+              id="upload-statement-year"
+              value={uploadStatementYear}
+              onChange={(e) => setUploadStatementYear(e.target.value)}
+              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5 min-w-[110px]"
+            >
+              <option value="">Year</option>
+              {yearDropdownOptions.map((yearOption) => (
+                <option key={yearOption} value={yearOption}>{yearOption}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex-shrink-0">
             <input
               ref={fileRef}
@@ -272,6 +353,7 @@ const BankStatementTab = () => {
               <tr>
                 <th className="text-left px-6 py-3">File</th>
                 <th className="text-left px-6 py-3">Account Number</th>
+                <th className="text-left px-6 py-3">Statement Month</th>
                 <th className="text-left px-6 py-3">Uploaded</th>
                 <th className="text-left px-6 py-3">Transactions</th>
                 <th className="text-left px-6 py-3">Status</th>
@@ -293,6 +375,7 @@ const BankStatementTab = () => {
                       : <span className="text-gray-300 text-xs italic">No account</span>
                     }
                   </td>
+                  <td className="px-6 py-4 text-gray-500">{s.statement_month ? formatStatementMonthLabel(s.statement_month) : '-'}</td>
                   <td className="px-6 py-4 text-gray-400">{new Date(s.upload_date).toLocaleDateString()}</td>
                   <td className="px-6 py-4">
                     <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold">{s.transaction_count}</span>
@@ -1061,6 +1144,38 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
       || hasSageTxnForSelectedGl;
   });
 
+  const scopedAccountsForSummary = React.useMemo(() => {
+    if (selectedBank === 'all') return allAccounts;
+
+    const allowedAccounts = new Set(
+      [selectedBankAccountNumber, selectedBankGlAccount]
+        .map((v) => String(v || '').trim())
+        .filter(Boolean)
+    );
+
+    if (!allowedAccounts.size) return [];
+
+    return allAccounts.filter((g) => {
+      const groupAccount = String(g.account ?? '').trim();
+      return allowedAccounts.has(groupAccount);
+    });
+  }, [allAccounts, selectedBank, selectedBankAccountNumber, selectedBankGlAccount]);
+
+  const summaryMatchedCount = React.useMemo(
+    () => scopedAccountsForSummary.reduce((sum, g) => sum + (g.matched_count || 0), 0),
+    [scopedAccountsForSummary]
+  );
+
+  const summaryUnmatchedBankCount = React.useMemo(
+    () => scopedAccountsForSummary.reduce((sum, g) => sum + (g.unmatched_bank_count || 0), 0),
+    [scopedAccountsForSummary]
+  );
+
+  const summaryUnmatchedSageCount = React.useMemo(
+    () => scopedAccountsForSummary.reduce((sum, g) => sum + (g.unmatched_sage_count || 0), 0),
+    [scopedAccountsForSummary]
+  );
+
   const orderedFilteredAccounts = [...filteredAccounts].sort((a, b) => {
     if (statusFilter !== 'unmatched') return 0;
 
@@ -1374,7 +1489,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
               className="flex items-center justify-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-60 w-full"
             >
               {matching
-                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> MatchingΓÇª</>
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Matching</>
                 : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> Run Matching</>
               }
             </button>
@@ -1398,9 +1513,9 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
         <>
           {/* Summary */}
           <div className="grid grid-cols-3 gap-4">
-            <SummaryCard label="Matched" value={results?.summary?.total_matched ?? 0} color="text-green-600" />
-            <SummaryCard label="Unmatched Bank" value={results?.summary?.total_unmatched_bank ?? 0} color="text-amber-600" />
-            <SummaryCard label="Unmatched Sage" value={results?.summary?.total_unmatched_sage ?? 0} color="text-red-600" />
+            <SummaryCard label="Matched" value={summaryMatchedCount} color="text-green-600" />
+            <SummaryCard label="Unmatched Bank" value={summaryUnmatchedBankCount} color="text-amber-600" />
+            <SummaryCard label="Unmatched Sage" value={summaryUnmatchedSageCount} color="text-red-600" />
           </div>
 
           {/* Filters */}

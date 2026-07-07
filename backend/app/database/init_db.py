@@ -89,6 +89,44 @@ def create_tables():
                 conn.execute(text("COMMIT"))
                 print("SUCCESS: Added account_number column to bank_statements table")
 
+            # Add statement_month column to bank_statements if it doesn't exist
+            result = conn.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE TABLE_NAME = 'bank_statements' AND COLUMN_NAME = 'statement_month'"
+            ))
+            if result.scalar() == 0:
+                conn.execute(text("ALTER TABLE bank_statements ADD statement_month NVARCHAR(7) NULL"))
+                conn.execute(text("COMMIT"))
+                print("SUCCESS: Added statement_month column to bank_statements table")
+
+            # Ensure no duplicate statements per account per month
+            duplicate_count = conn.execute(text(
+                "SELECT COUNT(*) FROM ("
+                "SELECT account_number, statement_month "
+                "FROM bank_statements "
+                "WHERE account_number IS NOT NULL AND statement_month IS NOT NULL "
+                "GROUP BY account_number, statement_month "
+                "HAVING COUNT(*) > 1"
+                ") dup"
+            )).scalar()
+
+            unique_index_exists = conn.execute(text(
+                "SELECT COUNT(*) FROM sys.indexes "
+                "WHERE object_id = OBJECT_ID('bank_statements') AND name = 'ux_bank_statements_account_month'"
+            )).scalar()
+
+            if not unique_index_exists:
+                if duplicate_count and duplicate_count > 0:
+                    print("WARNING: Duplicate account_number + statement_month rows exist in bank_statements; skipping unique index creation")
+                else:
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX ux_bank_statements_account_month "
+                        "ON bank_statements(account_number, statement_month) "
+                        "WHERE account_number IS NOT NULL AND statement_month IS NOT NULL"
+                    ))
+                    conn.execute(text("COMMIT"))
+                    print("SUCCESS: Added unique index ux_bank_statements_account_month on bank_statements")
+
             # Add SageGLTransactionCache extra columns if they don't exist
             columns_to_add = [
                 ("entry_date", "DATE NULL"),

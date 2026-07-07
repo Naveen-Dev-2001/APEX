@@ -904,6 +904,7 @@ class BankStatement(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     filename = Column(String(255), nullable=False)
     account_number = Column(String(100), nullable=True, index=True)  # GL account this statement belongs to
+    statement_month = Column(String(7), nullable=True, index=True)  # YYYY-MM
     upload_date = Column(DateTime, nullable=False, default=get_ist_now)
     status = Column(String(50), nullable=False, default="uploaded") # uploaded, reconciled
     entity = Column(String(100), nullable=True)

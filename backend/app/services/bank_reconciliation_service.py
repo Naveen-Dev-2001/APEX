@@ -224,7 +224,8 @@ class BankReconciliationService:
         file: UploadFile, 
         uploader: str, 
         entity: str = None,
-        account_number: str = None
+        account_number: str = None,
+        statement_month: str = None
     ) -> BankStatement:
         content = await file.read()
         filename = file.filename.lower()
@@ -265,11 +266,41 @@ class BankReconciliationService:
                     # Convert to string, taking care of potential floats (e.g., 1000.0 -> 1000)
                     account_number = str(int(first_valid_account)) if isinstance(first_valid_account, float) and first_valid_account.is_integer() else str(first_valid_account).strip()
 
+            resolved_statement_month = None
+            if statement_month:
+                month_text = str(statement_month).strip()
+                if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month_text):
+                    raise ValueError("Invalid statement_month format. Expected YYYY-MM.")
+                resolved_statement_month = month_text
+
+            if not resolved_statement_month and date_col:
+                date_series = df[date_col].dropna()
+                if not date_series.empty:
+                    try:
+                        resolved_statement_month = pd.to_datetime(date_series.iloc[0]).date().strftime("%Y-%m")
+                    except Exception:
+                        resolved_statement_month = None
+
+            normalized_account_number = str(account_number).strip() if account_number else ""
+            if normalized_account_number and resolved_statement_month:
+                existing_statements = self.db.query(BankStatement).filter(
+                    BankStatement.account_number == normalized_account_number,
+                    BankStatement.statement_month == resolved_statement_month
+                ).order_by(BankStatement.upload_date.desc(), BankStatement.id.desc()).all()
+
+                for existing_statement in existing_statements:
+                    deleted = self.delete_statement(existing_statement.id)
+                    if not deleted:
+                        raise ValueError(
+                            f"Failed to replace existing statement for account {normalized_account_number} and month {resolved_statement_month}."
+                        )
+
             statement = BankStatement(
                 filename=file.filename,
                 uploaded_by=uploader,
                 entity=entity,
-                account_number=account_number,
+                account_number=normalized_account_number or None,
+                statement_month=resolved_statement_month,
                 status="uploaded"
             )
             self.db.add(statement)
@@ -353,7 +384,7 @@ class BankReconciliationService:
                 except Exception as e:
                     logger.warning(f"Failed to parse row: {row.to_dict() if hasattr(row, 'to_dict') else row}, error: {e}")
                     continue
-                    
+
             if transactions:
                 self.db.bulk_save_objects(transactions)
             self.db.commit()

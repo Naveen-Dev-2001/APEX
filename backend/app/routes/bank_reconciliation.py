@@ -74,6 +74,7 @@ async def upload_bank_statement(
     file: UploadFile = File(...),
     entity: Optional[str] = Form(None),
     account_number: Optional[str] = Form(None),
+    statement_month: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
@@ -89,12 +90,14 @@ async def upload_bank_statement(
             file,
             uploader=uploader,
             entity=entity,
-            account_number=account_number
+            account_number=account_number,
+            statement_month=statement_month
         )
         return {
             "statement_id": statement.id,
             "filename": statement.filename,
             "account_number": statement.account_number,
+            "statement_month": statement.statement_month,
             "status": statement.status,
             "upload_date": statement.upload_date.isoformat(),
             "transaction_count": len(statement.transactions)
@@ -109,6 +112,7 @@ async def upload_bank_statement(
 @router.get("/statements")
 async def get_statements(
     account_number: Optional[str] = Query(None, description="Filter by GL account number"),
+    statement_month: Optional[str] = Query(None, description="Filter by statement month in YYYY-MM format"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -116,6 +120,8 @@ async def get_statements(
     query = db.query(BankStatement)
     if account_number:
         query = query.filter(BankStatement.account_number == account_number)
+    if statement_month:
+        query = query.filter(BankStatement.statement_month == statement_month)
     
     statements = query.order_by(BankStatement.upload_date.desc()).all()
     
@@ -124,6 +130,7 @@ async def get_statements(
             "id": s.id,
             "filename": s.filename,
             "account_number": s.account_number,
+            "statement_month": s.statement_month,
             "upload_date": s.upload_date.isoformat(),
             "status": s.status,
             "transaction_count": len(s.transactions)
