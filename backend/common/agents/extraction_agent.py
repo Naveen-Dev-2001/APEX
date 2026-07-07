@@ -82,8 +82,6 @@ class InvoiceExtractionAgent:
                 AnalyzeDocumentRequest(bytes_source=doc_bytes)
             )
             
-<<<<<<< HEAD:backend/app/agents/extraction_agent.py
-=======
             # Check cancellation before waiting for poller result
             if is_cancelled_callback and is_cancelled_callback():
                 raise Exception("cancelled")
@@ -94,7 +92,6 @@ class InvoiceExtractionAgent:
                 timeout=120
             )
             
->>>>>>> zoho_poc:backend/common/agents/extraction_agent.py
             if not result.documents or not any(getattr(doc, 'doc_type', None) == 'invoice' for doc in result.documents):
                 raise ValueError("No invoice found in the document")
 
