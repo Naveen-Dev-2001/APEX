@@ -22,9 +22,9 @@ else:
     MAILBOX = MAILBOX_ENV
     ENTITY_ID = "201" if TOOL == "sage" else "DEFAULT"
 
-UNREAD_DIR = Path(f"uploads/{TOOL}/unread")
-READ_DIR = Path(f"uploads/{TOOL}/read")
-NON_INVOICE_DIR = Path(f"uploads/{TOOL}/non_invoice")
+UNREAD_DIR = Path("uploads/unread")
+READ_DIR = Path("uploads/read")
+NON_INVOICE_DIR = Path("uploads/non_invoice")
 
 UNREAD_DIR.mkdir(parents=True, exist_ok=True)
 READ_DIR.mkdir(parents=True, exist_ok=True)
@@ -90,7 +90,7 @@ async def process_and_save_invoice_async(unread_filepath: Path, filename: str, o
     
     # Target paths
     read_filepath = READ_DIR / filename
-    in_progress_filepath = Path(f"uploads/{TOOL}/in_progress_files") / filename
+    in_progress_filepath = Path("uploads/in_progress_files") / filename
     
     invoice_id = None
     processor = None
