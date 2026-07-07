@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "npm run dev",
+    "start": "vite preview",
     "test:login": "npx playwright test --config=tests/login/playwright.config.js",
     "test:login:headed": "npx playwright test --config=tests/login/playwright.config.js --headed",
     "test:login:ui": "npx playwright test --config=tests/login/playwright.config.js --ui",

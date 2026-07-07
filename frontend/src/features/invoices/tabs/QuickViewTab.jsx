@@ -14,6 +14,7 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import loadLineItemTable from "../../../utils/lineItemLogic";
 import { getInvoiceHeuristics } from "../../../utils/invoiceCalculations";
+import { getERPSystem } from "../../../utils/envHelper";
 import * as XLSX from "xlsx";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import { Trash2 } from "lucide-react";
@@ -655,7 +656,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 ? (vendor?.tds_section_code ?? "NA")
                 : (prev?.tdsSection || vendor?.tds_section_code || "NA"),
             // Always sync payment terms and due date
-            paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || "",
+            paymentTerms: TERMS.includes(extractedPayTerms) ? extractedPayTerms : vendor?.pay_terms || vendor?.payment_terms_label || "",
             dueDate: computedDueDate,
             // Keep internal flags in sync
             gst_eligibility: useVendorDefaults ? vendor?.gst_eligibility : prev?.gst_eligibility,
@@ -945,9 +946,11 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
     }, [isAllFields, showOnlyHeader, quickViewFormData, entityMaster]);
 
     const handleExportExcel = useCallback(() => {
+        const isZoho = getERPSystem() === "Zoho";
         const dataToExport = (lineItems || [])
             .filter(item => !item.isSystemRow)
-            .map((item, index) => ({
+            .map((item, index) => {
+                const rowData = {
                 "S.No": index + 1,
                 "Description": item.description || "",
                 "Qty": item.qty || 0,
@@ -957,11 +960,19 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 "Tax Amt": item.taxAmt || 0,
                 "Line Type": item.lineType || "",
                 "GL Code": item.glCode || "",
-                "LOB": item.lob || "",
-                "Department": item.department || "",
-                "Customer": item.customer || "",
-                "Item": item.item || "",
-            }));
+                };
+                if (!isZoho) {
+                    rowData["LOB"] = item.lob || "";
+                    rowData["Department"] = item.department || "";
+                }
+                if (!isZoho) {
+                    rowData["Customer"] = item.customer || "";
+                }
+                if (!isZoho) {
+                    rowData["Item"] = item.item || "";
+                }
+                return rowData;
+            });
 
         if (dataToExport.length === 0) {
             return;
@@ -982,6 +993,7 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
             const worksheet = workbook.Sheets[sheetName];
             const json = XLSX.utils.sheet_to_json(worksheet);
 
+            const isZoho = getERPSystem() === "Zoho";
             const newItems = json.map(row => ({
                 id: Date.now() + Math.random(),
                 description: row["Description"] || "",
@@ -992,10 +1004,10 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
                 taxAmt: parseFloat(row["Tax Amt"]) || 0,
                 lineType: row["Line Type"] || "",
                 glCode: row["GL Code"] || "",
-                lob: row["LOB"] || "",
-                department: row["Department"] || "",
-                customer: row["Customer"] || "",
-                item: row["Item"] || "",
+                lob: isZoho ? "" : (row["LOB"] || ""),
+                department: isZoho ? "" : (row["Department"] || ""),
+                customer: isZoho ? "" : (row["Customer"] || ""),
+                item: isZoho ? "" : (row["Item"] || ""),
                 isSystemRow: false,
                 isNetAmountOverridden: true
             }));

@@ -5,9 +5,9 @@ from datetime import datetime
 # Add the parent directory to sys.path to allow importing from 'app'
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.database.database import SessionLocal
-from app.models.db_models import User
-from app.auth.jwt import get_password_hash
+from common.database.database import SessionLocal
+from common.models.db_models import User
+from common.auth.jwt import get_password_hash
 
 
 def seed_users():

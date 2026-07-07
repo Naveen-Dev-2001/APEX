@@ -1,8 +1,8 @@
 import axios from "axios";
+import { getBackendURL } from "../utils/getBackendURL";
 
-const baseURL =
-    window._env_?.VITE_BACKEND_URL ||
-    import.meta.env.VITE_BACKEND_URL;
+const baseURL = getBackendURL();
+
 
 const API = axios.create({
     baseURL: baseURL,
@@ -52,12 +52,12 @@ API.interceptors.response.use(
                 const res = await axios.post(`${baseURL}/auth/refresh`, {
                     refresh_token: refreshToken
                 });
-                
+
                 if (res.data?.access_token) {
                     const { access_token, refresh_token } = res.data;
                     sessionStorage.setItem('access_token', access_token);
                     if (refresh_token) sessionStorage.setItem('refresh_token', refresh_token);
-                    
+
                     originalRequest.headers.Authorization = `Bearer ${access_token}`;
                     return API(originalRequest);
                 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import UserManagementTab from './UserManagementTab';
 import useAdminStore from '../../store/useAdminStore';
 import { useAuthStore } from '../../store/authStore';
@@ -10,6 +10,8 @@ import CustomButton from '../../shared/components/CustomButton';
 import RefreshButton from '../../shared/components/RefreshButton';
 import SearchInput from '../../shared/components/SearchInput';
 import toast from '../../utils/toast';
+import { REQUIRED_FIELD } from '../../config/constants';
+import { getERPSystem } from '../../utils/envHelper';
 
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
@@ -29,9 +31,18 @@ const AdminPage = () => {
     const statusOptions = statuses?.map(s => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }));
 
     const { user } = useAuthStore();
+    
+    const erpSystem = getERPSystem();
+    const allAdminTabs = REQUIRED_FIELD[erpSystem]?.["Admin"] || [];
     const tabs = user?.email?.toLowerCase() === 'admin@example.com' 
-        ? ['User Management', 'Global Config', 'Delegations'] 
-        : ['User Management', 'Delegations'];
+        ? allAdminTabs 
+        : allAdminTabs.filter(t => t !== 'Global Config');
+
+    useEffect(() => {
+        if (tabs.length > 0 && !tabs.includes(activeTab)) {
+            setActiveTab(tabs[0]);
+        }
+    }, [activeTab, tabs, setActiveTab]);
 
     const handleRoleLogic = (newSelectedRoles, previousRoles) => {
         const multiRoles = ['admin', 'approver'];

@@ -19,6 +19,8 @@ import CustomButton from '../../shared/components/CustomButton';
 
 import { useAuthStore } from '../../store/authStore';
 import { masterDataService } from '../../api/masterdataAPI';
+import { REQUIRED_FIELD } from '../../config/constants';
+import { getERPSystem } from '../../utils/envHelper';
 
 const MasterDataPage = () => {
     const user = useAuthStore((state) => state.user);
@@ -62,7 +64,11 @@ const MasterDataPage = () => {
 
     const filteredData = getFilteredData();
     const currentMaster = masters[activeTab];
-    const tabs = Object.keys(masters);
+    
+    const erpSystem = getERPSystem();
+    const allowedTabs = REQUIRED_FIELD[erpSystem]?.["Master Data"] || [];
+    const tabs = Object.keys(masters).filter(tab => allowedTabs.includes(tab));
+
     const isEntityTab = activeTab === 'Entity Master';
     const isVendorTab = activeTab === 'Vendor Master';
     const isTDSTab = activeTab === 'TDS Rates';
@@ -79,9 +85,13 @@ const MasterDataPage = () => {
 
     // Fetch data on mount, tab change, or pagination/search change
     useEffect(() => {
+        if (allowedTabs.length > 0 && !allowedTabs.includes(activeTab)) {
+            setActiveTab(allowedTabs[0]);
+            return;
+        }
         // Unified fetcher handles all tabs
         fetchMasterData(activeTab);
-    }, [activeTab, fetchMasterData, currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection, columnFilters]);
+    }, [activeTab, fetchMasterData, currentPage, itemsPerPage, searchQuery, sortColumn, sortDirection, columnFilters, allowedTabs, setActiveTab]);
 
     // Open modal helpers
     const openAdd = () => setModalState({ open: true, mode: 'add', rowData: null, rowIndex: null });
@@ -583,7 +593,7 @@ const MasterDataPage = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 w-full max-w-full overflow-hidden">
                 {(entityError && isEntityTab) || (vendorError && isVendorTab) || (tdsError && isTDSTab) || (glError && isGLTab) || (lobError && isLOBTab) || (departmentError && isDepartmentTab) || (customerError && isCustomerTab) || (itemError && isItemTab) || (currencyError && isCurrencyTab) || (exchangeRateError && isExchangeRateTab) ? (
                     <div className="flex items-center justify-center p-12 text-center">
                         <div className="flex flex-col items-center gap-4 max-w-md">

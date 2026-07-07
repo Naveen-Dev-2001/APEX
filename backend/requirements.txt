@@ -6,6 +6,7 @@ anyio==4.11.0
 attrs==25.4.0
 azure-ai-documentintelligence==1.0.2
 azure-core==1.31.0
+azure-storage-blob==12.28.0
 bcrypt==4.2.1
 certifi==2025.11.12
 cffi==2.0.0
@@ -33,6 +34,7 @@ jsonpointer==3.0.0
 langchain-core==1.1.0
 langchain-openai==1.1.0
 langsmith==0.4.47
+msal==1.37.0
 multidict==6.7.0
 numpy==2.3.5
 openai==2.8.1
@@ -47,6 +49,7 @@ pyasn1==0.6.1
 pycparser==2.23
 pydantic==2.10.3
 pydantic_core==2.27.1
+PyJWT==2.13.0
 pymongo==4.10.1
 pymssql==2.3.11
 pyodbc==5.3.0

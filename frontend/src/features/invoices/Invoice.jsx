@@ -25,6 +25,7 @@ import ArchivedInvoicesTab from "./ArchivedInvoicesTab";
 import { useLocation, useNavigate } from "react-router-dom";
 import AlertModal from "../../shared/components/AlertModal";
 import { useCommonStore } from "../../store/common.store";
+import { getERPSystem } from "../../utils/envHelper";
 
 const ACCESSOR_TO_DB_FIELD = {
     vendor_name: "vendor_name",
@@ -443,7 +444,7 @@ const Invoice = () => {
                         <div style={{ display: "flex", border: "1px solid #D9D9D9", borderRadius: "4px", overflow: "hidden", background: "#FFFFFF", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
                             {[
                                 { key: "in_progress", label: "In Progress Invoices" },
-                                { key: "posted_stage", label: "Posted To Sage Invoices" },
+                                { key: "posted_stage", label: `Posted To ${getERPSystem()} Invoices` },
                                 { key: "delete", label: "Deleted Invoices" },
                                 { key: "archive", label: "Archived Invoices" },
                             ].map(({ key, label }, index, arr) => {

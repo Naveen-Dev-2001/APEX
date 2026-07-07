@@ -4,14 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import axios from "axios";
-import { useAuthStore } from "../../store/authStore"; // ← add this
+import { useAuthStore } from "../../store/authStore";
+import { getBackendURL } from "../../utils/getBackendURL";
+import { getERPSystem } from "../../utils/envHelper";
+import { useCommonStore } from "../../store/common.store";
+import { useInvoiceStore } from "../../store/invoice.store";
 
 export default function SSOCallback() {
     const navigate = useNavigate();
-    const setAuth = useAuthStore((state) => state.setAuth); // ← add this
+    const setAuth = useAuthStore((state) => state.setAuth);
     const [status, setStatus] = useState("Processing...");
     const hasProcessed = useRef(false);
-    const baseURL = window._env_?.VITE_BACKEND_URL;
+    const baseURL = getBackendURL();
 
     useEffect(() => {
         if (hasProcessed.current) return;
@@ -46,7 +50,30 @@ export default function SSOCallback() {
                 setStatus("Redirecting...");
                 toast.success("SSO Login Successful");
 
-                navigate("/select-entity", { replace: true });
+                if (getERPSystem() === 'Zoho') {
+                    const entityId = 'DEFAULT';
+                    const entityName = 'Consolidated Analytics';
+                    const entityDisplayName = `${entityId} - ${entityName}`;
+                    
+                    const userRoles = userObj.role ? userObj.role.split(',') : [];
+                    const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
+                    useAuthStore.getState().setActiveRole(activeRole);
+                    
+                    useCommonStore.getState().setEntity(entityId);
+                    sessionStorage.setItem('selected_entity', entityId);
+                    sessionStorage.setItem('selected_entity_name', entityDisplayName);
+
+                    const rawEntity = {
+                        entity_id: entityId,
+                        entity_name: entityName,
+                        id: 0
+                    };
+                    useInvoiceStore.getState().setEntityMaster(rawEntity);
+
+                    navigate('/dashboard', { replace: true });
+                } else {
+                    navigate("/select-entity", { replace: true });
+                }
 
             } catch (err) {
                 console.error("SSO exchange failed:", err);

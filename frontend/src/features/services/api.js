@@ -1,8 +1,7 @@
 import axios from "axios";
+import { getBackendURL } from "../../utils/getBackendURL";
 
-const baseURL =
-    window._env_?.VITE_BACKEND_URL ||
-    import.meta.env.VITE_BACKEND_URL;
+const baseURL = getBackendURL();
 
 const API = axios.create({
     baseURL: baseURL,

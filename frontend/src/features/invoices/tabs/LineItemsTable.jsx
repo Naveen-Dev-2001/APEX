@@ -3,6 +3,7 @@ import { PlusOutlined, DownloadOutlined, UploadOutlined, CaretUpOutlined, CaretD
 import { Trash2 } from "lucide-react";
 import { Modal, Tooltip } from "antd";
 import WorkflowTab from "./WorkflowTab";
+import { getERPSystem } from "../../../utils/envHelper";
 import ReusableDataTable from '../../../shared/components/ReusableDataTable' // adjust path
 import { formatCurrency } from '../../../utils/formatters'
 
@@ -176,6 +177,7 @@ const LineItemsTable = () => {
     };
 
     /* ── Column definitions for ReusableDataTable ── */
+    const isZoho = getERPSystem() === "Zoho";
     const columnDefs = [
         {
             field: "checkbox",
@@ -342,7 +344,12 @@ const LineItemsTable = () => {
                 </button>
             ),
         },
-    ];
+    ].filter(col => {
+        if (isZoho && ["lob", "department", "customer", "item"].includes(col.field)) {
+            return false;
+        }
+        return true;
+    });
 
     return (
         <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
