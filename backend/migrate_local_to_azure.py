@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 env_path = Path(__file__).resolve().parent / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
  
-from common.services.azure_blob import container_client, upload_file_to_blob
+from common.services.azure_blob import container_client, upload_file_to_blob, get_blob_name_from_path
 from common.database.database import SessionLocal
 from sqlalchemy import text
  
@@ -57,7 +57,7 @@ def migrate():
                
                 for local_file in files:
                     filename = local_file.name
-                    target_blob = f"sage/{azure_prefix}/{filename}"
+                    target_blob = get_blob_name_from_path(f"{azure_prefix}/{filename}")
                     print(f"Uploading {local_file} to Azure Blob: {target_blob}...")
                    
                     try:

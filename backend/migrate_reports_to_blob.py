@@ -9,7 +9,7 @@ env_path = Path(__file__).resolve().parent / '.env'
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=env_path, override=True)
 
-from common.services.azure_blob import upload_file_to_blob
+from common.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
 
 # Paths
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -77,8 +77,7 @@ def run_migration():
             print(f"Skipping '{filename}' — not found in Sage database.")
             continue
 
-        tool = "sage"
-        blob_name = f"{tool}/create_reports/{filename}"
+        blob_name = get_blob_name_from_path(f"create_reports/{filename}")
 
         print(f"Migrating '{filename}' -> Azure Blob: '{blob_name}'...")
         
