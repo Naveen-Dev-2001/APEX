@@ -3,9 +3,26 @@ import xmltodict
 import asyncio
 import json
 import os
+import sys
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from typing import Optional
+
+# ── DB (for bank_accounts lookup in standalone mode) ──────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+except ImportError:
+    pass
+
+try:
+    import pymssql
+    _DB_URL = os.getenv(
+        "DATABASE_URL",
+        "mssql+pymssql://sa:Loandna%402026@localhost:1433/accounts_payable"
+    )
+except ImportError:
+    _DB_URL = None
 
 app = FastAPI(title="Sage Bank Reconciliation API")
 
@@ -583,17 +600,47 @@ def normalize_records(records: list[dict]):
     for r in records:
         source = r.get("GLDETAIL") if isinstance(r.get("GLDETAIL"), dict) else r
 
-        amount = (
-            source.get("TRX_AMOUNT")
-            or source.get("TRX_DEBITAMOUNT")
-            or source.get("TRX_CREDITAMOUNT")
-            or 0
-        )
+        # ── Amount resolution ──────────────────────────────────────────────
+        # In Sage GLDETAIL:
+        #   TRX_CREDITAMOUNT  → positive value for credits (money IN)
+        #   TRX_DEBITAMOUNT   → positive value for debits  (money OUT)
+        #   TRX_AMOUNT        → signed amount (credit=positive, debit=negative)
+        # We prefer the explicit credit/debit fields first so direction is clear.
+        def _to_float(v):
+            try:
+                return float(v) if v not in (None, "") else 0.0
+            except (ValueError, TypeError):
+                return 0.0
 
-        try:
-            amount = float(amount)
-        except:
-            amount = 0
+        credit_amt = _to_float(source.get("TRX_CREDITAMOUNT"))
+        debit_amt  = _to_float(source.get("TRX_DEBITAMOUNT"))
+        trx_amount = _to_float(source.get("TRX_AMOUNT"))
+
+        # Determine direction and canonical signed amount
+        if credit_amt > 0:
+            # Explicit credit (money IN)
+            direction  = "credit"
+            txn_amount = credit_amt
+        elif debit_amt > 0:
+            # Explicit debit (money OUT)
+            direction  = "debit"
+            txn_amount = debit_amt
+        elif trx_amount > 0:
+            # Positive TRX_AMOUNT → credit
+            direction  = "credit"
+            txn_amount = trx_amount
+        elif trx_amount < 0:
+            # Negative TRX_AMOUNT → debit
+            direction  = "debit"
+            txn_amount = abs(trx_amount)
+        else:
+            direction  = _resolve_sage_txn_type(source) or ""
+            txn_amount = 0.0
+
+        # Override with explicit TR_TYPE if resolved is meaningful
+        resolved_type = _resolve_sage_txn_type(source)
+        if resolved_type in ("credit", "debit"):
+            direction = resolved_type
 
         normalized.append({
 
@@ -605,18 +652,28 @@ def normalize_records(records: list[dict]):
             "check_no":
                 source.get("DOCNUMBER"),
 
-            # TRANSACTION TYPE
+            # TRANSACTION TYPE: "credit" or "debit" (or raw Sage label)
             "txn_type":
-                _resolve_sage_txn_type(source),
+                direction,
 
             # TRANSACTION DATE
             "txn_date":
                 source.get("ENTRY_DATE")
                 or source.get("BATCH_DATE"),
 
-            # TRANSACTION AMOUNT
+            # TRANSACTION AMOUNT (always positive; direction is in txn_type)
             "txn_amount":
-                abs(amount),
+                txn_amount,
+
+            # RAW signed amount for reference
+            "trx_amount_raw":
+                trx_amount,
+
+            "credit_amount":
+                credit_amt,
+
+            "debit_amount":
+                debit_amt,
 
             "account_no":
                 source.get("ACCOUNTNO"),
@@ -673,42 +730,161 @@ async def get_uncleared_transactions(
     }
 
 
+# ── DB helper: look up gl_account from bank_accounts table ───────────────────
+
+def _get_gl_account_for_entity(financial_entity: str) -> str | None:
+    """
+    Query the local bank_accounts table and return the gl_account
+    that corresponds to the given financial_entity (= bank_id in the table).
+    Returns None if not found or if DB is unavailable.
+    """
+    try:
+        import urllib.parse
+        from sqlalchemy import create_engine, text
+
+        db_url = _DB_URL or os.getenv("DATABASE_URL", "")
+        if not db_url:
+            print("  ! DATABASE_URL not set — skipping gl_account lookup")
+            return None
+
+        engine = create_engine(db_url, pool_pre_ping=True)
+        with engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT TOP 1 gl_account FROM bank_accounts "
+                    "WHERE bank_id = :bid AND is_active = 1 "
+                    "AND gl_account IS NOT NULL"
+                ),
+                {"bid": financial_entity}
+            ).fetchone()
+
+        engine.dispose()
+
+        if row and row[0]:
+            gl = str(row[0]).strip()
+            print(f"  ✓ GL account for '{financial_entity}': {gl}")
+            return gl
+        else:
+            print(f"  ! No active gl_account found for financial_entity='{financial_entity}'")
+            return None
+
+    except Exception as exc:
+        print(f"  ! DB lookup failed: {exc}")
+        return None
+
+
+def _get_all_active_entities() -> list[dict]:
+    """
+    Return all active bank_accounts rows as list of
+    {bank_id, gl_account} dicts for bulk run.
+    """
+    try:
+        from sqlalchemy import create_engine, text
+
+        db_url = _DB_URL or os.getenv("DATABASE_URL", "")
+        if not db_url:
+            return []
+
+        engine = create_engine(db_url, pool_pre_ping=True)
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT bank_id, gl_account FROM bank_accounts "
+                    "WHERE is_active = 1 "
+                    "AND bank_id IS NOT NULL "
+                    "AND gl_account IS NOT NULL"
+                )
+            ).fetchall()
+        engine.dispose()
+
+        return [{"bank_id": r[0], "gl_account": r[1]} for r in rows if r[0] and r[1]]
+
+    except Exception as exc:
+        print(f"  ! DB lookup failed: {exc}")
+        return []
+
+
 # ── Standalone runner ─────────────────────────────────────────────────────────
 
-async def run_standalone():
-    print("\n=== Sage Bank Reconciliation — Fetch Uncleared Transactions ===\n")
+async def run_standalone(financial_entity: str, after_date: str = "09/30/2023"):
+    """
+    Fetch all uncleared transactions (debits + credits) for the given
+    financial_entity. GL account is resolved automatically from bank_accounts.
+    """
+    print(f"\n=== Sage Bank Reconciliation — Uncleared Transactions ===")
+    print(f"    Financial Entity : {financial_entity}")
+    print(f"    After Date       : {after_date}\n")
+
+    # ── Step 1: resolve GL account from DB ────────────────────────────────
+    print("Looking up GL account from bank_accounts table...")
+    account_no = _get_gl_account_for_entity(financial_entity) or ""
+    if not account_no:
+        print("  ⚠  No GL account found — will query Sage without ACCOUNTNO filter.")
+    else:
+        print(f"  → Using ACCOUNTNO = '{account_no}'")
+
     try:
+        # ── Step 2: authenticate ───────────────────────────────────────────
         session_id = await get_session_id()
 
-        print("\nFetching uncleared transactions...")
-        records    = await fetch_all_gldetail(
+        # ── Step 3: fetch ALL uncleared (debit + credit) ───────────────────
+        print(f"\nFetching uncleared transactions from Sage...")
+        records = await fetch_all_gldetail(
             session_id=session_id,
-            financial_entity="",
-            account_no="",
-            after_date="09/30/2023"
+            financial_entity=financial_entity,
+            account_no=account_no,
+            after_date=after_date
         )
         normalized = normalize_records(records)
 
-        print(f"\n{'='*60}")
-        print(f"Total uncleared transactions: {len(normalized)}")
-        print(f"{'='*60}\n")
+        # ── Step 4: split by direction for reporting ───────────────────────
+        credits = [t for t in normalized if t.get("txn_type") == "credit"]
+        debits  = [t for t in normalized if t.get("txn_type") == "debit"]
+        others  = [t for t in normalized if t.get("txn_type") not in ("credit", "debit")]
 
+        print(f"\n{'='*65}")
+        print(f"  Financial Entity : {financial_entity}")
+        print(f"  GL Account       : {account_no or '(all)'}")
+        print(f"  Total uncleared  : {len(normalized)}")
+        print(f"    💰 Credits (IN) : {len(credits)}")
+        print(f"    💸 Debits  (OUT): {len(debits)}")
+        if others:
+            print(f"    ❓ Unknown type  : {len(others)}")
+        print(f"{'='*65}\n")
+
+        # ── Step 5: preview first 10 ───────────────────────────────────────
         for txn in normalized[:10]:
-            txn_type = str(txn.get("txn_type") or "").lower()
-            direction = "💸 OUT" if txn_type in ("debit",) else "💰 IN"
-            print(f"{direction}  {txn.get('txn_date')}  "
-                  f"Check: {str(txn.get('check_no') or ''):<8}  "
-                  f"${txn.get('txn_amount', 0):>10,.2f}  "
-                f"Type: {txn.get('txn_type', '')}  "
-                f"Account: {txn.get('account_no', '')}")
+            txn_type  = str(txn.get("txn_type") or "").lower()
+            icon      = "💰 IN " if txn_type == "credit" else "💸 OUT"
+            print(
+                f"{icon}  {txn.get('txn_date'):<12}  "
+                f"Check: {str(txn.get('check_no') or ''):<10}  "
+                f"${txn.get('txn_amount', 0):>12,.2f}  "
+                f"Type: {txn_type:<8}  "
+                f"Payee: {str(txn.get('payee') or '')[:30]}"
+            )
 
         if len(normalized) > 10:
             print(f"\n  ... and {len(normalized) - 10} more records")
 
+        # ── Step 6: save output ────────────────────────────────────────────
         script_dir  = os.path.dirname(os.path.abspath(__file__))
-        output_path = os.path.join(script_dir, "uncleared_transactions.json")
+        safe_entity = financial_entity.replace("/", "_").replace("\\", "_")
+        output_path = os.path.join(script_dir, f"uncleared_{safe_entity}.json")
         with open(output_path, "w") as f:
-            json.dump({"total": len(normalized), "transactions": normalized}, f, indent=2)
+            json.dump(
+                {
+                    "financial_entity": financial_entity,
+                    "gl_account": account_no,
+                    "after_date": after_date,
+                    "total": len(normalized),
+                    "credits": len(credits),
+                    "debits": len(debits),
+                    "transactions": normalized,
+                },
+                f,
+                indent=2,
+            )
         print(f"\n✓ Full results saved to: {output_path}")
 
     except Exception as e:
@@ -718,10 +894,42 @@ async def run_standalone():
 
 
 if __name__ == "__main__":
-    import sys
+    # Usage:
+    #   python bank_recon.py server                          → start FastAPI
+    #   python bank_recon.py FFB_4449                        → fetch for one entity
+    #   python bank_recon.py FFB_4449 01/01/2024            → with custom after_date
+    #   python bank_recon.py --all                           → fetch all active entities from DB
+
     if len(sys.argv) > 1 and sys.argv[1] == "server":
         print("Starting FastAPI server on http://localhost:8000")
         print("Docs at: http://localhost:8000/docs\n")
         uvicorn.run("bank_recon:app", host="0.0.0.0", port=8000, reload=True)
+
+    elif len(sys.argv) > 1 and sys.argv[1] == "--all":
+        # Fetch uncleared transactions for EVERY active bank entity in the DB
+        after_date = sys.argv[2] if len(sys.argv) > 2 else "09/30/2023"
+        entities   = _get_all_active_entities()
+        if not entities:
+            print("No active bank_accounts found in DB. Exiting.")
+            sys.exit(1)
+        print(f"Found {len(entities)} active bank account(s) in DB.\n")
+        for entry in entities:
+            asyncio.run(run_standalone(
+                financial_entity=entry["bank_id"],
+                after_date=after_date,
+            ))
+
     else:
-        asyncio.run(run_standalone())
+        # Single entity mode (required)
+        if len(sys.argv) < 2:
+            print("Usage:")
+            print("  python bank_recon.py <financial_entity> [after_date]")
+            print("  python bank_recon.py --all [after_date]")
+            print("  python bank_recon.py server")
+            print("\nExample:")
+            print("  python bank_recon.py FFB_4449 09/30/2023")
+            sys.exit(1)
+
+        financial_entity = sys.argv[1]
+        after_date       = sys.argv[2] if len(sys.argv) > 2 else "09/30/2023"
+        asyncio.run(run_standalone(financial_entity=financial_entity, after_date=after_date))
