@@ -6,12 +6,12 @@ from typing import Optional
 logger = logging.getLogger("application_trace")
 
 from common.config.config import TOOL
-UPLOAD_BASE_DIR = f"uploads/{TOOL}"
+UPLOAD_BASE_DIR = "uploads"
 
 SUBFOLDERS = {
     "in_progress": "in_progress_files",
     "deleted": "deleted_files",
-    "posted_stage": "posted_to_sage_files" if TOOL == "sage" else "posted_to_zoho_files",
+    "posted_stage": f"posted_to_{TOOL}_files",
     "archive": "archived_files",
     "non_invoices": "non_invoice"
 }
@@ -94,10 +94,16 @@ def move_invoice_file(current_path: str, target_category: str) -> Optional[str]:
         # Robust lookup: if source blob does not exist directly, search other known prefixes in Azure
         if not source_blob_client.exists():
             from common.config.config import TOOL
+            from common.services.azure_blob import APEX_BLOB_FOLDER
             search_folders = ["in_progress_files", "deleted_files", "posted_to_sage_files", "posted_to_zoho_files", "archived_files", "non_invoice", "read", "unread"]
             found = False
+            prefixes = []
+            if APEX_BLOB_FOLDER:
+                prefixes.append(f"{APEX_BLOB_FOLDER}/{TOOL}/")
+            prefixes.append(f"{TOOL}/")
+            prefixes.append("")
             for folder_prefix in search_folders:
-                for prefix in [f"{TOOL}/", "sage/", "zoho/", ""]:
+                for prefix in prefixes:
                     candidate_blob = f"{prefix}{folder_prefix}/{filename}"
                     candidate_client = container_client.get_blob_client(candidate_blob)
                     if candidate_client.exists():

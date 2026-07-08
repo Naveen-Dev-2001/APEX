@@ -601,10 +601,10 @@ def generate_approval_pdf(db: Session, invoice_id: int) -> str:
 
     print(f"[PDFService] Approval PDF saved → {pdf_path}")
 
-    # Upload to Azure Blob Storage under zoho/create_reports/
+    # Upload to Azure Blob Storage under active tool/create_reports/
     try:
-        from common.services.azure_blob import upload_file_to_blob
-        blob_name = f"zoho/create_reports/{pdf_path.name}"
+        from common.services.azure_blob import upload_file_to_blob, get_blob_name_from_path
+        blob_name = get_blob_name_from_path(f"create_reports/{pdf_path.name}")
         upload_file_to_blob(str(pdf_path), blob_name)
         logger.info(f"[PDFService] Successfully uploaded PDF to Azure Blob Storage: {blob_name}")
     except Exception as blob_err:
