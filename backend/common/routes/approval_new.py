@@ -410,9 +410,25 @@ def notify_next_approvers(db: Session, invoice: Invoice, next_level_data: Dict, 
     if is_finance:
         finance_emails = _get_finance_users(db, invoice.entity)
         emails = list(set(emails) | set(finance_emails))
+
+    # Identify user emails who already approved a level in this cycle to avoid duplicate notifications
+    steps = _steps_for_invoice(db, invoice.id)
+    current_cycle_steps = _get_current_cycle_steps(steps)
+    already_acted_emails = {
+        s.user.lower() for s in current_cycle_steps
+        if s.user and s.step_type in {
+            StepType.LEVEL_APPROVED,
+            StepType.THRESHOLD_APPROVED,
+            StepType.POSTING_APPROVED,
+            StepType.APPROVED
+        }
+    }
         
     for next_email in emails:
         if not next_email: continue
+        if next_email.lower() in already_acted_emails:
+            logger.info(f"[Workflow] Skipping approval notification to {next_email} because they already acted in this cycle.")
+            continue
         
         # Fetch username for personal touch if possible
         approver_user = db.query(User).filter(User.email == next_email).first()
@@ -1003,7 +1019,7 @@ def _resolve_user_role_in_workflow(
                 for lvl, emails in approved_levels.items()
             )
             already_acted_at_other_mandatory = (
-                not result["is_posting_approver"]
+                not (result["is_posting_approver"] and has_posting)
                 and (acted_in_current_cycle or acted_in_valid_previous_level)
             )
             result["can_act"] = (
@@ -1240,7 +1256,7 @@ async def get_ui_status_from_frontend(
                 for lvl, emails in approved_levels.items()
             )
             already_acted_at_other_mandatory = (
-                not (is_posting_approver and current_level == max_seq)
+                not (is_posting_approver and has_posting and current_level == max_seq)
                 and (acted_in_current_cycle or acted_in_valid_previous_level)
             )
             can_act = user_in_level and not already_acted_here and not already_acted_at_other_mandatory
@@ -1525,7 +1541,7 @@ async def approve_invoice(
             InvoiceAssignedApprover.invoice_id == invoice_id
         ).scalar() or 0
 
-        if not (is_posting_approver_here and current_level == max_seq):
+        if not (is_posting_approver_here and has_posting and current_level == max_seq):
             if acted_in_current_cycle or acted_in_valid_previous_level:
                 raise HTTPException(
                     400,
