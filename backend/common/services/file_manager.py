@@ -94,12 +94,12 @@ def move_invoice_file(current_path: str, target_category: str) -> Optional[str]:
         # Robust lookup: if source blob does not exist directly, search other known prefixes in Azure
         if not source_blob_client.exists():
             from common.config.config import TOOL
-            from common.services.azure_blob import APEX_BLOB_FOLDER
+            from common.services.azure_blob import AZURE_BLOB_FOLDER
             search_folders = ["in_progress_files", "deleted_files", "posted_to_sage_files", "posted_to_zoho_files", "archived_files", "non_invoice", "read", "unread"]
             found = False
             prefixes = []
-            if APEX_BLOB_FOLDER:
-                prefixes.append(f"{APEX_BLOB_FOLDER}/{TOOL}/")
+            if AZURE_BLOB_FOLDER:
+                prefixes.append(f"{AZURE_BLOB_FOLDER}/{TOOL}/")
             prefixes.append(f"{TOOL}/")
             prefixes.append("")
             for folder_prefix in search_folders:
