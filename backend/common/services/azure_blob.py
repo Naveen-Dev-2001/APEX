@@ -5,7 +5,7 @@ import os
 # Azure Connection Details
 CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 CONTAINER_NAME = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
-APEX_BLOB_FOLDER = os.getenv("APEX_BLOB_FOLDER", "")
+AZURE_BLOB_FOLDER = os.getenv("AZURE_BLOB_FOLDER", "")
 
 blob_service_client = BlobServiceClient.from_connection_string(CONNECTION_STRING)
 container_client = blob_service_client.get_container_client(CONTAINER_NAME)
@@ -65,15 +65,15 @@ def get_blob_name_from_path(file_path: str) -> str:
     if normalized.startswith("uploads/"):
         normalized = normalized[len("uploads/"):]
         
-    prefix = f"{APEX_BLOB_FOLDER}/{TOOL}" if APEX_BLOB_FOLDER else TOOL
+    prefix = f"{AZURE_BLOB_FOLDER}/{TOOL}" if AZURE_BLOB_FOLDER else TOOL
     
     # If the path already has the full active prefix, return as is
     if normalized.startswith(f"{prefix}/"):
         return normalized
         
-    # If the path starts with just the tool prefix, prepend the apex_blob_folder if configured
+    # If the path starts with just the tool prefix, prepend the azure_blob_folder if configured
     if normalized.startswith(f"{TOOL}/"):
-        return f"{APEX_BLOB_FOLDER}/{normalized}" if APEX_BLOB_FOLDER else normalized
+        return f"{AZURE_BLOB_FOLDER}/{normalized}" if AZURE_BLOB_FOLDER else normalized
         
     # Prepend the active tool directory (prefix) to separate their paths in the container
     return f"{prefix}/{normalized}"
@@ -97,7 +97,7 @@ def ensure_container_and_folders() -> None:
             "create_reports"
         ]
         
-        prefix = f"{APEX_BLOB_FOLDER}/{TOOL}" if APEX_BLOB_FOLDER else TOOL
+        prefix = f"{AZURE_BLOB_FOLDER}/{TOOL}" if AZURE_BLOB_FOLDER else TOOL
         for folder in folders:
             placeholder_blob = f"{prefix}/{folder}/.placeholder"
             blob_client = container_client.get_blob_client(placeholder_blob)

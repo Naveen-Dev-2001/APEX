@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from dotenv import load_dotenv
 load_dotenv()
 
-from common.services.azure_blob import upload_file_to_blob, APEX_BLOB_FOLDER
+from common.services.azure_blob import upload_file_to_blob, AZURE_BLOB_FOLDER
 
 # Paths
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -88,7 +88,7 @@ def run_migration():
             tool = DEFAULT_TOOL
             print(f"Could not match '{filename}' to database records. Using fallback tool: '{tool}'")
 
-        prefix = f"{APEX_BLOB_FOLDER}/{tool}" if APEX_BLOB_FOLDER else tool
+        prefix = f"{AZURE_BLOB_FOLDER}/{tool}" if AZURE_BLOB_FOLDER else tool
         blob_name = f"{prefix}/create_reports/{filename}"
 
         print(f"Migrating '{filename}' -> Azure Blob: '{blob_name}'...")
