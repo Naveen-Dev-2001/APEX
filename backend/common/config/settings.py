@@ -38,14 +38,12 @@ class Settings:
     # -----------------------------------------------------------------------
     TOOL: str = TOOL
 
-    # SQL Server Database URL — selected based on active tool
-    if os.getenv("TOOL", "sage").lower() == "zoho":
-        _db_url = os.getenv("ZOHO_DATABASE_URL") or os.getenv("DATABASE_URL")
-        if _db_url and _db_url.endswith("/accounts_payable"):
-            _db_url = _db_url + "_zoho"
-        DATABASE_URL: str = _db_url
-    else:
-        DATABASE_URL: str = os.getenv("DATABASE_URL")
+    # SQL Server Database URL — always read directly from DATABASE_URL in .env.
+    # To switch tools (sage ↔ zoho), simply change the DB name at the end of
+    # DATABASE_URL in .env:
+    #   sage  → mssql+pymssql://...@localhost:1433/accounts_payable
+    #   zoho  → mssql+pymssql://...@localhost:1433/accounts_payable_zoho
+    DATABASE_URL: str = os.getenv("DATABASE_URL")
 
     # SMTP Settings (credentials should be configured in .env)
     SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.office365.com")
