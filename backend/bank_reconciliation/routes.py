@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel
 from app.database.database import get_db
 from app.auth.jwt import get_current_user
-from app.services.bank_reconciliation_service import BankReconciliationService
+from bank_reconciliation.service import BankReconciliationService
 from app.models.db_models import (
     BankStatement, BankStatementTransaction,
     SageGLTransactionCache, ReconciliationResult, BankAccount

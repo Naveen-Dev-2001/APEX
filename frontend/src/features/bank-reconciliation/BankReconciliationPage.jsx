@@ -1,7 +1,7 @@
 ﻿import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { reconciliationApi } from '../../api/reconciliationApi';
+import { reconciliationApi } from './reconciliationApi';
 import logo from '../../assets/loandna_logo_dark.png';
 import '../../layout/AuthLayout.css';
 import toast from '../../utils/toast';

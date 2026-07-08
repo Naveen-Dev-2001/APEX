@@ -5,7 +5,7 @@ from app.database.init_db import init_database, seed_api_master_data
 from app.database.database import engine, Base
 from app.routes import master_data, workflow, approval, admin, settings as settings_route, workflow_config, delegation, audit
 from app.routes import auth, invoices, coding, dashboard, currency
-from app.routes.bank_reconciliation import router as bank_reconciliation_router
+from bank_reconciliation.routes import router as bank_reconciliation_router
 from app.routes.auth import sso_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends

@@ -14,7 +14,7 @@ import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
 import ChangePasswordFirstTimePage from './features/auth/ChangePasswordFirstTimePage';
 import SSOCallback from './features/auth/SSOCallback';
-import BankReconciliationPage from './features/reconciliation/BankReconciliationPage';
+import BankReconciliationPage from './features/bank-reconciliation/BankReconciliationPage';
 
 import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
