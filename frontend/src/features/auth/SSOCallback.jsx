@@ -49,6 +49,7 @@ export default function SSOCallback() {
 
                 setStatus("Redirecting...");
                 toast.success("SSO Login Successful");
+                navigate("/module-select", { replace: true });
 
                 if (getERPSystem() === 'Zoho') {
                     const entityId = 'DEFAULT';
