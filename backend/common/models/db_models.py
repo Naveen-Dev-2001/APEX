@@ -905,12 +905,33 @@ class InvoiceApprovalLog(Base):
 
 # ==================== BANK RECONCILIATION MODELS ====================
 
+class BankAccount(Base):
+    __tablename__ = "bank_accounts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bank_id = Column(String(100), nullable=True, index=True)
+    bank_name = Column(String(255), nullable=True)
+    account_number = Column(String(100), nullable=False, index=True)
+    account_name = Column(String(255), nullable=True)
+    gl_account = Column(String(100), nullable=True, index=True)
+    gl_account_title = Column(String(255), nullable=True)
+    currency_code = Column(String(10), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    source = Column(String(50), nullable=False, default="upload")
+    created_at = Column(DateTime, nullable=False, default=get_ist_now)
+    updated_at = Column(DateTime, nullable=False, default=get_ist_now)
+
+    __table_args__ = (
+        UniqueConstraint("bank_id", "account_number", name="uq_bank_accounts_bankid_account"),
+    )
+
 class BankStatement(Base):
     __tablename__ = "bank_statements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     filename = Column(String(255), nullable=False)
     account_number = Column(String(100), nullable=True, index=True)  # GL account this statement belongs to
+    statement_month = Column(String(7), nullable=True, index=True)  # YYYY-MM
     upload_date = Column(DateTime, nullable=False, default=get_ist_now)
     status = Column(String(50), nullable=False, default="uploaded") # uploaded, reconciled
     entity = Column(String(100), nullable=True)

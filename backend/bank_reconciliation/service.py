@@ -11,12 +11,12 @@ import os
 import json
 import re
 
-from app.models.db_models import (
+from common.models.db_models import (
     BankStatement, BankStatementTransaction, 
     SageGLTransactionCache, ReconciliationResult, BankAccount, GLMaster
 )
-from app.services.base_sync_service import BaseSyncService
-from app.utils.date_utils import get_ist_now
+from sage.services.base_sync_service import BaseSyncService
+from common.utils.date_utils import get_ist_now
 
 logger = logging.getLogger(__name__)
 
@@ -603,7 +603,7 @@ class BankReconciliationService:
     async def fetch_sage_gl_transactions(self, account_filter: str = None, financial_entity_filter: str = None) -> int:
         """Fetch GL transactions from Sage. Optionally filter by account number and financial entity."""
         try:
-            from scripts.bank_recon import get_session_id, fetch_all_gldetail, normalize_records
+            from bank_reconciliation.scripts.bank_recon import get_session_id, fetch_all_gldetail, normalize_records
             
             session_id = await get_session_id()
             acct = account_filter or "10012"

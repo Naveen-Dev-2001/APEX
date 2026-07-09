@@ -343,58 +343,63 @@ const BankStatementTab = () => {
       </div>
 
       {/* Statements list */}
-      {filteredStatements.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-50">
-            <h3 className="font-semibold text-gray-700">Uploaded Statements</h3>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-400 text-xs uppercase">
-              <tr>
-                <th className="text-left px-6 py-3">File</th>
-                <th className="text-left px-6 py-3">Account Number</th>
-                <th className="text-left px-6 py-3">Statement Month</th>
-                <th className="text-left px-6 py-3">Uploaded</th>
-                <th className="text-left px-6 py-3">Transactions</th>
-                <th className="text-left px-6 py-3">Status</th>
-                <th className="text-right px-6 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredStatements.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-gray-700 flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    {s.filename}
-                  </td>
-                  <td className="px-6 py-4">
-                    {s.account_number
-                      ? <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono">{s.account_number}</span>
-                      : <span className="text-gray-300 text-xs italic">No account</span>
-                    }
-                  </td>
-                  <td className="px-6 py-4 text-gray-500">{s.statement_month ? formatStatementMonthLabel(s.statement_month) : '-'}</td>
-                  <td className="px-6 py-4 text-gray-400">{new Date(s.upload_date).toLocaleDateString()}</td>
-                  <td className="px-6 py-4">
-                    <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold">{s.transaction_count}</span>
-                  </td>
-                  <td className="px-6 py-4"><StatusPill matched={s.status === 'reconciled'} /></td>
-                  <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
-                    <button onClick={() => handleViewTransactions(s)} className="text-[#1e9bd8] hover:underline text-xs font-medium">View</button>
-                    <button onClick={(e) => handleDeleteStatement(e, s.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors" title="Delete Statement">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-50">
+          <h3 className="font-semibold text-gray-700">Uploaded Statements</h3>
         </div>
-      )}
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-gray-400 text-xs uppercase">
+            <tr>
+              <th className="text-left px-6 py-3">File</th>
+              <th className="text-left px-6 py-3">Account Number</th>
+              <th className="text-left px-6 py-3">Statement Month</th>
+              <th className="text-left px-6 py-3">Uploaded</th>
+              <th className="text-left px-6 py-3">Transactions</th>
+              <th className="text-left px-6 py-3">Status</th>
+              <th className="text-right px-6 py-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filteredStatements.map((s) => (
+              <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                <td className="px-6 py-4 font-medium text-gray-700 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {s.filename}
+                </td>
+                <td className="px-6 py-4">
+                  {s.account_number
+                    ? <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono">{s.account_number}</span>
+                    : <span className="text-gray-300 text-xs italic">No account</span>
+                  }
+                </td>
+                <td className="px-6 py-4 text-gray-500">{s.statement_month ? formatStatementMonthLabel(s.statement_month) : '-'}</td>
+                <td className="px-6 py-4 text-gray-400">{new Date(s.upload_date).toLocaleDateString()}</td>
+                <td className="px-6 py-4">
+                  <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold">{s.transaction_count}</span>
+                </td>
+                <td className="px-6 py-4"><StatusPill matched={s.status === 'reconciled'} /></td>
+                <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
+                  <button onClick={() => handleViewTransactions(s)} className="text-[#1e9bd8] hover:underline text-xs font-medium">View</button>
+                  <button onClick={(e) => handleDeleteStatement(e, s.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors" title="Delete Statement">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filteredStatements.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-400">
+                  No bank statements found. Upload your first statement to populate this table.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* Transaction detail */}
       {transactions && selectedStatement && (
