@@ -60,7 +60,7 @@ const LoginPage = () => {
                 if (response.data.ispasswordchange === false) {
                     toast.info('Please change your password to continue');
                     navigate('/change-password-first-time', { state: { email: response.data.email || email } });
-                } else {
+                } else if (response.data.is_module_selection_required) {
                     if (getERPSystem() === 'Zoho') {
                         const entityId = 'DEFAULT';
                         const entityName = 'Consolidated Analytics';
@@ -83,9 +83,13 @@ const LoginPage = () => {
                         useInvoiceStore.getState().setEntityMaster(rawEntity);
 
                         navigate('/dashboard');
-                    } else {
+                    }
+                     else {
                         navigate('/select-entity');
                     }
+                }
+                else{
+                     navigate('/module-select');
                 }
             } else {
                 setError('Invalid response from server');
