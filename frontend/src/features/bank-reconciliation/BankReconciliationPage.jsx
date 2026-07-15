@@ -29,6 +29,19 @@ const formatBankAccountOptionLabel = (bankName, accountNumber) => {
     : resolvedBankName;
 };
 
+const getTopLevelEntityName = (value) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+
+  // Entity selector stores values like "ENTITY_ID - Entity Name".
+  const splitByDash = text.split(' - ');
+  if (splitByDash.length >= 2) {
+    return splitByDash.slice(1).join(' - ').trim();
+  }
+
+  return text;
+};
+
 const Badge = ({ type }) => {
   const map = { debit: 'bg-red-100 text-red-600', credit: 'bg-green-100 text-green-600' };
   return (
@@ -2227,11 +2240,14 @@ const BankReconciliationPage = () => {
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const activeRole = useAuthStore((state) => state.activeRole);
   const [activeTab, setActiveTab] = useState('bank-statement');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef();
 
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
+  const rawEntityName = sessionStorage.getItem('selected_entity_name');
+  const selectedEntityName = getTopLevelEntityName(rawEntityName) || 'Top Level';
   const handleLogout = () => { logout(); navigate('/login'); };
 
   React.useEffect(() => {
@@ -2242,11 +2258,11 @@ const BankReconciliationPage = () => {
 
 
   const subtitles = {
-    'bank-statement': 'Upload and review your bank statement transactions',
-    'bank-accounts': 'Upload bank account files and sync account data from Sage',
-    'sage-gl': 'View GL transactions pulled from Sage Intacct, grouped by account',
-    'match-compare': 'Auto-match bank and Sage transactions side by side',
-    'unmatched': 'Review transactions that could not be automatically matched',
+    // 'bank-statement': 'Upload and review your bank statement transactions',
+    // 'bank-accounts': 'Upload bank account files and sync account data from Sage',
+    // 'sage-gl': 'View GL transactions pulled from Sage Intacct, grouped by account',
+    // 'match-compare': 'Auto-match bank and Sage transactions side by side',
+    // 'unmatched': 'Review transactions that could not be automatically matched',
   };
 
   return (
@@ -2273,27 +2289,66 @@ const BankReconciliationPage = () => {
           </nav>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/module-select')} className="hidden sm:flex items-center gap-2 text-sm text-gray-500 hover:text-[#1e9bd8] font-medium transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            Switch Module
-          </button>
           <div className="relative cursor-pointer" ref={dropdownRef}>
             <div
-              className="bg-[#1e9bd8] text-white w-[36px] h-[36px] rounded-full flex justify-center items-center text-sm font-bold shadow"
+              className="bg-[#1e9bd8] text-white w-[34px] h-[34px] rounded-full flex justify-center items-center text-[15px] font-semibold"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               {userInitial}
             </div>
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-100 rounded-xl shadow-lg py-1 z-50">
-                <div className="px-4 py-2 border-b border-gray-50">
-                  <p className="text-xs font-semibold text-gray-700 truncate">{user?.username}</p>
-                  <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+              <div className="absolute right-0 mt-3 w-[280px] bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                <div className="absolute -top-[6px] right-2.5 w-3 h-3 bg-white border-l border-t border-gray-100 rotate-45 z-0"></div>
+
+                <div className="relative z-10 p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <span
+                      className="text-[11px] font-bold text-[#333] tracking-tighter uppercase opacity-60 truncate mr-2"
+                      title={selectedEntityName}
+                    >
+                      {selectedEntityName}
+                    </span>
+                    <button
+                      onClick={handleLogout}
+                      className="text-[13px] text-[#ff5a5f] hover:text-red-600 font-semibold transition-colors shrink-0"
+                    >
+                      Logout
+                    </button>
+                  </div>
+
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-12 h-12 bg-[#3ba5d8] rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-sm shrink-0">
+                      {userInitial}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[16px] font-bold text-gray-900 truncate leading-none mb-1">
+                        {user?.username || 'admin'}
+                      </span>
+                      <span className="text-[13px] text-gray-400 font-medium truncate capitalize">
+                        {activeRole || 'User'} - {user?.department?.toLowerCase() === 'finance' ? 'Finance' : 'Non-Finance'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="h-[1px] w-full bg-gray-50 mb-3"></div>
+
+                  <button
+                    onClick={() => {
+                      navigate('/module-select');
+                      setIsDropdownOpen(false);
+                    }}
+                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
+                  >
+                    <div className="p-1 rounded-lg text-[#3ba5d8]">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                      </svg>
+                    </div>
+                    <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                      Switch Module
+                    </span>
+                  </button>
                 </div>
-                <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                  Logout
-                </button>
               </div>
             )}
           </div>

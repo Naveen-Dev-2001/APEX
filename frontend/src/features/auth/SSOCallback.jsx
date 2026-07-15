@@ -53,7 +53,7 @@ export default function SSOCallback() {
 
                 if (getERPSystem() === 'Zoho') {
                     const entityId = 'DEFAULT';
-                    const entityName = 'Consolidated Analytics';
+                    const entityName = 'Top Level';
                     const entityDisplayName = `${entityId} - ${entityName}`;
                     
                     const userRoles = userObj.role ? userObj.role.split(',') : [];

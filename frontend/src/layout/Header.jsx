@@ -45,6 +45,19 @@ const iconMap = {
     'default': { select: dashboardSelectIcon, unselect: dashboardUnselectIcon }
 };
 
+const getEntityDisplayName = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return '';
+
+    // Entity selector stores values like "ENTITY_ID - Entity Name".
+    const splitByDash = text.split(' - ');
+    if (splitByDash.length >= 2) {
+        return splitByDash.slice(1).join(' - ').trim();
+    }
+
+    return text;
+};
+
 // Remove hardcoded tabs as we will use dynamic navigation
 // const tabs = [ ... ];
 
@@ -58,7 +71,7 @@ const Header = () => {
     // Use the display name for UI; fall back to entity_id or a default
     const rawEntityName = sessionStorage.getItem('selected_entity_name');
     const rawEntityId = sessionStorage.getItem('selected_entity');
-    const selectedEntityName = rawEntityName || (rawEntityId ? `${rawEntityId} - ${entity || ''}` : entity) || 'consolidated analytics';
+    const selectedEntityName = getEntityDisplayName(rawEntityName || entity) || 'Top Level';
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -396,6 +409,24 @@ const Header = () => {
 
                                 {/* Divider */}
                                 <div className="h-[1px] w-full bg-gray-50 mb-4"></div>
+
+                                {/* Switch Module Action */}
+                                <button
+                                    onClick={() => {
+                                        navigate('/module-select');
+                                        setIsDropdownOpen(false);
+                                    }}
+                                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
+                                >
+                                    <div className="p-1 rounded-lg text-[#3ba5d8]">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                                        Switch Module
+                                    </span>
+                                </button>
 
                                 {/* Change Entity Action */}
                                 {getERPSystem() !== 'Zoho' && (

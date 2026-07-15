@@ -63,7 +63,7 @@ const LoginPage = () => {
                 } else if (response.data.is_module_selection_required) {
                     if (getERPSystem() === 'Zoho') {
                         const entityId = 'DEFAULT';
-                        const entityName = 'Consolidated Analytics';
+                        const entityName = 'Top Level';
                         const entityDisplayName = `${entityId} - ${entityName}`;
                         
                         // Set the active role (similar to SelectEntityPage default behavior)
