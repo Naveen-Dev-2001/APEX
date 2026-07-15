@@ -261,8 +261,8 @@ const BankStatementTab = () => {
     <div className="space-y-6">
       {/* Upload Zone */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+        <div className="px-6 py-4 border-b border-gray-50 flex flex-wrap items-end gap-4 lg:gap-5">
+          <div className="flex items-center gap-2 min-w-[240px]">
             <label htmlFor="bank-statement-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
               Bank:
             </label>
@@ -270,7 +270,7 @@ const BankStatementTab = () => {
               id="bank-statement-filter"
               value={selectedBank}
               onChange={(e) => setSelectedBank(e.target.value)}
-              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-52 p-2.5 transition-colors cursor-pointer"
+              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 transition-colors cursor-pointer"
             >
               <option value="all">All Banks</option>
               {bankOptions.map((bankOption) => (
@@ -278,7 +278,7 @@ const BankStatementTab = () => {
               ))}
             </select>
           </div>
-          <div className="flex-1 max-w-sm">
+          <div className="flex-1 min-w-[280px] lg:min-w-[340px] xl:min-w-[420px]">
             <input
               type="text"
               value={statementSearch}
@@ -287,7 +287,7 @@ const BankStatementTab = () => {
               className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-[330px]">
             <label htmlFor="upload-statement-month" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
               Statement Month:
             </label>
@@ -314,7 +314,7 @@ const BankStatementTab = () => {
               ))}
             </select>
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 lg:ml-2">
             <input
               ref={fileRef}
               type="file"
@@ -409,7 +409,7 @@ const BankStatementTab = () => {
               <div className="flex items-start justify-between gap-4 mb-3">
                 <AccountBanner
                   accountNumber={selectedStatement.account_number}
-                  extra={`${transactions.total} transactions ┬╖ ${new Date(selectedStatement.upload_date).toLocaleDateString()}`}
+                  extra={`${transactions.total} transactions  ${new Date(selectedStatement.upload_date).toLocaleDateString()}`}
                 />
                 <button
                   type="button"
@@ -2253,13 +2253,24 @@ const BankReconciliationPage = () => {
     <div className="min-h-screen bg-[#f5f6fa] flex flex-col">
       {/* Header */}
       <header className="fixed top-0 left-0 w-full h-[64px] bg-white border-b border-gray-100 shadow-sm px-6 flex items-center justify-between z-[2000]">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 min-w-0">
           <img src={logo} alt="Logo" className="h-[40px] w-auto" onError={(e) => { e.target.style.display = 'none'; }} />
-          <div className="hidden sm:flex items-center gap-2 text-sm text-gray-400">
-            <button onClick={() => navigate('/module-select')} className="hover:text-[#1e9bd8] transition-colors font-medium">Modules</button>
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            <span className="text-gray-700 font-semibold">Bank Reconciliation</span>
-          </div>
+          <nav className="hidden lg:flex items-center gap-1 ml-4 overflow-x-auto">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors
+                  ${activeTab === tab.id
+                    ? 'bg-[#1e9bd8]/10 text-[#1e9bd8] border border-[#1e9bd8]/20'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
+                  }`}
+              >
+                <span className={activeTab === tab.id ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/module-select')} className="hidden sm:flex items-center gap-2 text-sm text-gray-500 hover:text-[#1e9bd8] font-medium transition-colors">
@@ -2291,44 +2302,27 @@ const BankReconciliationPage = () => {
 
       {/* Body */}
       <div className="flex flex-1 pt-[64px]">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-100 flex flex-col fixed top-[64px] bottom-0 left-0 overflow-y-auto">
-          <div className="px-5 py-5 border-b border-gray-50">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#1e9bd8] flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <rect x="2" y="5" width="20" height="14" rx="2" strokeWidth={1.5} />
-                  <line x1="2" y1="10" x2="22" y2="10" strokeWidth={1.5} />
-                </svg>
-              </div>
-              <div>
-                <p className="font-bold text-gray-800 text-sm">Bank Reconciliation</p>
-                {/* <p className="text-xs text-gray-400">Bank Γåö Sage GL</p> */}
-              </div>
-            </div>
-          </div>
-          <nav className="flex-1 px-3 py-4 space-y-1">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 text-left
-                  ${activeTab === tab.id
-                    ? 'bg-[#1e9bd8]/10 text-[#1e9bd8] border border-[#1e9bd8]/20'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                  }`}
-              >
-                <span className={activeTab === tab.id ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
-                {tab.label}
-                {activeTab === tab.id && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#1e9bd8]" />}
-              </button>
-            ))}
-          </nav>
-        </aside>
-
         {/* Main */}
-        <main className="flex-1 ml-64 p-6 overflow-y-auto">
+        <main className="flex-1 p-6 overflow-y-auto">
           <div className="max-w-5xl mx-auto">
+            <nav className="lg:hidden mb-4 bg-white border border-gray-100 rounded-xl shadow-sm p-2 overflow-x-auto">
+              <div className="flex items-center gap-2 min-w-max">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors
+                      ${activeTab === tab.id
+                        ? 'bg-[#1e9bd8]/10 text-[#1e9bd8] border border-[#1e9bd8]/20'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
+                      }`}
+                  >
+                    <span className={activeTab === tab.id ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </nav>
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-800">{TABS.find((t) => t.id === activeTab)?.label}</h1>
               <p className="text-sm text-gray-400 mt-1">{subtitles[activeTab]}</p>
