@@ -2393,10 +2393,6 @@ const BankReconciliationPage = () => {
                 })}
               </div>
             </nav>
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-800">{TABS.find((t) => t.id === activeTab)?.label}</h1>
-              <p className="text-sm text-gray-400 mt-1">{subtitles[activeTab]}</p>
-            </div>
             {activeTab === 'bank-statement'  && <BankStatementTab />}
             {activeTab === 'bank-accounts'   && <BankAccountsTab />}
             {activeTab === 'sage-gl'         && <SageGLTab />}
