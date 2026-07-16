@@ -40,18 +40,24 @@ def _get_access_token() -> str:
     return access_token
 
 
-def _upload_document(access_token: str, file_path: str) -> tuple[str, str]:
+def _upload_document(access_token: str, file_path_or_bytes: str | bytes, file_name: str = None) -> tuple[str, str]:
     """Uploads document to Zoho Books and returns (document_id, file_name)."""
     url = f"{ZOHO_API_BASE}/documents"
     headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
     params = {"organization_id": ZOHO_ORG_ID}
     
-    file_name = os.path.basename(file_path)
-    logger.info(f"[PostAPBill Zoho] Uploading {file_name} to Zoho documents store")
-    
-    with open(file_path, "rb") as f:
-        files = {"document": (file_name, f)}
+    if isinstance(file_path_or_bytes, bytes):
+        if not file_name:
+            file_name = "document.pdf"
+        logger.info(f"[PostAPBill Zoho] Uploading {file_name} from bytes to Zoho documents store")
+        files = {"document": (file_name, file_path_or_bytes)}
         resp = requests.post(url, headers=headers, params=params, files=files, timeout=60)
+    else:
+        file_name = os.path.basename(file_path_or_bytes)
+        logger.info(f"[PostAPBill Zoho] Uploading {file_name} to Zoho documents store")
+        with open(file_path_or_bytes, "rb") as f:
+            files = {"document": (file_name, f)}
+            resp = requests.post(url, headers=headers, params=params, files=files, timeout=60)
         
     resp.raise_for_status()
     data = resp.json()
@@ -64,6 +70,7 @@ def _upload_document(access_token: str, file_path: str) -> tuple[str, str]:
         raise RuntimeError(f"No document_id returned from Zoho document upload: {data}")
         
     return document_id, document.get("file_name", file_name)
+
 
 
 def _resolve_gl_account_id(gl_code: str) -> str:
@@ -146,14 +153,26 @@ def post_ap_bill(
         documents_payload = []
         
         # Original invoice PDF upload
-        if invoice.file_path and os.path.exists(invoice.file_path):
+        if invoice.file_path:
             try:
-                doc_id, f_name = _upload_document(access_token, invoice.file_path)
-                documents_payload.append({"document_id": doc_id, "file_name": f_name})
+                if os.path.exists(invoice.file_path):
+                    doc_id, f_name = _upload_document(access_token, invoice.file_path)
+                    documents_payload.append({"document_id": doc_id, "file_name": f_name})
+                else:
+                    # Fetch from Azure Blob Storage
+                    from common.services.azure_blob import get_blob_name_from_path, container_client
+                    blob_name = get_blob_name_from_path(invoice.file_path)
+                    blob_client = container_client.get_blob_client(blob_name)
+                    if blob_client.exists():
+                        logger.info(f"[PostAPBill Zoho] Downloading original invoice '{blob_name}' from Azure Blob Storage.")
+                        invoice_bytes = blob_client.download_blob().readall()
+                        doc_id, f_name = _upload_document(access_token, invoice_bytes, os.path.basename(invoice.file_path))
+                        documents_payload.append({"document_id": doc_id, "file_name": f_name})
+                    else:
+                        logger.warning(f"[PostAPBill Zoho] Original invoice file not found in blob or locally: {invoice.file_path}")
             except Exception as e:
-                logger.warning(f"[PostAPBill Zoho] Failed to upload original invoice PDF: {e}")
-        else:
-            logger.warning(f"[PostAPBill Zoho] Original invoice file not found at '{invoice.file_path}'; skipping upload.")
+                logger.warning(f"[PostAPBill Zoho] Failed to fetch or upload original invoice PDF: {e}")
+
 
         # Final approval PDF upload
         if pdf_path and os.path.exists(pdf_path):
