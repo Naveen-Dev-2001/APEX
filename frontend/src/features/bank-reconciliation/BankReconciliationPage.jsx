@@ -256,7 +256,7 @@ const BankStatementTab = () => {
     if (!window.confirm('Are you sure you want to delete this bank statement? This will un-match any reconciled transactions.')) {
       return;
     }
-    
+
     try {
       await reconciliationApi.deleteStatement(id);
       toast.success('Statement deleted');
@@ -344,11 +344,11 @@ const BankStatementTab = () => {
               {uploading
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
                 : <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    Upload Bank Statement
-                  </>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload Bank Statement
+                </>
               }
             </button>
           </div>
@@ -615,11 +615,11 @@ const BankAccountsTab = () => {
               {uploading
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
                 : <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    Upload File
-                  </>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload File
+                </>
               }
             </button>
             <button
@@ -631,11 +631,11 @@ const BankAccountsTab = () => {
               {syncing
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Syncing...</>
                 : <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Sync from Sage
-                  </>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Sync from Sage
+                </>
               }
             </button>
           </div>
@@ -1261,14 +1261,14 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
 
   const selectedGroup = disableGlAccountFilter
     ? {
-        account: 'All Accounts',
-        matched_count: orderedFilteredAccounts.reduce((sum, g) => sum + (g.matched_count || 0), 0),
-        matched: orderedFilteredAccounts.flatMap((g) => g.matched || []),
-        bank_transactions: orderedFilteredAccounts.flatMap((g) => g.bank_transactions || []),
-        sage_transactions: orderedFilteredAccounts.flatMap((g) => g.sage_transactions || []),
-        unmatched_bank_count: orderedFilteredAccounts.reduce((sum, g) => sum + (g.unmatched_bank_count || 0), 0),
-        unmatched_sage_count: orderedFilteredAccounts.reduce((sum, g) => sum + (g.unmatched_sage_count || 0), 0),
-      }
+      account: 'All Accounts',
+      matched_count: orderedFilteredAccounts.reduce((sum, g) => sum + (g.matched_count || 0), 0),
+      matched: orderedFilteredAccounts.flatMap((g) => g.matched || []),
+      bank_transactions: orderedFilteredAccounts.flatMap((g) => g.bank_transactions || []),
+      sage_transactions: orderedFilteredAccounts.flatMap((g) => g.sage_transactions || []),
+      unmatched_bank_count: orderedFilteredAccounts.reduce((sum, g) => sum + (g.unmatched_bank_count || 0), 0),
+      unmatched_sage_count: orderedFilteredAccounts.reduce((sum, g) => sum + (g.unmatched_sage_count || 0), 0),
+    }
     : orderedFilteredAccounts.find((g) => g.account === selectedAccount);
   const matchedItems = (selectedGroup?.matched || []).filter((m) => {
     if (selectedBank === 'all') return true;
@@ -1572,145 +1572,160 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                   <AccountBanner accountNumber={selectedGroup.account} extra={`${statusFilter.charAt(0).toUpperCase()}${statusFilter.slice(1)} view`} />
                 </div>
               )}
-              
+
               {(statusFilter === 'matched' && matchedItems.length > 0)
                 || (statusFilter === 'unmatched' && (unmatchedBankItems.length > 0 || unmatchedSageItems.length > 0))
                 || (statusFilter === 'all' && (allBankItems.length > 0 || allSageItems.length > 0)) ? (
-                <div className="flex bg-gray-50/50 flex-1 min-h-[400px]">
-                  {/* Left: Bank Statement */}
-                  <div className="w-1/2 border-r border-gray-100 p-4">
-                    <div className="flex items-center gap-2 mb-3 px-2">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bank Statement</span>
-                      <span className="text-xs text-gray-400 ml-1">
-                        {filteredCompareBankItems.length} items
-                      </span>
+                <div className="flex w-full flex-1 min-h-[500px]">
+                  {/* LEFT — Bank Statement */}
+                  <div className="w-1/2 border-r border-gray-100 flex flex-col overflow-hidden">
+                    <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-amber-50/60">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 inline-block flex-shrink-0" />
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Bank Statement</span>
+                      <span className="ml-auto text-xs text-amber-600 font-semibold">{filteredCompareBankItems.length} items</span>
                     </div>
-                    <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                      {filteredCompareBankItems.map((t, idx) => (
-                        <div key={`bank-${t?.id ?? idx}`} className={`border rounded-xl p-3 flex justify-between items-start transition-colors ${statusFilter === 'unmatched' ? 'bg-amber-50/30 border-amber-100/60 hover:bg-amber-50/50' : statusFilter === 'matched' ? 'bg-green-50/40 border-green-100/50 hover:bg-green-50' : 'bg-white border-gray-100 hover:bg-gray-50'}`}>
-                          {statusFilter === 'unmatched' && (
-                            <div className="pr-3 pt-1">
-                              <input
-                                type="checkbox"
-                                checked={selectedBankIds.includes(t?.id)}
-                                onChange={() => t?.id && toggleSelection(t.id, selectedBankIds, setSelectedBankIds)}
-                                className="w-4 h-4 accent-[#1e9bd8]"
-                              />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-semibold text-gray-800 text-sm">
-                              {t?.description }
-                            </div>
-                            <div className="text-[11px] text-gray-500 mt-1 space-y-0.5">
-                              <div><span className="text-gray-400">Check No:</span> {t?.check_number || t?.reference || ''}</div>
-                              <div><span className="text-gray-400">Bank Name:</span> {resolveBankName(t) || ''}</div>
-                              <div><span className="text-gray-400">Txn Type:</span> {t?.type || t?.transaction_type || ''}</div>
-                              <div><span className="text-gray-400">Account No:</span> {t?.account_number || t?.account || selectedGroup?.account || ''}</div>
-                              <div><span className="text-gray-400">Date:</span> {t?.date || ''}</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Amount Paid</div>
-                            <div className={`font-bold ${statusFilter === 'unmatched' ? 'text-amber-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-700'}`}>{fmt(t?.amount)}</div>
-                            <div className={`text-[10px] mt-1 uppercase tracking-wider font-semibold inline-block px-1.5 py-0.5 rounded ${statusFilter === 'unmatched' ? 'bg-amber-100/60 text-amber-700' : statusFilter === 'matched' ? 'bg-green-100/50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-                              {statusFilter === 'all' ? (t?.is_matched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
-                            </div>
-                          </div>
+                    <div className="overflow-auto flex-1" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+                      {filteredCompareBankItems.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
+                          <span className="text-3xl mb-2">—</span>No bank transactions found.
                         </div>
-                      ))}
-                      {filteredCompareBankItems.length === 0 && (
-                        <div className="text-center text-sm text-gray-400 py-10 bg-white rounded-xl border border-gray-100">
-                          No bank transactions found for your search.
-                        </div>
+                      ) : (
+                        <table className="w-full table-fixed text-sm">
+                          <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0 z-10">
+                            <tr>
+                              {statusFilter === 'unmatched' && <th className="text-left px-4 py-3 w-10"></th>}
+                              <th className="text-left px-4 py-3 w-1/4">Check No</th>
+                              <th className="text-left px-4 py-3 w-1/4">Date</th>
+                              <th className="text-left px-4 py-3 w-1/3">Description</th>
+                              <th className="text-left px-4 py-3 w-1/6">Type</th>
+                              <th className="text-right px-4 py-3 w-1/4">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {filteredCompareBankItems.map((t, idx) => (
+                              <tr
+                                key={`bank-${t?.id ?? idx}`}
+                                className={`transition-colors ${statusFilter === 'unmatched' ? 'hover:bg-amber-50/40' :
+                                    statusFilter === 'matched' ? 'hover:bg-green-50/40' : 'hover:bg-gray-50'
+                                  }`}
+                              >
+                                {statusFilter === 'unmatched' && (
+                                  <td className="px-4 py-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedBankIds.includes(t?.id)}
+                                      onChange={() => t?.id && toggleSelection(t.id, selectedBankIds, setSelectedBankIds)}
+                                      className="w-4 h-4 accent-[#1e9bd8]"
+                                    />
+                                  </td>
+                                )}
+                                <td className="px-4 py-3 text-gray-700 font-mono text-xs truncate">{t?.check_number || t?.reference || ''}</td>
+                                <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{t?.date || ''}</td>
+                                <td className="px-4 py-3 text-gray-700 truncate text-xs" title={t?.description}>{t?.description || ''}</td>
+                                <td className="px-4 py-3"><Badge type={t?.type || t?.transaction_type} /></td>
+                                <td className="px-4 py-3 text-right text-xs">
+                                  <div className={`font-semibold ${statusFilter === 'unmatched' ? 'text-amber-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-800'}`}>
+                                    {fmt(t?.amount)}
+                                  </div>
+                                  <div className={`text-[10px] uppercase font-semibold mt-0.5 ${statusFilter === 'all' ? (t?.is_matched ? 'text-green-600' : 'text-amber-600') : statusFilter === 'matched' ? 'text-green-600' : 'text-amber-600'}`}>
+                                    {statusFilter === 'all' ? (t?.is_matched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       )}
                     </div>
                   </div>
 
-                  {/* Right: Sage GL Transactions */}
-                  <div className="w-1/2 p-4">
-                    <div className="flex items-center gap-2 mb-3 px-2">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sage GL Transactions</span>
-                      <span className="text-xs text-gray-400 ml-1">
-                        {filteredGroupedSageDisplay.length} groups
-                      </span>
+                  {/* RIGHT — Sage GL Transactions */}
+                  <div className="w-1/2 flex flex-col overflow-hidden">
+                    <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-red-50/60">
+                      <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sage GL Transactions</span>
+                      <span className="ml-auto text-xs text-red-600 font-semibold">{filteredGroupedSageDisplay.length} groups</span>
                     </div>
-                    <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                      {filteredGroupedSageDisplay.map((g, idx) => {
-                        const t = g.items[0];
-                        const groupMatched = g.items.every((item) => item?.is_matched);
-                        const isExpanded = expandedSageGroups.includes(g.groupKey);
-                        return (
-                        <div key={`sage-${g.groupKey}-${idx}`} className={`border rounded-xl p-3 transition-colors ${statusFilter === 'unmatched' ? 'bg-red-50/30 border-red-100/60 hover:bg-red-50/50' : statusFilter === 'matched' ? 'bg-green-50/40 border-green-100/50 hover:bg-green-50' : 'bg-white border-gray-100 hover:bg-gray-50'}`}>
-                          <div className="flex justify-between items-start">
-                          {statusFilter === 'unmatched' && (
-                            <div className="pr-3 pt-1">
-                              <input
-                                type="checkbox"
-                                checked={isGroupSelected(g.items, selectedSageIds)}
-                                onChange={() => toggleGroupSelection(g.items, selectedSageIds, setSelectedSageIds)}
-                                className="w-4 h-4 accent-[#1e9bd8]"
-                              />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-semibold text-gray-800 text-sm">
-                              {g.items.length > 1 ? `${g.items.length} transactions` : (t?.description || '')}
-                            </div>
-                            <div className="text-[11px] text-gray-500 mt-1 space-y-0.5">
-                              <div><span className="text-gray-400">Check No:</span> {g.checkNumber}</div>
-                              <div><span className="text-gray-400">Bank Name:</span> {t?.bank || ''}</div>
-                              <div><span className="text-gray-400">Txn Type:</span> {t?.type || t?.transaction_type || ''}</div>
-                              <div><span className="text-gray-400">GL Account:</span> {t?.account || t?.account_number || selectedGroup?.account || ''}</div>
-                              <div><span className="text-gray-400">Date:</span> {t?.date || ''}</div>
-                            </div>
-                            {t?.bank && <div className="text-[10px] text-gray-400 mt-1">Bank: {t.bank}</div>}
-                          </div>
-                          <div className="text-right">
-                            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Amount Paid</div>
-                            <div className={`font-bold ${statusFilter === 'unmatched' ? 'text-red-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-700'}`}>{fmt(g.totalAmount)}</div>
-                            {g.items.length > 1 && (
-                              <button
-                                onClick={() => toggleExpandedSageGroup(g.groupKey)}
-                                className="text-[11px] text-[#1e9bd8] hover:underline mt-1"
-                              >
-                                {isExpanded ? 'Hide entries' : `View entries (${g.items.length})`}
-                              </button>
-                            )}
-                            <div className={`text-[10px] mt-1 uppercase tracking-wider font-semibold inline-block px-1.5 py-0.5 rounded ${statusFilter === 'unmatched' ? 'bg-red-100/60 text-red-700' : statusFilter === 'matched' ? 'bg-green-100/50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-                              {statusFilter === 'all' ? (groupMatched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
-                            </div>
-                          </div>
-                          </div>
-
-                          {isExpanded && g.items.length > 1 && (
-                            <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                              {g.items.map((entry) => (
-                                <div key={`sage-entry-${entry.id}`} className="bg-white/60 border border-gray-100 rounded-lg px-3 py-2 text-[11px] text-gray-600 flex justify-between gap-3">
-                                  <div className="space-y-0.5">
-                                    <div><span className="text-gray-400">Date:</span> {entry.date || ''}</div>
-                                    <div><span className="text-gray-400">Txn Type:</span> {entry.type || entry.transaction_type || ''}</div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="font-semibold text-gray-700">{fmt(entry.amount)}</div>
-                                    <div className="text-gray-400">ID: {entry.id}</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                    <div className="overflow-auto flex-1" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+                      {filteredGroupedSageDisplay.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
+                          <span className="text-3xl mb-2">—</span>No Sage transactions found.
                         </div>
-                      )})}
-                      {filteredGroupedSageDisplay.length === 0 && (
-                        <div className="text-center text-sm text-gray-400 py-10 bg-white rounded-xl border border-gray-100">
-                          No Sage transactions found for your search.
-                        </div>
+                      ) : (
+                        <table className="w-full table-fixed text-sm">
+                          <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0 z-10">
+                            <tr>
+                              {statusFilter === 'unmatched' && <th className="text-left px-4 py-3 w-10"></th>}
+                              <th className="text-left px-4 py-3 w-1/4">Check No</th>
+                              <th className="text-left px-4 py-3 w-1/4">Date</th>
+                              <th className="text-left px-4 py-3 w-1/3">Description</th>
+                              <th className="text-left px-4 py-3 w-1/6">Type</th>
+                              <th className="text-right px-4 py-3 w-1/4">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {filteredGroupedSageDisplay.map((g, idx) => {
+                              const t = g.items[0];
+                              const groupMatched = g.items.every((item) => item?.is_matched);
+                              const isExpanded = expandedSageGroups.includes(g.groupKey);
+                              return (
+                                <React.Fragment key={`sage-${g.groupKey}-${idx}`}>
+                                  <tr className={`transition-colors ${statusFilter === 'unmatched' ? 'hover:bg-red-50/40' :
+                                      statusFilter === 'matched' ? 'hover:bg-green-50/40' : 'hover:bg-gray-50'
+                                    }`}>
+                                    {statusFilter === 'unmatched' && (
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={isGroupSelected(g.items, selectedSageIds)}
+                                          onChange={() => toggleGroupSelection(g.items, selectedSageIds, setSelectedSageIds)}
+                                          className="w-4 h-4 accent-[#1e9bd8]"
+                                        />
+                                      </td>
+                                    )}
+                                    <td className="px-4 py-3 text-gray-700 font-mono text-xs truncate">{g.checkNumber}</td>
+                                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{t?.date || ''}</td>
+                                    <td className="px-4 py-3 text-gray-700 truncate text-xs" title={g.items.length > 1 ? `${g.items.length} transactions` : (t?.description || '')}>
+                                      {g.items.length > 1 ? `${g.items.length} transactions` : (t?.description || '')}
+                                    </td>
+                                    <td className="px-4 py-3"><Badge type={t?.type || t?.transaction_type} /></td>
+                                    <td className="px-4 py-3 text-right text-xs">
+                                      <div className={`font-semibold ${statusFilter === 'unmatched' ? 'text-red-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-800'}`}>
+                                        {fmt(g.totalAmount)}
+                                      </div>
+                                      {g.items.length > 1 && (
+                                        <button
+                                          onClick={() => toggleExpandedSageGroup(g.groupKey)}
+                                          className="block ml-auto text-[10px] text-[#1e9bd8] hover:underline mt-0.5"
+                                        >
+                                          {isExpanded ? 'Hide' : `+${g.items.length}`}
+                                        </button>
+                                      )}
+                                      <div className={`text-[10px] uppercase font-semibold mt-0.5 ${statusFilter === 'all' ? (groupMatched ? 'text-green-600' : 'text-red-600') : statusFilter === 'matched' ? 'text-green-600' : 'text-red-600'}`}>
+                                        {statusFilter === 'all' ? (groupMatched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {isExpanded && g.items.length > 1 && g.items.map((entry) => (
+                                    <tr key={`sage-entry-${entry.id}`} className="bg-red-50/20">
+                                      {statusFilter === 'unmatched' && <td className="px-4 py-2" />}
+                                      <td className="px-4 py-2 text-gray-400 font-mono text-xs truncate">{entry.check_number || ''}</td>
+                                      <td className="px-4 py-2 text-gray-500 text-xs">{entry.date || ''}</td>
+                                      <td className="px-4 py-2 text-gray-600 truncate text-xs" title={entry.description}>{entry.description || ''}</td>
+                                      <td className="px-4 py-2"><Badge type={entry.type || entry.transaction_type} /></td>
+                                      <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(entry.amount)}</td>
+                                    </tr>
+                                  ))}
+                                </React.Fragment>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       )}
                     </div>
                   </div>
                 </div>
+
               ) : (
                 <div className="px-6 py-8 text-center text-gray-400 text-sm space-y-3">
                   <div>No records found for this filter combination.</div>
@@ -2039,168 +2054,178 @@ const UnmatchedTab = () => {
             </div>
           </div>
 
-          {/* Unmatched Bank */}
-          {filteredUnmatchedBank.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
-                <h3 className="font-semibold text-gray-700">Unmatched Bank Transactions</h3>
+          {/* Side-by-side: Unmatched Bank (left) + Unmatched Sage (right) */}
+          <div className="grid grid-cols-2 gap-4 items-start">
+
+            {/* LEFT — Unmatched Bank Statement */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+              <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2 bg-amber-50/60 sticky top-0 z-10">
+                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block flex-shrink-0" />
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Bank Statement</span>
                 <span className="ml-auto text-xs text-amber-600 font-semibold">{filteredUnmatchedBank.length} items</span>
               </div>
-              <div className="overflow-auto max-h-64">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
-                    <tr>
-                      <th className="text-left px-6 py-3">Select</th>
-                      <th className="text-left px-6 py-3">Check No</th>
-                      <th className="text-left px-6 py-3">Date</th>
-                      <th className="text-left px-6 py-3">Description</th>
-                      <th className="text-left px-6 py-3">Reference</th>
-                      <th className="text-left px-6 py-3">Type</th>
-                      <th className="text-right px-6 py-3">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {groupedUnmatchedBank.map((g) => (
-                      <React.Fragment key={`bank-group-${g.groupKey}`}>
-                      <tr className="hover:bg-amber-50/30">
-                        <td className="px-6 py-3">
-                          <input
-                            type="checkbox"
-                            checked={isGroupSelected(g.items, selectedBankIds)}
-                            onChange={() => toggleGroupSelection(g.items, selectedBankIds, setSelectedBankIds)}
-                            className="w-4 h-4 accent-[#1e9bd8]"
-                          />
-                        </td>
-                        <td className="px-6 py-3 text-gray-700 font-mono text-xs">{g.checkNumber}</td>
-                        <td className="px-6 py-3 text-gray-500">{g.items[0]?.date}</td>
-                        <td className="px-6 py-3 text-gray-700 max-w-[240px] truncate">{g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '')}</td>
-                        <td className="px-6 py-3 text-gray-400 font-mono text-xs">{g.items[0]?.reference || ''}</td>
-                        <td className="px-6 py-3"><Badge type={g.items[0]?.type} /></td>
-                        <td className="px-6 py-3 text-right font-medium text-gray-800">
-                          {fmt(g.totalAmount)}
-                          {g.items.length > 1 && (
-                            <button
-                              onClick={() => toggleExpanded(g.groupKey, expandedBankGroups, setExpandedBankGroups)}
-                              className="ml-3 text-xs text-[#1e9bd8] hover:underline"
-                            >
-                              {expandedBankGroups.includes(g.groupKey) ? 'Hide' : 'Show'} details
-                            </button>
-                          )}
-                        </td>
+              <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+                {filteredUnmatchedBank.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
+                    <span className="text-3xl mb-2">✓</span>No unmatched bank transactions
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
+                      <tr>
+                        <th className="text-left px-4 py-3 w-8"></th>
+                        <th className="text-left px-4 py-3">Check No</th>
+                        <th className="text-left px-4 py-3">Date</th>
+                        <th className="text-left px-4 py-3">Description</th>
+                        <th className="text-left px-4 py-3">Type</th>
+                        <th className="text-right px-4 py-3">Amount</th>
                       </tr>
-                      {g.items.length > 1 && expandedBankGroups.includes(g.groupKey) && g.items.map((t) => (
-                        <tr key={`bank-child-${t.id}`} className="bg-amber-50/20">
-                          <td className="px-6 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedBankIds.includes(t.id)}
-                              onChange={() => toggleSelection(t.id, selectedBankIds, setSelectedBankIds)}
-                              className="w-4 h-4 accent-[#1e9bd8]"
-                            />
-                          </td>
-                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.check_number || t.reference || ''}</td>
-                          <td className="px-6 py-3 text-gray-500">{t.date}</td>
-                          <td className="px-6 py-3 text-gray-700 max-w-[240px] truncate">{t.description || ''}</td>
-                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.reference || ''}</td>
-                          <td className="px-6 py-3"><Badge type={t.type} /></td>
-                          <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
-                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {groupedUnmatchedBank.map((g) => (
+                        <React.Fragment key={`bank-group-${g.groupKey}`}>
+                          <tr className="hover:bg-amber-50/40 transition-colors">
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={isGroupSelected(g.items, selectedBankIds)}
+                                onChange={() => toggleGroupSelection(g.items, selectedBankIds, setSelectedBankIds)}
+                                className="w-4 h-4 accent-[#1e9bd8]"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-gray-700 font-mono text-xs">{g.checkNumber}</td>
+                            <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{g.items[0]?.date}</td>
+                            <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate text-xs">
+                              {g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '')}
+                            </td>
+                            <td className="px-4 py-3"><Badge type={g.items[0]?.type} /></td>
+                            <td className="px-4 py-3 text-right font-semibold text-gray-800 text-xs">
+                              {fmt(g.totalAmount)}
+                              {g.items.length > 1 && (
+                                <button
+                                  onClick={() => toggleExpanded(g.groupKey, expandedBankGroups, setExpandedBankGroups)}
+                                  className="block ml-auto text-[10px] text-[#1e9bd8] hover:underline"
+                                >
+                                  {expandedBankGroups.includes(g.groupKey) ? 'Hide' : `+${g.items.length}`}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                          {g.items.length > 1 && expandedBankGroups.includes(g.groupKey) && g.items.map((t) => (
+                            <tr key={`bank-child-${t.id}`} className="bg-amber-50/20">
+                              <td className="px-4 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedBankIds.includes(t.id)}
+                                  onChange={() => toggleSelection(t.id, selectedBankIds, setSelectedBankIds)}
+                                  className="w-4 h-4 accent-[#1e9bd8]"
+                                />
+                              </td>
+                              <td className="px-4 py-2 text-gray-400 font-mono text-xs">{t.check_number || t.reference || ''}</td>
+                              <td className="px-4 py-2 text-gray-500 text-xs">{t.date}</td>
+                              <td className="px-4 py-2 text-gray-600 max-w-[160px] truncate text-xs">{t.description || ''}</td>
+                              <td className="px-4 py-2"><Badge type={t.type} /></td>
+                              <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(t.amount)}</td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
                       ))}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Unmatched Sage  grouped by account */}
-          {/* {unmatchedSageGroups.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                <h3 className="font-semibold text-gray-700">Unmatched Sage Transactions</h3>
+            {/* RIGHT — Unmatched Sage GL Transactions */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+              <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2 bg-red-50/60 sticky top-0 z-10">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sage GL Transactions</span>
                 <span className="ml-auto text-xs text-red-600 font-semibold">{filteredUnmatchedSageCount} items</span>
               </div>
-            </div>
-          )} */}
-          {unmatchedSageGroups.map((group) => {
-            const groupUnmatchedSage = group.display_unmatched_sage || [];
-
-            return (
-            <div key={group.account} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                <h3 className="font-semibold text-gray-700">Unmatched Sage Transactions</h3>
-                <span className="ml-auto text-xs text-red-600 font-semibold">{filteredUnmatchedSageCount} items</span>
-                             {/* <AccountBanner accountNumber={group.account} extra={`${groupUnmatchedSage.length} unmatched`} /> */}
-              </div>
-              <div className="overflow-auto max-h-64">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
-                    <tr>
-                      <th className="text-left px-6 py-3">Select</th>
-                      <th className="text-left px-6 py-3">Check No</th>
-                      <th className="text-left px-6 py-3">Date</th>
-                      <th className="text-left px-6 py-3">Description</th>
-                      <th className="text-left px-6 py-3">Type</th>
-                      <th className="text-right px-6 py-3">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {groupByCheckNumber(groupUnmatchedSage).map((g) => (
-                      <React.Fragment key={`sage-group-${group.account}-${g.groupKey}`}>
-                      <tr className="hover:bg-red-50/20">
-                        <td className="px-6 py-3">
-                          <input
-                            type="checkbox"
-                            checked={isGroupSelected(g.items, selectedSageIds)}
-                            onChange={() => toggleGroupSelection(g.items, selectedSageIds, setSelectedSageIds)}
-                            className="w-4 h-4 accent-[#1e9bd8]"
-                          />
-                        </td>
-                        <td className="px-6 py-3 text-gray-700 font-mono text-xs">{g.checkNumber}</td>
-                        <td className="px-6 py-3 text-gray-500">{g.items[0]?.date}</td>
-                        <td className="px-6 py-3 text-gray-700 max-w-[280px] truncate">{g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '')}</td>
-                        <td className="px-6 py-3"><Badge type={g.items[0]?.type} /></td>
-                        <td className="px-6 py-3 text-right font-medium text-gray-800">
-                          {fmt(g.totalAmount)}
-                          {g.items.length > 1 && (
-                            <button
-                              onClick={() => toggleExpanded(`${group.account}-${g.groupKey}`, expandedSageGroups, setExpandedSageGroups)}
-                              className="ml-3 text-xs text-[#1e9bd8] hover:underline"
-                            >
-                              {expandedSageGroups.includes(`${group.account}-${g.groupKey}`) ? 'Hide' : 'Show'} details
-                            </button>
-                          )}
-                        </td>
+              <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+                {unmatchedSageGroups.length === 0 || filteredUnmatchedSageCount === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
+                    <span className="text-3xl mb-2">✓</span>No unmatched Sage transactions
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
+                      <tr>
+                        <th className="text-left px-4 py-3 w-8"></th>
+                        <th className="text-left px-4 py-3">Check No</th>
+                        <th className="text-left px-4 py-3">Date</th>
+                        <th className="text-left px-4 py-3">Description</th>
+                        <th className="text-left px-4 py-3">Type</th>
+                        <th className="text-right px-4 py-3">Amount</th>
                       </tr>
-                      {g.items.length > 1 && expandedSageGroups.includes(`${group.account}-${g.groupKey}`) && g.items.map((t) => (
-                        <tr key={`sage-child-${t.id}`} className="bg-red-50/20">
-                          <td className="px-6 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedSageIds.includes(t.id)}
-                              onChange={() => toggleSelection(t.id, selectedSageIds, setSelectedSageIds)}
-                              className="w-4 h-4 accent-[#1e9bd8]"
-                            />
-                          </td>
-                          <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.check_number || ''}</td>
-                          <td className="px-6 py-3 text-gray-500">{t.date}</td>
-                          <td className="px-6 py-3 text-gray-700 max-w-[280px] truncate">{t.description || ''}</td>
-                          <td className="px-6 py-3"><Badge type={t.type} /></td>
-                          <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
-                        </tr>
-                      ))}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {unmatchedSageGroups.flatMap((group) => {
+                        const groupUnmatchedSage = group.display_unmatched_sage || [];
+                        return groupByCheckNumber(groupUnmatchedSage).flatMap((g) => {
+                          const sageKey = `${group.account}-${g.groupKey}`;
+                          const isExpanded = expandedSageGroups.includes(sageKey);
+                          const rows = [
+                            <tr key={`sage-group-${sageKey}`} className="hover:bg-red-50/30 transition-colors">
+                              <td className="px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isGroupSelected(g.items, selectedSageIds)}
+                                  onChange={() => toggleGroupSelection(g.items, selectedSageIds, setSelectedSageIds)}
+                                  className="w-4 h-4 accent-[#1e9bd8]"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-gray-700 font-mono text-xs">{g.checkNumber}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{g.items[0]?.date}</td>
+                              <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate text-xs">
+                                {g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '')}
+                              </td>
+                              <td className="px-4 py-3"><Badge type={g.items[0]?.type} /></td>
+                              <td className="px-4 py-3 text-right font-semibold text-gray-800 text-xs">
+                                {fmt(g.totalAmount)}
+                                {g.items.length > 1 && (
+                                  <button
+                                    onClick={() => toggleExpanded(sageKey, expandedSageGroups, setExpandedSageGroups)}
+                                    className="block ml-auto text-[10px] text-[#1e9bd8] hover:underline"
+                                  >
+                                    {isExpanded ? 'Hide' : `+${g.items.length}`}
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ];
+                          if (g.items.length > 1 && isExpanded) {
+                            g.items.forEach((t) => {
+                              rows.push(
+                                <tr key={`sage-child-${t.id}`} className="bg-red-50/20">
+                                  <td className="px-4 py-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedSageIds.includes(t.id)}
+                                      onChange={() => toggleSelection(t.id, selectedSageIds, setSelectedSageIds)}
+                                      className="w-4 h-4 accent-[#1e9bd8]"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2 text-gray-400 font-mono text-xs">{t.check_number || ''}</td>
+                                  <td className="px-4 py-2 text-gray-500 text-xs">{t.date}</td>
+                                  <td className="px-4 py-2 text-gray-600 max-w-[160px] truncate text-xs">{t.description || ''}</td>
+                                  <td className="px-4 py-2"><Badge type={t.type} /></td>
+                                  <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(t.amount)}</td>
+                                </tr>
+                              );
+                            });
+                          }
+                          return rows;
+                        });
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-            );
-          })}
+
+          </div>
 
           {filteredUnmatchedBank.length === 0 && filteredUnmatchedSageCount === 0 && (
             <EmptyState icon="" title="All transactions matched!" subtitle="No unmatched transactions found. Reconciliation is complete." />
@@ -2281,9 +2306,8 @@ const BankReconciliationPage = () => {
               <div
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-5 h-full cursor-pointer transition-colors relative ${
-                  isActive ? 'text-[#1e9bd8]' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`flex items-center space-x-2 px-5 h-full cursor-pointer transition-colors relative ${isActive ? 'text-[#1e9bd8]' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 <span className={isActive ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
                 <span className={`text-[14px] whitespace-nowrap ${isActive ? 'font-bold' : 'font-normal'}`}>
@@ -2367,7 +2391,7 @@ const BankReconciliationPage = () => {
       <div className="flex flex-1 pt-[60px]">
         {/* Main */}
         <main className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             {/* Mobile Navigation */}
             <nav className="lg:hidden mb-4 bg-white border border-[#e8e8e8] shadow-sm overflow-x-auto">
               <div className="flex items-center min-w-max">
@@ -2377,9 +2401,8 @@ const BankReconciliationPage = () => {
                     <div
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center space-x-2 px-4 py-3 cursor-pointer transition-colors relative ${
-                        isActive ? 'text-[#1e9bd8]' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                      }`}
+                      className={`flex items-center space-x-2 px-4 py-3 cursor-pointer transition-colors relative ${isActive ? 'text-[#1e9bd8]' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        }`}
                     >
                       <span className={isActive ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
                       <span className={`text-[13px] whitespace-nowrap ${isActive ? 'font-bold' : 'font-normal'}`}>
@@ -2393,11 +2416,11 @@ const BankReconciliationPage = () => {
                 })}
               </div>
             </nav>
-            {activeTab === 'bank-statement'  && <BankStatementTab />}
-            {activeTab === 'bank-accounts'   && <BankAccountsTab />}
-            {activeTab === 'sage-gl'         && <SageGLTab />}
-            {activeTab === 'match-compare'   && <MatchCompareTab onGoToUnmatched={() => setActiveTab('unmatched')} />}
-            {activeTab === 'unmatched'       && <UnmatchedTab />}
+            {activeTab === 'bank-statement' && <BankStatementTab />}
+            {activeTab === 'bank-accounts' && <BankAccountsTab />}
+            {activeTab === 'sage-gl' && <SageGLTab />}
+            {activeTab === 'match-compare' && <MatchCompareTab onGoToUnmatched={() => setActiveTab('unmatched')} />}
+            {activeTab === 'unmatched' && <UnmatchedTab />}
           </div>
         </main>
       </div>
