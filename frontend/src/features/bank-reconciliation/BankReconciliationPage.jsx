@@ -2268,25 +2268,33 @@ const BankReconciliationPage = () => {
   return (
     <div className="min-h-screen bg-[#f5f6fa] flex flex-col">
       {/* Header */}
-      <header className="fixed top-0 left-0 w-full h-[64px] bg-white border-b border-gray-100 shadow-sm px-6 flex items-center justify-between z-[2000]">
-        <div className="flex items-center gap-4 min-w-0">
-          <img src={logo} alt="Logo" className="h-[40px] w-auto" onError={(e) => { e.target.style.display = 'none'; }} />
-          <nav className="hidden lg:flex items-center gap-1 ml-4 overflow-x-auto">
-            {TABS.map((tab) => (
-              <button
+      <header className="fixed top-0 left-0 w-full h-[60px] bg-white border-b border-[#e8e8e8] shadow-sm flex items-center px-6 justify-between z-[2000]">
+        {/* Logo */}
+        <div className="flex items-center space-x-8 pr-8 border-r border-gray-100 h-full cursor-pointer" onClick={() => navigate('/module-select')}>
+          <img src={logo} alt="Logo" className="h-[35px] w-auto flex-shrink-0" onError={(e) => { e.target.style.display = 'none'; }} />
+        </div>
+        {/* Navigation Tabs (Desktop) */}
+        <div className="hidden lg:flex flex-1 h-full">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <div
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors
-                  ${activeTab === tab.id
-                    ? 'bg-[#1e9bd8]/10 text-[#1e9bd8] border border-[#1e9bd8]/20'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
-                  }`}
+                className={`flex items-center space-x-2 px-5 h-full cursor-pointer transition-colors relative ${
+                  isActive ? 'text-[#1e9bd8]' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
               >
-                <span className={activeTab === tab.id ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+                <span className={isActive ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
+                <span className={`text-[14px] whitespace-nowrap ${isActive ? 'font-bold' : 'font-normal'}`}>
+                  {tab.label}
+                </span>
+                {isActive && (
+                  <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#3ba5d8] rounded-t-sm" />
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="flex items-center gap-4">
           <div className="relative cursor-pointer" ref={dropdownRef}>
@@ -2356,26 +2364,33 @@ const BankReconciliationPage = () => {
       </header>
 
       {/* Body */}
-      <div className="flex flex-1 pt-[64px]">
+      <div className="flex flex-1 pt-[60px]">
         {/* Main */}
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="max-w-5xl mx-auto">
-            <nav className="lg:hidden mb-4 bg-white border border-gray-100 rounded-xl shadow-sm p-2 overflow-x-auto">
-              <div className="flex items-center gap-2 min-w-max">
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors
-                      ${activeTab === tab.id
-                        ? 'bg-[#1e9bd8]/10 text-[#1e9bd8] border border-[#1e9bd8]/20'
-                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
+            {/* Mobile Navigation */}
+            <nav className="lg:hidden mb-4 bg-white border border-[#e8e8e8] shadow-sm overflow-x-auto">
+              <div className="flex items-center min-w-max">
+                {TABS.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center space-x-2 px-4 py-3 cursor-pointer transition-colors relative ${
+                        isActive ? 'text-[#1e9bd8]' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                       }`}
-                  >
-                    <span className={activeTab === tab.id ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
-                    {tab.label}
-                  </button>
-                ))}
+                    >
+                      <span className={isActive ? 'text-[#1e9bd8]' : 'text-gray-400'}>{tab.icon}</span>
+                      <span className={`text-[13px] whitespace-nowrap ${isActive ? 'font-bold' : 'font-normal'}`}>
+                        {tab.label}
+                      </span>
+                      {isActive && (
+                        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#3ba5d8] rounded-t-sm" />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </nav>
             <div className="mb-6">
