@@ -53,7 +53,7 @@ export const useInvoiceStore = create((set, get) => ({
     setIsModalOpen: (open) => set({ isModalOpen: open }),
 
     // Invoice View Screen State
-    tabList: ["Quick View", "All Fields", "GL Summary", "Workflow", "Audit Trail", "Coding"],
+    tabList: ["Quick View", "All Fields", "GL Summary", "Workflow", "Audit Trail", "Coding", "Attachments"],
 
     invoiceActiveTab: "Quick View",
     setInvoiceActiveTab: (tab) => set({ invoiceActiveTab: tab }),

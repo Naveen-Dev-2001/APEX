@@ -50,6 +50,7 @@ class InvoiceBase(BaseModel):
     amount_due: Optional[float] = None
     last_modified_by: Optional[str] = None
     approver: Optional[str] = None
+    attachments: Optional[Any] = None
 
 class InvoiceCreate(InvoiceBase):
     pass
