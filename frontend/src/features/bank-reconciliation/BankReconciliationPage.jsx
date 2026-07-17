@@ -1566,25 +1566,23 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
 
           {/* Selected Account Comparison */}
           {selectedGroup ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+            <>
               {selectedGroup.account !== 'All Accounts' && (
-                <div className="px-6 py-4 border-b border-gray-50">
-                  <AccountBanner accountNumber={selectedGroup.account} extra={`${statusFilter.charAt(0).toUpperCase()}${statusFilter.slice(1)} view`} />
-                </div>
+                <AccountBanner accountNumber={selectedGroup.account} extra={`${statusFilter.charAt(0).toUpperCase()}${statusFilter.slice(1)} view`} />
               )}
 
               {(statusFilter === 'matched' && matchedItems.length > 0)
                 || (statusFilter === 'unmatched' && (unmatchedBankItems.length > 0 || unmatchedSageItems.length > 0))
                 || (statusFilter === 'all' && (allBankItems.length > 0 || allSageItems.length > 0)) ? (
-                <div className="flex w-full flex-1 min-h-[500px]">
+                <div className="grid grid-cols-2 gap-4 items-start">
                   {/* LEFT — Bank Statement */}
-                  <div className="w-1/2 border-r border-gray-100 flex flex-col overflow-hidden">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
                     <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-amber-50/60">
                       <span className="w-2 h-2 rounded-full bg-amber-500 inline-block flex-shrink-0" />
                       <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Bank Statement</span>
                       <span className="ml-auto text-xs text-amber-600 font-semibold">{filteredCompareBankItems.length} items</span>
                     </div>
-                    <div className="overflow-auto flex-1" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+                    <div className="overflow-auto flex-1" style={{ maxHeight: 'calc(100vh - 260px)' }}>
                       {filteredCompareBankItems.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
                           <span className="text-3xl mb-2">—</span>No bank transactions found.
@@ -1640,13 +1638,13 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                   </div>
 
                   {/* RIGHT — Sage GL Transactions */}
-                  <div className="w-1/2 flex flex-col overflow-hidden">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
                     <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-red-50/60">
                       <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
                       <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sage GL Transactions</span>
                       <span className="ml-auto text-xs text-red-600 font-semibold">{filteredGroupedSageDisplay.length} groups</span>
                     </div>
-                    <div className="overflow-auto flex-1" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+                    <div className="overflow-auto flex-1" style={{ maxHeight: 'calc(100vh - 260px)' }}>
                       {filteredGroupedSageDisplay.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
                           <span className="text-3xl mb-2">—</span>No Sage transactions found.
@@ -1727,7 +1725,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                 </div>
 
               ) : (
-                <div className="px-6 py-8 text-center text-gray-400 text-sm space-y-3">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-8 text-center text-gray-400 text-sm space-y-3">
                   <div>No records found for this filter combination.</div>
                   <button
                     onClick={onGoToUnmatched}
@@ -1737,7 +1735,8 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                   </button>
                 </div>
               )}
-            </div>
+            </>
+
           ) : (
             orderedFilteredAccounts.length === 0 && (
               <EmptyState icon="≡ƒöì" title="No records for selected filters" subtitle="Try a different Status/Bank filter or run matching to create matched records" />
