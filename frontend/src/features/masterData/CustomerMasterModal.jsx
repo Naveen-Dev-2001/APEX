@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import CustomButton from '../../shared/components/CustomButton';
+import { getERPSystem } from '../../utils/envHelper';
 
 const EMPTY_FORM = {
     id: null,
     customer_id: '',
     customer_name: '',
+    company_name: '',
+    display_name: '',
+    email_id: '',
+    phone: '',
+    currency_code: '',
+    billing_address: '',
+    billing_street2: '',
+    billing_city: '',
 };
 
 const FormField = ({ label, id, value, onChange, readOnly = false, placeholder = '', type = 'text', required = false, error = '' }) => (
@@ -30,6 +39,8 @@ const FormField = ({ label, id, value, onChange, readOnly = false, placeholder =
 
 const CustomerMasterModal = ({ mode, rowData, onClose, onSave }) => {
     const isEdit = mode === 'edit';
+    const erpSystem = getERPSystem();
+    const isZoho = erpSystem === 'Zoho';
     const [form, setForm] = useState(EMPTY_FORM);
     const [errors, setErrors] = useState({});
 
@@ -39,6 +50,14 @@ const CustomerMasterModal = ({ mode, rowData, onClose, onSave }) => {
                 id: rowData.id ?? null,
                 customer_id: rowData.customer_id ?? '',
                 customer_name: rowData.customer_name ?? '',
+                company_name: rowData.company_name ?? '',
+                display_name: rowData.display_name ?? '',
+                email_id: rowData.email_id ?? '',
+                phone: rowData.phone ?? '',
+                currency_code: rowData.currency_code ?? '',
+                billing_address: rowData.billing_address ?? '',
+                billing_street2: rowData.billing_street2 ?? '',
+                billing_city: rowData.billing_city ?? '',
             });
         } else {
             setForm(EMPTY_FORM);
@@ -72,7 +91,8 @@ const CustomerMasterModal = ({ mode, rowData, onClose, onSave }) => {
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-[1px]"
         >
-            <div className="bg-white rounded-[12px] shadow-xl w-full max-w-[500px] mx-4 flex flex-col">
+            <div className={`bg-white rounded-[12px] shadow-xl w-full mx-4 flex flex-col transition-all duration-200
+                ${isZoho ? 'max-w-[650px]' : 'max-w-[500px]'}`}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                     <h2 className="text-[18px] font-bold text-[#333333]">
@@ -87,7 +107,7 @@ const CustomerMasterModal = ({ mode, rowData, onClose, onSave }) => {
                 </div>
 
                 {/* Body */}
-                <div className="px-6 py-6 flex flex-col gap-5">
+                <div className="px-6 py-6 flex flex-col gap-5 overflow-y-auto max-h-[70vh]">
                     <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                         <FormField
                             label="Customer Id"
@@ -105,6 +125,62 @@ const CustomerMasterModal = ({ mode, rowData, onClose, onSave }) => {
                             required
                             error={errors.customer_name}
                         />
+                        {isZoho && (
+                            <>
+                                <FormField
+                                    label="Company Name"
+                                    id="company_name"
+                                    value={form.company_name}
+                                    onChange={handleChange('company_name')}
+                                />
+                                <FormField
+                                    label="Display Name"
+                                    id="display_name"
+                                    value={form.display_name}
+                                    onChange={handleChange('display_name')}
+                                />
+                                <FormField
+                                    label="Email ID"
+                                    id="email_id"
+                                    value={form.email_id}
+                                    onChange={handleChange('email_id')}
+                                />
+                                <FormField
+                                    label="Phone"
+                                    id="phone"
+                                    value={form.phone}
+                                    onChange={handleChange('phone')}
+                                />
+                                <FormField
+                                    label="Currency Code"
+                                    id="currency_code"
+                                    value={form.currency_code}
+                                    onChange={handleChange('currency_code')}
+                                />
+                                <FormField
+                                    label="Billing City"
+                                    id="billing_city"
+                                    value={form.billing_city}
+                                    onChange={handleChange('billing_city')}
+                                />
+                                <div className="col-span-2">
+                                    <FormField
+                                        label="Billing Address"
+                                        id="billing_address"
+                                        value={form.billing_address}
+                                        onChange={handleChange('billing_address')}
+                                    />
+                                </div>
+                                <div className="col-span-2">
+                                    <FormField
+                                        label="Billing Street 2"
+                                        id="billing_street2"
+                                        value={form.billing_street2}
+                                        onChange={handleChange('billing_street2')}
+                                    />
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
