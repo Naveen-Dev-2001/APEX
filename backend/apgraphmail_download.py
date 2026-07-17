@@ -29,9 +29,9 @@ else:
     MAILBOX = MAILBOX_ENV
     ENTITY_ID = "201" if TOOL == "sage" else "DEFAULT"
 
-UNREAD_DIR = Path(f"uploads/{TOOL}/unread")
-READ_DIR = Path(f"uploads/{TOOL}/read")
-NON_INVOICE_DIR = Path(f"uploads/{TOOL}/non_invoice")
+UNREAD_DIR = Path("uploads/unread")
+READ_DIR = Path("uploads/read")
+NON_INVOICE_DIR = Path("uploads/non_invoice")
 
 UNREAD_DIR.mkdir(parents=True, exist_ok=True)
 READ_DIR.mkdir(parents=True, exist_ok=True)
@@ -392,23 +392,13 @@ async def main():
     )
 
     loop = asyncio.get_event_loop()
-    interval_seconds = interval_minutes * 60.0
+    start_time = loop.time()
 
-    while True:
-        start_time = loop.time()
-
-        try:
-            await download_invoice_attachments(start_time, processing_window_seconds)
-        except Exception as e:
-            log.error("Unhandled error in download_invoice_attachments: %s", e)
-
-        elapsed = loop.time() - start_time
-        sleep_time = max(1.0, interval_seconds - elapsed)
-        log.info(
-            "Cycle finished (elapsed: %.1fs). Resting for %.1fs (%.2f min) before next run.",
-            elapsed, sleep_time, sleep_time / 60.0,
-        )
-        await asyncio.sleep(sleep_time)
+    try:
+        await download_invoice_attachments(start_time, processing_window_seconds)
+    except Exception as e:
+        log.error("Unhandled error in download_invoice_attachments: %s", e)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

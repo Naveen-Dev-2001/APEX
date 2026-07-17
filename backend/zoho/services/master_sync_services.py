@@ -232,10 +232,209 @@ class DepartmentSyncService:
         logger.warning("Zoho DepartmentSyncService.sync_departments is not implemented yet.")
 
 class CustomerSyncService:
-    def __init__(self, db):
+    # --- State Management ---
+    _sync_lock: Optional[asyncio.Lock] = None
+
+    @classmethod
+    def _get_lock(cls) -> asyncio.Lock:
+        if cls._sync_lock is None:
+            cls._sync_lock = asyncio.Lock()
+        return cls._sync_lock
+
+    def __init__(self, db: Session):
         self.db = db
-    async def sync_customers(self):
-        logger.warning("Zoho CustomerSyncService.sync_customers is not implemented yet.")
+        # Read credentials directly from environment loaded via .env.zoho
+        self.client_id = os.getenv("ZOHO_CLIENT_ID")
+        self.client_secret = os.getenv("ZOHO_CLIENT_SECRET")
+        self.refresh_token = os.getenv("ZOHO_REFRESH_TOKEN")
+        self.org_id = os.getenv("ZOHO_ORG_ID")
+        self.token_url = os.getenv("ZOHO_TOKEN_URL", "https://accounts.zoho.com/oauth/v2/token")
+        self.api_base = os.getenv("ZOHO_API_BASE", "https://www.zohoapis.com/books/v3")
+        self.verify_ssl = os.getenv("ZOHO_VERIFY_SSL", "false").lower() == "true"
+
+    async def _get_access_token(self, client: httpx.AsyncClient) -> str:
+        payload = {
+            "grant_type": "refresh_token",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "refresh_token": self.refresh_token,
+        }
+        response = await client.post(self.token_url, data=payload, timeout=30.0)
+        response.raise_for_status()
+        data = response.json()
+        
+        if "error" in data:
+            raise RuntimeError(f"Zoho token error: {data['error']}")
+            
+        access_token = data.get("access_token")
+        if not access_token:
+            raise RuntimeError(f"No access_token in Zoho response: {data}")
+            
+        return access_token
+
+    def _extract_customer_map(self, c: Dict[str, Any]) -> Dict[str, Any]:
+        contact_id = str(c.get("contact_id"))
+        customer_name = c.get("contact_name") or c.get("company_name") or "Unknown"
+        
+        billing_address = c.get("billing_address")
+        if not isinstance(billing_address, dict):
+            billing_address = {}
+            
+        return {
+            "customer_key": contact_id,
+            "customer_id": contact_id,
+            "customer_name": customer_name[:200],
+            "company_name": (c.get("company_name") or "")[:200],
+            "display_name": (c.get("company_name") or c.get("contact_name") or "")[:200],
+            "email_id": (c.get("email") or "")[:255],
+            "phone": (c.get("phone") or c.get("mobile") or "")[:50],
+            "currency_code": (c.get("currency_code") or "")[:10],
+            "billing_address": (billing_address.get("address") or "")[:255],
+            "billing_street2": (billing_address.get("street2") or "")[:255],
+            "billing_city": (billing_address.get("city") or "")[:100],
+            "status": c.get("status", "active"),
+            "raw_data": json.dumps(c, default=str),
+            "updated_at": datetime.utcnow()
+        }
+
+    def _bulk_upsert_customers(self, customer_details: List[Dict[str, Any]], key_to_id: Dict[str, int], cid_to_id: Dict[str, int]):
+        from common.models.db_models import CustomerMaster
+        to_insert = []
+        to_update = []
+        
+        # Deduplicate customers in current batch first
+        seen_in_batch = set()
+        unique_customers = []
+        for c in customer_details:
+            cid = c.get("contact_id")
+            if cid:
+                cid_stripped = str(cid).strip()
+                if cid_stripped not in seen_in_batch:
+                    seen_in_batch.add(cid_stripped)
+                    unique_customers.append(c)
+            else:
+                unique_customers.append(c)
+        
+        for c in unique_customers:
+            cm = self._extract_customer_map(c)
+            key_stripped = cm["customer_key"].strip() if cm.get("customer_key") else None
+            cid_stripped = cm["customer_id"].strip() if cm.get("customer_id") else None
+            
+            exist_id = None
+            if key_stripped:
+                exist_id = key_to_id.get(key_stripped)
+            if not exist_id and cid_stripped:
+                exist_id = cid_to_id.get(cid_stripped)
+            
+            if exist_id:
+                cm["id"] = exist_id
+                to_update.append(cm)
+            else:
+                to_insert.append(cm)
+
+        if to_insert:
+            self.db.bulk_insert_mappings(CustomerMaster, to_insert)
+        if to_update:
+            self.db.bulk_update_mappings(CustomerMaster, to_update)
+        
+        self.db.commit()
+
+        # Update tracking maps with database IDs of newly inserted customers
+        if to_insert:
+            inserted_cids = [r["customer_id"].strip() for r in to_insert if r.get("customer_id")]
+            if inserted_cids:
+                new_records = self.db.query(CustomerMaster.id, CustomerMaster.customer_key, CustomerMaster.customer_id).filter(CustomerMaster.customer_id.in_(inserted_cids)).all()
+                for r in new_records:
+                    if r.customer_key:
+                        key_to_id[str(r.customer_key).strip()] = r.id
+                    if r.customer_id:
+                        cid_to_id[str(r.customer_id).strip()] = r.id
+
+        return len(to_insert), len(to_update)
+
+    async def sync_customers(self, event: Optional[asyncio.Event] = None):
+        from common.models.db_models import CustomerMaster
+        lock = self._get_lock()
+        if lock.locked():
+            logger.warning("Zoho Customer sync is already running. Skipping request.")
+            return {"status": "skipped", "message": "Sync already in progress"}
+            
+        async with lock:
+            start_time = datetime.utcnow()
+            logger.info("Starting Zoho Customer Sync...")
+            
+            try:
+                if not all([self.client_id, self.client_secret, self.refresh_token, self.org_id]):
+                    raise ValueError("Zoho credentials (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN, ZOHO_ORG_ID) must be configured in environment variables.")
+
+                # Pre-fetch existing mappings with stripped values
+                existing = self.db.query(CustomerMaster.id, CustomerMaster.customer_key, CustomerMaster.customer_id).all()
+                key_to_id = {str(r.customer_key).strip(): r.id for r in existing if r.customer_key}
+                cid_to_id = {str(r.customer_id).strip(): r.id for r in existing if r.customer_id}
+                
+                async with httpx.AsyncClient(timeout=60.0, verify=self.verify_ssl) as client:
+                    access_token = await self._get_access_token(client)
+                    headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+                    
+                    page = 1
+                    total_inserted = 0
+                    total_updated = 0
+                    
+                    while True:
+                        url = f"{self.api_base}/contacts"
+                        params = {
+                            "organization_id": self.org_id,
+                            "contact_type": "customer",
+                            "per_page": 200,
+                            "page": page,
+                        }
+                        
+                        logger.info(f"Fetching Zoho customers page {page}...")
+                        response = await client.get(url, headers=headers, params=params, timeout=30.0)
+                        response.raise_for_status()
+                        data = response.json()
+                        
+                        if data.get("code") != 0:
+                            raise RuntimeError(
+                                f"Zoho API error {data.get('code')}: {data.get('message', 'unknown error')}"
+                            )
+                        
+                        contacts = data.get("contacts", [])
+                        if not contacts:
+                            break
+                            
+                        inserted, updated = self._bulk_upsert_customers(contacts, key_to_id, cid_to_id)
+                        total_inserted += inserted
+                        total_updated += updated
+                        
+                        page_context = data.get("page_context", {})
+                        has_more = page_context.get("has_more_page", False)
+                        
+                        logger.info(
+                            f"[fetch] Page {page} processed. "
+                            f"Inserted: {inserted}, Updated: {updated}. "
+                            f"Has more: {has_more}"
+                        )
+                        
+                        if not has_more:
+                            break
+                        page += 1
+                        
+                duration = datetime.utcnow() - start_time
+                logger.info(f"Zoho Customer Sync complete. Duration: {duration}. Total Inserted: {total_inserted}, Total Updated: {total_updated}")
+                if event:
+                    event.set()
+                return {
+                    "status": "success",
+                    "inserted": total_inserted,
+                    "updated": total_updated,
+                    "duration_seconds": duration.total_seconds()
+                }
+            except Exception as e:
+                logger.error(f"Zoho Customer Sync failed: {e}", exc_info=True)
+                if event:
+                    event.set()
+                raise e
 
 class ItemSyncService:
     def __init__(self, db):

@@ -53,5 +53,5 @@ def list_folder_structure(prefix):
  
 if __name__ == "__main__":
     # List both Sage and Zoho structures
-    list_folder_structure("sage/")
-    list_folder_structure("zoho/")
+    list_folder_structure("localdev/")
+    # list_folder_structure("zoho/")

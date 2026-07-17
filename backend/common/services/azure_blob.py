@@ -5,6 +5,7 @@ import os
 # Azure Connection Details
 CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 CONTAINER_NAME = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
+AZURE_BLOB_FOLDER = os.getenv("AZURE_BLOB_FOLDER", "")
 
 blob_service_client = BlobServiceClient.from_connection_string(CONNECTION_STRING)
 container_client = blob_service_client.get_container_client(CONTAINER_NAME)
@@ -64,15 +65,21 @@ def get_blob_name_from_path(file_path: str) -> str:
     if normalized.startswith("uploads/"):
         normalized = normalized[len("uploads/"):]
         
-    # If the path already has the tool prefix, don't prepend it again
-    if normalized.startswith("sage/") or normalized.startswith("zoho/"):
+    prefix = f"{AZURE_BLOB_FOLDER}/{TOOL}" if AZURE_BLOB_FOLDER else TOOL
+    
+    # If the path already has the full active prefix, return as is
+    if normalized.startswith(f"{prefix}/"):
         return normalized
         
-    # Prepend the active tool directory (sage/zoho) to separate their paths in the container
-    return f"{TOOL}/{normalized}"
+    # If the path starts with just the tool prefix, prepend the azure_blob_folder if configured
+    if normalized.startswith(f"{TOOL}/"):
+        return f"{AZURE_BLOB_FOLDER}/{normalized}" if AZURE_BLOB_FOLDER else normalized
+        
+    # Prepend the active tool directory (prefix) to separate their paths in the container
+    return f"{prefix}/{normalized}"
 
 def ensure_container_and_folders() -> None:
-    """Ensure the container exists and the five default folders are created in Azure Blob Storage for the active tool."""
+    """Ensure the container exists and the default folders are created in Azure Blob Storage for the active tool."""
     if not CONNECTION_STRING or not CONTAINER_NAME:
         return
     try:
@@ -84,14 +91,15 @@ def ensure_container_and_folders() -> None:
         folders = [
             "in_progress_files",
             "deleted_files",
-            "posted_to_sage_files" if TOOL == "sage" else "posted_to_zoho_files",
+            f"posted_to_{TOOL}_files",
             "archived_files",
             "non_invoice",
             "create_reports"
         ]
         
+        prefix = f"{AZURE_BLOB_FOLDER}/{TOOL}" if AZURE_BLOB_FOLDER else TOOL
         for folder in folders:
-            placeholder_blob = f"{TOOL}/{folder}/.placeholder"
+            placeholder_blob = f"{prefix}/{folder}/.placeholder"
             blob_client = container_client.get_blob_client(placeholder_blob)
             if not blob_client.exists():
                 blob_client.upload_blob(b"", overwrite=True)

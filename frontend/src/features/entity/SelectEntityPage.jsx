@@ -7,6 +7,7 @@ import logo from '../../assets/loandna_logo_dark.png';
 import { useCommonStore } from '../../store/common.store';
 import useMasterDataStore from '../../store/masterData.store';
 import { useInvoiceStore } from '../../store/invoice.store';
+import { getERPSystem } from '../../utils/envHelper';
 
 const SelectEntityPage = () => {
   const navigate = useNavigate();
@@ -40,7 +41,13 @@ const SelectEntityPage = () => {
 
   // Format entities for dropdown
   const entities = entityData.map((entity, index) => {
-    const baseName = entity.entity_name === 'Default Entity' ? 'Top Level' : entity.entity_name;
+    const isZoho = getERPSystem() === 'Zoho';
+    let baseName = entity.entity_name;
+    if (isZoho && entity.entity_id === 'DEFAULT') {
+      baseName = 'Consolidated Analytics';
+    } else if (entity.entity_name === 'Default Entity') {
+      baseName = 'Top Level';
+    }
     const combinedName = `${entity.entity_id} - ${baseName}`;
     return {
       id: entity.id || index,

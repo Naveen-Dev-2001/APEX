@@ -1063,9 +1063,6 @@ async def get_invoices(
                         )
                     )
 
-                    # Combine: Hide if...
-                    # - We are NOT at the last stage AND user has acted at any level
-                    # - OR we ARE at the last stage AND user has already done a Posting Approval
                     hide_condition = and_(
                         Invoice.status != InvoiceStatusEnum.SAGE_POST_FAILED,
                         or_(
@@ -1075,7 +1072,10 @@ async def get_invoices(
                             ),
                             and_(
                                 Invoice.current_approver_level == is_last_stage_subquery,
-                                user_acted_posting_subquery
+                                or_(
+                                    and_(has_posting_cond, user_acted_posting_subquery),
+                                    and_(~has_posting_cond, user_acted_any_subquery)
+                                )
                             )
                         )
                     )
@@ -1424,7 +1424,10 @@ async def get_invoice_filter_options(
                             ),
                             and_(
                                 Invoice.current_approver_level == is_last_stage_subquery,
-                                user_acted_posting_subquery
+                                or_(
+                                    and_(has_posting_cond, user_acted_posting_subquery),
+                                    and_(~has_posting_cond, user_acted_any_subquery)
+                                )
                             )
                         )
                     )
@@ -2587,7 +2590,7 @@ async def update_invoice_status(
                         details={"sage_response": sage_response},
                         sage_bill_number=sage_bill_no
                     )
-                    erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+                    erp_name = settings.TOOL.capitalize()
                     # Create/Update Workflow Step
                     db.add(WorkflowStep(
                         invoice_id=invoice_id,
@@ -2666,7 +2669,7 @@ async def repost_to_sage(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     if invoice.status not in [InvoiceStatusEnum.APPROVED, InvoiceStatusEnum.SAGE_POST_FAILED]:
-        erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+        erp_name = settings.TOOL.capitalize()
         raise HTTPException(
             status_code=400,
             detail=f"Invoice {invoice_id} is in status {invoice.status}. Only approved or failed-to-post invoices can be reposted to {erp_name}."
@@ -2745,7 +2748,7 @@ async def repost_to_sage(
                 sage_bill_number=sage_bill_no
             )
             
-            erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+            erp_name = settings.TOOL.capitalize()
             # Create/Update Workflow Step
             db.add(WorkflowStep(
                 invoice_id=invoice_id,
@@ -2833,7 +2836,8 @@ async def download_approval_report(
         )
 
     safe_invoice_number = str(invoice.invoice_number or "invoice").replace("/", "_").replace("\\", "_")
-    blob_name = f"{TOOL}/create_reports/{safe_invoice_number}_approval.pdf"
+    from common.services.azure_blob import get_blob_name_from_path
+    blob_name = get_blob_name_from_path(f"create_reports/{safe_invoice_number}_approval.pdf")
 
     # We will download the blob to a temporary file, serve it, and then delete the temp file.
     temp_dir = tempfile.gettempdir()

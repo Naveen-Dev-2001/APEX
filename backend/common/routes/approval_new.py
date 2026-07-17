@@ -410,9 +410,25 @@ def notify_next_approvers(db: Session, invoice: Invoice, next_level_data: Dict, 
     if is_finance:
         finance_emails = _get_finance_users(db, invoice.entity)
         emails = list(set(emails) | set(finance_emails))
+
+    # Identify user emails who already approved a level in this cycle to avoid duplicate notifications
+    steps = _steps_for_invoice(db, invoice.id)
+    current_cycle_steps = _get_current_cycle_steps(steps)
+    already_acted_emails = {
+        s.user.lower() for s in current_cycle_steps
+        if s.user and s.step_type in {
+            StepType.LEVEL_APPROVED,
+            StepType.THRESHOLD_APPROVED,
+            StepType.POSTING_APPROVED,
+            StepType.APPROVED
+        }
+    }
         
     for next_email in emails:
         if not next_email: continue
+        if next_email.lower() in already_acted_emails:
+            logger.info(f"[Workflow] Skipping approval notification to {next_email} because they already acted in this cycle.")
+            continue
         
         # Fetch username for personal touch if possible
         approver_user = db.query(User).filter(User.email == next_email).first()
@@ -615,7 +631,7 @@ async def _finalize_and_post(db: Session, invoice: Invoice, current_user: UserRe
         actual_bill_no = sage_result.get("sage_bill_number")
         invoice.sage_bill_number = actual_bill_no
         
-        erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+        erp_name = settings.TOOL.capitalize()
         _record_step(
             db, invoice_id,
             step_name=f"Posted to {erp_name}",
@@ -737,7 +753,7 @@ async def _post_to_sage(invoice_id: int, entity: str, db: Session) -> Dict:
             # User requested Sage bill number to be same as invoice number
             intended_bill_no = f"{invoice.invoice_number}"
             sage_bill_no = sage_response.get("billNumber") or intended_bill_no
-            erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+            erp_name = settings.TOOL.capitalize()
             return {
                 "success": True,
                 "message": f"Posted to {erp_name} successfully",
@@ -1003,7 +1019,7 @@ def _resolve_user_role_in_workflow(
                 for lvl, emails in approved_levels.items()
             )
             already_acted_at_other_mandatory = (
-                not result["is_posting_approver"]
+                not (result["is_posting_approver"] and has_posting)
                 and (acted_in_current_cycle or acted_in_valid_previous_level)
             )
             result["can_act"] = (
@@ -1240,7 +1256,7 @@ async def get_ui_status_from_frontend(
                 for lvl, emails in approved_levels.items()
             )
             already_acted_at_other_mandatory = (
-                not (is_posting_approver and current_level == max_seq)
+                not (is_posting_approver and has_posting and current_level == max_seq)
                 and (acted_in_current_cycle or acted_in_valid_previous_level)
             )
             can_act = user_in_level and not already_acted_here and not already_acted_at_other_mandatory
@@ -1525,7 +1541,7 @@ async def approve_invoice(
             InvoiceAssignedApprover.invoice_id == invoice_id
         ).scalar() or 0
 
-        if not (is_posting_approver_here and current_level == max_seq):
+        if not (is_posting_approver_here and has_posting and current_level == max_seq):
             if acted_in_current_cycle or acted_in_valid_previous_level:
                 raise HTTPException(
                     400,
@@ -1634,7 +1650,7 @@ async def approve_invoice(
                         invoice = invoice_repo.get(db, invoice_id)
                         _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
                         invoice.sage_bill_number = sage_result.get("sage_bill_number")
-                        erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+                        erp_name = settings.TOOL.capitalize()
                         _record_step(
                             db, invoice_id,
                             step_name=f"Posted to {erp_name}",
@@ -1653,7 +1669,7 @@ async def approve_invoice(
                     else:
                         invoice = invoice_repo.get(db, invoice_id)
                         _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POST_FAILED)
-                        erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+                        erp_name = settings.TOOL.capitalize()
                         _record_step(
                             db, invoice_id,
                             step_name=f"{erp_name} Post Failed",
@@ -1758,7 +1774,7 @@ async def approve_invoice(
 
             # Trigger Sage Post
             sage_result = await _post_to_sage(invoice_id, entity, db)
-            erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+            erp_name = settings.TOOL.capitalize()
             if sage_result["success"]:
                 invoice = invoice_repo.get(db, invoice_id)
                 _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
@@ -1851,7 +1867,7 @@ async def approve_invoice(
             invoice = invoice_repo.get(db, invoice_id)
             _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POSTED)
             invoice.sage_bill_number = sage_result.get("sage_bill_number")
-            erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+            erp_name = settings.TOOL.capitalize()
             _record_step(
                 db, invoice_id,
                 step_name=f"Posted to {erp_name}",
@@ -1870,7 +1886,7 @@ async def approve_invoice(
         else:
             invoice = invoice_repo.get(db, invoice_id)
             _update_invoice_status(db, invoice, InvoiceStatus.SAGE_POST_FAILED)
-            erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+            erp_name = settings.TOOL.capitalize()
             _record_step(
                 db, invoice_id,
                 step_name=f"{erp_name} Post Failed",
@@ -2350,7 +2366,7 @@ async def repost_to_sage(
         # single source of truth regardless of what Sage echoes back.
         resolved_bill_number = invoice.invoice_number
 
-        erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+        erp_name = settings.TOOL.capitalize()
         logger.info(
             f"[{erp_name}Repost] Successfully reposted invoice {invoice_id} to {erp_name}. "
             f"Bill number: {resolved_bill_number}"
@@ -2387,7 +2403,7 @@ async def repost_to_sage(
             sage_post_result=final_sage_result,
         )
     else:
-        erp_name = "Zoho" if settings.TOOL.lower() == "zoho" else "Sage"
+        erp_name = settings.TOOL.capitalize()
         _record_step(
             db,
             invoice_id,
