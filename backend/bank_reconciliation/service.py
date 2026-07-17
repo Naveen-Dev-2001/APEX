@@ -446,7 +446,7 @@ class BankReconciliationService:
         cols = [str(c).lower().strip() for c in df.columns]
         df.columns = cols
 
-        bank_id_col = next((c for c in cols if c in ("bank_id", "bank id", "bankid")), None)
+        bank_id_col = next((c for c in cols if c in ("bank_id", "bank id", "bankid", "id")), None)
         bank_name_col = next((c for c in cols if c in ("bank_name", "bank name", "bank")), None)
         account_number_col = next((c for c in cols if c in ("account_number", "account number", "account_no", "account no", "accountno")), None)
         account_name_col = next((c for c in cols if c in ("account_name", "account name")), None)

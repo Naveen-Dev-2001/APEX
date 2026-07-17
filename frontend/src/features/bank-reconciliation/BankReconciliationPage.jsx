@@ -21,12 +21,7 @@ const formatStatementMonthLabel = (value) => {
 };
 
 const formatBankAccountOptionLabel = (bankName, accountNumber) => {
-  const rawAccount = String(accountNumber ?? '').trim();
-  const resolvedBankName = String(bankName ?? '').trim() || 'Unknown Bank';
-
-  return rawAccount
-    ? `${resolvedBankName} - ${rawAccount}`
-    : resolvedBankName;
+  return String(bankName ?? '').trim() || 'Unknown Bank';
 };
 
 const getTopLevelEntityName = (value) => {
@@ -150,7 +145,7 @@ const BankStatementTab = () => {
       if (!accountNumber || dedupedByAccount.has(accountNumber)) return;
       dedupedByAccount.set(accountNumber, {
         value: accountNumber,
-        label: formatBankAccountOptionLabel(row?.bank_name, accountNumber),
+        label: formatBankAccountOptionLabel(row?.bank_id || row?.bank_name, accountNumber),
       });
     });
 
@@ -274,24 +269,78 @@ const BankStatementTab = () => {
     <div className="space-y-6">
       {/* Upload Zone */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-50 flex flex-wrap items-end gap-4 lg:gap-5">
-          <div className="flex items-center gap-2 min-w-[240px]">
-            <label htmlFor="bank-statement-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-              Bank:
-            </label>
-            <select
-              id="bank-statement-filter"
-              value={selectedBank}
-              onChange={(e) => setSelectedBank(e.target.value)}
-              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 transition-colors cursor-pointer"
-            >
-              <option value="all">All Banks</option>
-              {bankOptions.map((bankOption) => (
-                <option key={bankOption.value} value={bankOption.value}>{bankOption.label}</option>
-              ))}
-            </select>
+        <div className="px-6 py-4 border-b border-gray-50 flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-4 lg:gap-5">
+            <div className="flex items-center gap-2 min-w-[240px]">
+              <label htmlFor="bank-statement-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+                Bank:
+              </label>
+              <select
+                id="bank-statement-filter"
+                value={selectedBank}
+                onChange={(e) => setSelectedBank(e.target.value)}
+                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 transition-colors cursor-pointer"
+              >
+                <option value="all">All Banks</option>
+                {bankOptions.map((bankOption) => (
+                  <option key={bankOption.value} value={bankOption.value}>{bankOption.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 min-w-[330px]">
+              <label htmlFor="upload-statement-month" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+                Statement Month:
+              </label>
+              <select
+                id="upload-statement-month"
+                value={uploadStatementMonth}
+                onChange={(e) => setUploadStatementMonth(e.target.value)}
+                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5 min-w-[140px]"
+              >
+                <option value="">Month</option>
+                {availableMonthDropdownOptions.map((monthOption) => (
+                  <option key={monthOption.value} value={monthOption.value}>{monthOption.label}</option>
+                ))}
+              </select>
+              <select
+                id="upload-statement-year"
+                value={uploadStatementYear}
+                onChange={(e) => setUploadStatementYear(e.target.value)}
+                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5 min-w-[110px]"
+              >
+                <option value="">Year</option>
+                {yearDropdownOptions.map((yearOption) => (
+                  <option key={yearOption} value={yearOption}>{yearOption}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-shrink-0 lg:ml-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={(e) => handleFileUpload(e.target.files[0])}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
+              >
+                {uploading
+                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
+                  : <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Upload Bank Statement
+                  </>
+                }
+              </button>
+            </div>
           </div>
-          <div className="flex-1 min-w-[280px] lg:min-w-[340px] xl:min-w-[420px]">
+          <div className="w-full max-w-sm">
             <input
               type="text"
               value={statementSearch}
@@ -299,58 +348,6 @@ const BankStatementTab = () => {
               placeholder="Search statements"
               className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5"
             />
-          </div>
-          <div className="flex items-center gap-2 min-w-[330px]">
-            <label htmlFor="upload-statement-month" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-              Statement Month:
-            </label>
-            <select
-              id="upload-statement-month"
-              value={uploadStatementMonth}
-              onChange={(e) => setUploadStatementMonth(e.target.value)}
-              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5 min-w-[140px]"
-            >
-              <option value="">Month</option>
-              {availableMonthDropdownOptions.map((monthOption) => (
-                <option key={monthOption.value} value={monthOption.value}>{monthOption.label}</option>
-              ))}
-            </select>
-            <select
-              id="upload-statement-year"
-              value={uploadStatementYear}
-              onChange={(e) => setUploadStatementYear(e.target.value)}
-              className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5 min-w-[110px]"
-            >
-              <option value="">Year</option>
-              {yearDropdownOptions.map((yearOption) => (
-                <option key={yearOption} value={yearOption}>{yearOption}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-shrink-0 lg:ml-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              className="hidden"
-              onChange={(e) => handleFileUpload(e.target.files[0])}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
-            >
-              {uploading
-                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
-                : <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  Upload Bank Statement
-                </>
-              }
-            </button>
           </div>
         </div>
       </div>
@@ -658,7 +655,6 @@ const BankAccountsTab = () => {
                   <th className="text-left px-6 py-3">Bank ID</th>
                   <th className="text-left px-6 py-3">Bank Name</th>
                   <th className="text-left px-6 py-3">Account Number</th>
-                  <th className="text-left px-6 py-3">Account Name</th>
                   <th className="text-left px-6 py-3">GL Account</th>
                   <th className="text-left px-6 py-3">GL Account Title</th>
                   <th className="text-left px-6 py-3">Currency</th>
@@ -672,7 +668,6 @@ const BankAccountsTab = () => {
                     <td className="px-6 py-3 text-gray-700 font-mono text-xs">{a.bank_id || ''}</td>
                     <td className="px-6 py-3 text-gray-700">{a.bank_name || ''}</td>
                     <td className="px-6 py-3 text-gray-700 font-mono text-xs">{a.account_number || ''}</td>
-                    <td className="px-6 py-3 text-gray-700">{a.account_name || ''}</td>
                     <td className="px-6 py-3 text-gray-700 font-mono text-xs">{a.gl_account || ''}</td>
                     <td className="px-6 py-3 text-gray-700">{a.gl_account_title || ''}</td>
                     <td className="px-6 py-3 text-gray-700">{a.currency_code || ''}</td>
@@ -684,7 +679,7 @@ const BankAccountsTab = () => {
                 ))}
                 {filteredAccounts.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-6 py-10 text-center text-sm text-gray-400">
+                    <td colSpan={8} className="px-6 py-10 text-center text-sm text-gray-400">
                       No bank accounts found for your search.
                     </td>
                   </tr>
@@ -752,15 +747,15 @@ const SageGLTab = () => {
     ? null
     : String(selectedBankAccountRow?.bank_name || '').trim();
 
-  const selectedBankFinancialEntity = selectedBank === 'all'
+  const selectedBankId = selectedBank === 'all'
     ? null
-    : formatBankAccountOptionLabel(selectedBankName, selectedBankAccountNumber);
+    : String(selectedBankAccountRow?.bank_id || '').trim();
 
   const handleFetch = async () => {
     setFetching(true);
     try {
       const accountNumber = selectedBank === 'all' ? null : (selectedBankGlAccount || selectedBankAccountNumber || null);
-      const financialEntity = selectedBank === 'all' ? null : (selectedBankFinancialEntity || null);
+      const financialEntity = selectedBank === 'all' ? null : (selectedBankId || null);
       const res = await reconciliationApi.fetchSageTransactions(accountNumber, financialEntity);
       toast.success(res.data.message);
       await load();
@@ -778,7 +773,7 @@ const SageGLTab = () => {
       if (!accountNumber || dedupedByAccount.has(accountNumber)) return;
       dedupedByAccount.set(accountNumber, {
         value: accountNumber,
-        label: formatBankAccountOptionLabel(row?.bank_name, accountNumber),
+        label: formatBankAccountOptionLabel(row?.bank_id || row?.bank_name, accountNumber),
       });
     });
 
@@ -794,7 +789,7 @@ const SageGLTab = () => {
         const txnAccount = String(t.account || t.account_number || '').trim();
         return txnAccount === selectedBankGlAccount
           || txnAccount === selectedBankAccountNumber
-          || (selectedBankFinancialEntity && txnBankName === selectedBankFinancialEntity)
+          || (selectedBankId && txnBankName === selectedBankId)
           || (selectedBankName && txnBankName === selectedBankName);
       });
 
@@ -814,7 +809,7 @@ const SageGLTab = () => {
       || normalizeSearchValue(t.transaction_type).includes(query)
       || normalizeSearchValue(t.amount).includes(query)
     ));
-  }, [data, selectedBank, selectedBankGlAccount, selectedBankAccountNumber, selectedBankFinancialEntity, selectedBankName, sageSearch]);
+  }, [data, selectedBank, selectedBankGlAccount, selectedBankAccountNumber, selectedBankId, selectedBankName, sageSearch]);
 
   const filteredViewingTransactions = React.useMemo(() => {
     const rows = viewingBankSummary?.transactions || [];
@@ -1128,7 +1123,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
 
       dedupedByAccount.set(accountNumber, {
         value: accountNumber,
-        label: formatBankAccountOptionLabel(row?.bank_name, accountNumber),
+        label: formatBankAccountOptionLabel(row?.bank_id || row?.bank_name, accountNumber),
       });
     });
 
@@ -1781,7 +1776,7 @@ const UnmatchedTab = () => {
 
       dedupedByAccount.set(accountNumber, {
         value: accountNumber,
-        label: formatBankAccountOptionLabel(row?.bank_name, accountNumber),
+        label: formatBankAccountOptionLabel(row?.bank_id || row?.bank_name, accountNumber),
       });
     });
 
