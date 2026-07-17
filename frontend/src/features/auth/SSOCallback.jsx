@@ -50,14 +50,14 @@ export default function SSOCallback() {
                 setStatus("Redirecting...");
                 toast.success("SSO Login Successful");
 
-                if (getERPSystem() === 'Zoho') {
+                const userRoles = userObj.role ? userObj.role.split(',').map(r => r.trim()) : [];
+                const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
+                useAuthStore.getState().setActiveRole(activeRole);
+
+                if (getERPSystem() === 'Zoho' && userRoles.length <= 1) {
                     const entityId = 'DEFAULT';
                     const entityName = 'Consolidated Analytics';
                     const entityDisplayName = `${entityId} - ${entityName}`;
-                    
-                    const userRoles = userObj.role ? userObj.role.split(',') : [];
-                    const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
-                    useAuthStore.getState().setActiveRole(activeRole);
                     
                     useCommonStore.getState().setEntity(entityId);
                     sessionStorage.setItem('selected_entity', entityId);
