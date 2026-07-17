@@ -31,19 +31,9 @@ const SelectEntityPage = () => {
       try {
         const { masterDataService } = await import('../../api/masterdataAPI');
         const response = await masterDataService.getEntityMasterData({ page: 1, page_size: 1000 });
-        let data = response.data || [];
-        if (getERPSystem() === 'Zoho') {
-          const hasDefault = data.some(entity => entity.entity_id === 'DEFAULT');
-          if (!hasDefault) {
-            data = [{ id: 0, entity_id: 'DEFAULT', entity_name: 'Consolidated Analytics' }, ...data];
-          }
-        }
-        setEntityData(data);
+        setEntityData(response.data || []);
       } catch (err) {
         console.error("Failed to load entities:", err);
-        if (getERPSystem() === 'Zoho') {
-          setEntityData([{ id: 0, entity_id: 'DEFAULT', entity_name: 'Consolidated Analytics' }]);
-        }
       }
     };
     fetchAllEntities();
