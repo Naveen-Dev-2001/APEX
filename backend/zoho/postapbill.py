@@ -174,7 +174,7 @@ def post_ap_bill(
                 logger.warning(f"[PostAPBill Zoho] Failed to fetch or upload original invoice PDF: {e}")
 
 
-        # Final approval PDF upload
+         # Final approval PDF upload
         if pdf_path and os.path.exists(pdf_path):
             try:
                 doc_id, f_name = _upload_document(access_token, pdf_path)
@@ -183,6 +183,43 @@ def post_ap_bill(
                 logger.warning(f"[PostAPBill Zoho] Failed to upload approval PDF: {e}")
         else:
             logger.warning(f"[PostAPBill Zoho] Approval PDF not found at '{pdf_path}'; skipping upload.")
+
+        # Manual attachments upload (from Azure Blob Storage)
+        if invoice.attachments:
+            try:
+                from common.services.azure_blob import container_client
+                import tempfile
+                
+                att_list = _json.loads(invoice.attachments) if isinstance(invoice.attachments, str) else (invoice.attachments or [])
+                if isinstance(att_list, list):
+                    for att in att_list:
+                        blob_name = att.get("blob_name")
+                        filename = att.get("filename")
+                        if blob_name and filename:
+                            blob_client = container_client.get_blob_client(blob_name)
+                            if blob_client.exists():
+                                logger.info(f"[PostAPBill Zoho] Downloading manual attachment '{filename}' ({blob_name}) from Azure Blob Storage.")
+                                file_bytes = blob_client.download_blob().readall()
+                                
+                                # Write to a temporary file
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(filename)[1]) as temp_file:
+                                    temp_file.write(file_bytes)
+                                    temp_file_path = temp_file.name
+                                
+                                try:
+                                    # Upload the temporary file to Zoho
+                                    doc_id, f_name = _upload_document(access_token, temp_file_path)
+                                    # Use the original filename instead of the temporary filename
+                                    documents_payload.append({"document_id": doc_id, "file_name": filename})
+                                    logger.info(f"[PostAPBill Zoho] Successfully uploaded manual attachment '{filename}' to Zoho documents store.")
+                                finally:
+                                    # Always clean up the temp file
+                                    if os.path.exists(temp_file_path):
+                                        os.remove(temp_file_path)
+                            else:
+                                logger.warning(f"[PostAPBill Zoho] Manual attachment blob does not exist: {blob_name}")
+            except Exception as e:
+                logger.error(f"[PostAPBill Zoho] Failed to fetch/upload manual attachments: {e}", exc_info=True)
 
         # ── 3. Date & Term Calculations ──────────────────────────────────────
         current_date = datetime.utcnow()

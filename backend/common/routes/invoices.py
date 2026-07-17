@@ -4331,3 +4331,160 @@ async def generate_pdf_debug(invoice_id: int, db: Session = Depends(get_db)):
         import traceback
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
 
+
+@router.post("/{invoice_id}/attachments")
+async def add_attachments(
+    invoice_id: int,
+    files: List[UploadFile] = File(...),
+    current_user: UserResponse = Depends(get_current_user),
+    entity: str = Depends(get_current_entity),
+    db: Session = Depends(get_db)
+):
+    # Only scanner, coder, and admin can upload attachments
+    user_roles = [r.strip().lower() for r in (current_user.role or "user").split(",")]
+    if not any(r in ["scanner", "coder", "admin"] for r in user_roles):
+        raise HTTPException(status_code=403, detail="Permission denied. Only scanners, coders, and admins can add attachments.")
+
+    invoice = invoice_repo.get(db, invoice_id)
+    if not invoice or invoice.entity != entity:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    from common.services.azure_blob import upload_file_to_blob, AZURE_BLOB_FOLDER
+    from common.config.config import TOOL
+    import json as _json
+
+    current_attachments = []
+    if invoice.attachments:
+        try:
+            current_attachments = _json.loads(invoice.attachments) if isinstance(invoice.attachments, str) else (invoice.attachments or [])
+            if not isinstance(current_attachments, list):
+                current_attachments = []
+        except:
+            current_attachments = []
+
+    upload_dir = get_folder_path("in_progress")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    prefix = f"{AZURE_BLOB_FOLDER}/{TOOL}" if AZURE_BLOB_FOLDER else TOOL
+
+    for file in files:
+        clean_name = file.filename.replace("\\", "/").split("/")[-1]
+        name, ext = os.path.splitext(clean_name)
+        
+        # Validate file types
+        if ext.lower() not in [".pdf", ".jpg", ".jpeg", ".png"]:
+            raise HTTPException(status_code=400, detail=f"File type {ext} not allowed. Only PDF, JPG, JPEG, PNG are supported.")
+
+        timestamp = get_ist_now().strftime("%Y%m%d_%H%M%S")
+        new_name = f"{name}_{timestamp}{ext}"
+        local_path = os.path.join(upload_dir, new_name)
+        
+        # Save file locally
+        contents = await file.read()
+        with open(local_path, "wb") as f:
+            f.write(contents)
+
+        # Upload file to Azure blob
+        blob_name = f"{prefix}/attachments/{invoice_id}/{new_name}"
+        upload_file_to_blob(local_path, blob_name)
+
+        # Clean up local file
+        try:
+            os.remove(local_path)
+        except:
+            pass
+
+        current_attachments.append({
+            "filename": clean_name,
+            "blob_name": blob_name,
+            "uploaded_by": current_user.username,
+            "uploaded_at": get_ist_now().isoformat(),
+            "size": len(contents)
+        })
+
+    invoice.attachments = serialize_json_field(current_attachments)
+    db.commit()
+    db.refresh(invoice)
+
+    return {"status": "success", "attachments": current_attachments}
+
+
+@router.delete("/{invoice_id}/attachments")
+async def delete_attachment(
+    invoice_id: int,
+    blob_name: str = Query(...),
+    current_user: UserResponse = Depends(get_current_user),
+    entity: str = Depends(get_current_entity),
+    db: Session = Depends(get_db)
+):
+    # Only scanner, coder, and admin can delete attachments
+    user_roles = [r.strip().lower() for r in (current_user.role or "user").split(",")]
+    if not any(r in ["scanner", "coder", "admin"] for r in user_roles):
+        raise HTTPException(status_code=403, detail="Permission denied. Only scanners, coders, and admins can delete attachments.")
+
+    invoice = invoice_repo.get(db, invoice_id)
+    if not invoice or invoice.entity != entity:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    from common.services.azure_blob import delete_blob
+    import json as _json
+
+    current_attachments = []
+    if invoice.attachments:
+        try:
+            current_attachments = _json.loads(invoice.attachments) if isinstance(invoice.attachments, str) else (invoice.attachments or [])
+        except:
+            pass
+
+    # Filter out the deleted one
+    updated_attachments = [att for att in current_attachments if att.get("blob_name") != blob_name]
+
+    if len(updated_attachments) == len(current_attachments):
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Delete from Azure blob
+    try:
+        delete_blob(blob_name)
+    except Exception as e:
+        logger.warning(f"Failed to delete blob {blob_name}: {e}")
+
+    invoice.attachments = serialize_json_field(updated_attachments)
+    db.commit()
+    db.refresh(invoice)
+
+    return {"status": "success", "attachments": updated_attachments}
+
+
+@router.get("/{invoice_id}/attachments/link")
+async def get_attachment_link(
+    invoice_id: int,
+    blob_name: str = Query(...),
+    current_user: UserResponse = Depends(get_current_user),
+    entity: str = Depends(get_current_entity),
+    db: Session = Depends(get_db)
+):
+    invoice = invoice_repo.get(db, invoice_id)
+    if not invoice or invoice.entity != entity:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Verify that the blob_name belongs to this invoice's attachments
+    import json as _json
+    current_attachments = []
+    if invoice.attachments:
+        try:
+            current_attachments = _json.loads(invoice.attachments) if isinstance(invoice.attachments, str) else (invoice.attachments or [])
+        except:
+            pass
+            
+    is_valid = any(att.get("blob_name") == blob_name for att in current_attachments)
+    if not is_valid:
+        raise HTTPException(status_code=403, detail="Invalid attachment blob name for this invoice")
+
+    from common.services.azure_blob import get_pdf_link
+    try:
+        sas_url = get_pdf_link(blob_name)
+        return {"sas_url": sas_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate SAS token: {str(e)}")
+
+

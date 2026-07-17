@@ -111,6 +111,27 @@ def post_ap_bill(
         else:
             logger.warning(f"[PostAPBill] Approval PDF not found at '{pdf_path}'; skipping.")
 
+        #  • Any other manual attachments uploaded by scanner/coder (fetched from Azure Blob)
+        if invoice.attachments:
+            try:
+                import json as _json
+                from common.services.azure_blob import container_client
+                att_list = _json.loads(invoice.attachments) if isinstance(invoice.attachments, str) else (invoice.attachments or [])
+                if isinstance(att_list, list):
+                    for att in att_list:
+                        blob_name = att.get("blob_name")
+                        filename = att.get("filename")
+                        if blob_name and filename:
+                            blob_client = container_client.get_blob_client(blob_name)
+                            if blob_client.exists():
+                                logger.info(f"[PostAPBill] Downloading manual attachment '{filename}' ({blob_name}) from Azure Blob.")
+                                att_bytes = blob_client.download_blob().readall()
+                                attachment_files.append((filename, att_bytes))
+                            else:
+                                logger.warning(f"[PostAPBill] Manual attachment blob does not exist: {blob_name}")
+            except Exception as e:
+                logger.error(f"[PostAPBill] Failed to fetch manual attachments: {e}")
+
         # ── 4. Upload files to attachment ────────────────────────────────────
         if attachment_files:
             _upload_files(auth_headers, attachment_key, attachment_files)

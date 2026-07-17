@@ -152,6 +152,7 @@ def invoice_to_dict(invoice: Invoice, include_relationships: bool = True, minima
         "original_items": invoice.original_items,
         "approver_breakdown": invoice.approver_breakdown,
         "gl_summary": invoice.gl_summary,
+        "attachments": invoice.attachments,
     }
 
     for field, value in json_fields.items():
