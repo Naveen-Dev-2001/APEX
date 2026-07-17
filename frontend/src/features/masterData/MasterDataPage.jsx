@@ -487,7 +487,8 @@ const MasterDataPage = () => {
     };
 
     const handleSync = async () => {
-        const loadingToast = toast.loading(`Syncing data for ${activeTab} from Sage...`);
+        const erp = getERPSystem();
+        const loadingToast = toast.loading(`Syncing data for ${activeTab} from ${erp}...`);
         try {
             await syncMasterData(activeTab);
             toast.dismiss(loadingToast);

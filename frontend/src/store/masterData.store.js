@@ -653,6 +653,16 @@ const useMasterDataStore = create((set, get) => ({
             const payload = {
                 customer_id: formData.customer_id,
                 customer_name: formData.customer_name,
+                ...(getERPSystem() === 'Zoho' ? {
+                    company_name: formData.company_name,
+                    display_name: formData.display_name,
+                    email_id: formData.email_id,
+                    phone: formData.phone,
+                    currency_code: formData.currency_code,
+                    billing_address: formData.billing_address,
+                    billing_street2: formData.billing_street2,
+                    billing_city: formData.billing_city,
+                } : {})
             };
             await masterDataService.addCustomerRow(payload);
             await get().fetchCustomerMasterData();
@@ -669,6 +679,16 @@ const useMasterDataStore = create((set, get) => ({
                 id: formData.id,
                 customer_id: formData.customer_id,
                 customer_name: formData.customer_name,
+                ...(getERPSystem() === 'Zoho' ? {
+                    company_name: formData.company_name,
+                    display_name: formData.display_name,
+                    email_id: formData.email_id,
+                    phone: formData.phone,
+                    currency_code: formData.currency_code,
+                    billing_address: formData.billing_address,
+                    billing_street2: formData.billing_street2,
+                    billing_city: formData.billing_city,
+                } : {})
             };
             await masterDataService.editCustomerRow(rowIndex, payload);
             await get().fetchCustomerMasterData();

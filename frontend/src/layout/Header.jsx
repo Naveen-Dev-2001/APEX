@@ -366,13 +366,15 @@ const Header = () => {
 
                             <div className="relative z-10 p-4">
                                 {/* Dropdown Header */}
-                                <div className="flex justify-between items-center mb-4">
-                                    <span
-                                        className="text-[11px] font-bold text-[#333] tracking-tighter uppercase opacity-60 truncate mr-2"
-                                        title={selectedEntityName}
-                                    >
-                                        {selectedEntityName}
-                                    </span>
+                                <div className={`flex ${!(getERPSystem()?.toLowerCase() === 'zoho' && selectedEntityName?.toLowerCase().includes('consolidated analytics')) ? 'justify-between' : 'justify-end'} items-center mb-4`}>
+                                    {!(getERPSystem()?.toLowerCase() === 'zoho' && selectedEntityName?.toLowerCase().includes('consolidated analytics')) && (
+                                        <span
+                                            className="text-[11px] font-bold text-[#333] tracking-tighter uppercase opacity-60 truncate mr-2"
+                                            title={selectedEntityName}
+                                        >
+                                            {selectedEntityName}
+                                        </span>
+                                    )}
                                     <button
                                         onClick={handleLogout}
                                         className="text-[13px] text-[#ff5a5f] hover:text-red-600 font-semibold transition-colors shrink-0"
