@@ -61,31 +61,31 @@ const LoginPage = () => {
                     toast.info('Please change your password to continue');
                     navigate('/change-password-first-time', { state: { email: response.data.email || email } });
                 } else {
-                    if (getERPSystem() === 'Zoho') {
-                        const entityId = 'DEFAULT';
-                        const entityName = 'Consolidated Analytics';
-                        const entityDisplayName = `${entityId} - ${entityName}`;
-                        
                         // Set the active role (similar to SelectEntityPage default behavior)
-                        const userRoles = userObj.role ? userObj.role.split(',') : [];
+                        const userRoles = userObj.role ? userObj.role.split(',').map(r => r.trim()) : [];
                         const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
                         useAuthStore.getState().setActiveRole(activeRole);
-                        
-                        useCommonStore.getState().setEntity(entityId);
-                        sessionStorage.setItem('selected_entity', entityId);
-                        sessionStorage.setItem('selected_entity_name', entityDisplayName);
 
-                        const rawEntity = {
-                            entity_id: entityId,
-                            entity_name: entityName,
-                            id: 0
-                        };
-                        useInvoiceStore.getState().setEntityMaster(rawEntity);
+                        if (getERPSystem() === 'Zoho' && userRoles.length <= 1) {
+                            const entityId = 'DEFAULT';
+                            const entityName = 'Consolidated Analytics';
+                            const entityDisplayName = `${entityId} - ${entityName}`;
+                            
+                            useCommonStore.getState().setEntity(entityId);
+                            sessionStorage.setItem('selected_entity', entityId);
+                            sessionStorage.setItem('selected_entity_name', entityDisplayName);
 
-                        navigate('/dashboard');
-                    } else {
-                        navigate('/select-entity');
-                    }
+                            const rawEntity = {
+                                entity_id: entityId,
+                                entity_name: entityName,
+                                id: 0
+                            };
+                            useInvoiceStore.getState().setEntityMaster(rawEntity);
+
+                            navigate('/dashboard');
+                        } else {
+                            navigate('/select-entity');
+                        }
                 }
             } else {
                 setError('Invalid response from server');
