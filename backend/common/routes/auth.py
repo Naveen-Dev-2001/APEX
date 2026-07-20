@@ -31,6 +31,20 @@ SSO_TOKEN_TTL = 60
 
 router = APIRouter()
 
+@router.get("/session-timeout")
+async def get_session_timeout():
+    from pathlib import Path
+    from dotenv import load_dotenv
+    env_path = Path(__file__).resolve().parents[2] / '.env'
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path, override=True)
+    try:
+        timeout_str = os.getenv("SESSION_TIMOUT", "30")
+        timeout_val = int(timeout_str.strip())
+    except (ValueError, TypeError, AttributeError):
+        timeout_val = 30
+    return {"session_timeout": timeout_val}
+
 sso_router = APIRouter()
 
 

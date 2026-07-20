@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import useAdminStore from '../store/useAdminStore';
+import SessionTimeoutHandler from './SessionTimeoutHandler';
 
 const ProtectedRoute = () => {
     const token = useAuthStore((state) => state.token);
@@ -68,7 +69,12 @@ const ProtectedRoute = () => {
         }
     }
 
-    return <Outlet />;
+    return (
+        <>
+            <SessionTimeoutHandler />
+            <Outlet />
+        </>
+    );
 };
 
 export default ProtectedRoute;
