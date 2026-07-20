@@ -12,5 +12,5 @@ window._env_ = {
     VITE_BACKEND_URL: "http://localhost:8014",
 
     // ── Active Tool ───────────────────────────────────────────────────────────
-    VITE_TOOL: "sage"
+    VITE_TOOL: "zoho"
 };
