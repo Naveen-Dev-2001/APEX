@@ -39,7 +39,7 @@ async def get_session_timeout():
     if env_path.exists():
         load_dotenv(dotenv_path=env_path, override=True)
     try:
-        timeout_str = os.getenv("SESSION_TIMOUT", "30")
+        timeout_str = os.getenv("SESSION_TIMEOUT", "30")
         timeout_val = int(timeout_str.strip())
     except (ValueError, TypeError, AttributeError):
         timeout_val = 30
