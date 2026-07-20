@@ -55,15 +55,15 @@ def get_bank_accounts(
 
 
 @router.post("/bank-accounts/sync")
-def sync_bank_accounts_from_sage(
+async def sync_bank_accounts_from_sage(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    """Sync bank accounts table from cached Sage GL transactions."""
+    """Sync bank accounts table from Sage REST API."""
     service = BankReconciliationService(db)
     try:
-        count = service.sync_bank_accounts_from_sage_cache()
-        return {"message": f"Synced {count} bank account row(s) from Sage cache.", "count": count}
+        count = await service.sync_bank_accounts_from_sage_api()
+        return {"message": f"Synced {count} bank account(s) from Sage.", "count": count}
     except Exception as e:
         logger.error(f"Bank accounts sync failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to sync bank accounts: {str(e)}")

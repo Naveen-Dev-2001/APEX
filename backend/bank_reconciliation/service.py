@@ -600,6 +600,116 @@ class BankReconciliationService:
             self.db.rollback()
             raise
 
+    async def sync_bank_accounts_from_sage_api(self) -> int:
+        """Fetch bank accounts directly from Sage Intacct REST API (list only).
+
+        The individual detail endpoint (/checking-account/{key}) is broken on
+        Sage's side (REST-9024 / printOn field error), so we use the list
+        response which contains the account `id` (e.g. 'FFB_4449') and `key`.
+
+        Mapping:
+          - bank_id        → full id value ('FFB_4449')
+          - bank_name      → prefix before last '_' ('FFB')
+          - account_number → suffix after last '_' ('4449')
+
+        GL enrichment:
+          - gl_account       → from SageGLTransactionCache where bank = bank_id
+          - gl_account_title → from GLMaster where account_number = gl_account
+        """
+        import httpx
+
+        sync_svc = BaseSyncService(self.db)
+        upserted = 0
+
+        try:
+            # ── Build enrichment lookups from existing DB data ──────────────
+            # bank_id → GL account number (from cached Sage GL transactions)
+            bank_to_gl: dict[str, str] = {}
+            for row in self.db.query(SageGLTransactionCache).filter(
+                SageGLTransactionCache.bank != None,
+                SageGLTransactionCache.account != None
+            ).all():
+                if row.bank and row.account:
+                    bank_to_gl.setdefault(row.bank.strip(), row.account.strip())
+
+            # GL account number → title (from GL master)
+            gl_to_title: dict[str, str] = {
+                g.account_number: g.title
+                for g in self.db.query(GLMaster).all()
+                if g.account_number
+            }
+            # ────────────────────────────────────────────────────────────────
+
+            async with httpx.AsyncClient(timeout=120.0, verify=sync_svc.verify_ssl) as client:
+                token = await sync_svc._get_access_token(client)
+
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                }
+
+                list_url = f"{sync_svc.base_url}/objects/cash-management/checking-account"
+                r = await client.get(list_url, headers=headers)
+                r.raise_for_status()
+
+                items = r.json().get("ia::result", [])
+
+                for item in items:
+                    raw_id = (item.get("id") or "").strip()
+                    if not raw_id:
+                        continue
+
+                    # Parse bank prefix and account number from e.g. "FFB_4449"
+                    if "_" in raw_id:
+                        last_underscore = raw_id.rfind("_")
+                        bank_name = raw_id[:last_underscore]
+                        account_number = raw_id[last_underscore + 1:]
+                    else:
+                        bank_name = raw_id
+                        account_number = raw_id
+
+                    bank_id = raw_id  # full id as the unique bank identifier
+
+                    # Enrich with GL data
+                    gl_account = bank_to_gl.get(bank_id)
+                    gl_account_title = gl_to_title.get(gl_account) if gl_account else None
+
+                    existing = (
+                        self.db.query(BankAccount)
+                        .filter(BankAccount.bank_id == bank_id)
+                        .first()
+                    )
+
+                    if existing:
+                        existing.bank_name = bank_name or existing.bank_name
+                        existing.account_number = account_number or existing.account_number
+                        existing.gl_account = gl_account or existing.gl_account
+                        existing.gl_account_title = gl_account_title or existing.gl_account_title
+                        existing.is_active = True
+                        existing.source = "sage_api"
+                        existing.updated_at = get_ist_now()
+                    else:
+                        self.db.add(BankAccount(
+                            bank_id=bank_id,
+                            bank_name=bank_name,
+                            account_number=account_number,
+                            gl_account=gl_account,
+                            gl_account_title=gl_account_title,
+                            is_active=True,
+                            source="sage_api",
+                        ))
+
+                    upserted += 1
+
+                self.db.commit()
+                return upserted
+
+        except Exception as e:
+            logger.error(f"Failed to sync checking accounts from Sage API: {e}", exc_info=True)
+            self.db.rollback()
+            raise
+
     async def fetch_sage_gl_transactions(self, account_filter: str = None, financial_entity_filter: str = None) -> int:
         """Fetch GL transactions from Sage. Optionally filter by account number and financial entity."""
         try:
