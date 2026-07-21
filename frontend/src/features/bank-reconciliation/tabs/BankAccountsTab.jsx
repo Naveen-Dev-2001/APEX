@@ -3,7 +3,6 @@ import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
 import {
   normalizeSearchValue,
-  StatusPill,
   EmptyState,
 } from '../components/shared';
 
@@ -13,6 +12,7 @@ const BankAccountsTab = () => {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [accountSearch, setAccountSearch] = useState('');
+  const [deletingAccountId, setDeletingAccountId] = useState(null);
   const fileRef = useRef();
 
   const filteredAccounts = React.useMemo(() => {
@@ -72,6 +72,20 @@ const BankAccountsTab = () => {
       toast.error(e.response?.data?.detail || 'Failed to sync from Sage');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleDeleteAccount = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this bank account?')) return;
+    setDeletingAccountId(id);
+    try {
+      await reconciliationApi.deleteBankAccount(id);
+      toast.success('Bank account deleted');
+      setAccounts((prev) => prev.filter((account) => account.id !== id));
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to delete bank account');
+    } finally {
+      setDeletingAccountId(null);
     }
   };
 
@@ -152,7 +166,7 @@ const BankAccountsTab = () => {
                   <th className="text-left px-6 py-3">GL Account Title</th>
                   <th className="text-left px-6 py-3">Currency</th>
                   <th className="text-left px-6 py-3">Source</th>
-                  <th className="text-left px-6 py-3">Status</th>
+                  <th className="text-right px-6 py-3">Delete</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -165,7 +179,22 @@ const BankAccountsTab = () => {
                     <td className="px-6 py-3 text-gray-700">{a.gl_account_title || ''}</td>
                     <td className="px-6 py-3 text-gray-700">{a.currency_code || ''}</td>
                     <td className="px-6 py-3 text-gray-500 text-xs">{a.source || ''}</td>
-                    <td className="px-6 py-3"><StatusPill matched={Boolean(a.is_active)} /></td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAccount(a.id)}
+                        disabled={deletingAccountId === a.id}
+                        className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors disabled:opacity-60"
+                        title="Delete Bank Account"
+                      >
+                        {deletingAccountId === a.id
+                          ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                          : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        }
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {filteredAccounts.length === 0 && (

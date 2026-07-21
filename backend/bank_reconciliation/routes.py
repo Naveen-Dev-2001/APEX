@@ -69,6 +69,20 @@ async def sync_bank_accounts_from_sage(
         raise HTTPException(status_code=500, detail=f"Failed to sync bank accounts: {str(e)}")
 
 
+@router.delete("/bank-accounts/{account_id}")
+def delete_bank_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Delete a bank account row by ID."""
+    service = BankReconciliationService(db)
+    success = service.delete_bank_account(account_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Bank account not found")
+    return {"message": "Bank account deleted successfully"}
+
+
 @router.post("/upload")
 async def upload_bank_statement(
     file: UploadFile = File(...),

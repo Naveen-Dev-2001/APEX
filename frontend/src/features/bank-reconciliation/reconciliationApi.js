@@ -61,6 +61,9 @@ export const reconciliationApi = {
   // List bank accounts
   getBankAccounts: () => API.get('/reconciliation/bank-accounts'),
 
+  // Delete a bank account row
+  deleteBankAccount: (id) => API.delete(`/reconciliation/bank-accounts/${id}`),
+
   // Sync bank accounts from cached Sage transactions
   syncBankAccounts: () => API.post('/reconciliation/bank-accounts/sync'),
 };

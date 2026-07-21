@@ -541,6 +541,20 @@ class BankReconciliationService:
             for r in rows
         ]
 
+    def delete_bank_account(self, account_id: int) -> bool:
+        """Delete a bank account by ID."""
+        account = self.db.query(BankAccount).filter(BankAccount.id == account_id).first()
+        if not account:
+            return False
+
+        try:
+            self.db.delete(account)
+            self.db.commit()
+            return True
+        except Exception:
+            self.db.rollback()
+            raise
+
     def sync_bank_accounts_from_sage_cache(self) -> int:
         """Build/refresh bank_accounts from existing Sage cache + GL master."""
         gl_title_by_acct = {
