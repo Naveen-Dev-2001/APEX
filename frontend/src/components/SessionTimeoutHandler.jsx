@@ -107,6 +107,32 @@ const SessionTimeoutHandler = () => {
         };
     }, [token, timeoutMinutes, logout, isExpired, isWarningOpen]);
 
+    // Listen to user activity to extend session automatically (activity timeout)
+    useEffect(() => {
+        if (!token || isExpired || isWarningOpen) return;
+
+        const handleActivity = () => {
+            const now = Date.now();
+            const lastActiveStr = sessionStorage.getItem('session_start_time');
+            if (lastActiveStr) {
+                const lastActive = parseInt(lastActiveStr, 10);
+                // Throttle: only update sessionStorage if it's been more than 5 seconds since the last update
+                if (now - lastActive > 5000) {
+                    sessionStorage.setItem('session_start_time', now.toString());
+                }
+            } else {
+                sessionStorage.setItem('session_start_time', now.toString());
+            }
+        };
+
+        const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+        events.forEach((event) => window.addEventListener(event, handleActivity, { passive: true }));
+
+        return () => {
+            events.forEach((event) => window.removeEventListener(event, handleActivity));
+        };
+    }, [token, isExpired, isWarningOpen]);
+
     const handleExtendSession = () => {
         // Reset the start time
         sessionStorage.setItem('session_start_time', Date.now().toString());
