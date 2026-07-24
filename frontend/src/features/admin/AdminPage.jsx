@@ -12,6 +12,8 @@ import SearchInput from '../../shared/components/SearchInput';
 import toast from '../../utils/toast';
 import { REQUIRED_FIELD } from '../../config/constants';
 import { getERPSystem } from '../../utils/envHelper';
+import ExportButton from '../../shared/components/ExportButton';
+import { adminService } from './adminService';
 
 const AdminPage = () => {
     const [activeTab, setActiveTab] = useState('User Management');
@@ -93,6 +95,46 @@ const AdminPage = () => {
         } else {
             toast.error('Failed to create user. Please try again.');
         }
+    };
+
+    const exportColumns = [
+        { header: 'S.No', accessor: 'sno' },
+        { header: 'User Name', accessor: 'username' },
+        { header: 'Email', accessor: 'email' },
+        { header: 'Role', accessor: 'role' },
+        { header: 'Department', accessor: 'department' },
+        { header: 'Status', accessor: 'status' }
+    ];
+
+    const handleFetchAllForExport = async () => {
+        try {
+            const { sortColumn, sortDirection } = useAdminStore.getState();
+            const response = await adminService.getAllUsers({
+                skip: 0,
+                limit: -1,
+                search: searchQuery,
+                sort_by: sortColumn === 'sno' ? 'id' : sortColumn,
+                sort_dir: sortDirection
+            });
+            const data = response.data || [];
+            return data.map((user) => {
+                const dept = user.department?.toLowerCase().trim();
+                let normalizedDept = user.department;
+                if (dept === 'finance' || dept === 'finance team' || dept === 'finance-team') {
+                    normalizedDept = 'Finance';
+                } else if (dept === 'non-finance' || dept === 'non-finance team' || dept === 'non-finance-team') {
+                    normalizedDept = 'Non-Finance';
+                }
+                return {
+                    ...user,
+                    department: normalizedDept
+                };
+            });
+        } catch (error) {
+            console.error("Failed to fetch all users for export:", error);
+            toast.error("Failed to fetch all users for export");
+            return [];
+        }    
     };
 
     return (
@@ -215,6 +257,17 @@ const AdminPage = () => {
                                     </svg>
                                     <span>Add User</span>
                                 </button>
+                            )}
+
+                            {/* Export Button */}
+                            {activeTab === 'User Management' && (
+                                <ExportButton
+                                    data={[]}
+                                    fetchData={handleFetchAllForExport}
+                                    columns={exportColumns}
+                                    fileName="User_Management.xlsx"
+                                    className="!w-auto !h-10 px-4"
+                                />
                             )}
 
                             {/* Refresh Button */}

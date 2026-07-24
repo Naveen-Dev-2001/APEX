@@ -287,6 +287,20 @@ const Invoice = () => {
         }));
     }, [view, handleView, handleDelete, handleArchive, backendFilters, userRole, openingInvoiceId, pageTab]);
 
+    const exportColumnDefs = useMemo(() => {
+        const cols = getFullColumns(handleView, handleDelete, handleArchive, userRole, openingInvoiceId, pageTab === "delete" || pageTab === "archive", pageTab === "delete" || pageTab === "archive");
+
+        return cols.map(col => ({
+            ...col,
+            onGetOptions: col.filterable ? async (accessor, search) => {
+                const dbField = ACCESSOR_TO_DB_FIELD[accessor] || accessor;
+                const otherFilters = { ...backendFilters };
+                delete otherFilters[dbField];
+                return await getInvoiceFilterOptions(dbField, otherFilters, pageTab === "delete" ? undefined : pageTab, search);
+            } : undefined
+        }));
+    }, [handleView, handleDelete, handleArchive, backendFilters, userRole, openingInvoiceId, pageTab]);
+
     const handleUpload = async (files) => {
         if (!files || files.length === 0) {
             toast.warning("Please select at least one file");
@@ -471,7 +485,7 @@ const Invoice = () => {
                                 <ExportButton
                                     data={pageTab === 'delete' ? archivedRecords : invoices}
                                     fetchData={handleFetchAllForExport}
-                                    columns={columnDefs}
+                                    columns={exportColumnDefs}
                                     fileName={pageTab === 'delete' ? "Deleted_Invoices.xlsx" : `${pageTab.toUpperCase()}_Invoices.xlsx`}
                                     className="!w-auto !h-10 px-4"
                                 />
