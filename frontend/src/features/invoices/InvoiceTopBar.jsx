@@ -690,13 +690,40 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
                                 <>
                                     {/* Repost to Sage */}
                                     {currentStatus === "sage_post_failed" && (
-                                        <button
-                                            onClick={() => openModal("repost-sage")}
-                                            disabled={!canAction("can_repost_sage")}
-                                            className={getBtnClass("orange", canAction("can_repost_sage"))}
-                                        >
-                                            {busy("repost-sage") ? "Reposting…" : "Repost"}
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => openModal("repost-sage")}
+                                                disabled={!canAction("can_repost_sage")}
+                                                className={getBtnClass("orange", canAction("can_repost_sage"))}
+                                            >
+                                                {busy("repost-sage") ? "Reposting…" : "Repost"}
+                                            </button>
+
+                                            {/* Enable Editing — always available when not in active edit session */}
+                                            {!editingEnabled && (
+                                                <button
+                                                    onClick={handleEnableEditing}
+                                                    disabled={!canAction("can_enable_editing")}
+                                                    className={getBtnClass("blue", canAction("can_enable_editing"))}
+                                                >
+                                                    Enable Editing
+                                                </button>
+                                            )}
+
+                                            {/* Save — appears once editing is unlocked */}
+                                            {editingEnabled && (
+                                                <div className="w-[130px]">
+                                                    <CustomButton
+                                                        variant="primary"
+                                                        height="h-[34px]"
+                                                        disabled={!!actionLoading}
+                                                        onClick={handleSaveInvoice}
+                                                    >
+                                                        {busy("saving") ? "Saving..." : "Save"}
+                                                    </CustomButton>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
 
                                     {["waiting_approval", "reworked"].includes(currentStatus) && (
