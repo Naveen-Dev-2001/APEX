@@ -185,6 +185,25 @@ class EmailService:
         )
 
     @classmethod
+    def send_approval_reminder_email(cls, email: str, username: str, vendor_name: str, invoice_number: str, amount: str, currency: str, pending_days: int):
+        body = f"""
+        This is a reminder that an invoice has been pending your approval 
+        <br><br>
+        <span class='highlight'>Vendor:</span> {vendor_name}<br>
+        <span class='highlight'>Invoice #:</span> {invoice_number}<br>
+        <span class='highlight'>Amount:</span> {amount} {currency}
+        <br><br>
+        Please log in to the APEX portal as soon as possible to review and take action.
+        """
+        return cls.send_email(
+            to_email=email,
+            subject=f"Reminder: Approval Required for Invoice {invoice_number} from {vendor_name}",
+            title="Invoice Approval Reminder",
+            name=username,
+            body=body
+        )
+
+    @classmethod
     def send_rejection_notification(cls, email: str, username: str, vendor_name: str, invoice_number: str, status: str, comment: str):
         status_label = "Rejected" if status.lower() == "rejected" else "Rework"
         body = f"""

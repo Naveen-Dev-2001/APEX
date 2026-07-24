@@ -1334,20 +1334,6 @@ async def get_ui_status_from_frontend(
                 if current_lvl_entry and current_lvl_entry.get("type") == "threshold" and not already_threshold_approved:
                     can_act = True
  
-    # ── can_enable_editing logic ─────────────────────────────────────────────
-    can_enable_editing = (
-        (is_finance or is_threshold_approver or is_posting_approver)
-        and can_act
-    )
- 
-    # Pre-calculate delegated flags for the response
-    delegated_finance = False
-    for f_user in finance_users:
-        subs = check_active_delegation(db, f_user, entity)
-        if email in [s.lower() for s in subs]:
-            delegated_finance = True
-            break
- 
     delegated_posting = False
     for p_email in posting_emails:
         if not p_email:
@@ -1356,7 +1342,13 @@ async def get_ui_status_from_frontend(
         if email in [s.lower() for s in subs]:
             delegated_posting = True
             break
- 
+
+    # ── can_enable_editing logic ─────────────────────────────────────────────
+    can_enable_editing = (
+        ((is_finance or is_threshold_approver or is_posting_approver) and can_act)
+        or (current_status == InvoiceStatus.SAGE_POST_FAILED and (is_posting_approver or delegated_posting))
+    )
+
     rework_error = _get_rework_error(db, current_level, assigned)
 
     return ApproverUIStatus(
@@ -1368,7 +1360,7 @@ async def get_ui_status_from_frontend(
         can_reject=can_act,
         can_rework=can_act,
         can_enable_editing=can_enable_editing,
-        can_repost_sage=current_status == InvoiceStatus.SAGE_POST_FAILED and is_posting_approver,
+        can_repost_sage=current_status == InvoiceStatus.SAGE_POST_FAILED and (is_posting_approver or delegated_posting),
         is_posting_approver=is_posting_approver,
         is_threshold_approver=is_threshold_approver,
         is_finance_team=is_finance,
@@ -2241,7 +2233,7 @@ async def enable_editing(
         if hasattr(invoice.status, "value")
         else str(invoice.status)
     )
-    if current_status not in (InvoiceStatus.WAITING_APPROVAL, InvoiceStatus.REWORKED):
+    if current_status not in (InvoiceStatus.WAITING_APPROVAL, InvoiceStatus.REWORKED, InvoiceStatus.SAGE_POST_FAILED):
         raise HTTPException(
             400, f"Editing cannot be enabled for status: {current_status}")
 

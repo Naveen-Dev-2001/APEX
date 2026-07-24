@@ -9,6 +9,7 @@ export const REQUIRED_FIELD = {
         ],
         "Settings": [
             "Vendor Based Workflow",
+            "Reminder Settings"
         ],
         "Admin": [
             "User Management",
@@ -31,7 +32,8 @@ export const REQUIRED_FIELD = {
         ],
         "Settings": [
             "Vendor Based Workflow",
-            "Codification Based Workflow"
+            "Codification Based Workflow",
+            "Reminder Settings"
         ],
         "Admin": [
             "User Management",

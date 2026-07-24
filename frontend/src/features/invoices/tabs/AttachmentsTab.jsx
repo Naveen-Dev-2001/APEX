@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Modal, Table, Space, message } from "antd";
-import { Trash2, Download, Paperclip, FileText, Image } from "lucide-react";
+import { Trash2, Download, Paperclip, FileText, Image, FileSpreadsheet } from "lucide-react";
 import { useInvoiceStore } from "../../../store/invoice.store";
 import { useAuthStore } from "../../../store/authStore";
 import {
@@ -106,17 +106,21 @@ const AttachmentsTab = () => {
             title: "File Name",
             dataIndex: "filename",
             key: "filename",
-            render: (text, record) => {
-                const isPdf = text.toLowerCase().endsWith(".pdf");
+            render: (text) => {
+                const lower = text.toLowerCase();
+                const isPdf = lower.endsWith(".pdf");
+                const isExcel = lower.endsWith(".xls") || lower.endsWith(".xlsx") || lower.endsWith(".csv");
                 return (
-                    <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2">
                         {isPdf ? (
                             <FileText size={16} className="text-[#22B4E6]" />
+                        ) : isExcel ? (
+                            <FileSpreadsheet size={16} className="text-[#22B4E6]" />
                         ) : (
                             <Image size={16} className="text-[#22B4E6]" />
                         )}
                         <span className="font-medium text-gray-800">{text}</span>
-                    </div>
+                     </div>
                 );
             }
         },
@@ -291,8 +295,16 @@ const AddAttachmentModal = ({ open, invoiceId, onCancel, onSuccess }) => {
 
     const handleFiles = (incoming) => {
         const allFiles = Array.from(incoming);
-        const allowedTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
-        const allowedExts = [".pdf", ".jpg", ".jpeg", ".png"];
+        const allowedTypes = [
+            "application/pdf", 
+            "image/jpeg", 
+            "image/jpg", 
+            "image/png",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv"
+        ];
+        const allowedExts = [".pdf", ".jpg", ".jpeg", ".png", ".xls", ".xlsx", ".csv"];
 
         const validFiles = allFiles.filter((f) => {
             const ext = f.name.substring(f.name.lastIndexOf(".")).toLowerCase();
@@ -300,7 +312,7 @@ const AddAttachmentModal = ({ open, invoiceId, onCancel, onSuccess }) => {
         });
 
         if (validFiles.length < allFiles.length) {
-            message.warning("Some files were skipped. Only PDF, JPG, JPEG, and PNG are allowed.");
+            message.warning("Some files were skipped. Only PDF, JPG, JPEG, PNG, XLS, XLSX, and CSV are allowed.");
         }
 
         setFiles((prev) => {
@@ -456,7 +468,7 @@ const AddAttachmentModal = ({ open, invoiceId, onCancel, onSuccess }) => {
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept=".pdf,image/jpeg,image/jpg,image/png"
+                            accept=".pdf,image/jpeg,image/jpg,image/png,.xls,.xlsx,.csv"
                             multiple
                             className="hidden"
                             onChange={handleFileInput}
