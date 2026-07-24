@@ -4372,8 +4372,8 @@ async def add_attachments(
         name, ext = os.path.splitext(clean_name)
         
         # Validate file types
-        if ext.lower() not in [".pdf", ".jpg", ".jpeg", ".png"]:
-            raise HTTPException(status_code=400, detail=f"File type {ext} not allowed. Only PDF, JPG, JPEG, PNG are supported.")
+        if ext.lower() not in [".pdf", ".jpg", ".jpeg", ".png", ".xls", ".xlsx", ".csv"]:
+            raise HTTPException(status_code=400, detail=f"File type {ext} not allowed. Only PDF, JPG, JPEG, PNG, XLS, XLSX, CSV are supported.")
 
         timestamp = get_ist_now().strftime("%Y%m%d_%H%M%S")
         new_name = f"{name}_{timestamp}{ext}"
