@@ -95,7 +95,8 @@ const InvoiceTopBar = ({ invoice = {}, isPdfVisible, onTogglePdf }) => {
             const status = err?.response?.status;
             if (status !== 409) {
                 console.error("Enable editing error:", err);
-                toast.error("Failed to enable editing on server. Please try again.");
+                const errorMsg = err.response?.data?.detail || "Failed to enable editing on server. Please try again.";
+                toast.error(errorMsg);
                 return;
             }
         }

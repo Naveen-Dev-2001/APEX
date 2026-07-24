@@ -15,6 +15,7 @@ import { formatCurrency } from '../../utils/formatters';
 import ExportButton from '../../shared/components/ExportButton';
 import { REQUIRED_FIELD } from '../../config/constants';
 import { getERPSystem } from '../../utils/envHelper';
+import useAdminStore from '../../store/useAdminStore';
 
 const SettingsPage = () => {
     const {
@@ -479,6 +480,10 @@ const SettingsPage = () => {
             );
         }
 
+        if (activeTab === 'Reminder Settings') {
+            return <ReminderSettingsForm />;
+        }
+
         return (
             <DataTable
                 columns={columns}
@@ -530,39 +535,43 @@ const SettingsPage = () => {
 
                 <div className="flex-1" />
 
-                {/* Search */}
-                <SearchInput
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onClear={() => setSearchQuery('')}
-                    width="220px"
-                />
+                {activeTab !== 'Reminder Settings' && (
+                    <>
+                        {/* Search */}
+                        <SearchInput
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onClear={() => setSearchQuery('')}
+                            width="220px"
+                        />
 
-                {/* Add Rule Button */}
-                {!isReadOnly && (
-                    <button
-                        onClick={openAdd}
-                        className="bg-[#24A1DD] hover:bg-[#1c8ad1] text-white px-4 h-[40px] min-w-[110px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
-                    >
-                        <Plus size={16} className="flex-shrink-0" /> Add Rule
-                    </button>
+                        {/* Add Rule Button */}
+                        {!isReadOnly && (
+                            <button
+                                onClick={openAdd}
+                                className="bg-[#24A1DD] hover:bg-[#1c8ad1] text-white px-4 h-[40px] min-w-[110px] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
+                            >
+                                <Plus size={16} className="flex-shrink-0" /> Add Rule
+                            </button>
+                        )}
+
+                        {/* Refresh Button */}
+                        <RefreshButton
+                            onClick={() => activeTab === 'Vendor Based Workflow' ? fetchVendorWorkflows() : fetchCodificationWorkflows()}
+                            loading={activeTab === 'Vendor Based Workflow' ? vendorLoading : codificationLoading}
+                            height="h-[36px]"
+                            className="!w-auto !min-w-[110px] !text-[13px] !font-medium"
+                        />
+
+                        <ExportButton
+                            data={filteredData}
+                            columns={activeTab === 'Vendor Based Workflow' ? vendorColumns : codificationColumns}
+                            fileName={activeTab === 'Vendor Based Workflow' ? "vendor_workflows" : "codification_workflows"}
+                            variant="primary"
+                            className="!bg-[#24A1DD] hover:!bg-[#1c8ad1] !w-auto !min-w-[110px] h-[36px] !text-[13px] !font-medium"
+                        />
+                    </>
                 )}
-
-                {/* Refresh Button */}
-                <RefreshButton
-                    onClick={() => activeTab === 'Vendor Based Workflow' ? fetchVendorWorkflows() : fetchCodificationWorkflows()}
-                    loading={activeTab === 'Vendor Based Workflow' ? vendorLoading : codificationLoading}
-                    height="h-[36px]"
-                    className="!w-auto !min-w-[110px] !text-[13px] !font-medium"
-                />
-
-                <ExportButton
-                    data={filteredData}
-                    columns={activeTab === 'Vendor Based Workflow' ? vendorColumns : codificationColumns}
-                    fileName={activeTab === 'Vendor Based Workflow' ? "vendor_workflows" : "codification_workflows"}
-                    variant="primary"
-                    className="!bg-[#24A1DD] hover:!bg-[#1c8ad1] !w-auto !min-w-[110px] h-[36px] !text-[13px] !font-medium"
-                />
             </div>
 
             {/* Content Area */}
@@ -586,6 +595,66 @@ const SettingsPage = () => {
                     }}
                 />
             )}
+        </div>
+    );
+};
+
+const ReminderSettingsForm = () => {
+    const { reminderDays, updateReminderDays, fetchSettings, loading, isUpdating } = useAdminStore();
+    const [inputValue, setInputValue] = useState(reminderDays);
+    const { activeRole } = useAuthStore();
+    const isReadOnly = ['coder', 'scanner'].includes(activeRole?.toLowerCase());
+
+    useEffect(() => {
+        fetchSettings();
+    }, [fetchSettings]);
+
+    useEffect(() => {
+        setInputValue(reminderDays);
+    }, [reminderDays]);
+
+    const handleSave = async () => {
+        const days = parseFloat(inputValue);
+        if (isNaN(days) || days <= 0) {
+            toast.error("Please enter a valid number of days (greater than 0)");
+            return;
+        }
+        const success = await updateReminderDays(days);
+        if (success) {
+            fetchSettings();
+        }
+    };
+
+    return (
+        <div className="max-w-xl mx-auto my-8 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Approval Reminder Configuration</h2>
+            <p className="text-sm text-gray-505 mb-6">
+                Configure the number of days after which an invoice pending approval triggers an email notification to the assigned approver.
+            </p>
+            <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                    <label htmlFor="reminderDaysInput" className="text-sm font-semibold text-gray-700">Reminder Days</label>
+                    <input
+                        id="reminderDaysInput"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        disabled={isReadOnly || loading || isUpdating}
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#24A1DD] focus:border-transparent disabled:bg-gray-100 text-sm w-full max-w-[200px]"
+                    />
+                </div>
+                {!isReadOnly && (
+                    <button
+                        onClick={handleSave}
+                        disabled={loading || isUpdating}
+                        className="bg-[#24A1DD] hover:bg-[#1c8ad1] text-white px-5 h-[38px] rounded-md flex items-center justify-center text-sm font-medium transition-colors whitespace-nowrap"
+                    >
+                        {isUpdating ? "Saving..." : "Save Settings"}
+                    </button>
+                )}
+            </div>
         </div>
     );
 };
