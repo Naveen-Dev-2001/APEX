@@ -9,7 +9,7 @@
 window._env_ = {
 
     // ── Backend Base URL ──────────────────────────────────────────────────────
-    VITE_BACKEND_URL: "http://localhost:8014",
+    VITE_BACKEND_URL: "http://localhost:5000",
 
     // ── Active Tool ───────────────────────────────────────────────────────────
     VITE_TOOL: "sage"
