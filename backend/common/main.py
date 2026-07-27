@@ -21,6 +21,9 @@ load_dotenv(dotenv_path=env_path, override=True)
 # Reload trigger: 1
 app = FastAPI(title="Accounts Payable API", version="1.0.0")
 
+# Store strong references to background tasks to prevent garbage collection
+background_tasks = set()
+
 # Register Trace Middleware
 app.add_middleware(TraceMiddleware)
 
@@ -89,7 +92,9 @@ async def startup_event():
         # Start approval reminder background task
         import asyncio
         from common.utils.reminders import start_reminder_scheduler
-        asyncio.create_task(start_reminder_scheduler())
+        task = asyncio.create_task(start_reminder_scheduler())
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
         print("✓ Approval reminder background scheduler started")
     except Exception as e:
         print(f"✗ Startup initialization error: {e}")
