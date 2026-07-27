@@ -24,9 +24,9 @@ async def check_approval_reminders():
         settings_data = get_app_settings(db)
         reminder_days = settings_data.get("reminder_days", 3)
         try:
-            reminder_days = float(reminder_days)
+            reminder_days = int(reminder_days)
         except (ValueError, TypeError):
-            reminder_days = 3.0
+            reminder_days = 3
 
         if reminder_days <= 0:
             return
