@@ -614,9 +614,9 @@ const ReminderSettingsForm = () => {
     }, [reminderDays]);
 
     const handleSave = async () => {
-        const days = parseFloat(inputValue);
+        const days = parseInt(inputValue, 10);
         if (isNaN(days) || days <= 0) {
-            toast.error("Please enter a valid number of days (greater than 0)");
+            toast.error("Please enter a valid integer number of days (greater than 0)");
             return;
         }
         const success = await updateReminderDays(days);
@@ -636,12 +636,15 @@ const ReminderSettingsForm = () => {
                     <label htmlFor="reminderDaysInput" className="text-sm font-semibold text-gray-700">Reminder Days</label>
                     <input
                         id="reminderDaysInput"
-                        type="number"
-                        min="0.1"
-                        step="0.1"
+                        type="text"
                         disabled={isReadOnly || loading || isUpdating}
                         value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || /^\d+$/.test(val)) {
+                                setInputValue(val);
+                            }
+                        }}
                         className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#24A1DD] focus:border-transparent disabled:bg-gray-100 text-sm w-full max-w-[200px]"
                     />
                 </div>

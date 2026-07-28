@@ -88,14 +88,6 @@ async def startup_event():
         from common.services.azure_blob import ensure_container_and_folders
         ensure_container_and_folders()
         print("✓ Azure Blob Storage container and folders initialized successfully")
-
-        # Start approval reminder background task
-        import asyncio
-        from common.utils.reminders import start_reminder_scheduler
-        task = asyncio.create_task(start_reminder_scheduler())
-        background_tasks.add(task)
-        task.add_done_callback(background_tasks.discard)
-        print("✓ Approval reminder background scheduler started")
     except Exception as e:
         print(f"✗ Startup initialization error: {e}")
         import traceback
