@@ -25,7 +25,7 @@ USER_PASSWORD = os.getenv("USER_PASSWORD")
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
-async def get_session_id() -> str:
+async def get_session_id(max_retries: int = 3, timeout: float = 60.0) -> str:
     payload = f"""<?xml version="1.0" encoding="UTF-8"?>
 <request>
   <control>
@@ -52,11 +52,23 @@ async def get_session_id() -> str:
 </request>"""
 
     print("  → Getting session token...")
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(
-            SAGE_URL, content=payload,
-            headers={"Content-Type": "application/xml"}
-        )
+    client_timeout = httpx.Timeout(timeout, connect=20.0)
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=client_timeout) as client:
+                response = await client.post(
+                    SAGE_URL, content=payload,
+                    headers={"Content-Type": "application/xml"}
+                )
+            break
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            if attempt == max_retries:
+                print(f"  ✗ Auth request failed after {max_retries} attempts: {exc}")
+                raise
+            wait_time = attempt * 2
+            print(f"  ! Timeout/network error on session attempt {attempt}/{max_retries}: {exc}. Retrying in {wait_time}s...")
+            await asyncio.sleep(wait_time)
+
     data   = xmltodict.parse(response.text)
     op     = data["response"]["operation"]
 
@@ -78,7 +90,9 @@ async def fetch_all_gldetail(
     financial_entity: str = "FFB_4449",
     account_no: str = "",
     after_date: str = "10/02/2025",
-    page_size: int = 1000
+    page_size: int = 1000,
+    timeout: float = 180.0,
+    max_retries: int = 3,
 ) -> list[dict]:
 
     all_records = []
@@ -112,7 +126,8 @@ async def fetch_all_gldetail(
         "RECORDTYPE"
     )
 
-    async with httpx.AsyncClient(timeout=60) as client:
+    client_timeout = httpx.Timeout(timeout, connect=30.0)
+    async with httpx.AsyncClient(timeout=client_timeout) as client:
 
         while True:
 
@@ -168,13 +183,23 @@ async def fetch_all_gldetail(
 </request>
 """
 
-            response = await client.post(
-                SAGE_URL,
-                content=payload,
-                headers={
-                    "Content-Type": "application/xml"
-                }
-            )
+            for attempt in range(1, max_retries + 1):
+                try:
+                    response = await client.post(
+                        SAGE_URL,
+                        content=payload,
+                        headers={
+                            "Content-Type": "application/xml"
+                        }
+                    )
+                    break
+                except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                    if attempt == max_retries:
+                        print(f"  ✗ Fetch request failed after {max_retries} attempts on page {page_num}: {exc}")
+                        raise
+                    wait_time = attempt * 2
+                    print(f"  ! Timeout/network error on attempt {attempt}/{max_retries} (page {page_num}): {exc}. Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
 
             data = xmltodict.parse(
                 response.text,

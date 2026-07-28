@@ -17,7 +17,7 @@ router = APIRouter(prefix="/reconciliation", tags=["bank-reconciliation"])
 
 
 class ManualMatchRequest(BaseModel):
-    bank_transaction_ids: list[int]
+    bank_transaction_ids: list[int] = []
     sage_transaction_ids: list[int]
 
 
@@ -315,11 +315,22 @@ def mark_matched_pairs(
     """Manually mark selected bank/sage transaction pairs as matched."""
     service = BankReconciliationService(db)
     try:
-        if not payload.bank_transaction_ids or not payload.sage_transaction_ids:
-            raise HTTPException(status_code=400, detail="Select at least one bank and one Sage transaction.")
+        if not payload.sage_transaction_ids:
+            raise HTTPException(status_code=400, detail="Select at least one Sage transaction.")
 
         bank_count = len(payload.bank_transaction_ids)
         sage_count = len(payload.sage_transaction_ids)
+
+        # Sage-only void pair: no bank rows selected, exactly 2 sage rows (original + void)
+        if bank_count == 0:
+            marked = service.mark_void_pair_matched(
+                sage_transaction_ids=payload.sage_transaction_ids,
+            )
+            return {
+                "message": f"{marked} void pair transaction(s) marked as matched.",
+                "marked_count": marked,
+            }
+
         if bank_count != sage_count and bank_count != 1 and sage_count != 1:
             raise HTTPException(
                 status_code=400,

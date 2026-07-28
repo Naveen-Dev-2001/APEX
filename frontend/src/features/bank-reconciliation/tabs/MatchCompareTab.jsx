@@ -265,8 +265,12 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
     setExpandedSageGroups((prev) => prev.includes(groupKey) ? prev.filter((k) => k !== groupKey) : [...prev, groupKey]);
 
   const handleManualMarkMatched = async () => {
-    if (!selectedBankIds.length || !selectedSageIds.length) { toast.error('Select at least one Bank row and one Sage row'); return; }
-    if (selectedBankIds.length !== selectedSageIds.length && selectedBankIds.length !== 1 && selectedSageIds.length !== 1) {
+    const isSageOnlyVoidPair = selectedBankIds.length === 0 && selectedSageIds.length === 2;
+    if (!isSageOnlyVoidPair && (!selectedBankIds.length || !selectedSageIds.length)) {
+      toast.error('Select at least one Bank row and one Sage row (or exactly 2 Sage rows for a void pair)');
+      return;
+    }
+    if (!isSageOnlyVoidPair && selectedBankIds.length !== selectedSageIds.length && selectedBankIds.length !== 1 && selectedSageIds.length !== 1) {
       toast.error('Select equal counts, or use grouped matching only for non-ACH debit transactions.'); return;
     }
     setManualMarking(true);
@@ -322,7 +326,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                 : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> Run Matching</>
               }
             </button>
-            <button onClick={handleManualMarkMatched} disabled={manualMarking || !selectedBankIds.length || !selectedSageIds.length}
+            <button onClick={handleManualMarkMatched} disabled={manualMarking || (selectedBankIds.length === 0 && selectedSageIds.length !== 2) || (selectedBankIds.length > 0 && !selectedSageIds.length)}
               className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-60 w-full">
               {manualMarking
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Marking…</>

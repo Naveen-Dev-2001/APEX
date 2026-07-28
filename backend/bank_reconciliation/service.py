@@ -32,6 +32,15 @@ def _to_cents(value: Any) -> int:
     amount = _to_decimal(value)
     return int((amount * Decimal("100")).quantize(Decimal("1")))
 
+
+def _sign_decimal(value: Any) -> int:
+    amount = _to_decimal(value)
+    if amount > 0:
+        return 1
+    if amount < 0:
+        return -1
+    return 0
+
 class BankReconciliationService:
     def __init__(self, db: Session):
         self.db = db
@@ -133,27 +142,28 @@ class BankReconciliationService:
         fallback = self._as_text(self._pick_key(source, "TR_TYPE", "TRTYPE"))
         return self._normalize_txn_type_label(fallback)
 
-    def _is_ach_debit(self, bank_txn: BankStatementTransaction) -> bool:
-        bank_type = self._normalize_text(bank_txn.transaction_type)
-        description = self._normalize_text(bank_txn.description)
-        reference = self._normalize_text(bank_txn.reference)
-        return bank_type == "debit" and ("ach" in description or "ach" in reference)
-
-    def _pair_matches_criteria(self, bank_txn: BankStatementTransaction, sage_txn: SageGLTransactionCache) -> bool:
+    def _is_ach_transaction(self, bank_txn: BankStatementTransaction, sage_txn: SageGLTransactionCache) -> bool:
         bank_type = self._normalize_text(bank_txn.transaction_type)
         sage_type = self._normalize_text(sage_txn.transaction_type)
+        bank_desc = self._normalize_text(bank_txn.description)
+        bank_ref = self._normalize_text(bank_txn.reference)
+        sage_desc = self._normalize_text(sage_txn.description)
 
+        return (
+            bank_type == "ach" or "ach" in bank_type or "ach" in bank_desc or "ach" in bank_ref or
+            sage_type == "ach" or "ach" in sage_type or "ach" in sage_desc
+        )
+
+    def _pair_matches_criteria(self, bank_txn: BankStatementTransaction, sage_txn: SageGLTransactionCache) -> bool:
         bank_amount_cents = _to_cents(bank_txn.amount)
         sage_amount_cents = _to_cents(sage_txn.amount)
+
         if bank_amount_cents != sage_amount_cents:
             return False
 
-        if self._is_ach_debit(bank_txn):
-            if bank_type != "debit" or sage_type != "debit":
-                return False
-
+        # ACH matching rule: check date + amount + description match
+        if self._is_ach_transaction(bank_txn, sage_txn):
             bank_date = self._normalize_date(bank_txn.date)
-            # Sage posting date is represented by entry_date; fallback to date if missing.
             sage_date = self._normalize_date(sage_txn.entry_date or sage_txn.date)
             if not bank_date or not sage_date or bank_date != sage_date:
                 return False
@@ -162,6 +172,10 @@ class BankReconciliationService:
             sage_desc = self._normalize_text(sage_txn.description)
             return bool(bank_desc and sage_desc and bank_desc == sage_desc)
 
+        bank_type = self._normalize_text(bank_txn.transaction_type)
+        sage_type = self._normalize_text(sage_txn.transaction_type)
+
+        # Debit matching rule: check check_number + debit amount match
         if bank_type == "debit":
             if sage_type != "debit":
                 return False
@@ -170,26 +184,149 @@ class BankReconciliationService:
             sage_check = self._normalize_check_number(sage_txn.doc_number)
             return bool(bank_check and sage_check and bank_check == sage_check)
 
+        # Credit matching rule: reference number + posting date + description + amount
         if bank_type == "credit":
             if sage_type != "credit":
                 return False
 
-            bank_reference = self._normalize_check_number(bank_txn.reference or bank_txn.check_number)
-            sage_reference = self._normalize_check_number(sage_txn.doc_number)
-            if not bank_reference or not sage_reference or bank_reference != sage_reference:
-                return False
-
             bank_date = self._normalize_date(bank_txn.date)
-            # Sage posting date is represented by entry_date; fallback to date if missing.
             sage_posting_date = self._normalize_date(sage_txn.entry_date or sage_txn.date)
             if not bank_date or not sage_posting_date or bank_date != sage_posting_date:
                 return False
 
             bank_desc = self._normalize_text(bank_txn.description)
             sage_desc = self._normalize_text(sage_txn.description)
-            return bool(bank_desc and sage_desc and bank_desc == sage_desc)
+            if not bank_desc or not sage_desc or bank_desc != sage_desc:
+                return False
+
+            bank_reference = self._normalize_check_number(bank_txn.reference or bank_txn.check_number)
+            sage_reference = self._normalize_check_number(sage_txn.doc_number)
+            if bank_reference or sage_reference:
+                if bank_reference != sage_reference:
+                    return False
+
+            return True
 
         return False
+
+    def _auto_match_sage_internal_reversals(
+        self,
+        account_number: Optional[str] = None,
+        financial_entity: Optional[str] = None,
+    ) -> int:
+        """Auto-match Sage internal reversals and void pairs.
+
+        Rule 1 — Check Number Void Pair:
+            One doc_number is a check number (e.g. "8241") and the other is a
+            voided variant (e.g. "Voided - 8241"). Both share the same numeric suffix,
+            account, and bank.
+
+        Rule 2 — Same Description Reversal Pair (amounts may vary, e.g. 500 vs -100):
+            Two entries with the exact same normalized description, but opposite
+            directions/signs (one positive/debit, one negative/credit). Amounts
+            can vary (e.g. 500 and -100).
+        """
+        query = self.db.query(SageGLTransactionCache).filter(
+            SageGLTransactionCache.is_matched == False
+        )
+
+        if account_number:
+            query = query.filter(SageGLTransactionCache.account == account_number)
+        if financial_entity:
+            query = query.filter(SageGLTransactionCache.bank == financial_entity)
+
+        unmatched = query.order_by(SageGLTransactionCache.id.asc()).all()
+        if not unmatched:
+            return 0
+
+        def _doc_check_suffix(raw: str) -> str:
+            norm = re.sub(r"\s+", "", str(raw or "")).lower()
+            m = re.search(r"(\d+)$", norm)
+            return m.group(1) if m else ""
+
+        def _doc_is_voided(raw: str) -> bool:
+            norm = self._normalize_text(raw or "")
+            return any(kw in norm for kw in ("void", "voided"))
+
+        def _save_matched_pair(txn_a: SageGLTransactionCache, txn_b: SageGLTransactionCache) -> None:
+            txn_a.is_matched = True
+            txn_b.is_matched = True
+            for sid in (txn_a.id, txn_b.id):
+                existing = self.db.query(ReconciliationResult).filter(
+                    ReconciliationResult.bank_transaction_id.is_(None),
+                    ReconciliationResult.sage_transaction_id == sid,
+                    ReconciliationResult.match_status == "matched",
+                ).first()
+                if not existing:
+                    self.db.add(ReconciliationResult(
+                        bank_transaction_id=None,
+                        sage_transaction_id=sid,
+                        match_status="matched",
+                    ))
+
+        # Buckets for Rule 1 (Check number void pair)
+        # key: (account, bank, check_suffix)
+        check_voided_grouped: Dict[tuple, Dict[str, List[SageGLTransactionCache]]] = {}
+
+        # Buckets for Rule 2 (Same description reversal pair, amounts may vary)
+        # key: (account, bank, normalized_desc)
+        desc_reversal_grouped: Dict[tuple, Dict[str, List[SageGLTransactionCache]]] = {}
+
+        for txn in unmatched:
+            acct_key = (txn.account or "").strip().lower()
+            bank_key = (txn.bank or "").strip().lower()
+
+            # Rule 1: Check number void pair
+            raw_doc = txn.doc_number or ""
+            suffix = _doc_check_suffix(raw_doc)
+            if suffix:
+                check_key = (acct_key, bank_key, suffix)
+                bucket = check_voided_grouped.setdefault(check_key, {"base": [], "voided": []})
+                if _doc_is_voided(raw_doc):
+                    bucket["voided"].append(txn)
+                else:
+                    bucket["base"].append(txn)
+
+            # Rule 2: Description based reversal pair
+            normalized_desc = self._normalize_text(txn.description)
+            if not normalized_desc:
+                continue
+
+            # Determine direction: positive vs negative
+            amt = _to_decimal(txn.amount)
+            txn_type = self._normalize_text(txn.transaction_type)
+
+            if amt < 0 or txn_type == "credit":
+                direction = "negative"
+            else:
+                direction = "positive"
+
+            rev_key = (acct_key, bank_key, normalized_desc)
+            rev_bucket = desc_reversal_grouped.setdefault(rev_key, {"positive": [], "negative": []})
+            rev_bucket[direction].append(txn)
+
+        matched_pairs = 0
+
+        # Apply Rule 1: Check number void pairs
+        for bucket in check_voided_grouped.values():
+            bases = [t for t in bucket["base"] if not t.is_matched]
+            voideds = [t for t in bucket["voided"] if not t.is_matched]
+            pair_count = min(len(bases), len(voideds))
+            for i in range(pair_count):
+                _save_matched_pair(bases[i], voideds[i])
+                matched_pairs += 1
+
+        # Apply Rule 2: Same description reversal pairs (amount may vary)
+        for bucket in desc_reversal_grouped.values():
+            positives = [t for t in bucket["positive"] if not t.is_matched]
+            negatives = [t for t in bucket["negative"] if not t.is_matched]
+            pair_count = min(len(positives), len(negatives))
+            for i in range(pair_count):
+                _save_matched_pair(positives[i], negatives[i])
+                matched_pairs += 1
+
+        return matched_pairs
+
 
     def _normalize_raw_sage_record(self, raw_record: Dict[str, Any]) -> Dict[str, Any]:
         # Some XML parser paths can nest actual row data under GLDETAIL.
@@ -882,11 +1019,28 @@ class BankReconciliationService:
             if to_save:
                 self.db.bulk_save_objects(to_save)
 
-            if to_save or updated_count:
+            auto_matched_pairs = self._auto_match_sage_internal_reversals(
+                account_number=acct,
+                financial_entity=financial_entity,
+            )
+
+            if auto_matched_pairs:
+                logger.info(
+                    "Auto-matched %s internal Sage reversal pair(s) for account=%s financial_entity=%s",
+                    auto_matched_pairs,
+                    acct,
+                    financial_entity,
+                )
+
+            if to_save or updated_count or auto_matched_pairs:
                 self.db.commit()
 
             return len(to_save) + updated_count
             
+        except httpx.TimeoutException as e:
+            logger.error(f"Sage API connection timed out: {e}", exc_info=True)
+            self.db.rollback()
+            raise Exception("Sage Intacct server timed out while fetching transactions. Please try again.") from e
         except Exception as e:
             logger.error(f"Error fetching Sage transactions: {e}", exc_info=True)
             self.db.rollback()
@@ -899,6 +1053,16 @@ class BankReconciliationService:
           for that account against Sage GL entries for that account.
         - Otherwise matches all unmatched transactions globally.
         """
+        auto_matched_pairs = self._auto_match_sage_internal_reversals(
+            account_number=account_number
+        )
+        if auto_matched_pairs:
+            logger.info(
+                "Auto-matched %s internal Sage pair(s) before bank-vs-sage matching (account=%s)",
+                auto_matched_pairs,
+                account_number,
+            )
+
         bank_query = self.db.query(BankStatementTransaction).filter(
             BankStatementTransaction.is_matched == False
         )
@@ -926,7 +1090,7 @@ class BankReconciliationService:
         candidate_bank_ids = [b.id for b in unmatched_bank]
         candidate_sage_ids = [s.id for s in unmatched_sage]
 
-        matches_found = 0
+        matches_found = auto_matched_pairs
         
         for b_txn in unmatched_bank:
             if b_txn.is_matched:
@@ -1037,21 +1201,52 @@ class BankReconciliationService:
             if self._is_ach_debit(bank_txn):
                 raise ValueError("ACH debit must be matched one-to-one.")
 
-            bank_total = _to_decimal(bank_by_id[bank_id].amount)
-            sage_total = sum((_to_decimal(sage_by_id[sid].amount) for sid in sage_transaction_ids), Decimal("0"))
-            if bank_total != sage_total:
-                raise ValueError("Amount does not match.")
-
             bank_check = self._normalize_check_number(bank_by_id[bank_id].check_number)
             if not bank_check:
                 raise ValueError("Check no is wrong.")
 
+            # Validate every sage check number — accept voided variants like "Voided - 8241"
+            # by extracting the trailing numeric portion from the normalised doc_number.
+            def _extract_check_suffix(raw_doc: str) -> str:
+                """Return the trailing digit-run from a normalised check string.
+                e.g. 'voided-8241' -> '8241',  '8241' -> '8241'."""
+                m = re.search(r"(\d+)$", raw_doc)
+                return m.group(1) if m else raw_doc
+
             for sid in sage_transaction_ids:
                 if self._normalize_text(sage_by_id[sid].transaction_type) != "debit":
                     raise ValueError("Grouped matching is allowed only for debit transactions.")
-                sage_check = self._normalize_check_number(sage_by_id[sid].doc_number)
-                if not sage_check or sage_check != bank_check:
+                sage_check_raw = self._normalize_check_number(sage_by_id[sid].doc_number)
+                sage_check = _extract_check_suffix(sage_check_raw)
+                bank_check_digits = _extract_check_suffix(bank_check)
+                if not sage_check or sage_check != bank_check_digits:
                     raise ValueError("Check no is wrong.")
+
+            # Amount validation: for void pairs the Sage items include an original + its
+            # void (same amount, both debits) which net to $0 when summed.  In that case
+            # the bank amount should equal the original (non-voided) Sage entry amount.
+            bank_total = _to_decimal(bank_by_id[bank_id].amount)
+            sage_total = sum((_to_decimal(sage_by_id[sid].amount) for sid in sage_transaction_ids), Decimal("0"))
+
+            # Detect a pure void-pair: exactly two sage rows with the same absolute amount
+            # where one doc_number contains a "void" indicator.
+            is_void_pair = False
+            if len(sage_transaction_ids) == 2:
+                sid_a, sid_b = sage_transaction_ids
+                amt_a = _to_decimal(sage_by_id[sid_a].amount)
+                amt_b = _to_decimal(sage_by_id[sid_b].amount)
+                doc_a = self._normalize_text(sage_by_id[sid_a].doc_number or "")
+                doc_b = self._normalize_text(sage_by_id[sid_b].doc_number or "")
+                void_keywords = ("void", "voided")
+                one_is_void = any(kw in doc_a for kw in void_keywords) or any(kw in doc_b for kw in void_keywords)
+                if one_is_void and amt_a == amt_b:
+                    # Bank should match the amount of the original (non-void) entry
+                    is_void_pair = bank_total == amt_a
+                    if not is_void_pair:
+                        raise ValueError("Amount does not match.")
+
+            if not is_void_pair and bank_total != sage_total:
+                raise ValueError("Amount does not match.")
 
             pairs = [(bank_id, sid) for sid in sage_transaction_ids]
         elif len(sage_transaction_ids) == 1:
@@ -1117,6 +1312,85 @@ class BankReconciliationService:
                 bank_transaction_id=bank_id,
                 sage_transaction_id=sage_id,
                 match_status="matched"
+            ))
+            marked += 1
+
+        self.db.commit()
+        return marked
+
+    def mark_void_pair_matched(self, sage_transaction_ids: List[int]) -> int:
+        """Mark a Sage-only void pair (original + voided entry) as matched with no bank counterpart.
+
+        Rules:
+        - Exactly 2 Sage rows must be selected.
+        - Both must share the same numeric check number (e.g. '8241' and 'Voided - 8241').
+        - Both amounts must be equal (they cancel each other out).
+        - bank_transaction_id is stored as NULL in ReconciliationResult.
+        """
+        if len(sage_transaction_ids) != 2:
+            raise ValueError("Void pair matching requires exactly 2 Sage rows (original + voided).")
+
+        sage_txns = self.db.query(SageGLTransactionCache).filter(
+            SageGLTransactionCache.id.in_(sage_transaction_ids)
+        ).all()
+
+        if len(sage_txns) != 2:
+            raise ValueError("Some selected Sage transactions were not found.")
+
+        sage_by_id = {t.id: t for t in sage_txns}
+        sid_a, sid_b = sage_transaction_ids
+        txn_a, txn_b = sage_by_id[sid_a], sage_by_id[sid_b]
+
+        # Extract trailing digit suffix to normalise "Voided - 8241" -> "8241"
+        def _check_suffix(raw: str) -> str:
+            m = re.search(r"(\d+)$", raw)
+            return m.group(1) if m else raw
+
+        check_a = _check_suffix(self._normalize_check_number(txn_a.doc_number or ""))
+        check_b = _check_suffix(self._normalize_check_number(txn_b.doc_number or ""))
+
+        if not check_a or not check_b or check_a != check_b:
+            raise ValueError(
+                "Both Sage rows must share the same check number (e.g. '8241' and 'Voided - 8241')."
+            )
+
+        # Confirm one entry carries a void indicator
+        void_keywords = ("void", "voided")
+        doc_a_norm = self._normalize_text(txn_a.doc_number or "")
+        doc_b_norm = self._normalize_text(txn_b.doc_number or "")
+        one_is_void = (
+            any(kw in doc_a_norm for kw in void_keywords)
+            or any(kw in doc_b_norm for kw in void_keywords)
+        )
+        if not one_is_void:
+            raise ValueError(
+                "One of the Sage rows must be a voided entry (doc number should contain 'Void')."
+            )
+
+        amt_a = _to_decimal(txn_a.amount)
+        amt_b = _to_decimal(txn_b.amount)
+        if amt_a != amt_b:
+            raise ValueError("Both Sage rows must have the same amount to form a void pair.")
+
+        marked = 0
+        for sid in sage_transaction_ids:
+            sage_txn = sage_by_id[sid]
+            if not sage_txn.is_matched:
+                sage_txn.is_matched = True
+
+            existing = self.db.query(ReconciliationResult).filter(
+                ReconciliationResult.bank_transaction_id.is_(None),
+                ReconciliationResult.sage_transaction_id == sid,
+                ReconciliationResult.match_status == "matched",
+            ).first()
+
+            if existing:
+                continue
+
+            self.db.add(ReconciliationResult(
+                bank_transaction_id=None,
+                sage_transaction_id=sid,
+                match_status="matched",
             ))
             marked += 1
 
