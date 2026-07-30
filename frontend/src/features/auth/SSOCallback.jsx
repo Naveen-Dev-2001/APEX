@@ -17,6 +17,27 @@ export default function SSOCallback() {
     const hasProcessed = useRef(false);
     const baseURL = getBackendURL();
 
+    const setZohoDefaultEntityContext = (userObj) => {
+        const entityId = 'DEFAULT';
+        const entityName = 'Top Level';
+        const entityDisplayName = `${entityId} - ${entityName}`;
+
+        const userRoles = userObj.role ? userObj.role.split(',') : [];
+        const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
+        useAuthStore.getState().setActiveRole(activeRole);
+
+        useCommonStore.getState().setEntity(entityId);
+        sessionStorage.setItem('selected_entity', entityId);
+        sessionStorage.setItem('selected_entity_name', entityDisplayName);
+
+        const rawEntity = {
+            entity_id: entityId,
+            entity_name: entityName,
+            id: 0
+        };
+        useInvoiceStore.getState().setEntityMaster(rawEntity);
+    };
+
     useEffect(() => {
         if (hasProcessed.current) return;
         hasProcessed.current = true;
@@ -49,31 +70,12 @@ export default function SSOCallback() {
 
                 setStatus("Redirecting...");
                 toast.success("SSO Login Successful");
-                navigate("/module-select", { replace: true });
 
                 if (getERPSystem() === 'Zoho') {
-                    const entityId = 'DEFAULT';
-                    const entityName = 'Top Level';
-                    const entityDisplayName = `${entityId} - ${entityName}`;
-                    
-                    const userRoles = userObj.role ? userObj.role.split(',') : [];
-                    const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
-                    useAuthStore.getState().setActiveRole(activeRole);
-                    
-                    useCommonStore.getState().setEntity(entityId);
-                    sessionStorage.setItem('selected_entity', entityId);
-                    sessionStorage.setItem('selected_entity_name', entityDisplayName);
-
-                    const rawEntity = {
-                        entity_id: entityId,
-                        entity_name: entityName,
-                        id: 0
-                    };
-                    useInvoiceStore.getState().setEntityMaster(rawEntity);
-
+                    setZohoDefaultEntityContext(userObj);
                     navigate('/dashboard', { replace: true });
                 } else {
-                    navigate("/select-entity", { replace: true });
+                    navigate('/module-select', { replace: true });
                 }
 
             } catch (err) {

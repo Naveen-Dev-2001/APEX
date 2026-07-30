@@ -49,7 +49,7 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/module-select" element={<ModuleSelectionPage />} />
+            <Route path="/module-select" element={isSage ? <ModuleSelectionPage /> : <DashboardPage />} />
             <Route path="/select-entity" element={<SelectEntityPage />} />
             <Route path="/change-password-first-time" element={<ChangePasswordFirstTimePage />} />
             {isSage && <Route path="/bank-reconciliation" element={<BankReconciliationPage />} />}

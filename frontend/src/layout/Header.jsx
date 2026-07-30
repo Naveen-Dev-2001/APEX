@@ -411,22 +411,24 @@ const Header = () => {
                                 <div className="h-[1px] w-full bg-gray-50 mb-4"></div>
 
                                 {/* Switch Module Action */}
-                                <button
-                                    onClick={() => {
-                                        navigate('/module-select');
-                                        setIsDropdownOpen(false);
-                                    }}
-                                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
-                                >
-                                    <div className="p-1 rounded-lg text-[#3ba5d8]">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                        </svg>
-                                    </div>
-                                    <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
-                                        Switch Module
-                                    </span>
-                                </button>
+                                {getERPSystem() !== 'Zoho' && (
+                                    <button
+                                        onClick={() => {
+                                            navigate('/module-select');
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
+                                    >
+                                        <div className="p-1 rounded-lg text-[#3ba5d8]">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-[14px] font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                                            Switch Module
+                                        </span>
+                                    </button>
+                                )}
 
                                 {/* Change Entity Action */}
                                 {getERPSystem() !== 'Zoho' && (

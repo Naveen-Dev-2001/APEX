@@ -23,6 +23,28 @@ const LoginPage = () => {
     const [showAlert, setShowAlert] = useState(false);
     const [alertMessage, setAlertMessage] = useState('');
 
+    const setZohoDefaultEntityContext = (userObj) => {
+        const entityId = 'DEFAULT';
+        const entityName = 'Top Level';
+        const entityDisplayName = `${entityId} - ${entityName}`;
+
+        // Align role/entity context with SelectEntityPage defaults.
+        const userRoles = userObj.role ? userObj.role.split(',') : [];
+        const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
+        useAuthStore.getState().setActiveRole(activeRole);
+
+        useCommonStore.getState().setEntity(entityId);
+        sessionStorage.setItem('selected_entity', entityId);
+        sessionStorage.setItem('selected_entity_name', entityDisplayName);
+
+        const rawEntity = {
+            entity_id: entityId,
+            entity_name: entityName,
+            id: 0
+        };
+        useInvoiceStore.getState().setEntityMaster(rawEntity);
+    };
+
     const handleLogin = async (e) => {
         e.preventDefault();
         if (!email || !password) {
@@ -60,33 +82,11 @@ const LoginPage = () => {
                 if (response.data.ispasswordchange === false) {
                     toast.info('Please change your password to continue');
                     navigate('/change-password-first-time', { state: { email: response.data.email || email } });
+                } else if (getERPSystem() === 'Zoho') {
+                    setZohoDefaultEntityContext(userObj);
+                    navigate('/dashboard');
                 } else if (response.data.is_module_selection_required) {
-                    if (getERPSystem() === 'Zoho') {
-                        const entityId = 'DEFAULT';
-                        const entityName = 'Top Level';
-                        const entityDisplayName = `${entityId} - ${entityName}`;
-                        
-                        // Set the active role (similar to SelectEntityPage default behavior)
-                        const userRoles = userObj.role ? userObj.role.split(',') : [];
-                        const activeRole = sessionStorage.getItem('active_role') || userRoles[0] || 'approver';
-                        useAuthStore.getState().setActiveRole(activeRole);
-                        
-                        useCommonStore.getState().setEntity(entityId);
-                        sessionStorage.setItem('selected_entity', entityId);
-                        sessionStorage.setItem('selected_entity_name', entityDisplayName);
-
-                        const rawEntity = {
-                            entity_id: entityId,
-                            entity_name: entityName,
-                            id: 0
-                        };
-                        useInvoiceStore.getState().setEntityMaster(rawEntity);
-
-                        navigate('/dashboard');
-                    }
-                     else {
-                        navigate('/select-entity');
-                    }
+                    navigate('/select-entity');
                 }
                 else{
                      navigate('/module-select');
