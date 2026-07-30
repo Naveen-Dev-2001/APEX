@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import logo from '../../assets/loandna_logo_dark.png';
 import '../../layout/AuthLayout.css';
+import { getERPSystem } from '../../utils/envHelper';
 
 const ModuleSelectionPage = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const ModuleSelectionPage = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
   const dropdownRef = useRef(null);
+  const isSage = getERPSystem() === 'Sage';
 
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
@@ -67,7 +69,7 @@ const ModuleSelectionPage = () => {
       features: ['Bank Statement Upload', 'Sage GL Sync', 'Auto Match & Compare'],
       badge: 'New',
     },
-  ];
+  ].filter((module) => isSage || module.id !== 'bank-reconciliation');
 
   return (
     <div className="auth-background min-h-screen w-full flex flex-col font-creato">

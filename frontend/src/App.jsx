@@ -22,8 +22,10 @@ import CodingPage from './features/invoices/CodingPage';
 import ApprovalsPage from './features/invoices/ApprovalsPage';
 
 import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
+import { getERPSystem } from './utils/envHelper';
 
 function App() {
+  const isSage = getERPSystem() === 'Sage';
 
   return (
     <ConfigProvider
@@ -50,7 +52,7 @@ function App() {
             <Route path="/module-select" element={<ModuleSelectionPage />} />
             <Route path="/select-entity" element={<SelectEntityPage />} />
             <Route path="/change-password-first-time" element={<ChangePasswordFirstTimePage />} />
-            <Route path="/bank-reconciliation" element={<BankReconciliationPage />} />
+            {isSage && <Route path="/bank-reconciliation" element={<BankReconciliationPage />} />}
 
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
