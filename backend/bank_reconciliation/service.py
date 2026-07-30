@@ -419,29 +419,43 @@ class BankReconciliationService:
                         resolved_statement_month = None
 
             normalized_account_number = str(account_number).strip() if account_number else ""
+            existing_uploaded_dates = set()
+            existing_statement = None
             if normalized_account_number and resolved_statement_month:
-                existing_statements = self.db.query(BankStatement).filter(
+                existing_statement = self.db.query(BankStatement).filter(
                     BankStatement.account_number == normalized_account_number,
                     BankStatement.statement_month == resolved_statement_month
-                ).order_by(BankStatement.upload_date.desc(), BankStatement.id.desc()).all()
+                ).order_by(BankStatement.upload_date.desc(), BankStatement.id.desc()).first()
 
-                for existing_statement in existing_statements:
-                    deleted = self.delete_statement(existing_statement.id)
-                    if not deleted:
-                        raise ValueError(
-                            f"Failed to replace existing statement for account {normalized_account_number} and month {resolved_statement_month}."
-                        )
+                existing_date_rows = self.db.query(BankStatementTransaction.date).join(
+                    BankStatement,
+                    BankStatementTransaction.statement_id == BankStatement.id
+                ).filter(
+                    BankStatement.account_number == normalized_account_number,
+                    BankStatement.statement_month == resolved_statement_month
+                ).distinct().all()
+                existing_uploaded_dates = {row[0] for row in existing_date_rows if row and row[0] is not None}
 
-            statement = BankStatement(
-                filename=file.filename,
-                uploaded_by=uploader,
-                entity=entity,
-                account_number=normalized_account_number or None,
-                statement_month=resolved_statement_month,
-                status="uploaded"
-            )
-            self.db.add(statement)
-            self.db.flush()
+            created_new_statement = False
+            statement = existing_statement
+            if statement is None:
+                statement = BankStatement(
+                    filename=file.filename,
+                    uploaded_by=uploader,
+                    entity=entity,
+                    account_number=normalized_account_number or None,
+                    statement_month=resolved_statement_month,
+                    status="uploaded"
+                )
+                self.db.add(statement)
+                self.db.flush()
+                created_new_statement = True
+            else:
+                # Keep metadata fresh on incremental uploads to the same month bucket.
+                statement.filename = file.filename
+                statement.uploaded_by = uploader
+                statement.entity = entity or statement.entity
+                statement.status = "uploaded"
             
             transactions = []
             for _, row in df.iterrows():
@@ -450,6 +464,10 @@ class BankReconciliationService:
                     if pd.isna(raw_date):
                         continue
                     parsed_date = pd.to_datetime(raw_date).date()
+
+                    if parsed_date in existing_uploaded_dates:
+                        # Incremental monthly upload: skip dates already saved for this account+month.
+                        continue
                     
                     description = str(row[desc_col]) if desc_col and not pd.isna(row.get(desc_col, None)) else ""
                     reference   = str(row[ref_col])  if ref_col  and not pd.isna(row.get(ref_col, None))  else ""
@@ -524,6 +542,15 @@ class BankReconciliationService:
 
             if transactions:
                 self.db.bulk_save_objects(transactions)
+            else:
+                # Duplicate-only upload for the same month/account: do not error.
+                if existing_statement:
+                    return existing_statement
+
+                if created_new_statement:
+                    self.db.rollback()
+
+                raise ValueError("No valid transactions found to insert from the uploaded file.")
             self.db.commit()
             self.db.refresh(statement)
             return statement
