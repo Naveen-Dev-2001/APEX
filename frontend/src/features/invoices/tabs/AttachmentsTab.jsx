@@ -295,6 +295,15 @@ const AddAttachmentModal = ({ open, invoiceId, onCancel, onSuccess }) => {
 
     const handleFiles = (incoming) => {
         const allFiles = Array.from(incoming);
+        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
+
+        const oversizedFiles = allFiles.filter((f) => f.size > MAX_FILE_SIZE);
+        if (oversizedFiles.length > 0) {
+            oversizedFiles.forEach((f) => {
+                message.error(`"${f.name}" exceeds the maximum allowed size of 50MB.`);
+            });
+        }
+
         const allowedTypes = [
             "application/pdf", 
             "image/jpeg", 
@@ -307,11 +316,12 @@ const AddAttachmentModal = ({ open, invoiceId, onCancel, onSuccess }) => {
         const allowedExts = [".pdf", ".jpg", ".jpeg", ".png", ".xls", ".xlsx", ".csv"];
 
         const validFiles = allFiles.filter((f) => {
+            if (f.size > MAX_FILE_SIZE) return false;
             const ext = f.name.substring(f.name.lastIndexOf(".")).toLowerCase();
             return allowedTypes.includes(f.type) || allowedExts.includes(ext);
         });
 
-        if (validFiles.length < allFiles.length) {
+        if (validFiles.length + oversizedFiles.length < allFiles.length) {
             message.warning("Some files were skipped. Only PDF, JPG, JPEG, PNG, XLS, XLSX, and CSV are allowed.");
         }
 
