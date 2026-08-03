@@ -161,6 +161,13 @@ class BankReconciliationService:
         if bank_amount_cents != sage_amount_cents:
             return False
 
+        # Relaxed check-number rule:
+        # If check number and amount match, allow matching even when dates differ.
+        bank_check_any = self._normalize_check_number(bank_txn.check_number or bank_txn.reference)
+        sage_check_any = self._normalize_check_number(sage_txn.doc_number)
+        if bank_check_any and sage_check_any and bank_check_any == sage_check_any:
+            return True
+
         # ACH matching rule: check date + amount + description match
         if self._is_ach_transaction(bank_txn, sage_txn):
             bank_date = self._normalize_date(bank_txn.date)
@@ -1130,6 +1137,87 @@ class BankReconciliationService:
         candidate_sage_ids = [s.id for s in unmatched_sage]
 
         matches_found = auto_matched_pairs
+
+        def _extract_check_suffix(raw_doc: str) -> str:
+            # Normalize "Voided - 8241" and "8241" to the same suffix.
+            m = re.search(r"(\d+)$", raw_doc)
+            return m.group(1) if m else raw_doc
+
+        # Grouped debit auto-match:
+        # If one bank debit check maps to 2 Sage debit rows with the same check number,
+        # and the combined Sage amount equals the bank amount, match them together.
+        for b_txn in unmatched_bank:
+            if b_txn.is_matched:
+                continue
+
+            if self._normalize_text(b_txn.transaction_type) != "debit":
+                continue
+
+            bank_check = _extract_check_suffix(self._normalize_check_number(b_txn.check_number))
+            if not bank_check:
+                continue
+
+            bank_amount_cents = _to_cents(b_txn.amount)
+
+            grouped_candidates = []
+            for s_txn in unmatched_sage:
+                if s_txn.is_matched:
+                    continue
+                if self._normalize_text(s_txn.transaction_type) != "debit":
+                    continue
+
+                sage_check = _extract_check_suffix(self._normalize_check_number(s_txn.doc_number))
+                if not sage_check or sage_check != bank_check:
+                    continue
+
+                grouped_candidates.append(s_txn)
+
+            if len(grouped_candidates) < 2:
+                continue
+
+            selected_group = None
+            for i in range(len(grouped_candidates)):
+                for j in range(i + 1, len(grouped_candidates)):
+                    combined_cents = _to_cents(grouped_candidates[i].amount) + _to_cents(grouped_candidates[j].amount)
+                    if combined_cents == bank_amount_cents:
+                        selected_group = [grouped_candidates[i], grouped_candidates[j]]
+                        break
+                if selected_group:
+                    break
+
+            if not selected_group and len(grouped_candidates) >= 3:
+                for i in range(len(grouped_candidates)):
+                    for j in range(i + 1, len(grouped_candidates)):
+                        for k in range(j + 1, len(grouped_candidates)):
+                            combined_cents = (
+                                _to_cents(grouped_candidates[i].amount)
+                                + _to_cents(grouped_candidates[j].amount)
+                                + _to_cents(grouped_candidates[k].amount)
+                            )
+                            if combined_cents == bank_amount_cents:
+                                selected_group = [
+                                    grouped_candidates[i],
+                                    grouped_candidates[j],
+                                    grouped_candidates[k],
+                                ]
+                                break
+                        if selected_group:
+                            break
+                    if selected_group:
+                        break
+
+            if not selected_group:
+                continue
+
+            b_txn.is_matched = True
+            for s_txn in selected_group:
+                s_txn.is_matched = True
+                self.db.add(ReconciliationResult(
+                    bank_transaction_id=b_txn.id,
+                    sage_transaction_id=s_txn.id,
+                    match_status="matched"
+                ))
+                matches_found += 1
         
         for b_txn in unmatched_bank:
             if b_txn.is_matched:
