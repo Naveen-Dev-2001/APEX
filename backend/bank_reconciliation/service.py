@@ -458,12 +458,18 @@ class BankReconciliationService:
                 statement.status = "uploaded"
             
             transactions = []
+            skipped_out_of_month = 0
             for _, row in df.iterrows():
                 try:
                     raw_date = row[date_col]
                     if pd.isna(raw_date):
                         continue
                     parsed_date = pd.to_datetime(raw_date).date()
+
+                    # If a statement month is selected, only keep transactions in that month.
+                    if resolved_statement_month and parsed_date.strftime("%Y-%m") != resolved_statement_month:
+                        skipped_out_of_month += 1
+                        continue
 
                     if parsed_date in existing_uploaded_dates:
                         # Incremental monthly upload: skip dates already saved for this account+month.
@@ -543,6 +549,12 @@ class BankReconciliationService:
             if transactions:
                 self.db.bulk_save_objects(transactions)
             else:
+                # If rows were excluded due to month filtering, still keep the statement header.
+                if skipped_out_of_month > 0:
+                    self.db.commit()
+                    self.db.refresh(statement)
+                    return statement
+
                 # Duplicate-only upload for the same month/account: do not error.
                 if existing_statement:
                     return existing_statement
