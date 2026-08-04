@@ -284,16 +284,20 @@ const AddAttachmentModal = ({ open, invoiceId, onCancel, onSuccess }) => {
 
     const fileInputRef = useRef(null);
 
+    const [errorMessage, setErrorMessage] = useState("");
+
     useEffect(() => {
         if (!open) {
             setFiles([]);
             setIsDragging(false);
             setConfirmLoading(false);
             setUploadProgress(0);
+            setErrorMessage("");
         }
     }, [open]);
 
     const handleFiles = (incoming) => {
+        setErrorMessage("");
         const allFiles = Array.from(incoming);
         const allowedTypes = [
             "application/pdf", 
@@ -339,10 +343,22 @@ const AddAttachmentModal = ({ open, invoiceId, onCancel, onSuccess }) => {
 
     const handleDelete = (fileToDelete) => {
         setFiles((prev) => prev.filter((f) => f.name !== fileToDelete.name));
+        setErrorMessage("");
     };
 
     const handleUpload = async () => {
         if (files.length === 0) return;
+        setErrorMessage("");
+
+        const MAX_FILE_SIZE = 1 * 1024 * 1024; // 50MB limit
+        const oversizedFiles = files.filter((f) => f.size > MAX_FILE_SIZE);
+
+        if (oversizedFiles.length > 0) {
+            const names = oversizedFiles.map(f => `"${f.name}"`).join(", ");
+            setErrorMessage(`File size exceeds limit: ${names} ${oversizedFiles.length > 1 ? 'exceed' : 'exceeds'} maximum allowed size of 50MB.`);
+            return;
+        }
+
         setConfirmLoading(true);
         setUploadProgress(10);
 
@@ -552,6 +568,12 @@ const AddAttachmentModal = ({ open, invoiceId, onCancel, onSuccess }) => {
                                 {uploadProgress}%
                             </span>
                         </div>
+                    </div>
+                )}
+
+                {errorMessage && (
+                    <div className="px-6 pb-2 text-[12px] text-red-500 font-medium">
+                        {errorMessage}
                     </div>
                 )}
 
