@@ -1,3 +1,5 @@
+import { getERPSystem } from "./envHelper";
+
 const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
 const normalizeItems = (items) => {
@@ -82,7 +84,7 @@ const addSystemRows = (rows, formData, entityMaster, activeInvoiceData) => {
     const isGstApplicable = entityMaster?.gst_applicable === true && !isGstDeleted;
     if (isGstApplicable) {
         const gstValue = Number(formData?.totalTaxAmount || 0);
-        const gstLabel = "Total GST";
+        const gstLabel = getERPSystem() === "Zoho" ? "Total VAT" : "Total GST";
 
         let gstCoding = { glCode: "", lob: "", department: "", customer: "", item: "", lineType: "Expense" };
         if (activeInvoiceData) {
@@ -91,7 +93,7 @@ const addSystemRows = (rows, formData, entityMaster, activeInvoiceData) => {
                 const desc = item.description?.value || item.description || "";
                 return item.is_system_row === true || item.isSystemRow === true ||
                        item.type === "GST" || item.row_type === "GST" ||
-                       desc === "Total GST" || desc === "Total Tax";
+                       desc === "Total GST" || desc === "Total VAT" || desc === "Total Tax";
             });
             if (existingGst) {
                 gstCoding = {

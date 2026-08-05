@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getERPSystem } from "../utils/envHelper";
 
 const roundTo2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
@@ -149,13 +150,17 @@ export const useInvoiceStore = create((set, get) => ({
         const isEntityGstApplicable = entityMaster?.gst_applicable === true;
         const isGstDeleted = formData?.isGstDeleted === true || formData?.isGstDeleted === "true";
         const isGstApplicable = isEntityGstApplicable && !isGstDeleted;
+        const gstLabel = getERPSystem() === "Zoho" ? "Total VAT" : "Total GST";
 
         if (isModified) {
             // Preserve saved system rows exactly as-is if GST is applicable
-            const gstRow = existingGstRow ?? (isGstApplicable ? {
+            const gstRow = existingGstRow ? {
+                ...existingGstRow,
+                description: gstLabel,
+            } : (isGstApplicable ? {
                 id: "gst-row",
                 type: "GST",
-                description: "Total GST",
+                description: gstLabel,
                 qty: 1,
                 unitPrice: 0,
                 discount: 0,
@@ -184,7 +189,7 @@ export const useInvoiceStore = create((set, get) => ({
         const gstRow = isGstApplicable ? {
             id: "gst-row",
             type: "GST",
-            description: "Total GST",
+            description: gstLabel,
             qty: 1,
             unitPrice: gstValue,
             discount: 0,
@@ -380,13 +385,14 @@ export const useInvoiceStore = create((set, get) => ({
                 const discount = Number(item.discount?.value) || 0;
                 const taxAmt = Number(item.tax_amount?.value) || 0;
 
-                const isGst = desc === "Total GST" || desc === "Total Tax";
+                const isGst = desc === "Total GST" || desc === "Total VAT" || desc === "Total Tax";
                 const isTds = desc === "TDS Deduction";
+                const rowDescription = isGst ? (getERPSystem() === "Zoho" ? "Total VAT" : "Total GST") : desc;
 
                 return {
                     id: isGst ? "gst-row" : isTds ? "tds-row" : index + 1,
                     type: isGst ? "GST" : isTds ? "TDS" : undefined,
-                    description: desc,
+                    description: rowDescription,
                     qty,
                     unitPrice: isGst || isTds ? netAmount : unitPrice,
                     discount,
