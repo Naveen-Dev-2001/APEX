@@ -485,6 +485,41 @@ class InvoiceExtractionAgent:
                 item_count = len(azure_data["Items"].get("value", []))
                 print(f"Using {item_count} Azure-extracted line items")
 
+            # Check if SSCL tax exists in extracted amounts or raw content and append as a line item
+            sscl_val = merged.get("amounts", {}).get("SSCL", {}).get("value") if isinstance(merged.get("amounts", {}).get("SSCL"), dict) else merged.get("amounts", {}).get("SSCL")
+            
+            # Fallback: scan raw OCR text if SSCL amount not in structured fields
+            if sscl_val is None and raw_content:
+                import re
+                sscl_match = re.search(r'SSCL\s*(?:\([^)]*\))?\s*[:\-]?\s*([\d,]+(?:\.\d+)?)', raw_content, re.IGNORECASE)
+                if sscl_match:
+                    sscl_val = sscl_match.group(1)
+
+            if sscl_val is not None:
+                try:
+                    sscl_amount = float(str(sscl_val).replace(",", "").strip())
+                    if sscl_amount > 0:
+                        if "Items" not in merged or not isinstance(merged["Items"], dict):
+                            merged["Items"] = {"source": "system", "confidence": 1.0, "bounding_regions": [], "value": []}
+                        items_list = merged["Items"].get("value", [])
+                        
+                        # Check if SSCL line item is already appended
+                        already_exists = any("SSCL" in str(item.get("description", {}).get("value", "")).upper() for item in items_list)
+                        if not already_exists:
+                            new_item_num = len(items_list) + 1
+                            sscl_item = {
+                                "description": {"value": "SSCL Tax", "source": "system", "confidence": 1.0},
+                                "amount": {"value": sscl_amount, "source": "system", "confidence": 1.0},
+                                "unit_price": {"value": sscl_amount, "source": "system", "confidence": 1.0},
+                                "quantity": {"value": 1.0, "source": "system", "confidence": 1.0},
+                                "item_number": {"value": new_item_num, "source": "system", "confidence": 1.0}
+                            }
+                            items_list.append(sscl_item)
+                            merged["Items"]["value"] = items_list
+                            print(f"Added SSCL tax of {sscl_amount} as line item #{new_item_num}")
+                except Exception as ex:
+                    print(f"Failed to append SSCL line item: {ex}")
+
             state["enhanced_data"] = merged
             duration = time.time() - start_time
             print(f"LLM Enhancement took {duration:.2f}s")
@@ -589,6 +624,7 @@ Extract and return ALL available information in this EXACT JSON format:
         "CGST": number or null,
         "SGST": number or null,
         "IGST": number or null,
+        "SSCL": number or null,
         "withholding_tax": number or null,
         "total_invoice_amount": number or null,
         "amount_paid": number or null,
@@ -701,6 +737,7 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
                 "CGST": None,
                 "SGST": None,
                 "IGST": None,
+                "SSCL": None,
                 "withholding_tax": None,
                 "amount_paid": "AmountPaid",
             },
@@ -720,7 +757,7 @@ Return ONLY the JSON object. No explanations, no markdown formatting, just pure 
             "client_info": ["name", "billing_address", "shipping_address", "tax_id", "phone", "email", "contact_person"],
             "invoice_details": ["invoice_number", "invoice_date", "due_date", "po_number", "payment_terms", "currency", "type", "payment_method", "cost_center"],
             "service_period": ["start_date", "end_date"],
-            "amounts": ["subtotal", "total_tax_amount", "total_invoice_amount", "amount_due", "previous_unpaid_balance", "shipping_handling_fees", "surcharges", "tax_type_breakdown", "CGST", "SGST", "IGST", "withholding_tax", "amount_paid"],
+            "amounts": ["subtotal", "total_tax_amount", "total_invoice_amount", "amount_due", "previous_unpaid_balance", "shipping_handling_fees", "surcharges", "tax_type_breakdown", "CGST", "SGST", "IGST", "SSCL", "withholding_tax", "amount_paid"],
             "additional_info": ["notes_terms", "qr_code_irn", "company_registration_number"]
         }
 
