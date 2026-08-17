@@ -66,7 +66,7 @@ class InvoiceExtractionAgent:
                 with open(file_path, "rb") as document:
                     doc_bytes = document.read()
             else:
-                from app.services.azure_blob import container_client, get_blob_name_from_path
+                from common.services.azure_blob import container_client, get_blob_name_from_path
                 blob_name = get_blob_name_from_path(file_path)
                 try:
                     print(f"File {file_path} not found locally. Fetching bytes from Azure Blob: {blob_name}")

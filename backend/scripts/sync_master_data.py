@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 env_path = backend_dir / '.env'
 load_dotenv(dotenv_path=env_path)
 
-from app.database.database import SessionLocal
-from app.database.init_db import seed_api_master_data
+from common.database.database import SessionLocal
+from common.database.init_db import seed_api_master_data
 
 async def main():
     # Check for --force flag
