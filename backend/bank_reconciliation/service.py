@@ -10,6 +10,7 @@ import httpx
 import os
 import json
 import re
+import hashlib
 
 from common.models.db_models import (
     BankStatement, BankStatementTransaction, 
@@ -387,13 +388,13 @@ class BankReconciliationService:
             desc_col = next((c for c in cols if 'description' in c or 'particulars' in c or 'narration' in c), None)
             ref_col  = next((c for c in cols if 'ref' in c or 'cheque' in c or 'check' in c), None)
             check_no_col = next((c for c in cols if 'check number' in c or 'cheque number' in c or 'check no' in c or 'cheque no' in c), None)
-            amount_col = next((c for c in cols if c == 'amount'), None)
+            amount_col = next((c for c in cols if c in ('amount', 'total')), None)
             debit_col = next((c for c in cols if 'debit' in c or 'withdrawal' in c or 'dr' == c), None)
             credit_col = next((c for c in cols if 'credit' in c or 'deposit' in c or 'cr' == c), None)
             account_number_col = next((c for c in cols if 'account number' in c or c in ('accountno', 'account_no', 'account_number')), None)
             account_name_col = next((c for c in cols if 'account name' in c), None)
-            txn_type_col = next((c for c in cols if 'transaction type' in c or 'txn type' in c), None)
-            status_col = next((c for c in cols if c == 'status' or 'transaction status' in c), None)
+            txn_type_col = next((c for c in cols if 'transaction type' in c or 'txn type' in c or c == 'direction'), None)
+            status_col = next((c for c in cols if c in ('status', 'state', 'display_state') or 'transaction status' in c), None)
             
             if not amount_col and not (debit_col or credit_col):
                 raise ValueError("Could not find Amount or Debit/Credit columns in the uploaded file.")
@@ -520,9 +521,9 @@ class BankReconciliationService:
                             continue
 
                     if txn_type_raw:
-                        if txn_type_raw in ("debit", "dr", "withdrawal"):
+                        if txn_type_raw in ("debit", "dr", "withdrawal", "decrease", "out", "outflow", "-1"):
                             t_type = "debit"
-                        elif txn_type_raw in ("credit", "cr", "deposit"):
+                        elif txn_type_raw in ("credit", "cr", "deposit", "increase", "in", "inflow", "1"):
                             t_type = "credit"
                     
                     if not t_type or amount == Decimal('0.00'):
@@ -781,75 +782,103 @@ class BankReconciliationService:
                 return "debit"
             return "debit"  # safe default
 
+        # ── Pass 1: parse all rows and compute sage_keys ────────────────────
+        pending_rows = []
+        for _, row in df.iterrows():
+            raw_date = str(row.get("date", "") or "").strip()
+            date_obj = self._normalize_date(raw_date)
+            if date_obj is None:
+                continue
+
+            doc_number  = str(row.get("doc_number", "") or "").strip() or None
+            description = str(row.get("description", "") or "").strip() or None
+            total_raw   = str(row.get("total", "0") or "0").strip()
+            source_obj  = str(row.get("source_object", "") or "").strip() or None
+            direction   = str(row.get("direction", "") or "").strip()
+            party_name  = str(row.get("party_name", "") or "").strip() or None
+            pay_method  = str(row.get("payment_method", "") or "").strip() or None
+            cleared_val = (
+                str(row.get("cleared", "") or "").strip()
+                or str(row.get("display_state", "") or "").strip()
+                or None
+            )
+
+            try:
+                amount = Decimal(total_raw.replace(",", ""))
+            except Exception:
+                amount = Decimal("0")
+
+            txn_type = _direction_to_txn_type(direction)
+
+            # Deterministic unique key via SHA-256 hash (no truncation collisions)
+            _key_raw = f"xl|{source_obj}|{direction}|{raw_date}|{doc_number}|{total_raw}|{description}"
+            sage_key = "xl_" + hashlib.sha256(_key_raw.encode()).hexdigest()[:60]
+
+            row_account = str(row.get("account", "") or row.get("gl_account", "") or "").strip() or None
+            resolved_account = row_account or account_number or None
+
+            row_bank = str(row.get("bank", "") or row.get("financial_entity", "") or "").strip() or None
+            resolved_bank = row_bank or bank or None
+
+            pending_rows.append({
+                "sage_key": sage_key,
+                "date": date_obj,
+                "description": description or "",
+                "account": resolved_account or "",
+                "amount": amount,
+                "transaction_type": txn_type,
+                "entry_date": date_obj,
+                "doc_number": doc_number,
+                "vendor": party_name,
+                "record_type": source_obj,
+                "cleared": cleared_val,
+                "tr_type": pay_method,
+                "bank": resolved_bank,
+            })
+
+        if not pending_rows:
+            return 0
+
+        # ── Pass 2: fetch all already-existing keys in ONE query ─────────────
+        candidate_keys = list({r["sage_key"] for r in pending_rows})  # dedupe within file
+        existing_keys = set(
+            row[0]
+            for row in self.db.query(SageGLTransactionCache.sage_key)
+            .filter(SageGLTransactionCache.sage_key.in_(candidate_keys))
+            .all()
+        )
+
+        # ── Pass 3: insert only genuinely new rows ───────────────────────────
         inserted = 0
+        seen_in_batch: set = set()  # guard against duplicates within the file
         try:
-            for _, row in df.iterrows():
-                raw_date = str(row.get("date", "") or "").strip()
-                date_obj = self._normalize_date(raw_date)
-                if date_obj is None:
-                    # Skip rows without a parseable date
+            for r in pending_rows:
+                key = r["sage_key"]
+                if key in existing_keys or key in seen_in_batch:
                     continue
+                seen_in_batch.add(key)
 
-                doc_number  = str(row.get("doc_number", "") or "").strip() or None
-                description = str(row.get("description", "") or "").strip() or None
-                total_raw   = str(row.get("total", "0") or "0").strip()
-                source_obj  = str(row.get("source_object", "") or "").strip() or None
-                direction   = str(row.get("direction", "") or "").strip()
-                party_name  = str(row.get("party_name", "") or "").strip() or None
-                pay_method  = str(row.get("payment_method", "") or "").strip() or None
-                # Prefer 'cleared' column; fall back to 'display_state'
-                cleared_val = (
-                    str(row.get("cleared", "") or "").strip()
-                    or str(row.get("display_state", "") or "").strip()
-                    or None
-                )
-
-                try:
-                    amount = Decimal(total_raw.replace(",", ""))
-                except Exception:
-                    amount = Decimal("0")
-
-                txn_type = _direction_to_txn_type(direction)
-
-                # Build a deterministic unique key for deduplication
-                sage_key = f"xl_{source_obj}_{direction}_{raw_date}_{doc_number}_{total_raw}_{description}"
-                # Truncate to fit the 100-char column
-                sage_key = sage_key[:100]
-
-                # Resolve account: prefer file column, fall back to param
-                row_account = str(row.get("account", "") or row.get("gl_account", "") or "").strip() or None
-                resolved_account = row_account or account_number or None
-
-                # Resolve bank: prefer file column, fall back to param
-                row_bank = str(row.get("bank", "") or row.get("financial_entity", "") or "").strip() or None
-                resolved_bank = row_bank or bank or None
-
-                existing = self.db.query(SageGLTransactionCache).filter_by(sage_key=sage_key).first()
-                if existing:
-                    continue  # idempotent re-upload
-
-                cache_item = SageGLTransactionCache(
-                    sage_key=sage_key,
-                    date=date_obj,
-                    description=description or "",
-                    account=resolved_account or "",
-                    amount=amount,
-                    transaction_type=txn_type,
+                self.db.add(SageGLTransactionCache(
+                    sage_key=key,
+                    date=r["date"],
+                    description=r["description"],
+                    account=r["account"],
+                    amount=r["amount"],
+                    transaction_type=r["transaction_type"],
                     is_matched=False,
-                    entry_date=date_obj,
-                    doc_number=doc_number,
-                    vendor=party_name,
+                    entry_date=r["entry_date"],
+                    doc_number=r["doc_number"],
+                    vendor=r["vendor"],
                     customer=None,
-                    record_type=source_obj,
-                    cleared=cleared_val,
-                    tr_type=pay_method,
-                    bank=resolved_bank,
-                )
-                self.db.add(cache_item)
+                    record_type=r["record_type"],
+                    cleared=r["cleared"],
+                    tr_type=r["tr_type"],
+                    bank=r["bank"],
+                ))
                 inserted += 1
 
             self.db.commit()
-            
+
             # Auto-match reversals and voided pairs for the uploaded data
             auto_matched = self._auto_match_sage_internal_reversals(
                 account_number=account_number,
@@ -861,6 +890,7 @@ class BankReconciliationService:
             raise
 
         return inserted
+
 
     def sync_bank_accounts_from_sage_cache(self) -> int:
         """Build/refresh bank_accounts from existing Sage cache + GL master."""

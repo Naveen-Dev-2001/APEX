@@ -139,6 +139,18 @@ const BankStatementTab = () => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('statement_month', statementMonthValue);
+
+    // Pass account_number and entity from the selected bank dropdown
+    if (selectedBank && selectedBank !== 'all') {
+      const selectedRow = bankAccounts.find(
+        (r) => String(r?.account_number || '').trim() === selectedBank,
+      );
+      const accountNumber = selectedRow?.account_number || selectedBank;
+      const entity = selectedRow?.bank_id || selectedRow?.bank_name || null;
+      formData.append('account_number', accountNumber);
+      if (entity) formData.append('entity', entity);
+    }
+
     setUploading(true);
     try {
       await reconciliationApi.uploadStatement(formData);
@@ -148,6 +160,7 @@ const BankStatementTab = () => {
       toast.error(e.response?.data?.detail || 'Upload failed');
     } finally {
       setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
