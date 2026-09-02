@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
 import {
@@ -20,6 +20,13 @@ const SageGLTab = () => {
   const [sageSearch, setSageSearch] = useState('');
   const [sageDetailSearch, setSageDetailSearch] = useState('');
   const [viewingBankSummary, setViewingBankSummary] = useState(null);
+
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadBank, setUploadBank] = useState('');
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef();
 
   const load = async () => {
     setLoading(true);
@@ -76,6 +83,55 @@ const SageGLTab = () => {
       setFetching(false);
     }
   };
+
+  // ── Excel Upload ─────────────────────────────────────────────────────────
+  const openUploadModal = () => {
+    setUploadBank('');
+    setUploadFile(null);
+    if (fileRef.current) fileRef.current.value = '';
+    setShowUploadModal(true);
+  };
+
+  const closeUploadModal = () => {
+    setShowUploadModal(false);
+    setUploadFile(null);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handleFileChange = (e) => {
+    setUploadFile(e.target.files?.[0] || null);
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile) {
+      toast.error('Please select an Excel file to upload.');
+      return;
+    }
+
+    const selectedRow = bankAccounts.find(
+      (r) => String(r?.account_number || '').trim() === uploadBank,
+    );
+    const accountNumber = selectedRow?.gl_account || selectedRow?.account_number || uploadBank || null;
+    const bank = selectedRow?.bank_id || selectedRow?.bank_name || null;
+
+    const fd = new FormData();
+    fd.append('file', uploadFile);
+    if (accountNumber) fd.append('account_number', accountNumber);
+    if (bank) fd.append('bank', bank);
+
+    setUploading(true);
+    try {
+      const res = await reconciliationApi.uploadSageTransactions(fd);
+      toast.success(res.data.message || 'Upload successful');
+      closeUploadModal();
+      await load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const bankOptions = React.useMemo(() => {
     const dedupedByAccount = new Map();
@@ -191,16 +247,31 @@ const SageGLTab = () => {
             className="w-full max-w-sm bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5"
           />
         </div>
-        <button
-          onClick={handleFetch}
-          disabled={fetching}
-          className="flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
-        >
-          {fetching
-            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Fetching</>
-            : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Sync from Sage</>
-          }
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Upload Excel button */}
+          <button
+            id="sage-upload-excel-btn"
+            onClick={openUploadModal}
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Upload Excel
+          </button>
+          {/* Sync from Sage button */}
+          <button
+            id="sage-sync-btn"
+            onClick={handleFetch}
+            disabled={fetching}
+            className="flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
+          >
+            {fetching
+              ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Fetching</>
+              : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Sync from Sage</>
+            }
+          </button>
+        </div>
       </div>
 
       {loading && <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" /></div>}
@@ -337,8 +408,134 @@ const SageGLTab = () => {
         </div>
       )}
 
+      {/* Upload Excel modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-[2200] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden">
+            {/* Modal header */}
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800 text-base">Upload Sage Transactions</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Import from Excel / CSV export</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeUploadModal}
+                disabled={uploading}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Bank account selector */}
+              <div>
+                <label htmlFor="upload-sage-bank" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Bank Account <span className="text-gray-400 font-normal">(optional — helps link transactions)</span>
+                </label>
+                <select
+                  id="upload-sage-bank"
+                  value={uploadBank}
+                  onChange={(e) => setUploadBank(e.target.value)}
+                  className="appearance-none w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-emerald-400 focus:border-emerald-400 p-2.5 transition-colors cursor-pointer"
+                >
+                  <option value="">— No specific bank account —</option>
+                  {bankOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* File picker */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Sage GL Export File <span className="text-red-500">*</span>
+                </label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  className={`relative flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors ${
+                    uploadFile
+                      ? 'border-emerald-400 bg-emerald-50'
+                      : 'border-gray-200 bg-gray-50 hover:border-emerald-300 hover:bg-emerald-50/40'
+                  }`}
+                >
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  {uploadFile ? (
+                    <>
+                      <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-sm font-semibold text-emerald-700">{uploadFile.name}</p>
+                      <p className="text-xs text-emerald-500">{(uploadFile.size / 1024).toFixed(1)} KB — click to change</p>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <p className="text-sm font-medium text-gray-600">Click to browse</p>
+                      <p className="text-xs text-gray-400">.xlsx, .xls, .csv accepted</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Column hint */}
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Expected columns:{' '}
+                <span className="font-mono text-gray-500">
+                  source_object, direction, date, doc_number, description, total, party_name, payment_method, display_state, cleared
+                </span>
+              </p>
+            </div>
+
+            {/* Modal footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeUploadModal}
+                disabled={uploading}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                id="sage-upload-submit-btn"
+                type="button"
+                onClick={handleUpload}
+                disabled={uploading || !uploadFile}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {uploading ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading…</>
+                ) : (
+                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg> Upload</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!loading && (!data || filteredTransactions.length === 0) && (
-        <EmptyState icon="📊" title="No Sage transactions yet" subtitle="Click 'Sync from Sage' to pull the latest GL entries" />
+        <EmptyState icon="📊" title="No Sage transactions yet" subtitle="Click 'Sync from Sage' or 'Upload Excel' to add GL entries" />
       )}
     </div>
   );

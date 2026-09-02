@@ -214,6 +214,36 @@ def get_statement_transactions(
     }
 
 
+@router.post("/upload-sage-transactions")
+async def upload_sage_transactions(
+    file: UploadFile = File(...),
+    account_number: Optional[str] = Form(None),
+    bank: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Upload a Sage GL Excel/CSV export and cache the transactions."""
+    if not file.filename.lower().endswith(('.csv', '.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Only CSV and Excel files are supported.")
+
+    service = BankReconciliationService(db)
+    try:
+        count = await service.process_sage_transactions_excel(
+            file=file,
+            account_number=account_number or None,
+            bank=bank or None,
+        )
+        return {
+            "message": f"Uploaded {count} new Sage transaction(s).",
+            "count": count,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Sage Excel upload failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to process Sage transactions file: {str(e)}")
+
+
 @router.post("/fetch-sage-transactions")
 async def fetch_sage_transactions(
     account_number: Optional[str] = Query(None, description="Filter by GL account number"),

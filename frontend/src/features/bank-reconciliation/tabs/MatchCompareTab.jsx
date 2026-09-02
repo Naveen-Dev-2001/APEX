@@ -202,12 +202,12 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
     return Array.from(grouped.values());
   };
 
-  const bankDisplayItems = statusFilter === 'matched' ? matchedItems.map((m) => m.bank)
+  const bankDisplayItems = statusFilter === 'matched' ? matchedItems.map((m) => m.bank).filter(Boolean)
     : statusFilter === 'unmatched' ? unmatchedBankItems : allBankItems;
 
   const uniqueBankDisplayItems = uniqueById(bankDisplayItems);
 
-  const sageDisplayItems = statusFilter === 'matched' ? matchedItems.map((m) => m.sage)
+  const sageDisplayItems = statusFilter === 'matched' ? matchedItems.map((m) => m.sage).filter(Boolean)
     : statusFilter === 'unmatched' ? unmatchedSageItems : allSageItems;
 
   const groupedSageDisplay = groupByCheckNo(sageDisplayItems);

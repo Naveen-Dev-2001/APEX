@@ -168,21 +168,27 @@ class BankReconciliationService:
         if bank_check_any and sage_check_any and bank_check_any == sage_check_any:
             return True
 
-        # ACH matching rule: check date + amount + description match
-        if self._is_ach_transaction(bank_txn, sage_txn):
-            bank_date = self._normalize_date(bank_txn.date)
-            sage_date = self._normalize_date(sage_txn.entry_date or sage_txn.date)
-            if not bank_date or not sage_date or bank_date != sage_date:
-                return False
+        bank_type = self._normalize_text(bank_txn.transaction_type)
+        sage_type = self._normalize_text(sage_txn.transaction_type)
+        
+        bank_date = self._normalize_date(bank_txn.date)
+        sage_date = self._normalize_date(sage_txn.entry_date or sage_txn.date)
+        
+        if not bank_date or not sage_date or bank_date != sage_date:
+            return False
 
+        # ACH matching rule
+        if self._is_ach_transaction(bank_txn, sage_txn):
+            # For incoming ACH credits, Amount and Date match is sufficient.
+            if bank_type == "credit" and sage_type == "credit":
+                return True
+                
+            # For ACH debits, require description match
             bank_desc = self._normalize_text(bank_txn.description)
             sage_desc = self._normalize_text(sage_txn.description)
             return bool(bank_desc and sage_desc and bank_desc == sage_desc)
 
-        bank_type = self._normalize_text(bank_txn.transaction_type)
-        sage_type = self._normalize_text(sage_txn.transaction_type)
-
-        # Debit matching rule: check check_number + debit amount match
+        # Debit matching rule: check check_number match
         if bank_type == "debit":
             if sage_type != "debit":
                 return False
@@ -191,27 +197,14 @@ class BankReconciliationService:
             sage_check = self._normalize_check_number(sage_txn.doc_number)
             return bool(bank_check and sage_check and bank_check == sage_check)
 
-        # Credit matching rule: reference number + posting date + description + amount
+        # Credit matching rule (Wires, generic incoming money):
         if bank_type == "credit":
             if sage_type != "credit":
                 return False
-
-            bank_date = self._normalize_date(bank_txn.date)
-            sage_posting_date = self._normalize_date(sage_txn.entry_date or sage_txn.date)
-            if not bank_date or not sage_posting_date or bank_date != sage_posting_date:
-                return False
-
-            bank_desc = self._normalize_text(bank_txn.description)
-            sage_desc = self._normalize_text(sage_txn.description)
-            if not bank_desc or not sage_desc or bank_desc != sage_desc:
-                return False
-
-            bank_reference = self._normalize_check_number(bank_txn.reference or bank_txn.check_number)
-            sage_reference = self._normalize_check_number(sage_txn.doc_number)
-            if bank_reference or sage_reference:
-                if bank_reference != sage_reference:
-                    return False
-
+                
+            # For incoming credits, since they are already scoped by Account, Amount, and Date,
+            # we can consider them a match even if the descriptions (e.g. "INCOMING MONEY TRANSFER" vs "nan")
+            # and references don't explicitly align.
             return True
 
         return False
@@ -248,7 +241,7 @@ class BankReconciliationService:
 
         def _doc_check_suffix(raw: str) -> str:
             norm = re.sub(r"\s+", "", str(raw or "")).lower()
-            m = re.search(r"(\d+)$", norm)
+            m = re.search(r"(\d+)", norm)
             return m.group(1) if m else ""
 
         def _doc_is_voided(raw: str) -> bool:
@@ -301,12 +294,14 @@ class BankReconciliationService:
 
             # Determine direction: positive vs negative
             amt = _to_decimal(txn.amount)
-            txn_type = self._normalize_text(txn.transaction_type)
 
-            if amt < 0 or txn_type == "credit":
+            if amt < 0:
                 direction = "negative"
-            else:
+            elif amt > 0:
                 direction = "positive"
+            else:
+                txn_type = self._normalize_text(txn.transaction_type)
+                direction = "negative" if txn_type == "credit" else "positive"
 
             rev_key = (acct_key, bank_key, normalized_desc)
             rev_bucket = desc_reversal_grouped.setdefault(rev_key, {"positive": [], "negative": []})
@@ -737,6 +732,135 @@ class BankReconciliationService:
         except Exception:
             self.db.rollback()
             raise
+
+    async def process_sage_transactions_excel(
+        self,
+        file: UploadFile,
+        account_number: Optional[str] = None,
+        bank: Optional[str] = None,
+    ) -> int:
+        """Parse a Sage GL Excel export and upsert rows into SageGLTransactionCache.
+
+        Expected Sage Excel headers (case-insensitive):
+          source_object, direction, date, doc_number, description,
+          total, party_name, payment_method, state, display_state, cleared
+
+        ``direction`` is mapped to transaction_type:
+          increase / credit / cr / in / inflow → credit
+          decrease / debit / dr / out / outflow → debit
+
+        ``total`` is used as the amount.  A ``sage_key`` is derived from
+        source_object + direction + date + doc_number + total + description
+        to make re-uploads idempotent.
+        """
+        content = await file.read()
+        ext = (file.filename or "").lower().rsplit(".", 1)[-1]
+        try:
+            if ext in ("xlsx", "xls"):
+                df = pd.read_excel(BytesIO(content), dtype=str)
+            else:
+                df = pd.read_csv(BytesIO(content), dtype=str)
+        except Exception as exc:
+            raise ValueError(f"Could not read file: {exc}") from exc
+
+        # Normalise column names: lower-case + strip whitespace
+        df.columns = [str(c).strip().lower().replace(" ", "_") for c in df.columns]
+
+        def _col(df, *names):
+            """Return the first matching column value series or None."""
+            for name in names:
+                if name in df.columns:
+                    return df[name]
+            return None
+
+        def _direction_to_txn_type(val: str) -> str:
+            v = str(val or "").strip().lower()
+            if v in ("increase", "credit", "cr", "in", "inflow", "1"):
+                return "credit"
+            if v in ("decrease", "debit", "dr", "out", "outflow", "-1"):
+                return "debit"
+            return "debit"  # safe default
+
+        inserted = 0
+        try:
+            for _, row in df.iterrows():
+                raw_date = str(row.get("date", "") or "").strip()
+                date_obj = self._normalize_date(raw_date)
+                if date_obj is None:
+                    # Skip rows without a parseable date
+                    continue
+
+                doc_number  = str(row.get("doc_number", "") or "").strip() or None
+                description = str(row.get("description", "") or "").strip() or None
+                total_raw   = str(row.get("total", "0") or "0").strip()
+                source_obj  = str(row.get("source_object", "") or "").strip() or None
+                direction   = str(row.get("direction", "") or "").strip()
+                party_name  = str(row.get("party_name", "") or "").strip() or None
+                pay_method  = str(row.get("payment_method", "") or "").strip() or None
+                # Prefer 'cleared' column; fall back to 'display_state'
+                cleared_val = (
+                    str(row.get("cleared", "") or "").strip()
+                    or str(row.get("display_state", "") or "").strip()
+                    or None
+                )
+
+                try:
+                    amount = Decimal(total_raw.replace(",", ""))
+                except Exception:
+                    amount = Decimal("0")
+
+                txn_type = _direction_to_txn_type(direction)
+
+                # Build a deterministic unique key for deduplication
+                sage_key = f"xl_{source_obj}_{direction}_{raw_date}_{doc_number}_{total_raw}_{description}"
+                # Truncate to fit the 100-char column
+                sage_key = sage_key[:100]
+
+                # Resolve account: prefer file column, fall back to param
+                row_account = str(row.get("account", "") or row.get("gl_account", "") or "").strip() or None
+                resolved_account = row_account or account_number or None
+
+                # Resolve bank: prefer file column, fall back to param
+                row_bank = str(row.get("bank", "") or row.get("financial_entity", "") or "").strip() or None
+                resolved_bank = row_bank or bank or None
+
+                existing = self.db.query(SageGLTransactionCache).filter_by(sage_key=sage_key).first()
+                if existing:
+                    continue  # idempotent re-upload
+
+                cache_item = SageGLTransactionCache(
+                    sage_key=sage_key,
+                    date=date_obj,
+                    description=description or "",
+                    account=resolved_account or "",
+                    amount=amount,
+                    transaction_type=txn_type,
+                    is_matched=False,
+                    entry_date=date_obj,
+                    doc_number=doc_number,
+                    vendor=party_name,
+                    customer=None,
+                    record_type=source_obj,
+                    cleared=cleared_val,
+                    tr_type=pay_method,
+                    bank=resolved_bank,
+                )
+                self.db.add(cache_item)
+                inserted += 1
+
+            self.db.commit()
+            
+            # Auto-match reversals and voided pairs for the uploaded data
+            auto_matched = self._auto_match_sage_internal_reversals(
+                account_number=account_number,
+                financial_entity=bank,
+            )
+            logger.info(f"Auto-matched {auto_matched} internal Sage reversal pair(s) from Excel upload")
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return inserted
 
     def sync_bank_accounts_from_sage_cache(self) -> int:
         """Build/refresh bank_accounts from existing Sage cache + GL master."""
@@ -1601,7 +1725,7 @@ class BankReconciliationService:
                             "amount": float(r.bank_transaction.amount),
                             "type": r.bank_transaction.transaction_type,
                             "account_number": r.bank_transaction.account_number,
-                        },
+                        } if r.bank_transaction else None,
                         "sage": {
                             "id": r.sage_transaction.id,
                             "date": r.sage_transaction.date.isoformat(),
@@ -1611,10 +1735,10 @@ class BankReconciliationService:
                             "type": r.sage_transaction.transaction_type,
                             "account": r.sage_transaction.account,
                             "bank": r.sage_transaction.bank,
-                        },
+                        } if r.sage_transaction else None,
                         "matched_at": r.matched_at.isoformat() if r.matched_at else None,
                     }
-                    for r in matched_results if r.bank_transaction and r.sage_transaction
+                    for r in matched_results if r.sage_transaction or r.bank_transaction
                 ],
                 "sage_transactions": [
                     {

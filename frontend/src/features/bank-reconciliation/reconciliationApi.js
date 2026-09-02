@@ -64,6 +64,12 @@ export const reconciliationApi = {
   // Delete a bank account row
   deleteBankAccount: (id) => API.delete(`/reconciliation/bank-accounts/${id}`),
 
+  // Upload Sage GL transactions from Excel/CSV file
+  uploadSageTransactions: (formData) =>
+    API.post('/reconciliation/upload-sage-transactions', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
   // Sync bank accounts from cached Sage transactions
   syncBankAccounts: () => API.post('/reconciliation/bank-accounts/sync'),
 };
