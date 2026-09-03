@@ -85,12 +85,12 @@ load_env_file()
 # SECURITY NOTE: these were hardcoded in plaintext in an earlier version of
 # this script. That password should be considered exposed — please rotate
 # it in Intacct regardless of the .env fix below.
-SENDER_ID       = os.environ.get("SAGE_SENDER_ID", "consolidatedanalytic")
-SENDER_PASSWORD = os.environ.get("SAGE_SENDER_PASSWORD", "CHANGE_ME")
-USER_ID         = os.environ.get("SAGE_USER_ID", "Apex")
+SENDER_ID       = os.environ.get("SAGE_SENDER_ID", "")
+SENDER_PASSWORD = os.environ.get("SAGE_SENDER_PASSWORD", "")
+USER_ID         = os.environ.get("SAGE_USER_ID", "")
 LOCATION_ID     = os.environ.get("SAGE_LOCATION_ID", "")   # e.g. "303" — optional, only for multi-entity/location-scoped logins
-COMPANY_ID      = os.environ.get("SAGE_COMPANY_ID", "consolidatedanalytics-sandbox")
-USER_PASSWORD   = os.environ.get("SAGE_USER_PASSWORD", "CHANGE_ME")
+COMPANY_ID      = os.environ.get("SAGE_COMPANY_ID", "")
+USER_PASSWORD   = os.environ.get("SAGE_USER_PASSWORD", "")
 
 if SENDER_PASSWORD == "CHANGE_ME" or USER_PASSWORD == "CHANGE_ME":
     print("  ✗ Credentials still on CHANGE_ME placeholder — check your .env "
@@ -98,7 +98,7 @@ if SENDER_PASSWORD == "CHANGE_ME" or USER_PASSWORD == "CHANGE_ME":
 
 # Start with FFB_4449 only, per your instruction. Add FFB_8723 back in
 # once FFB_4449 is confirmed working.
-FINANCIAL_ENTITIES = ["FFB_4183"]
+FINANCIAL_ENTITIES = ["FFB_7906"]
 
 # object_name -> lowercase XML record tag xmltodict will produce
 OBJECTS = {

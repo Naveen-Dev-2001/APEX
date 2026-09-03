@@ -1,0 +1,12 @@
+{
+  "financial_entity": "FFB_7990",
+  "counts": {
+    "FUNDSTRANSFER": 0,
+    "OTHERRECEIPTS": 0,
+    "DEPOSIT": 0,
+    "ARPYMT": 0,
+    "APPYMT": 0
+  },
+  "total": 0,
+  "transactions": []
+}
