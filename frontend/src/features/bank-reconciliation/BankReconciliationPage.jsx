@@ -22,7 +22,7 @@ const TABS = [
     icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M5 7l1 12h12l1-12M9 11v5m6-5v5" /></svg>,
   },
   {
-    id: 'sage-gl', label: 'Sage GL Transactions',
+    id: 'sage-gl', label: 'Sage Transactions',
     icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>,
   },
   {

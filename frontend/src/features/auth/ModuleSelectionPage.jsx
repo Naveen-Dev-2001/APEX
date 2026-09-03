@@ -54,7 +54,7 @@ const ModuleSelectionPage = () => {
     {
       id: 'bank-reconciliation',
       title: 'Bank Reconciliation',
-      subtitle: 'Match bank statements with Sage GL transactions',
+      subtitle: 'Match bank statements with Sage transactions',
       route: '/bank-reconciliation',
       gradient: 'from-[#6c48c5] to-[#4b2fa8]',
       hoverGradient: 'from-[#5c3aaa] to-[#3d2490]',

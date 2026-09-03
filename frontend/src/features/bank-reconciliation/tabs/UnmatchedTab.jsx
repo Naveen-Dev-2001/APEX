@@ -287,11 +287,11 @@ const UnmatchedTab = () => {
               </div>
             </div>
 
-            {/* RIGHT — Unmatched Sage GL Transactions */}
+            {/* RIGHT — Unmatched Sage Transactions */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
               <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2 bg-red-50/60 sticky top-0 z-10">
                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sage GL Transactions</span>
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sage Transactions</span>
                 <span className="ml-auto text-xs text-red-600 font-semibold">{filteredUnmatchedSageCount} items</span>
               </div>
               <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>

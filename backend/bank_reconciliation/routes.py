@@ -259,7 +259,7 @@ async def fetch_sage_transactions(
             financial_entity_filter=financial_entity,
         )
         return {
-            "message": f"Fetched and cached {count} new Sage GL transactions.",
+            "message": f"Fetched and cached {count} new Sage transactions.",
             "count": count,
             "account_number": account_number,
             "financial_entity": financial_entity,
