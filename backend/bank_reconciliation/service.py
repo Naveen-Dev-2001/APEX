@@ -734,6 +734,60 @@ class BankReconciliationService:
             self.db.rollback()
             raise
 
+    def delete_sage_transactions(
+        self,
+        transaction_id: Optional[int] = None,
+        bank: Optional[str] = None,
+        account_number: Optional[str] = None,
+    ) -> int:
+        """Delete cached Sage transactions and clean related reconciliation links.
+
+        Returns number of deleted Sage transactions.
+        """
+        query = self.db.query(SageGLTransactionCache)
+        if transaction_id is not None:
+            query = query.filter(SageGLTransactionCache.id == transaction_id)
+        if bank:
+            query = query.filter(SageGLTransactionCache.bank == bank)
+        if account_number:
+            query = query.filter(SageGLTransactionCache.account == account_number)
+
+        rows = query.all()
+        if not rows:
+            return 0
+
+        sage_ids = [row.id for row in rows]
+
+        try:
+            results = self.db.query(ReconciliationResult).filter(
+                ReconciliationResult.sage_transaction_id.in_(sage_ids)
+            ).all()
+
+            bank_txn_ids = [
+                result.bank_transaction_id
+                for result in results
+                if result.bank_transaction_id is not None
+            ]
+
+            if bank_txn_ids:
+                self.db.query(BankStatementTransaction).filter(
+                    BankStatementTransaction.id.in_(bank_txn_ids)
+                ).update({"is_matched": False}, synchronize_session=False)
+
+            self.db.query(ReconciliationResult).filter(
+                ReconciliationResult.sage_transaction_id.in_(sage_ids)
+            ).delete(synchronize_session=False)
+
+            self.db.query(SageGLTransactionCache).filter(
+                SageGLTransactionCache.id.in_(sage_ids)
+            ).delete(synchronize_session=False)
+
+            self.db.commit()
+            return len(sage_ids)
+        except Exception:
+            self.db.rollback()
+            raise
+
     async def process_sage_transactions_excel(
         self,
         file: UploadFile,

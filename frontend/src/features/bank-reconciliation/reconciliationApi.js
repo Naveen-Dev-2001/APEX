@@ -31,6 +31,17 @@ export const reconciliationApi = {
     return API.get('/reconciliation/sage-transactions', { params });
   },
 
+  // Delete one Sage GL transaction by id
+  deleteSageTransaction: (id) => API.delete(`/reconciliation/sage-transactions/${id}`),
+
+  // Delete Sage GL transactions by filter (bank and/or account_number)
+  deleteSageTransactions: (bank = null, accountNumber = null) => {
+    const params = {};
+    if (bank) params.bank = bank;
+    if (accountNumber) params.account_number = accountNumber;
+    return API.delete('/reconciliation/sage-transactions', { params });
+  },
+
   // Run matching (optionally scoped to account or statement)
   runMatching: (accountNumber = null, statementId = null) => {
     const params = {};

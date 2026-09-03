@@ -15,6 +15,7 @@ const SageGLTab = () => {
   const [data, setData] = useState(null);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [fetching, setFetching] = useState(false);
+  const [deletingBank, setDeletingBank] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedBank, setSelectedBank] = useState('all');
   const [sageSearch, setSageSearch] = useState('');
@@ -81,6 +82,37 @@ const SageGLTab = () => {
       toast.error(e.response?.data?.detail || 'Failed to fetch from Sage');
     } finally {
       setFetching(false);
+    }
+  };
+
+  const handleDeleteBankTransactions = async (bankName) => {
+    const targetBank = String(bankName || '').trim();
+    if (!targetBank) {
+      toast.error('Missing bank name for delete.');
+      return;
+    }
+
+    const accountFilter = selectedBank === 'all'
+      ? null
+      : (selectedBankGlAccount || selectedBankAccountNumber || null);
+
+    if (!window.confirm(`Are you sure you want to delete Sage transactions for ${targetBank}? This will un-match linked reconciliation records.`)) {
+      return;
+    }
+
+    setDeletingBank(targetBank);
+    try {
+      const res = await reconciliationApi.deleteSageTransactions(targetBank, accountFilter);
+      toast.success(res?.data?.message || 'Sage transactions deleted');
+      if (viewingBankSummary?.bank === targetBank) {
+        setViewingBankSummary(null);
+        setSageDetailSearch('');
+      }
+      await load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to delete Sage transactions');
+    } finally {
+      setDeletingBank('');
     }
   };
 
@@ -305,13 +337,30 @@ const SageGLTab = () => {
                       <td className="px-6 py-3 text-right text-green-600 font-medium">{fmt(bankRow.creditTotal)}</td>
                       <td className="px-6 py-3 text-right text-gray-800 font-semibold">{fmt(bankRow.totalAmount)}</td>
                       <td className="px-6 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => { setViewingBankSummary(bankRow); setSageDetailSearch(''); }}
-                          className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                        >
-                          View
-                        </button>
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setViewingBankSummary(bankRow); setSageDetailSearch(''); }}
+                            className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBankTransactions(bankRow.bank)}
+                            disabled={deletingBank === bankRow.bank}
+                            title="Delete"
+                            className="inline-flex items-center justify-center bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-lg transition-colors disabled:opacity-60"
+                          >
+                            {deletingBank === bankRow.bank
+                              ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                </svg>
+                              )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

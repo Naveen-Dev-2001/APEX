@@ -315,6 +315,38 @@ def get_sage_transactions(
     }
 
 
+@router.delete("/sage-transactions/{transaction_id}")
+def delete_sage_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Delete one cached Sage transaction by ID and clear related reconciliation rows."""
+    service = BankReconciliationService(db)
+    deleted_count = service.delete_sage_transactions(transaction_id=transaction_id)
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Sage transaction not found")
+    return {"message": "Sage transaction deleted successfully", "deleted": deleted_count}
+
+
+@router.delete("/sage-transactions")
+def delete_sage_transactions(
+    bank: Optional[str] = Query(None, description="Delete by bank/financial entity"),
+    account_number: Optional[str] = Query(None, description="Delete by GL account number"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Delete cached Sage transactions by filter and clear related reconciliation rows."""
+    if not bank and not account_number:
+        raise HTTPException(status_code=400, detail="Provide bank and/or account_number to delete Sage transactions")
+
+    service = BankReconciliationService(db)
+    deleted_count = service.delete_sage_transactions(bank=bank, account_number=account_number)
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="No Sage transactions found for the provided filter")
+    return {"message": f"Deleted {deleted_count} Sage transaction(s)", "deleted": deleted_count}
+
+
 @router.post("/match")
 def run_matching(
     account_number: Optional[str] = Query(None, description="Match only for a specific GL account"),
