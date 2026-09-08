@@ -5,6 +5,7 @@ import {
   fmt,
   normalizeSearchValue,
   formatBankAccountOptionLabel,
+  BankSelect,
   Badge,
   EmptyState,
 } from '../components/shared';
@@ -172,11 +173,15 @@ const UnmatchedTab = () => {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
               <label htmlFor="unmatched-bank-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">Bank:</label>
-              <select id="unmatched-bank-filter" value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)}
-                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-52 p-2.5 transition-colors cursor-pointer">
-                <option value="all">All Banks</option>
-                {bankOptions.map((bankOption) => <option key={bankOption.value} value={bankOption.value}>{bankOption.label}</option>)}
-              </select>
+              <BankSelect
+                id="unmatched-bank-filter"
+                value={selectedBank}
+                onChange={setSelectedBank}
+                options={bankOptions}
+                allOptionLabel="All Banks"
+                allOptionValue="all"
+                className="w-52"
+              />
               <input type="text" value={unmatchedSearch} onChange={(e) => setUnmatchedSearch(e.target.value)}
                 placeholder="Search unmatched transactions"
                 className="w-full max-w-sm bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5" />

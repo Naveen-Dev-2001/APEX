@@ -5,6 +5,7 @@ import {
   fmt,
   normalizeSearchValue,
   formatBankAccountOptionLabel,
+  BankSelect,
   Badge,
   EmptyState,
   SummaryCard,
@@ -294,11 +295,15 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
             <div className="flex items-center gap-2 w-full">
               <label htmlFor="bank-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">Bank:</label>
               <div className="relative flex-1">
-                <select id="bank-filter" value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)}
-                  className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 pr-8 transition-colors cursor-pointer">
-                  <option value="all">All Banks</option>
-                  {bankOptions.map((bankOption) => <option key={bankOption.value} value={bankOption.value}>{bankOption.label}</option>)}
-                </select>
+                <BankSelect
+                  id="bank-filter"
+                  value={selectedBank}
+                  onChange={setSelectedBank}
+                  options={bankOptions}
+                  allOptionLabel="All Banks"
+                  allOptionValue="all"
+                  className="w-full"
+                />
               </div>
             </div>
             <div className="flex items-center gap-2 w-full">

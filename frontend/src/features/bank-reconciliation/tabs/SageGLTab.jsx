@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
+import DataTable from '../../../components/ui/DataTable';
 import {
   fmt,
   normalizeSearchValue,
   formatBankAccountOptionLabel,
+  BankSelect,
   Badge,
   StatusPill,
   EmptyState,
@@ -21,6 +23,20 @@ const SageGLTab = () => {
   const [sageSearch, setSageSearch] = useState('');
   const [sageDetailSearch, setSageDetailSearch] = useState('');
   const [viewingBankSummary, setViewingBankSummary] = useState(null);
+
+  // Main summaries table state
+  const [summarySortColumn, setSummarySortColumn] = useState(null);
+  const [summarySortDirection, setSummarySortDirection] = useState('asc');
+  const [summaryColumnFilters, setSummaryColumnFilters] = useState({});
+  const [summaryCurrentPage, setSummaryCurrentPage] = useState(1);
+  const [summaryItemsPerPage, setSummaryItemsPerPage] = useState(15);
+
+  // Detail modal table state
+  const [detailSortColumn, setDetailSortColumn] = useState(null);
+  const [detailSortDirection, setDetailSortDirection] = useState('asc');
+  const [detailColumnFilters, setDetailColumnFilters] = useState({});
+  const [detailCurrentPage, setDetailCurrentPage] = useState(1);
+  const [detailItemsPerPage, setDetailItemsPerPage] = useState(15);
 
   // Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -53,7 +69,7 @@ const SageGLTab = () => {
   React.useEffect(() => { load(); }, []);
 
   const selectedBankAccountNumber = String(selectedBank || '').trim();
-  const selectedBankAccountRow = React.useMemo(() => {
+  const selectedBankAccountRow = useMemo(() => {
     if (selectedBank === 'all') return null;
     return (bankAccounts || []).find((row) => String(row?.account_number || '').trim() === selectedBankAccountNumber) || null;
   }, [bankAccounts, selectedBank, selectedBankAccountNumber]);
@@ -116,7 +132,6 @@ const SageGLTab = () => {
     }
   };
 
-  // ── Excel Upload ─────────────────────────────────────────────────────────
   const openUploadModal = () => {
     setUploadBank('');
     setUploadFile(null);
@@ -163,9 +178,8 @@ const SageGLTab = () => {
       setUploading(false);
     }
   };
-  // ─────────────────────────────────────────────────────────────────────────
 
-  const bankOptions = React.useMemo(() => {
+  const bankOptions = useMemo(() => {
     const dedupedByAccount = new Map();
     (bankAccounts || []).forEach((row) => {
       const accountNumber = String(row?.account_number || '').trim();
@@ -178,7 +192,7 @@ const SageGLTab = () => {
     return Array.from(dedupedByAccount.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [bankAccounts]);
 
-  const filteredTransactions = React.useMemo(() => {
+  const filteredTransactions = useMemo(() => {
     const txns = data?.transactions || [];
     const byBank = selectedBank === 'all'
       ? txns
@@ -207,7 +221,7 @@ const SageGLTab = () => {
     ));
   }, [data, selectedBank, selectedBankGlAccount, selectedBankAccountNumber, selectedBankId, selectedBankName, sageSearch]);
 
-  const filteredViewingTransactions = React.useMemo(() => {
+  const filteredViewingTransactions = useMemo(() => {
     const rows = viewingBankSummary?.transactions || [];
     const query = normalizeSearchValue(sageDetailSearch).trim();
     if (!query) return rows;
@@ -228,6 +242,27 @@ const SageGLTab = () => {
     ));
   }, [viewingBankSummary, sageDetailSearch]);
 
+  const sortedViewingTransactions = useMemo(() => {
+    if (!detailSortColumn) return filteredViewingTransactions;
+    return [...filteredViewingTransactions].sort((a, b) => {
+      let aVal = a[detailSortColumn] ?? '';
+      let bVal = b[detailSortColumn] ?? '';
+      if (detailSortColumn === 'check_no') {
+        aVal = a.doc_number || a.check_no || '';
+        bVal = b.doc_number || b.check_no || '';
+      } else if (detailSortColumn === 'tr_type') {
+        aVal = a.tr_type || a.txn_type || '';
+        bVal = b.tr_type || b.txn_type || '';
+      }
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return detailSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return detailSortDirection === 'asc'
+        ? String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: 'base' })
+        : String(bVal).localeCompare(String(aVal), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [filteredViewingTransactions, detailSortColumn, detailSortDirection]);
+
   const filteredDebits = filteredTransactions
     .filter((t) => String(t.transaction_type || '').toLowerCase() === 'debit')
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -236,7 +271,7 @@ const SageGLTab = () => {
     .filter((t) => String(t.transaction_type || '').toLowerCase() === 'credit')
     .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-  const bankSummaries = React.useMemo(() => {
+  const bankSummaries = useMemo(() => {
     const grouped = new Map();
     filteredTransactions.forEach((t) => {
       const bankName = t.bank || t.financial_entity || 'Unknown Bank';
@@ -254,23 +289,213 @@ const SageGLTab = () => {
     return Array.from(grouped.values()).sort((a, b) => a.bank.localeCompare(b.bank));
   }, [filteredTransactions]);
 
+  const sortedBankSummaries = useMemo(() => {
+    if (!summarySortColumn) return bankSummaries;
+    return [...bankSummaries].sort((a, b) => {
+      let aVal = a[summarySortColumn] ?? '';
+      let bVal = b[summarySortColumn] ?? '';
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return summarySortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return summarySortDirection === 'asc'
+        ? String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: 'base' })
+        : String(bVal).localeCompare(String(aVal), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [bankSummaries, summarySortColumn, summarySortDirection]);
+
+  const summaryColumns = useMemo(() => [
+    {
+      header: 'Bank',
+      accessor: 'bank',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="font-semibold text-gray-700">{val}</span>,
+    },
+    {
+      header: 'Transactions',
+      accessor: 'transactionCount',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      render: (val) => <span className="font-medium text-gray-600 text-right block">{val}</span>,
+    },
+    {
+      header: 'Debits',
+      accessor: 'debitTotal',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      filterRender: (val) => fmt(val),
+      render: (val) => <span className="font-medium text-red-600 text-right block">{fmt(val)}</span>,
+    },
+    {
+      header: 'Credits',
+      accessor: 'creditTotal',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      filterRender: (val) => fmt(val),
+      render: (val) => <span className="font-medium text-green-600 text-right block">{fmt(val)}</span>,
+    },
+    {
+      header: 'Total Amount',
+      accessor: 'totalAmount',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      filterRender: (val) => fmt(val),
+      render: (val) => <span className="font-semibold text-gray-800 text-right block">{fmt(val)}</span>,
+    },
+    {
+      header: 'Action',
+      accessor: 'action',
+      sortable: false,
+      filterable: false,
+      render: (_, bankRow) => (
+        <div className="text-right inline-flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => { setViewingBankSummary(bankRow); setSageDetailSearch(''); }}
+            className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+          >
+            View
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDeleteBankTransactions(bankRow.bank)}
+            disabled={deletingBank === bankRow.bank}
+            title="Delete"
+            className="inline-flex items-center justify-center bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-lg transition-colors disabled:opacity-60"
+          >
+            {deletingBank === bankRow.bank
+              ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                </svg>
+              )}
+          </button>
+        </div>
+      ),
+    },
+  ], [deletingBank]);
+
+  const detailColumns = useMemo(() => [
+    {
+      header: 'Txn Date',
+      accessor: 'date',
+      sortable: true,
+      filterable: true,
+      filterType: 'date',
+      render: (val) => <span className="text-gray-500">{val || '-'}</span>,
+    },
+    {
+      header: 'Entry Date',
+      accessor: 'entry_date',
+      sortable: true,
+      filterable: true,
+      filterType: 'date',
+      render: (val) => <span className="text-gray-500">{val || '-'}</span>,
+    },
+    {
+      header: 'Check No',
+      accessor: 'check_no',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => row.doc_number || row.check_no || '',
+      render: (_, row) => <span className="font-mono text-xs text-gray-700">{row.doc_number || row.check_no || '-'}</span>,
+    },
+    {
+      header: 'Account Number',
+      accessor: 'account',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold font-mono">{val || '-'}</span>,
+    },
+    {
+      header: 'Type',
+      accessor: 'transaction_type',
+      sortable: true,
+      filterable: true,
+      render: (val) => <Badge type={val} />,
+    },
+    {
+      header: 'Txn Type',
+      accessor: 'tr_type',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => row.tr_type || row.txn_type || '',
+      render: (_, row) => <span className="text-xs font-mono text-gray-400">{row.tr_type || row.txn_type || '-'}</span>,
+    },
+    {
+      header: 'Txn Amount',
+      accessor: 'amount',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      filterRender: (val) => fmt(val),
+      render: (val) => <span className="font-medium text-gray-800 text-right block">{fmt(val)}</span>,
+    },
+    {
+      header: 'Vendor',
+      accessor: 'vendor',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-gray-700 max-w-[120px] truncate block" title={val}>{val || '-'}</span>,
+    },
+    {
+      header: 'Customer',
+      accessor: 'customer',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-gray-700 max-w-[120px] truncate block" title={val}>{val || '-'}</span>,
+    },
+    {
+      header: 'Record Type',
+      accessor: 'record_type',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-xs text-gray-500">{val || '-'}</span>,
+    },
+    {
+      header: 'Cleared',
+      accessor: 'cleared',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-xs text-gray-400">{val || '-'}</span>,
+    },
+    {
+      header: 'Description',
+      accessor: 'description',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-gray-700 max-w-[220px] truncate block" title={val}>{val || '-'}</span>,
+    },
+    {
+      header: 'Status',
+      accessor: 'is_matched',
+      sortable: true,
+      filterable: true,
+      filterRender: (val) => (val ? 'Matched' : 'Unmatched'),
+      render: (val) => <StatusPill matched={val} />,
+    },
+  ], []);
+
   return (
     <div className="space-y-6">
       {/* Action bar */}
       <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4">
         <div className="flex items-center gap-3 flex-1">
           <label htmlFor="sage-bank-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">Bank:</label>
-          <select
+          <BankSelect
             id="sage-bank-filter"
             value={selectedBank}
-            onChange={(e) => setSelectedBank(e.target.value)}
-            className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-52 p-2.5 transition-colors cursor-pointer"
-          >
-            <option value="all">All Banks</option>
-            {bankOptions.map((bankOption) => (
-              <option key={bankOption.value} value={bankOption.value}>{bankOption.label}</option>
-            ))}
-          </select>
+            onChange={setSelectedBank}
+            options={bankOptions}
+            allOptionLabel="All Banks"
+            allOptionValue="all"
+            className="w-52"
+          />
           <input
             type="text"
             value={sageSearch}
@@ -315,58 +540,23 @@ const SageGLTab = () => {
             <SummaryCard label="Total Debits" value={fmt(filteredDebits)} color="text-red-600" />
             <SummaryCard label="Total Credits" value={fmt(filteredCredits)} color="text-green-600" />
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-auto max-h-[450px]">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
-                  <tr>
-                    <th className="text-left px-6 py-3">Bank</th>
-                    <th className="text-right px-6 py-3">Transactions</th>
-                    <th className="text-right px-6 py-3">Debits</th>
-                    <th className="text-right px-6 py-3">Credits</th>
-                    <th className="text-right px-6 py-3">Total Amount</th>
-                    <th className="text-right px-6 py-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {bankSummaries.map((bankRow) => (
-                    <tr key={bankRow.bank} className="hover:bg-gray-50/50">
-                      <td className="px-6 py-3 text-gray-700 font-semibold">{bankRow.bank}</td>
-                      <td className="px-6 py-3 text-right text-gray-600 font-medium">{bankRow.transactionCount}</td>
-                      <td className="px-6 py-3 text-right text-red-600 font-medium">{fmt(bankRow.debitTotal)}</td>
-                      <td className="px-6 py-3 text-right text-green-600 font-medium">{fmt(bankRow.creditTotal)}</td>
-                      <td className="px-6 py-3 text-right text-gray-800 font-semibold">{fmt(bankRow.totalAmount)}</td>
-                      <td className="px-6 py-3 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => { setViewingBankSummary(bankRow); setSageDetailSearch(''); }}
-                            className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                          >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteBankTransactions(bankRow.bank)}
-                            disabled={deletingBank === bankRow.bank}
-                            title="Delete"
-                            className="inline-flex items-center justify-center bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-lg transition-colors disabled:opacity-60"
-                          >
-                            {deletingBank === bankRow.bank
-                              ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              : (
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                                </svg>
-                              )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 space-y-3">
+            <DataTable
+              columns={summaryColumns}
+              data={sortedBankSummaries}
+              isClientSide={true}
+              enableColumnFilters={true}
+              columnFilters={summaryColumnFilters}
+              onColumnFiltersChange={setSummaryColumnFilters}
+              sortColumn={summarySortColumn}
+              sortDirection={summarySortDirection}
+              onSort={(col, dir) => { setSummarySortColumn(col); setSummarySortDirection(dir); }}
+              currentPage={summaryCurrentPage}
+              itemsPerPage={summaryItemsPerPage}
+              onPageChange={setSummaryCurrentPage}
+              onItemsPerPageChange={setSummaryItemsPerPage}
+              expandable={false}
+            />
           </div>
         </>
       )}
@@ -404,58 +594,28 @@ const SageGLTab = () => {
                 <SummaryCard label="Total" value={fmt(viewingBankSummary.totalAmount)} color="text-[#1e9bd8]" />
               </div>
             </div>
-            <div className="flex-1 overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0 z-10">
-                  <tr>
-                    <th className="text-left px-6 py-3">Txn Date</th>
-                    <th className="text-left px-6 py-3">Entry Date</th>
-                    <th className="text-left px-6 py-3">Check No</th>
-                    <th className="text-left px-6 py-3">Account Number</th>
-                    <th className="text-left px-6 py-3">Type</th>
-                    <th className="text-left px-6 py-3">Txn Type</th>
-                    <th className="text-right px-6 py-3">Txn Amount</th>
-                    <th className="text-left px-6 py-3">Vendor</th>
-                    <th className="text-left px-6 py-3">Customer</th>
-                    <th className="text-left px-6 py-3">Record Type</th>
-                    <th className="text-left px-6 py-3">Cleared</th>
-                    <th className="text-left px-6 py-3">Description</th>
-                    <th className="text-left px-6 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredViewingTransactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-gray-50/50">
-                      <td className="px-6 py-3 text-gray-500">{t.date}</td>
-                      <td className="px-6 py-3 text-gray-500">{t.entry_date || ''}</td>
-                      <td className="px-6 py-3 text-gray-700 font-mono text-xs">{t.doc_number || t.check_no || ''}</td>
-                      <td className="px-6 py-3">
-                        <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold font-mono">{t.account || ''}</span>
-                      </td>
-                      <td className="px-6 py-3"><Badge type={t.transaction_type} /></td>
-                      <td className="px-6 py-3 text-gray-400 text-xs font-mono">{t.tr_type || t.txn_type || ''}</td>
-                      <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
-                      <td className="px-6 py-3 text-gray-700 max-w-[120px] truncate" title={t.vendor}>{t.vendor || ''}</td>
-                      <td className="px-6 py-3 text-gray-700 max-w-[120px] truncate" title={t.customer}>{t.customer || ''}</td>
-                      <td className="px-6 py-3 text-gray-500 text-xs">{t.record_type || ''}</td>
-                      <td className="px-6 py-3 text-gray-400 text-xs">{t.cleared || ''}</td>
-                      <td className="px-6 py-3 text-gray-700 max-w-[220px] truncate" title={t.description}>{t.description || ''}</td>
-                      <td className="px-6 py-3"><StatusPill matched={t.is_matched} /></td>
-                    </tr>
-                  ))}
-                  {filteredViewingTransactions.length === 0 && (
-                    <tr>
-                      <td colSpan={13} className="px-6 py-10 text-center text-sm text-gray-400">
-                        No Sage transactions found for your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="flex-1 overflow-auto p-4">
+              <DataTable
+                columns={detailColumns}
+                data={sortedViewingTransactions}
+                isClientSide={true}
+                enableColumnFilters={true}
+                columnFilters={detailColumnFilters}
+                onColumnFiltersChange={setDetailColumnFilters}
+                sortColumn={detailSortColumn}
+                sortDirection={detailSortDirection}
+                onSort={(col, dir) => { setDetailSortColumn(col); setDetailSortDirection(dir); }}
+                currentPage={detailCurrentPage}
+                itemsPerPage={detailItemsPerPage}
+                onPageChange={setDetailCurrentPage}
+                onItemsPerPageChange={setDetailItemsPerPage}
+                expandable={false}
+              />
             </div>
           </div>
         </div>
       )}
+
 
       {/* Upload Excel modal */}
       {showUploadModal && (
@@ -493,17 +653,15 @@ const SageGLTab = () => {
                 <label htmlFor="upload-sage-bank" className="block text-sm font-medium text-gray-700 mb-1.5">
                   Bank Account <span className="text-gray-400 font-normal">(optional — helps link transactions)</span>
                 </label>
-                <select
+                <BankSelect
                   id="upload-sage-bank"
                   value={uploadBank}
-                  onChange={(e) => setUploadBank(e.target.value)}
-                  className="appearance-none w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-emerald-400 focus:border-emerald-400 p-2.5 transition-colors cursor-pointer"
-                >
-                  <option value="">— No specific bank account —</option>
-                  {bankOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  onChange={setUploadBank}
+                  options={bankOptions}
+                  allOptionLabel="— No specific bank account —"
+                  allOptionValue=""
+                  className="w-full"
+                />
               </div>
 
               {/* File picker */}
@@ -513,11 +671,10 @@ const SageGLTab = () => {
                 </label>
                 <div
                   onClick={() => fileRef.current?.click()}
-                  className={`relative flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors ${
-                    uploadFile
-                      ? 'border-emerald-400 bg-emerald-50'
-                      : 'border-gray-200 bg-gray-50 hover:border-emerald-300 hover:bg-emerald-50/40'
-                  }`}
+                  className={`relative flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors ${uploadFile
+                    ? 'border-emerald-400 bg-emerald-50'
+                    : 'border-gray-200 bg-gray-50 hover:border-emerald-300 hover:bg-emerald-50/40'
+                    }`}
                 >
                   <input
                     ref={fileRef}

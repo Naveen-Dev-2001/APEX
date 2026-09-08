@@ -1,7 +1,5 @@
-/* ─────────────────────────────────────────────────────────────
-   shared.jsx — Shared helpers & display components
-   Used by all Bank Reconciliation tab files.
-───────────────────────────────────────────────────────────── */
+import React from 'react';
+import { Select } from 'antd';
 
 /* ── Formatters ── */
 export const fmt = (v) =>
@@ -18,7 +16,12 @@ export const formatStatementMonthLabel = (value) => {
 };
 
 export const formatBankAccountOptionLabel = (bankName, accountNumber) => {
-  return String(bankName ?? '').trim() || 'Unknown Bank';
+  const name = String(bankName ?? '').trim();
+  const acc = String(accountNumber ?? '').trim();
+  if (name && acc && !name.includes(acc)) {
+    return `${name} (${acc})`;
+  }
+  return name || acc || 'Unknown Bank';
 };
 
 export const getTopLevelEntityName = (value) => {
@@ -32,6 +35,61 @@ export const getTopLevelEntityName = (value) => {
 };
 
 /* ── Display Components ── */
+
+export const BankSelect = ({
+  id,
+  value,
+  onChange,
+  options = [],
+  placeholder = "Search or select bank",
+  allOptionLabel = "All Banks",
+  allOptionValue = "all",
+  className = "min-w-[200px]",
+}) => {
+  const selectOptions = [
+    ...(allOptionLabel ? [{ value: allOptionValue, label: allOptionLabel }] : []),
+    ...options,
+  ];
+
+  return (
+    <div className={`inline-block ${className} bank-select-container`}>
+      <style>{`
+        .bank-select-container .ant-select-selector {
+          background-color: #f9fafb !important;
+          border-color: #e5e7eb !important;
+          border-radius: 0.5rem !important;
+          min-height: 40px !important;
+          display: flex !important;
+          align-items: center !important;
+        }
+        .bank-select-container .ant-select-selection-item,
+        .bank-select-container .ant-select-selection-placeholder {
+          font-size: 0.875rem !important;
+          color: #1f2937 !important;
+        }
+      `}</style>
+      <Select
+        id={id}
+        showSearch
+        value={value}
+        onChange={(val) => onChange(val ?? (allOptionLabel ? allOptionValue : ''))}
+        placeholder={placeholder}
+        optionFilterProp="label"
+        filterOption={(input, option) => {
+          const searchText = input.toLowerCase();
+          const label = String(option?.label ?? '').toLowerCase();
+          const val = String(option?.value ?? '').toLowerCase();
+          return label.includes(searchText) || val.includes(searchText);
+        }}
+        options={selectOptions}
+        className="w-full"
+        styles={{
+          popup: { root: { zIndex: 9999 } }
+        }}
+      />
+    </div>
+  );
+};
 
 export const Badge = ({ type }) => {
   const map = { debit: 'bg-red-100 text-red-600', credit: 'bg-green-100 text-green-600' };

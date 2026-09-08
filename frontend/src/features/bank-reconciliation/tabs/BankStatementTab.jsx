@@ -1,11 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
+import DataTable from '../../../components/ui/DataTable';
 import {
   fmt,
   normalizeSearchValue,
   formatStatementMonthLabel,
   formatBankAccountOptionLabel,
+  BankSelect,
   Badge,
   StatusPill,
   EmptyState,
@@ -26,7 +28,21 @@ const BankStatementTab = () => {
   const [transactions, setTransactions] = useState(null);
   const fileRef = useRef();
 
-  const monthDropdownOptions = React.useMemo(() => ([
+  // State for main statements table
+  const [stmtSortColumn, setStmtSortColumn] = useState(null);
+  const [stmtSortDirection, setStmtSortDirection] = useState('asc');
+  const [stmtColumnFilters, setStmtColumnFilters] = useState({});
+  const [stmtCurrentPage, setStmtCurrentPage] = useState(1);
+  const [stmtItemsPerPage, setStmtItemsPerPage] = useState(15);
+
+  // State for transaction details modal table
+  const [txnSortColumn, setTxnSortColumn] = useState(null);
+  const [txnSortDirection, setTxnSortDirection] = useState('asc');
+  const [txnColumnFilters, setTxnColumnFilters] = useState({});
+  const [txnCurrentPage, setTxnCurrentPage] = useState(1);
+  const [txnItemsPerPage, setTxnItemsPerPage] = useState(15);
+
+  const monthDropdownOptions = useMemo(() => ([
     { value: '01', label: 'January' },
     { value: '02', label: 'February' },
     { value: '03', label: 'March' },
@@ -41,7 +57,7 @@ const BankStatementTab = () => {
     { value: '12', label: 'December' },
   ]), []);
 
-  const yearDropdownOptions = React.useMemo(() => {
+  const yearDropdownOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const years = [];
     for (let year = currentYear; year >= currentYear - 10; year -= 1) {
@@ -50,7 +66,7 @@ const BankStatementTab = () => {
     return years;
   }, []);
 
-  const availableMonthDropdownOptions = React.useMemo(() => {
+  const availableMonthDropdownOptions = useMemo(() => {
     const now = new Date();
     const currentYear = String(now.getFullYear());
     const currentMonth = now.getMonth() + 1;
@@ -60,7 +76,7 @@ const BankStatementTab = () => {
     return monthDropdownOptions;
   }, [monthDropdownOptions, uploadStatementYear]);
 
-  const bankOptions = React.useMemo(() => {
+  const bankOptions = useMemo(() => {
     const dedupedByAccount = new Map();
     (bankAccounts || []).forEach((row) => {
       const accountNumber = String(row?.account_number || '').trim();
@@ -73,7 +89,7 @@ const BankStatementTab = () => {
     return Array.from(dedupedByAccount.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [bankAccounts]);
 
-  const filteredStatements = React.useMemo(() => {
+  const filteredStatements = useMemo(() => {
     const byBank = selectedBank === 'all'
       ? statements
       : statements.filter((s) => String(s.account_number || '').trim() === String(selectedBank).trim());
@@ -90,7 +106,21 @@ const BankStatementTab = () => {
     ));
   }, [selectedBank, statements, statementSearch]);
 
-  const filteredStatementTransactions = React.useMemo(() => {
+  const sortedStatements = useMemo(() => {
+    if (!stmtSortColumn) return filteredStatements;
+    return [...filteredStatements].sort((a, b) => {
+      let aVal = a[stmtSortColumn] ?? '';
+      let bVal = b[stmtSortColumn] ?? '';
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return stmtSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return stmtSortDirection === 'asc'
+        ? String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: 'base' })
+        : String(bVal).localeCompare(String(aVal), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [filteredStatements, stmtSortColumn, stmtSortDirection]);
+
+  const filteredStatementTransactions = useMemo(() => {
     const rows = transactions?.transactions || [];
     const query = normalizeSearchValue(transactionSearch).trim();
     if (!query) return rows;
@@ -108,6 +138,20 @@ const BankStatementTab = () => {
       || normalizeSearchValue(t.credit).includes(query)
     ));
   }, [transactions, transactionSearch, selectedStatement]);
+
+  const sortedStatementTransactions = useMemo(() => {
+    if (!txnSortColumn) return filteredStatementTransactions;
+    return [...filteredStatementTransactions].sort((a, b) => {
+      let aVal = a[txnSortColumn] ?? '';
+      let bVal = b[txnSortColumn] ?? '';
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return txnSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return txnSortDirection === 'asc'
+        ? String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: 'base' })
+        : String(bVal).localeCompare(String(aVal), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [filteredStatementTransactions, txnSortColumn, txnSortDirection]);
 
   const loadStatements = async () => {
     try {
@@ -140,7 +184,6 @@ const BankStatementTab = () => {
     formData.append('file', file);
     formData.append('statement_month', statementMonthValue);
 
-    // Pass account_number and entity from the selected bank dropdown
     if (selectedBank && selectedBank !== 'all') {
       const selectedRow = bankAccounts.find(
         (r) => String(r?.account_number || '').trim() === selectedBank,
@@ -191,6 +234,167 @@ const BankStatementTab = () => {
     }
   };
 
+  const statementColumns = useMemo(() => [
+    {
+      header: 'File',
+      accessor: 'filename',
+      sortable: true,
+      filterable: true,
+      render: (val) => (
+        <span className="font-medium text-gray-700 flex items-center gap-2">
+          <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          {val}
+        </span>
+      ),
+    },
+    {
+      header: 'Account Number',
+      accessor: 'account_number',
+      sortable: true,
+      filterable: true,
+      render: (val) => (
+        val ? <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono">{val}</span>
+          : <span className="text-gray-300 text-xs italic">No account</span>
+      ),
+    },
+    {
+      header: 'Statement Month',
+      accessor: 'statement_month',
+      sortable: true,
+      filterable: true,
+      filterRender: (val) => formatStatementMonthLabel(val),
+      render: (val) => <span className="text-gray-500">{val ? formatStatementMonthLabel(val) : '-'}</span>,
+    },
+    {
+      header: 'Uploaded',
+      accessor: 'upload_date',
+      sortable: true,
+      filterable: true,
+      filterType: 'date',
+      render: (val) => <span className="text-gray-400">{val ? new Date(val).toLocaleDateString() : '-'}</span>,
+    },
+    {
+      header: 'Transactions',
+      accessor: 'transaction_count',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      render: (val) => <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold">{val}</span>,
+    },
+    {
+      header: 'Status',
+      accessor: 'status',
+      sortable: true,
+      filterable: true,
+      render: (val) => <StatusPill matched={val === 'reconciled'} />,
+    },
+    {
+      header: 'Actions',
+      accessor: 'actions',
+      sortable: false,
+      filterable: false,
+      render: (_, s) => (
+        <div className="text-right flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => handleViewTransactions(s)} className="text-[#1e9bd8] hover:underline text-xs font-medium">View</button>
+          <button onClick={(e) => handleDeleteStatement(e, s.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors" title="Delete Statement">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      ),
+    },
+  ], []);
+
+  const transactionColumns = useMemo(() => [
+    {
+      header: 'Account Number',
+      accessor: 'account_number',
+      sortable: true,
+      filterable: true,
+      render: (val, row) => <span className="font-mono text-xs text-gray-500">{val || selectedStatement?.account_number || ''}</span>,
+    },
+    {
+      header: 'Date',
+      accessor: 'date',
+      sortable: true,
+      filterable: true,
+      filterType: 'date',
+      render: (val) => <span className="text-gray-500">{val || '-'}</span>,
+    },
+    {
+      header: 'Description',
+      accessor: 'description',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-gray-700 max-w-[220px] truncate block" title={val}>{val || '-'}</span>,
+    },
+    {
+      header: 'Account Name',
+      accessor: 'account_name',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-gray-500">{val || '-'}</span>,
+    },
+    {
+      header: 'Debit',
+      accessor: 'debit',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      filterRender: (val) => fmt(val),
+      render: (val) => <span className="text-red-600 font-medium">{val != null ? fmt(val) : ''}</span>,
+    },
+    {
+      header: 'Credit',
+      accessor: 'credit',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      filterRender: (val) => fmt(val),
+      render: (val) => <span className="text-green-600 font-medium">{val != null ? fmt(val) : ''}</span>,
+    },
+    {
+      header: 'Check Number',
+      accessor: 'check_number',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="font-mono text-xs text-gray-700">{val || '-'}</span>,
+    },
+    {
+      header: 'Transaction Type',
+      accessor: 'transaction_type',
+      sortable: true,
+      filterable: true,
+      render: (val) => <Badge type={val} />,
+    },
+    {
+      header: 'Reference',
+      accessor: 'reference',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="font-mono text-xs text-gray-400">{val || '-'}</span>,
+    },
+    {
+      header: 'Amount',
+      accessor: 'amount',
+      sortable: true,
+      filterable: true,
+      filterType: 'number',
+      filterRender: (val) => fmt(val),
+      render: (val) => <span className="font-medium text-gray-800 text-right block">{fmt(val)}</span>,
+    },
+    {
+      header: 'Status',
+      accessor: 'status',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-xs text-gray-500">{val || 'Pending'}</span>,
+    },
+  ], [selectedStatement]);
+
   return (
     <div className="space-y-6">
       {/* Upload Zone */}
@@ -201,17 +405,15 @@ const BankStatementTab = () => {
               <label htmlFor="bank-statement-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
                 Bank:
               </label>
-              <select
+              <BankSelect
                 id="bank-statement-filter"
                 value={selectedBank}
-                onChange={(e) => setSelectedBank(e.target.value)}
-                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 transition-colors cursor-pointer"
-              >
-                <option value="all">All Banks</option>
-                {bankOptions.map((bankOption) => (
-                  <option key={bankOption.value} value={bankOption.value}>{bankOption.label}</option>
-                ))}
-              </select>
+                onChange={setSelectedBank}
+                options={bankOptions}
+                allOptionLabel="All Banks"
+                allOptionValue="all"
+                className="w-full min-w-[180px]"
+              />
             </div>
             <div className="flex items-center gap-2 min-w-[330px]">
               <label htmlFor="upload-statement-month" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
@@ -279,62 +481,26 @@ const BankStatementTab = () => {
       </div>
 
       {/* Statements list */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-50">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 space-y-3">
+        <div className="px-2 py-1">
           <h3 className="font-semibold text-gray-700">Uploaded Statements</h3>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-400 text-xs uppercase">
-            <tr>
-              <th className="text-left px-6 py-3">File</th>
-              <th className="text-left px-6 py-3">Account Number</th>
-              <th className="text-left px-6 py-3">Statement Month</th>
-              <th className="text-left px-6 py-3">Uploaded</th>
-              <th className="text-left px-6 py-3">Transactions</th>
-              <th className="text-left px-6 py-3">Status</th>
-              <th className="text-right px-6 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {filteredStatements.map((s) => (
-              <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4 font-medium text-gray-700 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {s.filename}
-                </td>
-                <td className="px-6 py-4">
-                  {s.account_number
-                    ? <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono">{s.account_number}</span>
-                    : <span className="text-gray-300 text-xs italic">No account</span>
-                  }
-                </td>
-                <td className="px-6 py-4 text-gray-500">{s.statement_month ? formatStatementMonthLabel(s.statement_month) : '-'}</td>
-                <td className="px-6 py-4 text-gray-400">{new Date(s.upload_date).toLocaleDateString()}</td>
-                <td className="px-6 py-4">
-                  <span className="bg-[#1e9bd8]/10 text-[#1e9bd8] px-2 py-0.5 rounded-full text-xs font-semibold">{s.transaction_count}</span>
-                </td>
-                <td className="px-6 py-4"><StatusPill matched={s.status === 'reconciled'} /></td>
-                <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
-                  <button onClick={() => handleViewTransactions(s)} className="text-[#1e9bd8] hover:underline text-xs font-medium">View</button>
-                  <button onClick={(e) => handleDeleteStatement(e, s.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors" title="Delete Statement">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {filteredStatements.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-400">
-                  No bank statements found. Upload your first statement to populate this table.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          columns={statementColumns}
+          data={sortedStatements}
+          isClientSide={true}
+          enableColumnFilters={true}
+          columnFilters={stmtColumnFilters}
+          onColumnFiltersChange={setStmtColumnFilters}
+          sortColumn={stmtSortColumn}
+          sortDirection={stmtSortDirection}
+          onSort={(col, dir) => { setStmtSortColumn(col); setStmtSortDirection(dir); }}
+          currentPage={stmtCurrentPage}
+          itemsPerPage={stmtItemsPerPage}
+          onPageChange={setStmtCurrentPage}
+          onItemsPerPageChange={setStmtItemsPerPage}
+          expandable={false}
+        />
       </div>
 
       {/* Transaction detail modal */}
@@ -376,48 +542,23 @@ const BankStatementTab = () => {
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0 z-10">
-                  <tr>
-                    <th className="text-left px-6 py-3">Account Number</th>
-                    <th className="text-left px-6 py-3">Date</th>
-                    <th className="text-left px-6 py-3">Description</th>
-                    <th className="text-left px-6 py-3">Account Name</th>
-                    <th className="text-left px-6 py-3">Debit</th>
-                    <th className="text-left px-6 py-3">Credit</th>
-                    <th className="text-left px-6 py-3">Check Number</th>
-                    <th className="text-left px-6 py-3">Transaction Type</th>
-                    <th className="text-left px-6 py-3">Reference</th>
-                    <th className="text-right px-6 py-3">Amount</th>
-                    <th className="text-left px-6 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredStatementTransactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-gray-50/50">
-                      <td className="px-6 py-3 text-gray-500 font-mono text-xs">{t.account_number || selectedStatement.account_number || ''}</td>
-                      <td className="px-6 py-3 text-gray-500">{t.date}</td>
-                      <td className="px-6 py-3 text-gray-700 max-w-[220px] truncate">{t.description || ''}</td>
-                      <td className="px-6 py-3 text-gray-500">{t.account_name || ''}</td>
-                      <td className="px-6 py-3 text-red-600 font-medium">{t.debit != null ? fmt(t.debit) : ''}</td>
-                      <td className="px-6 py-3 text-green-600 font-medium">{t.credit != null ? fmt(t.credit) : ''}</td>
-                      <td className="px-6 py-3 text-gray-700 font-mono text-xs">{t.check_number || ''}</td>
-                      <td className="px-6 py-3"><Badge type={t.transaction_type} /></td>
-                      <td className="px-6 py-3 text-gray-400 font-mono text-xs">{t.reference || ''}</td>
-                      <td className="px-6 py-3 text-right font-medium text-gray-800">{fmt(t.amount)}</td>
-                      <td className="px-6 py-3 text-gray-500 text-xs">{t.status || 'Pending'}</td>
-                    </tr>
-                  ))}
-                  {filteredStatementTransactions.length === 0 && (
-                    <tr>
-                      <td colSpan={11} className="px-6 py-10 text-center text-sm text-gray-400">
-                        No bank statement transactions found for your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="flex-1 overflow-auto p-4">
+              <DataTable
+                columns={transactionColumns}
+                data={sortedStatementTransactions}
+                isClientSide={true}
+                enableColumnFilters={true}
+                columnFilters={txnColumnFilters}
+                onColumnFiltersChange={setTxnColumnFilters}
+                sortColumn={txnSortColumn}
+                sortDirection={txnSortDirection}
+                onSort={(col, dir) => { setTxnSortColumn(col); setTxnSortDirection(dir); }}
+                currentPage={txnCurrentPage}
+                itemsPerPage={txnItemsPerPage}
+                onPageChange={setTxnCurrentPage}
+                onItemsPerPageChange={setTxnItemsPerPage}
+                expandable={false}
+              />
             </div>
           </div>
         </div>
@@ -431,3 +572,4 @@ const BankStatementTab = () => {
 };
 
 export default BankStatementTab;
+
