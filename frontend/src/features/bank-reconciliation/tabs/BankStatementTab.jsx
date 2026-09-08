@@ -155,8 +155,10 @@ const BankStatementTab = () => {
     });
   }, [filteredStatementTransactions, txnSortColumn, txnSortDirection]);
 
-  const loadStatements = async () => {
-    setLoading(true);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const fetchStatements = async () => {
     try {
       const [statementsRes, bankAccountsRes] = await Promise.all([
         reconciliationApi.getStatements(),
@@ -171,9 +173,13 @@ const BankStatementTab = () => {
       setBankAccounts(bankRows);
     } catch {
       toast.error('Failed to load statements');
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const loadStatements = async () => {
+    setLoading(true);
+    await fetchStatements();
+    setLoading(false);
   };
 
   React.useEffect(() => { loadStatements(); }, []);
@@ -223,9 +229,15 @@ const BankStatementTab = () => {
     }
   };
 
-  const handleDeleteStatement = async (e, id) => {
+  const openDeleteConfirmation = (e, stmt) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this bank statement? This will un-match any reconciled transactions.')) return;
+    setDeleteTarget(stmt);
+  };
+
+  const confirmDeleteStatement = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteLoading(true);
     try {
       await reconciliationApi.deleteStatement(id);
       toast.success('Statement deleted');
@@ -233,9 +245,14 @@ const BankStatementTab = () => {
         setSelectedStatement(null);
         setTransactions(null);
       }
-      await loadStatements();
+      setStatements((prev) => prev.filter((s) => s.id !== id));
+      setDeleteTarget(null);
+      // Silently refresh statements background data if needed
+      fetchStatements();
     } catch {
       toast.error('Failed to delete statement');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -303,7 +320,7 @@ const BankStatementTab = () => {
       render: (_, s) => (
         <div className="text-right flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
           <button onClick={() => handleViewTransactions(s)} className="text-[#1e9bd8] hover:underline text-xs font-medium">View</button>
-          <button onClick={(e) => handleDeleteStatement(e, s.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors" title="Delete Statement">
+          <button onClick={(e) => openDeleteConfirmation(e, s)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors" title="Delete Statement">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -565,6 +582,48 @@ const BankStatementTab = () => {
                 stickyHeader={true}
                 expandable={false}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Application Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[2200] bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-red-100 shadow-xl max-w-md w-full overflow-hidden p-6 text-center animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Bank Statement</h3>
+            <p className="text-xs text-gray-600 mb-6 leading-relaxed">
+              Are you sure you want to delete <span className="font-semibold text-gray-800">{deleteTarget.filename}</span>? This will un-match any reconciled transactions.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteLoading}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteStatement}
+                disabled={deleteLoading}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {deleteLoading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Statement'
+                )}
+              </button>
             </div>
           </div>
         </div>
