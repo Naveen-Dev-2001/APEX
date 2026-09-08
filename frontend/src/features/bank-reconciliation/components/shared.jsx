@@ -58,14 +58,16 @@ export const BankSelect = ({
           background-color: #f9fafb !important;
           border-color: #e5e7eb !important;
           border-radius: 0.5rem !important;
-          min-height: 40px !important;
+          height: 34px !important;
+          min-height: 34px !important;
           display: flex !important;
           align-items: center !important;
         }
         .bank-select-container .ant-select-selection-item,
         .bank-select-container .ant-select-selection-placeholder {
-          font-size: 0.875rem !important;
+          font-size: 0.75rem !important;
           color: #1f2937 !important;
+          line-height: 32px !important;
         }
       `}</style>
       <Select
@@ -82,6 +84,58 @@ export const BankSelect = ({
           return label.includes(searchText) || val.includes(searchText);
         }}
         options={selectOptions}
+        className="w-full"
+        styles={{
+          popup: { root: { zIndex: 9999 } }
+        }}
+      />
+    </div>
+  );
+};
+
+export const SearchSelect = ({
+  id,
+  value,
+  onChange,
+  options = [],
+  placeholder = "Search or select...",
+  className = "min-w-[120px]",
+  allowClear = true,
+}) => {
+  return (
+    <div className={`inline-block ${className} search-select-container`}>
+      <style>{`
+        .search-select-container .ant-select-selector {
+          background-color: #f9fafb !important;
+          border-color: #e5e7eb !important;
+          border-radius: 0.5rem !important;
+          height: 34px !important;
+          min-height: 34px !important;
+          display: flex !important;
+          align-items: center !important;
+        }
+        .search-select-container .ant-select-selection-item,
+        .search-select-container .ant-select-selection-placeholder {
+          font-size: 0.75rem !important;
+          color: #1f2937 !important;
+          line-height: 32px !important;
+        }
+      `}</style>
+      <Select
+        id={id}
+        showSearch
+        allowClear={allowClear}
+        value={value || undefined}
+        onChange={(val) => onChange(val ?? '')}
+        placeholder={placeholder}
+        optionFilterProp="label"
+        filterOption={(input, option) => {
+          const searchText = input.toLowerCase();
+          const label = String(option?.label ?? '').toLowerCase();
+          const val = String(option?.value ?? '').toLowerCase();
+          return label.includes(searchText) || val.includes(searchText);
+        }}
+        options={options}
         className="w-full"
         styles={{
           popup: { root: { zIndex: 9999 } }

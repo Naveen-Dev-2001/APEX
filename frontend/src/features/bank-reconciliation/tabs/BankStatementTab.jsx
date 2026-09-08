@@ -8,6 +8,7 @@ import {
   formatStatementMonthLabel,
   formatBankAccountOptionLabel,
   BankSelect,
+  SearchSelect,
   Badge,
   StatusPill,
   EmptyState,
@@ -17,6 +18,7 @@ import {
 
 const BankStatementTab = () => {
   const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [statements, setStatements] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedBank, setSelectedBank] = useState('all');
@@ -61,7 +63,7 @@ const BankStatementTab = () => {
     const currentYear = new Date().getFullYear();
     const years = [];
     for (let year = currentYear; year >= currentYear - 10; year -= 1) {
-      years.push(String(year));
+      years.push({ value: String(year), label: String(year) });
     }
     return years;
   }, []);
@@ -154,6 +156,7 @@ const BankStatementTab = () => {
   }, [filteredStatementTransactions, txnSortColumn, txnSortDirection]);
 
   const loadStatements = async () => {
+    setLoading(true);
     try {
       const [statementsRes, bankAccountsRes] = await Promise.all([
         reconciliationApi.getStatements(),
@@ -168,6 +171,8 @@ const BankStatementTab = () => {
       setBankAccounts(bankRows);
     } catch {
       toast.error('Failed to load statements');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -396,13 +401,13 @@ const BankStatementTab = () => {
   ], [selectedStatement]);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col space-y-4 h-full min-h-0 overflow-hidden">
       {/* Upload Zone */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-50 flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-4 lg:gap-5">
-            <div className="flex items-center gap-2 min-w-[240px]">
-              <label htmlFor="bank-statement-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+        <div className="px-5 py-3 border-b border-gray-50 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label htmlFor="bank-statement-filter" className="text-xs font-semibold text-gray-700 whitespace-nowrap">
                 Bank:
               </label>
               <BankSelect
@@ -412,37 +417,31 @@ const BankStatementTab = () => {
                 options={bankOptions}
                 allOptionLabel="All Banks"
                 allOptionValue="all"
-                className="w-full min-w-[180px]"
+                className="w-44"
               />
             </div>
-            <div className="flex items-center gap-2 min-w-[330px]">
-              <label htmlFor="upload-statement-month" className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-                Statement Month:
+            <div className="flex items-center gap-2">
+              <label htmlFor="upload-statement-month" className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                Month:
               </label>
-              <select
+              <SearchSelect
                 id="upload-statement-month"
                 value={uploadStatementMonth}
-                onChange={(e) => setUploadStatementMonth(e.target.value)}
-                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5 min-w-[140px]"
-              >
-                <option value="">Month</option>
-                {availableMonthDropdownOptions.map((monthOption) => (
-                  <option key={monthOption.value} value={monthOption.value}>{monthOption.label}</option>
-                ))}
-              </select>
-              <select
+                onChange={setUploadStatementMonth}
+                options={availableMonthDropdownOptions}
+                placeholder="Month"
+                className="w-32"
+              />
+              <SearchSelect
                 id="upload-statement-year"
                 value={uploadStatementYear}
-                onChange={(e) => setUploadStatementYear(e.target.value)}
-                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5 min-w-[110px]"
-              >
-                <option value="">Year</option>
-                {yearDropdownOptions.map((yearOption) => (
-                  <option key={yearOption} value={yearOption}>{yearOption}</option>
-                ))}
-              </select>
+                onChange={setUploadStatementYear}
+                options={yearDropdownOptions}
+                placeholder="Year"
+                className="w-28"
+              />
             </div>
-            <div className="flex-shrink-0 lg:ml-2">
+            <div className="flex-shrink-0">
               <input
                 ref={fileRef}
                 type="file"
@@ -454,54 +453,61 @@ const BankStatementTab = () => {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="inline-flex items-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-4 py-2 rounded-lg font-medium text-xs transition-colors disabled:opacity-60"
               >
                 {uploading
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
+                  ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
                   : <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    Upload Bank Statement
+                    Upload Statement
                   </>
                 }
               </button>
             </div>
           </div>
-          <div className="w-full max-w-sm">
+          <div className="w-full sm:w-64">
             <input
               type="text"
               value={statementSearch}
               onChange={(e) => setStatementSearch(e.target.value)}
               placeholder="Search statements"
-              className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2"
             />
           </div>
         </div>
       </div>
 
       {/* Statements list */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 space-y-3">
-        <div className="px-2 py-1">
-          <h3 className="font-semibold text-gray-700">Uploaded Statements</h3>
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" /></div>
+      ) : sortedStatements.length > 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-3 space-y-2 flex-1 min-h-0 flex flex-col">
+          <div className="px-1 py-0.5">
+            <h3 className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Uploaded Statements</h3>
+          </div>
+          <DataTable
+            columns={statementColumns}
+            data={sortedStatements}
+            loading={loading}
+            isClientSide={true}
+            enableColumnFilters={true}
+            sortColumn={stmtSortColumn}
+            sortDirection={stmtSortDirection}
+            onSort={(col, dir) => { setStmtSortColumn(col); setStmtSortDirection(dir); }}
+            currentPage={stmtCurrentPage}
+            itemsPerPage={stmtItemsPerPage}
+            onPageChange={setStmtCurrentPage}
+            onItemsPerPageChange={setStmtItemsPerPage}
+            maxHeight="calc(100vh - 280px)"
+            stickyHeader={true}
+            expandable={false}
+          />
         </div>
-        <DataTable
-          columns={statementColumns}
-          data={sortedStatements}
-          isClientSide={true}
-          enableColumnFilters={true}
-          columnFilters={stmtColumnFilters}
-          onColumnFiltersChange={setStmtColumnFilters}
-          sortColumn={stmtSortColumn}
-          sortDirection={stmtSortDirection}
-          onSort={(col, dir) => { setStmtSortColumn(col); setStmtSortDirection(dir); }}
-          currentPage={stmtCurrentPage}
-          itemsPerPage={stmtItemsPerPage}
-          onPageChange={setStmtCurrentPage}
-          onItemsPerPageChange={setStmtItemsPerPage}
-          expandable={false}
-        />
-      </div>
+      ) : !uploading && (
+        <EmptyState icon="📄" title="No statements yet" subtitle="Upload your first bank statement above to get started" />
+      )}
 
       {/* Transaction detail modal */}
       {transactions && selectedStatement && (
@@ -548,8 +554,6 @@ const BankStatementTab = () => {
                 data={sortedStatementTransactions}
                 isClientSide={true}
                 enableColumnFilters={true}
-                columnFilters={txnColumnFilters}
-                onColumnFiltersChange={setTxnColumnFilters}
                 sortColumn={txnSortColumn}
                 sortDirection={txnSortDirection}
                 onSort={(col, dir) => { setTxnSortColumn(col); setTxnSortDirection(dir); }}
@@ -557,6 +561,8 @@ const BankStatementTab = () => {
                 itemsPerPage={txnItemsPerPage}
                 onPageChange={setTxnCurrentPage}
                 onItemsPerPageChange={setTxnItemsPerPage}
+                maxHeight="calc(100vh - 360px)"
+                stickyHeader={true}
                 expandable={false}
               />
             </div>
@@ -564,9 +570,6 @@ const BankStatementTab = () => {
         </div>
       )}
 
-      {filteredStatements.length === 0 && !uploading && (
-        <EmptyState icon="📄" title="No statements yet" subtitle="Upload your first bank statement above to get started" />
-      )}
     </div>
   );
 };

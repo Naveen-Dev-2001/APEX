@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
+import DataTable from '../../../components/ui/DataTable';
 import {
   fmt,
   normalizeSearchValue,
@@ -132,7 +133,204 @@ const UnmatchedTab = () => {
     }).filter((group) => group.display_unmatched_sage.length > 0);
   }, [results, selectedBank, selectedBankGlAccount, unmatchedSearch]);
 
-  const groupedUnmatchedBank = groupByCheckNumber(filteredUnmatchedBank);
+  const [bankSortCol, setBankSortCol] = useState(null);
+  const [bankSortDir, setBankSortDir] = useState('asc');
+  const [bankCurrentPage, setBankCurrentPage] = useState(1);
+  const [bankItemsPerPage, setBankItemsPerPage] = useState(15);
+
+  const [sageSortCol, setSageSortCol] = useState(null);
+  const [sageSortDir, setSageSortDir] = useState('asc');
+  const [sageCurrentPage, setSageCurrentPage] = useState(1);
+  const [sageItemsPerPage, setSageItemsPerPage] = useState(15);
+
+  const groupedUnmatchedBankWithId = React.useMemo(() => {
+    const rawGroups = groupByCheckNumber(filteredUnmatchedBank);
+    const list = rawGroups.map((g) => ({
+      ...g,
+      id: g.groupKey,
+    }));
+    if (!bankSortCol) return list;
+    return [...list].sort((a, b) => {
+      let aVal = a[bankSortCol];
+      let bVal = b[bankSortCol];
+      if (bankSortCol === 'date') {
+        aVal = a.items?.[0]?.date || '';
+        bVal = b.items?.[0]?.date || '';
+      } else if (bankSortCol === 'description') {
+        aVal = a.items?.length > 1 ? `${a.items.length} transactions` : (a.items?.[0]?.description || '');
+        bVal = b.items?.length > 1 ? `${b.items.length} transactions` : (b.items?.[0]?.description || '');
+      } else if (bankSortCol === 'type') {
+        aVal = a.items?.[0]?.type || a.items?.[0]?.transaction_type || '';
+        bVal = b.items?.[0]?.type || b.items?.[0]?.transaction_type || '';
+      }
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return bankSortDir === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return bankSortDir === 'asc'
+        ? String(aVal ?? '').localeCompare(String(bVal ?? ''), undefined, { numeric: true, sensitivity: 'base' })
+        : String(bVal ?? '').localeCompare(String(aVal ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [filteredUnmatchedBank, bankSortCol, bankSortDir]);
+
+  const selectedBankGroupIds = React.useMemo(() => {
+    return groupedUnmatchedBankWithId
+      .filter((g) => g.items.length > 0 && g.items.every((item) => selectedBankIds.includes(item.id)))
+      .map((g) => g.id);
+  }, [groupedUnmatchedBankWithId, selectedBankIds]);
+
+  const handleBankGroupSelectionChange = (newSelectedGroupIds) => {
+    const allSelectedTransactionIds = [];
+    groupedUnmatchedBankWithId.forEach((g) => {
+      if (newSelectedGroupIds.includes(g.id)) {
+        g.items.forEach((item) => allSelectedTransactionIds.push(item.id));
+      }
+    });
+    setSelectedBankIds(allSelectedTransactionIds);
+  };
+
+  const bankColumns = React.useMemo(() => [
+    {
+      header: 'Check No',
+      accessor: 'checkNumber',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="font-mono text-xs text-gray-700 truncate block">{val || '-'}</span>,
+    },
+    {
+      header: 'Date',
+      accessor: 'date',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.items?.[0]?.date || ''),
+      render: (val, row) => <span className="text-gray-500 text-xs whitespace-nowrap">{row?.items?.[0]?.date || '-'}</span>,
+    },
+    {
+      header: 'Description',
+      accessor: 'description',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => row?.items?.length > 1 ? `${row.items.length} transactions` : String(row?.items?.[0]?.description || ''),
+      render: (val, row) => (
+        <span className="text-gray-700 text-xs truncate block max-w-[160px]" title={row?.items?.length > 1 ? `${row.items.length} transactions` : (row?.items?.[0]?.description || '')}>
+          {row?.items?.length > 1 ? `${row.items.length} transactions` : (row?.items?.[0]?.description || '-')}
+        </span>
+      ),
+    },
+    {
+      header: 'Type',
+      accessor: 'type',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.items?.[0]?.type || row?.items?.[0]?.transaction_type || ''),
+      render: (val, row) => <Badge type={row?.items?.[0]?.type || row?.items?.[0]?.transaction_type} />,
+    },
+    {
+      header: 'Amount',
+      accessor: 'totalAmount',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => fmt(row?.totalAmount),
+      render: (val, row) => (
+        <div className="text-right font-semibold text-gray-800 text-xs">{fmt(val)}</div>
+      ),
+    },
+  ], []);
+
+  const flattenedSageCheckGroups = React.useMemo(() => {
+    const list = unmatchedSageGroups.flatMap((group) => {
+      const checkGroups = groupByCheckNumber(group.display_unmatched_sage || []);
+      return checkGroups.map((g) => ({
+        ...g,
+        id: `${group.account}-${g.groupKey}`,
+      }));
+    });
+    if (!sageSortCol) return list;
+    return [...list].sort((a, b) => {
+      let aVal = a[sageSortCol];
+      let bVal = b[sageSortCol];
+      if (sageSortCol === 'date') {
+        aVal = a.items?.[0]?.date || '';
+        bVal = b.items?.[0]?.date || '';
+      } else if (sageSortCol === 'description') {
+        aVal = a.items?.length > 1 ? `${a.items.length} transactions` : (a.items?.[0]?.description || '');
+        bVal = b.items?.length > 1 ? `${b.items.length} transactions` : (b.items?.[0]?.description || '');
+      } else if (sageSortCol === 'type') {
+        aVal = a.items?.[0]?.type || a.items?.[0]?.transaction_type || '';
+        bVal = b.items?.[0]?.type || b.items?.[0]?.transaction_type || '';
+      }
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sageSortDir === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return sageSortDir === 'asc'
+        ? String(aVal ?? '').localeCompare(String(bVal ?? ''), undefined, { numeric: true, sensitivity: 'base' })
+        : String(bVal ?? '').localeCompare(String(aVal ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [unmatchedSageGroups, sageSortCol, sageSortDir]);
+
+  const selectedSageGroupIds = React.useMemo(() => {
+    return flattenedSageCheckGroups
+      .filter((g) => g.items.length > 0 && g.items.every((item) => selectedSageIds.includes(item.id)))
+      .map((g) => g.id);
+  }, [flattenedSageCheckGroups, selectedSageIds]);
+
+  const handleSageGroupSelectionChange = (newSelectedGroupIds) => {
+    const allSelectedTransactionIds = [];
+    flattenedSageCheckGroups.forEach((g) => {
+      if (newSelectedGroupIds.includes(g.id)) {
+        g.items.forEach((item) => allSelectedTransactionIds.push(item.id));
+      }
+    });
+    setSelectedSageIds(allSelectedTransactionIds);
+  };
+
+  const sageColumns = React.useMemo(() => [
+    {
+      header: 'Check No',
+      accessor: 'checkNumber',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="font-mono text-xs text-gray-700 truncate block">{val || '-'}</span>,
+    },
+    {
+      header: 'Date',
+      accessor: 'date',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.items?.[0]?.date || ''),
+      render: (val, row) => <span className="text-gray-500 text-xs whitespace-nowrap">{row?.items?.[0]?.date || '-'}</span>,
+    },
+    {
+      header: 'Description',
+      accessor: 'description',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => row?.items?.length > 1 ? `${row.items.length} transactions` : String(row?.items?.[0]?.description || ''),
+      render: (val, row) => (
+        <span className="text-gray-700 text-xs truncate block max-w-[160px]" title={row?.items?.length > 1 ? `${row.items.length} transactions` : (row?.items?.[0]?.description || '')}>
+          {row?.items?.length > 1 ? `${row.items.length} transactions` : (row?.items?.[0]?.description || '-')}
+        </span>
+      ),
+    },
+    {
+      header: 'Type',
+      accessor: 'type',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.items?.[0]?.type || row?.items?.[0]?.transaction_type || ''),
+      render: (val, row) => <Badge type={row?.items?.[0]?.type || row?.items?.[0]?.transaction_type} />,
+    },
+    {
+      header: 'Amount',
+      accessor: 'totalAmount',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => fmt(row?.totalAmount),
+      render: (val, row) => (
+        <div className="text-right font-semibold text-gray-800 text-xs">{fmt(val)}</div>
+      ),
+    },
+  ], []);
+
   const filteredUnmatchedSageCount = unmatchedSageGroups.reduce((sum, group) => sum + (group.display_unmatched_sage || []).length, 0);
 
   const toggleSelection = (id, selectedIds, setSelectedIds) =>
@@ -165,14 +363,14 @@ const UnmatchedTab = () => {
   }, [selectedBank]);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col space-y-3 h-full min-h-0 overflow-hidden">
       {loading && <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>}
 
       {!loading && results && (
         <>
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
-              <label htmlFor="unmatched-bank-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">Bank:</label>
+              <label htmlFor="unmatched-bank-filter" className="text-xs font-semibold text-gray-700 whitespace-nowrap">Bank:</label>
               <BankSelect
                 id="unmatched-bank-filter"
                 value={selectedBank}
@@ -180,14 +378,14 @@ const UnmatchedTab = () => {
                 options={bankOptions}
                 allOptionLabel="All Banks"
                 allOptionValue="all"
-                className="w-52"
+                className="w-44"
               />
               <input type="text" value={unmatchedSearch} onChange={(e) => setUnmatchedSearch(e.target.value)}
                 placeholder="Search unmatched transactions"
-                className="w-full max-w-sm bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5" />
+                className="w-full max-w-xs bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2" />
             </div>
             <button onClick={handleManualMarkMatched} disabled={manualMarking || !selectedBankIds.length || !selectedSageIds.length}
-              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60">
+              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60">
               {manualMarking
                 ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Marking…</>
                 : <>Mark as Matched</>
@@ -195,182 +393,85 @@ const UnmatchedTab = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                 </svg>
               </div>
               <div>
-                <div className="text-2xl font-bold text-amber-700">{filteredUnmatchedBank.length}</div>
-                <div className="text-xs text-amber-600 font-medium">Unmatched in Bank Statement</div>
+                <div className="text-lg font-bold text-amber-700">{filteredUnmatchedBank.length}</div>
+                <div className="text-[11px] text-amber-600 font-medium">Unmatched in Bank Statement</div>
               </div>
             </div>
-            <div className="bg-red-50 border border-red-100 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-700">{filteredUnmatchedSageCount}</div>
-                <div className="text-xs text-red-600 font-medium">Unmatched in Sage GL</div>
+                <div className="text-lg font-bold text-red-700">{filteredUnmatchedSageCount}</div>
+                <div className="text-[11px] text-red-600 font-medium">Unmatched in Sage GL</div>
               </div>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-4 items-start">
+          <div className="grid grid-cols-2 gap-4 items-start flex-1 min-h-0">
             {/* LEFT — Unmatched Bank Statement */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-              <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2 bg-amber-50/60 sticky top-0 z-10">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col p-3 space-y-2 flex-1 min-h-0">
+              <div className="flex items-center gap-2 bg-amber-50/60 p-2 rounded-xl border border-amber-100 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-amber-500 inline-block flex-shrink-0" />
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Bank Statement</span>
+                <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Bank Statement</span>
                 <span className="ml-auto text-xs text-amber-600 font-semibold">{filteredUnmatchedBank.length} items</span>
               </div>
-              <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
-                {filteredUnmatchedBank.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
-                    <span className="text-3xl mb-2">✓</span>No unmatched bank transactions
-                  </div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
-                      <tr>
-                        <th className="text-left px-4 py-3 w-8"></th>
-                        <th className="text-left px-4 py-3">Check No</th>
-                        <th className="text-left px-4 py-3">Date</th>
-                        <th className="text-left px-4 py-3">Description</th>
-                        <th className="text-left px-4 py-3">Type</th>
-                        <th className="text-right px-4 py-3">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {groupedUnmatchedBank.map((g) => (
-                        <React.Fragment key={`bank-group-${g.groupKey}`}>
-                          <tr className="hover:bg-amber-50/40 transition-colors">
-                            <td className="px-4 py-3">
-                              <input type="checkbox" checked={isGroupSelected(g.items, selectedBankIds)}
-                                onChange={() => toggleGroupSelection(g.items, selectedBankIds, setSelectedBankIds)}
-                                className="w-4 h-4 accent-[#1e9bd8]" />
-                            </td>
-                            <td className="px-4 py-3 text-gray-700 font-mono text-xs">{g.checkNumber}</td>
-                            <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{g.items[0]?.date}</td>
-                            <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate text-xs">
-                              {g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '')}
-                            </td>
-                            <td className="px-4 py-3"><Badge type={g.items[0]?.type} /></td>
-                            <td className="px-4 py-3 text-right font-semibold text-gray-800 text-xs">
-                              {fmt(g.totalAmount)}
-                              {g.items.length > 1 && (
-                                <button onClick={() => toggleExpanded(g.groupKey, expandedBankGroups, setExpandedBankGroups)}
-                                  className="block ml-auto text-[10px] text-[#1e9bd8] hover:underline">
-                                  {expandedBankGroups.includes(g.groupKey) ? 'Hide' : `+${g.items.length}`}
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                          {g.items.length > 1 && expandedBankGroups.includes(g.groupKey) && g.items.map((t) => (
-                            <tr key={`bank-child-${t.id}`} className="bg-amber-50/20">
-                              <td className="px-4 py-2">
-                                <input type="checkbox" checked={selectedBankIds.includes(t.id)}
-                                  onChange={() => toggleSelection(t.id, selectedBankIds, setSelectedBankIds)}
-                                  className="w-4 h-4 accent-[#1e9bd8]" />
-                              </td>
-                              <td className="px-4 py-2 text-gray-400 font-mono text-xs">{t.check_number || t.reference || ''}</td>
-                              <td className="px-4 py-2 text-gray-500 text-xs">{t.date}</td>
-                              <td className="px-4 py-2 text-gray-600 max-w-[160px] truncate text-xs">{t.description || ''}</td>
-                              <td className="px-4 py-2"><Badge type={t.type} /></td>
-                              <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(t.amount)}</td>
-                            </tr>
-                          ))}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              <DataTable
+                columns={bankColumns}
+                data={groupedUnmatchedBankWithId}
+                selectable={true}
+                selectedRows={selectedBankGroupIds}
+                onSelectionChange={handleBankGroupSelectionChange}
+                isClientSide={true}
+                enableColumnFilters={true}
+                sortColumn={bankSortCol}
+                sortDirection={bankSortDir}
+                onSort={(col, dir) => { setBankSortCol(col); setBankSortDir(dir); }}
+                currentPage={bankCurrentPage}
+                itemsPerPage={bankItemsPerPage}
+                onPageChange={setBankCurrentPage}
+                onItemsPerPageChange={setBankItemsPerPage}
+                maxHeight="180px"
+                stickyHeader={true}
+                expandable={false}
+              />
             </div>
 
             {/* RIGHT — Unmatched Sage Transactions */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-              <div className="px-5 py-3 border-b border-gray-50 flex items-center gap-2 bg-red-50/60 sticky top-0 z-10">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col p-3 space-y-2 flex-1 min-h-0">
+              <div className="flex items-center gap-2 bg-red-50/60 p-2 rounded-xl border border-red-100 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sage Transactions</span>
+                <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Sage Transactions</span>
                 <span className="ml-auto text-xs text-red-600 font-semibold">{filteredUnmatchedSageCount} items</span>
               </div>
-              <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
-                {unmatchedSageGroups.length === 0 || filteredUnmatchedSageCount === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
-                    <span className="text-3xl mb-2">✓</span>No unmatched Sage transactions
-                  </div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
-                      <tr>
-                        <th className="text-left px-4 py-3 w-8"></th>
-                        <th className="text-left px-4 py-3">Check No</th>
-                        <th className="text-left px-4 py-3">Date</th>
-                        <th className="text-left px-4 py-3">Description</th>
-                        <th className="text-left px-4 py-3">Type</th>
-                        <th className="text-right px-4 py-3">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {unmatchedSageGroups.flatMap((group) => {
-                        const groupUnmatchedSage = group.display_unmatched_sage || [];
-                        return groupByCheckNumber(groupUnmatchedSage).flatMap((g) => {
-                          const sageKey = `${group.account}-${g.groupKey}`;
-                          const isExpanded = expandedSageGroups.includes(sageKey);
-                          const rows = [
-                            <tr key={`sage-group-${sageKey}`} className="hover:bg-red-50/30 transition-colors">
-                              <td className="px-4 py-3">
-                                <input type="checkbox" checked={isGroupSelected(g.items, selectedSageIds)}
-                                  onChange={() => toggleGroupSelection(g.items, selectedSageIds, setSelectedSageIds)}
-                                  className="w-4 h-4 accent-[#1e9bd8]" />
-                              </td>
-                              <td className="px-4 py-3 text-gray-700 font-mono text-xs">{g.checkNumber}</td>
-                              <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{g.items[0]?.date}</td>
-                              <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate text-xs">
-                                {g.items.length > 1 ? `${g.items.length} transactions` : (g.items[0]?.description || '')}
-                              </td>
-                              <td className="px-4 py-3"><Badge type={g.items[0]?.type} /></td>
-                              <td className="px-4 py-3 text-right font-semibold text-gray-800 text-xs">
-                                {fmt(g.totalAmount)}
-                                {g.items.length > 1 && (
-                                  <button onClick={() => toggleExpanded(sageKey, expandedSageGroups, setExpandedSageGroups)}
-                                    className="block ml-auto text-[10px] text-[#1e9bd8] hover:underline">
-                                    {isExpanded ? 'Hide' : `+${g.items.length}`}
-                                  </button>
-                                )}
-                              </td>
-                            </tr>,
-                          ];
-                          if (g.items.length > 1 && isExpanded) {
-                            g.items.forEach((t) => {
-                              rows.push(
-                                <tr key={`sage-child-${t.id}`} className="bg-red-50/20">
-                                  <td className="px-4 py-2">
-                                    <input type="checkbox" checked={selectedSageIds.includes(t.id)}
-                                      onChange={() => toggleSelection(t.id, selectedSageIds, setSelectedSageIds)}
-                                      className="w-4 h-4 accent-[#1e9bd8]" />
-                                  </td>
-                                  <td className="px-4 py-2 text-gray-400 font-mono text-xs">{t.check_number || ''}</td>
-                                  <td className="px-4 py-2 text-gray-500 text-xs">{t.date}</td>
-                                  <td className="px-4 py-2 text-gray-600 max-w-[160px] truncate text-xs">{t.description || ''}</td>
-                                  <td className="px-4 py-2"><Badge type={t.type} /></td>
-                                  <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(t.amount)}</td>
-                                </tr>
-                              );
-                            });
-                          }
-                          return rows;
-                        });
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              <DataTable
+                columns={sageColumns}
+                data={flattenedSageCheckGroups}
+                selectable={true}
+                selectedRows={selectedSageGroupIds}
+                onSelectionChange={handleSageGroupSelectionChange}
+                isClientSide={true}
+                enableColumnFilters={true}
+                sortColumn={sageSortCol}
+                sortDirection={sageSortDir}
+                onSort={(col, dir) => { setSageSortCol(col); setSageSortDir(dir); }}
+                currentPage={sageCurrentPage}
+                itemsPerPage={sageItemsPerPage}
+                onPageChange={setSageCurrentPage}
+                onItemsPerPageChange={setSageItemsPerPage}
+                maxHeight="180px"
+                stickyHeader={true}
+                expandable={false}
+              />
             </div>
           </div>
 
