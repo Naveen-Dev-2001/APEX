@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
 import DataTable from '../../../components/ui/DataTable';
+import TableSkeleton from '../../../components/ui/TableSkeleton';
 import {
   normalizeSearchValue,
   EmptyState,
@@ -10,7 +11,7 @@ import {
 const BankAccountsTab = () => {
   const [uploading, setUploading] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState([]);
   const [accountSearch, setAccountSearch] = useState('');
   const [deletingAccountId, setDeletingAccountId] = useState(null);
@@ -199,7 +200,7 @@ const BankAccountsTab = () => {
             type="button"
             onClick={() => openDeleteConfirmation(row)}
             disabled={deletingAccountId === row.id}
-            className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors disabled:opacity-60"
+            className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors disabled:opacity-60 cursor-pointer"
             title="Delete Bank Account"
           >
             {deletingAccountId === row.id
@@ -239,7 +240,7 @@ const BankAccountsTab = () => {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="inline-flex items-center gap-1.5 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-4 py-2 rounded-lg font-medium text-xs transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-4 py-2 rounded-lg font-medium text-xs transition-colors disabled:opacity-60 cursor-pointer"
             >
               {uploading
                 ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
@@ -255,7 +256,7 @@ const BankAccountsTab = () => {
               type="button"
               onClick={handleSyncFromSage}
               disabled={syncing}
-              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium text-xs transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium text-xs transition-colors disabled:opacity-60 cursor-pointer"
             >
               {syncing
                 ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Syncing...</>
@@ -272,12 +273,9 @@ const BankAccountsTab = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" /></div>
+        <TableSkeleton rowCount={8} columnCount={6} />
       ) : accounts.length > 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-3 space-y-2 flex-1 min-h-0 flex flex-col">
-          <div className="px-1 py-0.5">
-            <h3 className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Bank Accounts Master</h3>
-          </div>
           <DataTable
             columns={columns}
             data={sortedAccounts}
@@ -318,7 +316,7 @@ const BankAccountsTab = () => {
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleteLoading}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
@@ -326,7 +324,7 @@ const BankAccountsTab = () => {
                 type="button"
                 onClick={confirmDeleteAccount}
                 disabled={deleteLoading}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 {deleteLoading ? (
                   <>

@@ -107,7 +107,7 @@ const BankReconciliationPage = () => {
                     </span>
                     <button
                       onClick={handleLogout}
-                      className="text-[13px] text-[#ff5a5f] hover:text-red-600 font-semibold transition-colors shrink-0"
+                      className="text-[13px] text-[#ff5a5f] hover:text-red-600 font-semibold transition-colors shrink-0 cursor-pointer"
                     >
                       Logout
                     </button>
@@ -131,7 +131,7 @@ const BankReconciliationPage = () => {
                       navigate('/module-select');
                       setIsDropdownOpen(false);
                     }}
-                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
+                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5 cursor-pointer"
                   >
                     <div className="p-1 rounded-lg text-[#3ba5d8]">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

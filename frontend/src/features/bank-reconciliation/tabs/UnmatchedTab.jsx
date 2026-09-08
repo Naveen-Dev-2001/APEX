@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
 import DataTable from '../../../components/ui/DataTable';
+import TableSkeleton from '../../../components/ui/TableSkeleton';
 import {
   fmt,
   normalizeSearchValue,
@@ -14,7 +15,7 @@ import {
 const UnmatchedTab = () => {
   const [results, setResults] = useState(null);
   const [bankAccounts, setBankAccounts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [manualMarking, setManualMarking] = useState(false);
   const [selectedBank, setSelectedBank] = useState('all');
   const [unmatchedSearch, setUnmatchedSearch] = useState('');
@@ -364,7 +365,12 @@ const UnmatchedTab = () => {
 
   return (
     <div className="flex flex-col space-y-3 h-full min-h-0 overflow-hidden">
-      {loading && <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>}
+      {loading && (
+        <div className="grid grid-cols-2 gap-4">
+          <TableSkeleton rowCount={8} columnCount={5} />
+          <TableSkeleton rowCount={8} columnCount={5} />
+        </div>
+      )}
 
       {!loading && results && (
         <>
@@ -385,7 +391,7 @@ const UnmatchedTab = () => {
                 className="w-full max-w-xs bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2" />
             </div>
             <button onClick={handleManualMarkMatched} disabled={manualMarking || !selectedBankIds.length || !selectedSageIds.length}
-              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60">
+              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer">
               {manualMarking
                 ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Marking…</>
                 : <>Mark as Matched</>

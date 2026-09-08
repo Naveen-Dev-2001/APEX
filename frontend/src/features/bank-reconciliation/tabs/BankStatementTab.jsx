@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
 import DataTable from '../../../components/ui/DataTable';
+import TableSkeleton from '../../../components/ui/TableSkeleton';
 import {
   fmt,
   normalizeSearchValue,
@@ -319,8 +320,8 @@ const BankStatementTab = () => {
       filterable: false,
       render: (_, s) => (
         <div className="text-right flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => handleViewTransactions(s)} className="text-[#1e9bd8] hover:underline text-xs font-medium">View</button>
-          <button onClick={(e) => openDeleteConfirmation(e, s)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors" title="Delete Statement">
+          <button onClick={() => handleViewTransactions(s)} className="text-[#1e9bd8] hover:underline text-xs font-medium cursor-pointer">View</button>
+          <button onClick={(e) => openDeleteConfirmation(e, s)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer" title="Delete Statement">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -470,7 +471,7 @@ const BankStatementTab = () => {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="inline-flex items-center gap-1.5 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-4 py-2 rounded-lg font-medium text-xs transition-colors disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-4 py-2 rounded-lg font-medium text-xs transition-colors disabled:opacity-60 cursor-pointer"
               >
                 {uploading
                   ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading...</>
@@ -498,12 +499,9 @@ const BankStatementTab = () => {
 
       {/* Statements list */}
       {loading ? (
-        <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" /></div>
+        <TableSkeleton rowCount={8} columnCount={6} />
       ) : sortedStatements.length > 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-3 space-y-2 flex-1 min-h-0 flex flex-col">
-          <div className="px-1 py-0.5">
-            <h3 className="font-semibold text-gray-700 text-xs uppercase tracking-wider">Uploaded Statements</h3>
-          </div>
           <DataTable
             columns={statementColumns}
             data={sortedStatements}
@@ -539,7 +537,7 @@ const BankStatementTab = () => {
                 <button
                   type="button"
                   onClick={() => { setSelectedStatement(null); setTransactions(null); }}
-                  className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
                   title="Close"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -605,7 +603,7 @@ const BankStatementTab = () => {
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleteLoading}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
@@ -613,7 +611,7 @@ const BankStatementTab = () => {
                 type="button"
                 onClick={confirmDeleteStatement}
                 disabled={deleteLoading}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 {deleteLoading ? (
                   <>
