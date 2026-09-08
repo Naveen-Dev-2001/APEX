@@ -1116,38 +1116,61 @@ class BankReconciliationService:
             raise
 
     async def fetch_sage_gl_transactions(self, account_filter: str = None, financial_entity_filter: str = None) -> int:
-        """Fetch GL transactions from Sage. Optionally filter by account number and financial entity."""
+        """Fetch bank reconciliation transactions from Sage and cache them."""
         try:
-            from bank_reconciliation.scripts.bank_recon import get_session_id, fetch_all_gldetail, normalize_records
-            
-            session_id = await get_session_id()
-            acct = account_filter or "10012"
-            financial_entity = financial_entity_filter or "FFB_4449"
-            
-            records = await fetch_all_gldetail(
-                session_id=session_id,
-                financial_entity=financial_entity,
-                account_no=acct,
-                after_date="09/30/2023"
-            )
-            normalized = normalize_records(records)
+            import bank_recon_all
 
-            if records and not normalized:
-                logger.warning(
-                    "normalize_records returned 0 items for %s records; applying fallback normalization",
-                    len(records),
+            backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            bank_recon_all.load_env_file(os.path.join(backend_dir, ".env"))
+
+            for attr, env_names in {
+                "SENDER_ID": ("SAGE_SENDER_ID", "SENDER_ID"),
+                "SENDER_PASSWORD": ("SAGE_SENDER_PASSWORD", "SENDER_PASSWORD"),
+                "USER_ID": ("SAGE_USER_ID", "USER_ID"),
+                "LOCATION_ID": ("SAGE_LOCATION_ID", "LOCATION_ID"),
+                "COMPANY_ID": ("SAGE_COMPANY_ID", "COMPANY_ID"),
+                "USER_PASSWORD": ("SAGE_USER_PASSWORD", "USER_PASSWORD"),
+            }.items():
+                for env_name in env_names:
+                    value = os.environ.get(env_name)
+                    if value:
+                        setattr(bank_recon_all, attr, value)
+                        break
+
+            acct = str(account_filter or "").strip() or None
+            financial_entity = str(financial_entity_filter or "").strip()
+            if not financial_entity:
+                raise ValueError("Please choose a bank before syncing Sage transactions.")
+
+            session_id = await bank_recon_all.get_session_id()
+            normalized = []
+            counts = {}
+
+            for object_name, record_tag in bank_recon_all.OBJECTS.items():
+                query_str = bank_recon_all.build_query(object_name, financial_entity)
+                records = await bank_recon_all.fetch_object_records(
+                    session_id=session_id,
+                    object_name=object_name,
+                    record_tag=record_tag,
+                    query_str=query_str,
                 )
-                normalized = [self._normalize_raw_sage_record(r) for r in records if isinstance(r, dict)]
+                counts[object_name] = len(records)
+                normalized.extend(
+                    bank_recon_all.normalize_record(record, object_name)
+                    for record in records
+                    if isinstance(record, dict)
+                )
 
             logger.info(
-                "Sage fetch completed: raw_records=%s normalized_records=%s account=%s",
-                len(records),
+                "Sage bank reconciliation fetch completed: counts=%s normalized_records=%s account=%s financial_entity=%s",
+                counts,
                 len(normalized),
                 acct,
+                financial_entity,
             )
 
             script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
-            output_path = os.path.join(script_dir, "uncleared_transactions.json")
+            output_path = os.path.join(script_dir, f"uncleared_transactions_{financial_entity}.json")
 
             try:
                 os.makedirs(script_dir, exist_ok=True)
@@ -1155,6 +1178,7 @@ class BankReconciliationService:
                     json.dump(
                         {
                             "total": len(normalized),
+                            "counts": counts,
                             "financial_entity": financial_entity,
                             "gl_account": acct,
                             "fetched_at": get_ist_now().isoformat(),
@@ -1170,40 +1194,55 @@ class BankReconciliationService:
             to_save = []
             updated_count = 0
             for idx, item in enumerate(normalized):
-                raw = records[idx] if idx < len(records) else {}
+                raw = item.get("raw") if isinstance(item.get("raw"), dict) else {}
 
                 doc_number = self._first_non_empty(
-                    item.get("check_no"),
                     item.get("doc_number"),
                     self._pick_key(raw, "DOCNUMBER", "DOCNO", "DOCUMENTNO", "DOCUMENT"),
                 )
                 tr_type = self._first_non_empty(
-                    item.get("txn_type"),
                     item.get("tr_type"),
+                    item.get("payment_method"),
                     self._pick_key(raw, "TR_TYPE", "TRX_TYPE", "TRTYPE"),
                 )
                 bank = self._first_non_empty(
                     item.get("financial_entity"),
+                    item.get("bank_account"),
+                    item.get("to_account"),
                     item.get("bank"),
                     self._pick_key(raw, "FINANCIALENTITY", "BANK"),
                     financial_entity,
                 )
 
-                sage_key = str(item.get("record_no") or f"{item.get('txn_date')}_{item.get('check_no')}_{item.get('txn_amount')}_{item.get('account_no')}")
+                source_object = item.get("source_object") or self._pick_key(raw, "RECORDTYPE") or "SAGE_BANK_RECON"
+                sage_key_raw = "|".join(str(part or "") for part in (
+                    "brall",
+                    financial_entity,
+                    source_object,
+                    item.get("record_no"),
+                    item.get("date"),
+                    doc_number,
+                    item.get("total"),
+                ))
+                sage_key = "brall_" + hashlib.sha256(sage_key_raw.encode()).hexdigest()[:58]
                 
                 existing = self.db.query(SageGLTransactionCache).filter_by(sage_key=sage_key).first()
                 if existing:
                     changed = False
 
-                    new_description = item.get("description") or item.get("payee")
-                    new_vendor = item.get("vendor") or item.get("payee")
-                    new_customer = item.get("customer")
-                    new_record_type = item.get("record_type")
+                    new_description = item.get("description")
+                    new_vendor = item.get("party_name") if source_object == "APPYMT" else None
+                    new_customer = item.get("party_name") if source_object != "APPYMT" else None
+                    new_record_type = source_object
                     new_cleared = item.get("cleared")
                     new_doc_number = str(doc_number) if doc_number is not None else None
                     new_tr_type = str(tr_type) if tr_type is not None else None
                     new_bank = str(bank) if bank is not None else None
+                    new_account = acct
 
+                    if not existing.account and new_account:
+                        existing.account = new_account
+                        changed = True
                     if not existing.doc_number and new_doc_number:
                         existing.doc_number = new_doc_number
                         changed = True
@@ -1233,16 +1272,13 @@ class BankReconciliationService:
                         updated_count += 1
                     continue
                     
-                raw_date = item.get("txn_date")
-                try:
-                    date_obj = datetime.strptime(raw_date, "%m/%d/%Y").date() if raw_date else datetime.now().date()
-                except ValueError:
-                    date_obj = datetime.now().date()
+                raw_date = item.get("date")
+                date_obj = self._normalize_date(raw_date) or datetime.now().date()
                 
                 entry_date_obj = date_obj # default to txn_date
 
-                amount = Decimal(str(item.get("txn_amount", 0)))
-                normalized_txn_type = self._normalize_txn_type_label(item.get("txn_type"))
+                amount = Decimal(str(item.get("total") or 0).replace(",", ""))
+                normalized_txn_type = self._normalize_txn_type_label(item.get("direction"))
                 if normalized_txn_type == "debit":
                     t_type = "debit"
                 elif normalized_txn_type == "credit":
@@ -1254,18 +1290,18 @@ class BankReconciliationService:
                 cache_item = SageGLTransactionCache(
                     sage_key=sage_key,
                     date=date_obj,
-                    description=item.get("description") or item.get("payee") or "",
-                    account=item.get("account_no", ""),
+                    description=item.get("description") or "",
+                    account=acct or "",
                     amount=amount,
                     transaction_type=t_type,
                     is_matched=False,
                     entry_date=entry_date_obj,
                     doc_number=str(doc_number) if doc_number is not None else None,
-                    vendor=item.get("vendor") or item.get("payee"),
-                    customer=item.get("customer"),
-                    record_type=item.get("record_type"),
+                    vendor=item.get("party_name") if source_object == "APPYMT" else None,
+                    customer=item.get("party_name") if source_object != "APPYMT" else None,
+                    record_type=source_object,
                     cleared=item.get("cleared"),
-                    tr_type=str(item.get("txn_type") or tr_type) if (item.get("txn_type") or tr_type) is not None else None,
+                    tr_type=str(item.get("payment_method") or tr_type) if (item.get("payment_method") or tr_type) is not None else None,
                     bank=str(bank) if bank is not None else None,
                 )
                 to_save.append(cache_item)
