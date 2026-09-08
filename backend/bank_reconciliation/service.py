@@ -824,7 +824,7 @@ class BankReconciliationService:
         def _col(df, *names):
             """Return the first matching column value series or None."""
             for name in names:
-                if name in df.columns:
+                if name in df:
                     return df[name]
             return None
 
@@ -839,21 +839,20 @@ class BankReconciliationService:
         # ── Pass 1: parse all rows and compute sage_keys ────────────────────
         pending_rows = []
         for _, row in df.iterrows():
-            raw_date = str(row.get("date", "") or "").strip()
+            raw_date = str(_col(row, "date", "transaction_date", "posting_date", "entry_date") or "").strip()
             date_obj = self._normalize_date(raw_date)
             if date_obj is None:
                 continue
 
-            doc_number  = str(row.get("doc_number", "") or "").strip() or None
-            description = str(row.get("description", "") or "").strip() or None
-            total_raw   = str(row.get("total", "0") or "0").strip()
-            source_obj  = str(row.get("source_object", "") or "").strip() or None
-            direction   = str(row.get("direction", "") or "").strip()
-            party_name  = str(row.get("party_name", "") or "").strip() or None
-            pay_method  = str(row.get("payment_method", "") or "").strip() or None
+            doc_number  = str(_col(row, "doc_number", "document_number", "document_no", "check_number") or "").strip() or None
+            description = str(_col(row, "description", "memo", "transaction_description") or "").strip() or None
+            total_raw   = str(_col(row, "total", "amount", "transaction_amount") or "0").strip()
+            source_obj  = str(_col(row, "source_object", "record_type", "source") or "").strip() or None
+            direction   = str(_col(row, "direction", "transaction_type", "type") or "").strip()
+            party_name  = str(_col(row, "party_name", "vendor", "customer", "payee") or "").strip() or None
+            pay_method  = str(_col(row, "payment_method", "payment_type", "tr_type") or "").strip() or None
             cleared_val = (
-                str(row.get("cleared", "") or "").strip()
-                or str(row.get("display_state", "") or "").strip()
+                str(_col(row, "cleared", "display_state", "state", "status") or "").strip()
                 or None
             )
 
@@ -864,15 +863,15 @@ class BankReconciliationService:
 
             txn_type = _direction_to_txn_type(direction)
 
-            # Deterministic unique key via SHA-256 hash (no truncation collisions)
-            _key_raw = f"xl|{source_obj}|{direction}|{raw_date}|{doc_number}|{total_raw}|{description}"
-            sage_key = "xl_" + hashlib.sha256(_key_raw.encode()).hexdigest()[:60]
-
-            row_account = str(row.get("account", "") or row.get("gl_account", "") or "").strip() or None
+            row_account = str(_col(row, "account", "gl_account", "account_number") or "").strip() or None
             resolved_account = row_account or account_number or None
 
-            row_bank = str(row.get("bank", "") or row.get("financial_entity", "") or "").strip() or None
+            row_bank = str(_col(row, "bank", "financial_entity", "bank_name") or "").strip() or None
             resolved_bank = row_bank or bank or None
+
+            # Scope idempotency to the bank/GL account selected for this upload.
+            _key_raw = f"xl|{resolved_bank}|{resolved_account}|{source_obj}|{direction}|{raw_date}|{doc_number}|{total_raw}|{description}"
+            sage_key = "xl_" + hashlib.sha256(_key_raw.encode()).hexdigest()[:60]
 
             pending_rows.append({
                 "sage_key": sage_key,
@@ -1160,6 +1159,20 @@ class BankReconciliationService:
                     for record in records
                     if isinstance(record, dict)
                 )
+
+            object_display_names = {
+                "FUNDSTRANSFER": "Fund Transfer",
+                "OTHERRECEIPTS": "Other Receipts",
+                "DEPOSIT": "Deposit",
+                "ARPYMT": "AR Payment",
+                "APPYMT": "AP Payment",
+            }
+            total_count = sum(counts.values())
+            print(f"\nSage sync summary (financial_entity={financial_entity}):")
+            for object_name, count in counts.items():
+                label = object_display_names.get(object_name, object_name)
+                print(f"  {label} {count}")
+            print(f"  Total {total_count}")
 
             logger.info(
                 "Sage bank reconciliation fetch completed: counts=%s normalized_records=%s account=%s financial_entity=%s",
