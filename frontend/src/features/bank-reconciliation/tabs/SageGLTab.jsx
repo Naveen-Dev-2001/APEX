@@ -356,7 +356,7 @@ const SageGLTab = () => {
     },
     {
       header: 'Actions',
-      accessor: 'action',
+      accessor: 'actions',
       sortable: false,
       filterable: false,
       render: (_, bankRow) => (

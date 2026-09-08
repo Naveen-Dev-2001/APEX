@@ -153,7 +153,7 @@ const BankReconciliationPage = () => {
       <div className="flex flex-1 pt-[60px] overflow-hidden">
         {/* Main */}
         <main className="flex-1 p-3 pt-2 overflow-hidden flex flex-col min-h-0">
-          <div className="max-w-7xl w-full mx-auto flex-1 flex flex-col min-h-0 space-y-3">
+          <div className="w-full flex-1 flex flex-col min-h-0 space-y-3">
             {/* Mobile Navigation */}
             <nav className="lg:hidden mb-4 bg-white border border-[#e8e8e8] shadow-sm overflow-x-auto">
               <div className="flex items-center min-w-max">

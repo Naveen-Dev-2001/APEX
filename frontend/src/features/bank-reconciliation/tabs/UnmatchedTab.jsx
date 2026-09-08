@@ -391,7 +391,7 @@ const UnmatchedTab = () => {
                 className="w-full max-w-xs bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2" />
             </div>
             <button onClick={handleManualMarkMatched} disabled={manualMarking || !selectedBankIds.length || !selectedSageIds.length}
-              className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer">
+              className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 py-2 rounded-lg font-medium text-xs transition-all disabled:opacity-60 cursor-pointer">
               {manualMarking
                 ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Marking…</>
                 : <>Mark as Matched</>
@@ -446,7 +446,7 @@ const UnmatchedTab = () => {
                 itemsPerPage={bankItemsPerPage}
                 onPageChange={setBankCurrentPage}
                 onItemsPerPageChange={setBankItemsPerPage}
-                maxHeight="180px"
+                maxHeight="calc(100vh - 365px)"
                 stickyHeader={true}
                 expandable={false}
               />
@@ -474,7 +474,7 @@ const UnmatchedTab = () => {
                 itemsPerPage={sageItemsPerPage}
                 onPageChange={setSageCurrentPage}
                 onItemsPerPageChange={setSageItemsPerPage}
-                maxHeight="180px"
+                maxHeight="calc(100vh - 365px)"
                 stickyHeader={true}
                 expandable={false}
               />

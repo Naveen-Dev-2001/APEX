@@ -566,7 +566,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                       itemsPerPage={bankItemsPerPage}
                       onPageChange={setBankCurrentPage}
                       onItemsPerPageChange={setBankItemsPerPage}
-                      maxHeight="180px"
+                      maxHeight="calc(100vh - 365px)"
                       stickyHeader={true}
                       expandable={false}
                     />
@@ -594,7 +594,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                       itemsPerPage={sageItemsPerPage}
                       onPageChange={setSageCurrentPage}
                       onItemsPerPageChange={setSageItemsPerPage}
-                      maxHeight="180px"
+                      maxHeight="calc(100vh - 365px)"
                       stickyHeader={true}
                       expandable={false}
                     />
