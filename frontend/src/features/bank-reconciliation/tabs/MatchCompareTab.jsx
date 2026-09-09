@@ -6,6 +6,7 @@ import TableSkeleton from '../../../components/ui/TableSkeleton';
 import {
   fmt,
   normalizeSearchValue,
+  matchesSearchQuery,
   formatBankAccountOptionLabel,
   BankSelect,
   Badge,
@@ -213,39 +214,19 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
   const sageDisplayItems = statusFilter === 'matched' ? matchedItems.map((m) => m.sage).filter(Boolean)
     : statusFilter === 'unmatched' ? unmatchedSageItems : allSageItems;
 
-  const groupedSageDisplay = groupByCheckNo(sageDisplayItems);
-
   const filteredCompareBankItems = React.useMemo(() => {
-    const query = normalizeSearchValue(compareSearch).trim();
-    if (!query) return uniqueBankDisplayItems;
-    return uniqueBankDisplayItems.filter((t) => (
-      normalizeSearchValue(t?.description).includes(query)
-      || normalizeSearchValue(t?.check_number || t?.reference).includes(query)
-      || normalizeSearchValue(t?.type || t?.transaction_type).includes(query)
-      || normalizeSearchValue(t?.account_number || t?.account || selectedGroup?.account).includes(query)
-      || normalizeSearchValue(t?.date).includes(query)
-      || normalizeSearchValue(t?.amount).includes(query)
-      || normalizeSearchValue(t?.is_matched ? 'matched' : 'unmatched').includes(query)
-    ));
-  }, [uniqueBankDisplayItems, compareSearch, selectedGroup]);
+    if (!compareSearch.trim()) return uniqueBankDisplayItems;
+    return uniqueBankDisplayItems.filter((t) => matchesSearchQuery(t, compareSearch));
+  }, [uniqueBankDisplayItems, compareSearch]);
 
-  const filteredGroupedSageDisplay = React.useMemo(() => {
-    const query = normalizeSearchValue(compareSearch).trim();
-    if (!query) return groupedSageDisplay;
-    return groupedSageDisplay.filter((g) => {
-      if (normalizeSearchValue(g.checkNumber).includes(query) || normalizeSearchValue(g.totalAmount).includes(query)) return true;
-      return g.items.some((item) => (
-        normalizeSearchValue(item?.description).includes(query)
-        || normalizeSearchValue(item?.check_number || item?.reference).includes(query)
-        || normalizeSearchValue(item?.type || item?.transaction_type).includes(query)
-        || normalizeSearchValue(item?.account || item?.account_number || selectedGroup?.account).includes(query)
-        || normalizeSearchValue(item?.date).includes(query)
-        || normalizeSearchValue(item?.amount).includes(query)
-        || normalizeSearchValue(item?.bank).includes(query)
-        || normalizeSearchValue(item?.is_matched ? 'matched' : 'unmatched').includes(query)
-      ));
-    });
-  }, [groupedSageDisplay, compareSearch, selectedGroup]);
+  const filteredSageDisplayItems = React.useMemo(() => {
+    if (!compareSearch.trim()) return sageDisplayItems;
+    return sageDisplayItems.filter((t) => matchesSearchQuery(t, compareSearch));
+  }, [sageDisplayItems, compareSearch]);
+
+  const groupedSageDisplay = React.useMemo(() => {
+    return groupByCheckNo(filteredSageDisplayItems);
+  }, [filteredSageDisplayItems]);
 
   const [bankSortCol, setBankSortCol] = useState(null);
   const [bankSortDir, setBankSortDir] = useState('asc');
@@ -577,7 +558,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                     <div className="flex items-center gap-2 bg-red-50/60 p-2 rounded-xl border border-red-100 shrink-0">
                       <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
                       <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Sage Transactions</span>
-                      <span className="ml-auto text-xs text-red-600 font-semibold">{filteredGroupedSageDisplay.length} groups</span>
+                      <span className="ml-auto text-xs text-red-600 font-semibold">{groupedSageDisplay.length} groups</span>
                     </div>
                     <DataTable
                       columns={sageColumns}

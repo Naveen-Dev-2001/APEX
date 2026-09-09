@@ -7,6 +7,43 @@ export const fmt = (v) =>
 
 export const normalizeSearchValue = (value) => String(value ?? '').toLowerCase();
 
+export const matchesSearchQuery = (item, queryRaw) => {
+  if (!queryRaw) return true;
+  const q = String(queryRaw).trim().toLowerCase();
+  if (!q) return true;
+
+  const cleanQ = q.replace(/[\$,\s]/g, '');
+
+  const getSearchTokens = (obj) => {
+    if (obj == null) return [];
+    if (typeof obj === 'number' || typeof obj === 'string' || typeof obj === 'boolean') {
+      const valStr = String(obj).toLowerCase();
+      if (typeof obj === 'number' && !isNaN(obj)) {
+        return [valStr, fmt(obj).toLowerCase(), valStr.replace(/\./g, '')];
+      }
+      return [valStr];
+    }
+    if (Array.isArray(obj)) {
+      return obj.flatMap(getSearchTokens);
+    }
+    if (typeof obj === 'object') {
+      const tokens = [];
+      for (const key of Object.keys(obj)) {
+        if (key === 'items' || key === 'bank_transactions' || key === 'sage_transactions' || key === 'matched' || key === 'display_unmatched_sage') continue;
+        tokens.push(...getSearchTokens(obj[key]));
+      }
+      return tokens;
+    }
+    return [];
+  };
+
+  const tokens = getSearchTokens(item);
+  const combinedText = tokens.join(' ');
+  const cleanCombined = combinedText.replace(/[\$,\s]/g, '');
+
+  return combinedText.includes(q) || (cleanQ !== '' && cleanCombined.includes(cleanQ));
+};
+
 export const formatStatementMonthLabel = (value) => {
   const text = String(value || '').trim();
   if (!/^\d{4}-\d{2}$/.test(text)) return text;
