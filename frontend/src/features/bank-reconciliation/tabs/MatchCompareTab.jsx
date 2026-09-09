@@ -372,10 +372,10 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
       accessor: 'description',
       sortable: true,
       filterable: true,
-      getFilterValue: (row) => row?.items?.length > 1 ? `${row.items.length} transactions` : String(row?.items?.[0]?.description || ''),
+      getFilterValue: (row) => String(row?.items?.[0]?.description || ''),
       render: (val, row) => (
-        <span className="text-gray-700 text-xs truncate block max-w-[160px]" title={row?.items?.length > 1 ? `${row.items.length} transactions` : (row?.items?.[0]?.description || '')}>
-          {row?.items?.length > 1 ? `${row.items.length} transactions` : (row?.items?.[0]?.description || '-')}
+        <span className="text-gray-700 text-xs truncate block max-w-[160px]" title={row?.items?.[0]?.description || ''}>
+          {row?.items?.[0]?.description || '-'}
         </span>
       ),
     },
@@ -395,11 +395,19 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
       getFilterValue: (row) => fmt(row?.totalAmount),
       render: (val, row) => {
         const groupMatched = row?.items?.every((item) => item?.is_matched);
+        const count = row?.items?.length || 1;
         return (
-          <div className="text-right">
+          <div className="text-right flex flex-col items-end">
             <div className={`font-semibold text-xs ${statusFilter === 'unmatched' ? 'text-red-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-800'}`}>{fmt(val)}</div>
-            <div className={`text-[10px] uppercase font-semibold mt-0.5 ${statusFilter === 'all' ? (groupMatched ? 'text-green-600' : 'text-red-600') : statusFilter === 'matched' ? 'text-green-600' : 'text-red-600'}`}>
-              {statusFilter === 'all' ? (groupMatched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
+            <div className="flex items-center gap-1 mt-0.5">
+              {count > 1 && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">
+                  +{count - 1}
+                </span>
+              )}
+              <span className={`text-[10px] uppercase font-semibold ${statusFilter === 'all' ? (groupMatched ? 'text-green-600' : 'text-red-600') : statusFilter === 'matched' ? 'text-green-600' : 'text-red-600'}`}>
+                {statusFilter === 'all' ? (groupMatched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
+              </span>
             </div>
           </div>
         );
@@ -577,7 +585,29 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
                       onItemsPerPageChange={setSageItemsPerPage}
                       maxHeight="calc(100vh - 365px)"
                       stickyHeader={true}
-                      expandable={false}
+                      expandable={true}
+                      renderExpandedRow={(groupRow) => (
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-gray-500 mb-1">
+                            Group Details ({groupRow?.items?.length || 0} transactions)
+                          </div>
+                          <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            {(groupRow?.items || []).map((subItem, sIdx) => (
+                              <div key={subItem.id || sIdx} className="p-2.5 flex items-center justify-between text-xs hover:bg-gray-50">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-mono text-gray-500">{subItem.date || '-'}</span>
+                                  <span className="text-gray-800 font-medium">{subItem.description || subItem.vendor || subItem.customer || '-'}</span>
+                                  <span className="text-gray-400 text-[11px] font-mono">{subItem.doc_number || subItem.check_no || subItem.reference || ''}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <Badge type={subItem.type || subItem.transaction_type} />
+                                  <span className="font-semibold text-gray-800">{fmt(subItem.amount)}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     />
                   </div>
                 </div>
