@@ -97,6 +97,26 @@ class BankReconciliationService:
         return text
 
     @staticmethod
+    def _description_mentions_reversal(value: Any) -> bool:
+        norm = BankReconciliationService._normalize_text(value)
+        if not norm:
+            return False
+
+        reversal_keywords = (
+            "reversal",
+            "reversed",
+            "refund",
+            "refunded",
+            "reserved for refund",
+            "reserve for refund",
+            "refund reversal",
+            "reversal refund",
+            "incorrectly recorded",
+            "incorrectly-recorded",
+        )
+        return any(keyword in norm for keyword in reversal_keywords)
+
+    @staticmethod
     def _normalize_date(value: Any):
         if value is None:
             return None
@@ -250,10 +270,6 @@ class BankReconciliationService:
             norm = self._normalize_text(raw or "")
             return any(kw in norm for kw in ("void", "voided"))
 
-        def _description_mentions_reversal(text: Any) -> bool:
-            norm = self._normalize_text(text or "")
-            return "reversal" in norm or "reversed" in norm
-
         def _save_matched_pair(txn_a: SageGLTransactionCache, txn_b: SageGLTransactionCache) -> None:
             txn_a.is_matched = True
             txn_b.is_matched = True
@@ -347,7 +363,7 @@ class BankReconciliationService:
                 for txn_b in candidates[i + 1:]:
                     if txn_b.id in paired_ids:
                         continue
-                    if not (_description_mentions_reversal(txn_a.description) or _description_mentions_reversal(txn_b.description)):
+                    if not (self._description_mentions_reversal(txn_a.description) or self._description_mentions_reversal(txn_b.description)):
                         continue
                     if _to_decimal(txn_a.amount) + _to_decimal(txn_b.amount) != Decimal("0"):
                         continue
@@ -1483,7 +1499,7 @@ class BankReconciliationService:
                 continue
 
             has_reversal_group = any(
-                "reversal" in self._normalize_text(t.description) or "reversed" in self._normalize_text(t.description)
+                self._description_mentions_reversal(t.description)
                 for t in grouped_candidates
             )
 
