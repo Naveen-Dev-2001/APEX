@@ -222,10 +222,11 @@ class BankReconciliationService:
             voided variant (e.g. "Voided - 8241"). Both share the same numeric suffix,
             account, and bank.
 
-        Rule 2 — Same Description Reversal Pair (amounts may vary, e.g. 500 vs -100):
+        Rule 2 — Same Description Reversal Pair:
             Two entries with the exact same normalized description, but opposite
-            directions/signs (one positive/debit, one negative/credit). Amounts
-            can vary (e.g. 500 and -100).
+            directions/signs (one positive/debit, one negative/credit), and which
+            net to zero when added together. If the total is not zero, the pair
+            remains unmatched so the residual amount can be matched separately.
         """
         query = self.db.query(SageGLTransactionCache).filter(
             SageGLTransactionCache.is_matched == False
@@ -249,6 +250,10 @@ class BankReconciliationService:
             norm = self._normalize_text(raw or "")
             return any(kw in norm for kw in ("void", "voided"))
 
+        def _description_mentions_reversal(text: Any) -> bool:
+            norm = self._normalize_text(text or "")
+            return "reversal" in norm or "reversed" in norm
+
         def _save_matched_pair(txn_a: SageGLTransactionCache, txn_b: SageGLTransactionCache) -> None:
             txn_a.is_matched = True
             txn_b.is_matched = True
@@ -269,7 +274,11 @@ class BankReconciliationService:
         # key: (account, bank, check_suffix)
         check_voided_grouped: Dict[tuple, Dict[str, List[SageGLTransactionCache]]] = {}
 
-        # Buckets for Rule 2 (Same description reversal pair, amounts may vary)
+        # Buckets for Rule 2 (Same check number + reversal description)
+        # key: (account, bank, check_suffix)
+        check_reversal_grouped: Dict[tuple, List[SageGLTransactionCache]] = {}
+
+        # Buckets for Rule 3 (Same description reversal pair, amounts may vary)
         # key: (account, bank, normalized_desc)
         desc_reversal_grouped: Dict[tuple, Dict[str, List[SageGLTransactionCache]]] = {}
 
@@ -288,7 +297,13 @@ class BankReconciliationService:
                 else:
                     bucket["base"].append(txn)
 
-            # Rule 2: Description based reversal pair
+            # Rule 2: Same check number + reversal description
+            # Include the full same-check bucket so a reversal entry can still pair
+            # with its non-reversal counterpart when both rows share the same check number.
+            if suffix:
+                check_reversal_grouped.setdefault((acct_key, bank_key, suffix), []).append(txn)
+
+            # Rule 3: Description based reversal pair
             normalized_desc = self._normalize_text(txn.description)
             if not normalized_desc:
                 continue
@@ -319,14 +334,49 @@ class BankReconciliationService:
                 _save_matched_pair(bases[i], voideds[i])
                 matched_pairs += 1
 
-        # Apply Rule 2: Same description reversal pairs (amount may vary)
+        # Apply Rule 2: Same check number + reversal description
+        for bucket in check_reversal_grouped.values():
+            candidates = [t for t in bucket if not t.is_matched]
+            if len(candidates) < 2:
+                continue
+
+            paired_ids = set()
+            for i, txn_a in enumerate(candidates):
+                if txn_a.id in paired_ids:
+                    continue
+                for txn_b in candidates[i + 1:]:
+                    if txn_b.id in paired_ids:
+                        continue
+                    if not (_description_mentions_reversal(txn_a.description) or _description_mentions_reversal(txn_b.description)):
+                        continue
+                    if _to_decimal(txn_a.amount) + _to_decimal(txn_b.amount) != Decimal("0"):
+                        continue
+                    _save_matched_pair(txn_a, txn_b)
+                    paired_ids.add(txn_a.id)
+                    paired_ids.add(txn_b.id)
+                    matched_pairs += 1
+                    break
+
+        # Apply Rule 3: Same description reversal pairs (must cancel to zero)
         for bucket in desc_reversal_grouped.values():
             positives = [t for t in bucket["positive"] if not t.is_matched]
             negatives = [t for t in bucket["negative"] if not t.is_matched]
-            pair_count = min(len(positives), len(negatives))
-            for i in range(pair_count):
-                _save_matched_pair(positives[i], negatives[i])
-                matched_pairs += 1
+            matched_this_bucket = False
+            for pos in positives:
+                if pos.is_matched:
+                    continue
+                for neg in negatives:
+                    if neg.is_matched:
+                        continue
+                    if _to_decimal(pos.amount) + _to_decimal(neg.amount) == Decimal("0"):
+                        _save_matched_pair(pos, neg)
+                        pos.is_matched = True
+                        neg.is_matched = True
+                        matched_pairs += 1
+                        matched_this_bucket = True
+                        break
+                if matched_this_bucket:
+                    break
 
         return matched_pairs
 
@@ -1432,10 +1482,17 @@ class BankReconciliationService:
             if len(grouped_candidates) < 2:
                 continue
 
+            has_reversal_group = any(
+                "reversal" in self._normalize_text(t.description) or "reversed" in self._normalize_text(t.description)
+                for t in grouped_candidates
+            )
+
             selected_group = None
             for i in range(len(grouped_candidates)):
                 for j in range(i + 1, len(grouped_candidates)):
                     combined_cents = _to_cents(grouped_candidates[i].amount) + _to_cents(grouped_candidates[j].amount)
+                    if has_reversal_group and combined_cents != 0:
+                        continue
                     if combined_cents == bank_amount_cents:
                         selected_group = [grouped_candidates[i], grouped_candidates[j]]
                         break
@@ -1451,6 +1508,8 @@ class BankReconciliationService:
                                 + _to_cents(grouped_candidates[j].amount)
                                 + _to_cents(grouped_candidates[k].amount)
                             )
+                            if has_reversal_group and combined_cents != 0:
+                                continue
                             if combined_cents == bank_amount_cents:
                                 selected_group = [
                                     grouped_candidates[i],
