@@ -1,13 +1,48 @@
-/* ─────────────────────────────────────────────────────────────
-   shared.jsx — Shared helpers & display components
-   Used by all Bank Reconciliation tab files.
-───────────────────────────────────────────────────────────── */
+import React from 'react';
+import { Select } from 'antd';
 
 /* ── Formatters ── */
 export const fmt = (v) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(v ?? 0);
 
 export const normalizeSearchValue = (value) => String(value ?? '').toLowerCase();
+
+export const matchesSearchQuery = (item, queryRaw) => {
+  if (!queryRaw) return true;
+  const q = String(queryRaw).trim().toLowerCase();
+  if (!q) return true;
+
+  const cleanQ = q.replace(/[\$,\s]/g, '');
+
+  const getSearchTokens = (obj) => {
+    if (obj == null) return [];
+    if (typeof obj === 'number' || typeof obj === 'string' || typeof obj === 'boolean') {
+      const valStr = String(obj).toLowerCase();
+      if (typeof obj === 'number' && !isNaN(obj)) {
+        return [valStr, fmt(obj).toLowerCase(), valStr.replace(/\./g, '')];
+      }
+      return [valStr];
+    }
+    if (Array.isArray(obj)) {
+      return obj.flatMap(getSearchTokens);
+    }
+    if (typeof obj === 'object') {
+      const tokens = [];
+      for (const key of Object.keys(obj)) {
+        if (key === 'items' || key === 'bank_transactions' || key === 'sage_transactions' || key === 'matched' || key === 'display_unmatched_sage') continue;
+        tokens.push(...getSearchTokens(obj[key]));
+      }
+      return tokens;
+    }
+    return [];
+  };
+
+  const tokens = getSearchTokens(item);
+  const combinedText = tokens.join(' ');
+  const cleanCombined = combinedText.replace(/[\$,\s]/g, '');
+
+  return combinedText.includes(q) || (cleanQ !== '' && cleanCombined.includes(cleanQ));
+};
 
 export const formatStatementMonthLabel = (value) => {
   const text = String(value || '').trim();
@@ -18,7 +53,12 @@ export const formatStatementMonthLabel = (value) => {
 };
 
 export const formatBankAccountOptionLabel = (bankName, accountNumber) => {
-  return String(bankName ?? '').trim() || 'Unknown Bank';
+  const name = String(bankName ?? '').trim();
+  const acc = String(accountNumber ?? '').trim();
+  if (name && acc && !name.includes(acc)) {
+    return `${name} (${acc})`;
+  }
+  return name || acc || 'Unknown Bank';
 };
 
 export const getTopLevelEntityName = (value) => {
@@ -32,6 +72,115 @@ export const getTopLevelEntityName = (value) => {
 };
 
 /* ── Display Components ── */
+
+export const BankSelect = ({
+  id,
+  value,
+  onChange,
+  options = [],
+  placeholder = "Search or select bank",
+  allOptionLabel = "All Banks",
+  allOptionValue = "all",
+  className = "min-w-[200px]",
+}) => {
+  const selectOptions = [
+    ...(allOptionLabel ? [{ value: allOptionValue, label: allOptionLabel }] : []),
+    ...options,
+  ];
+
+  return (
+    <div className={`inline-block ${className} bank-select-container`}>
+      <style>{`
+        .bank-select-container .ant-select-selector {
+          background-color: #f9fafb !important;
+          border-color: #e5e7eb !important;
+          border-radius: 0.5rem !important;
+          height: 34px !important;
+          min-height: 34px !important;
+          display: flex !important;
+          align-items: center !important;
+        }
+        .bank-select-container .ant-select-selection-item,
+        .bank-select-container .ant-select-selection-placeholder {
+          font-size: 0.75rem !important;
+          color: #1f2937 !important;
+          line-height: 32px !important;
+        }
+      `}</style>
+      <Select
+        id={id}
+        showSearch
+        value={value}
+        onChange={(val) => onChange(val ?? (allOptionLabel ? allOptionValue : ''))}
+        placeholder={placeholder}
+        optionFilterProp="label"
+        filterOption={(input, option) => {
+          const searchText = input.toLowerCase();
+          const label = String(option?.label ?? '').toLowerCase();
+          const val = String(option?.value ?? '').toLowerCase();
+          return label.includes(searchText) || val.includes(searchText);
+        }}
+        options={selectOptions}
+        className="w-full"
+        styles={{
+          popup: { root: { zIndex: 9999 } }
+        }}
+      />
+    </div>
+  );
+};
+
+export const SearchSelect = ({
+  id,
+  value,
+  onChange,
+  options = [],
+  placeholder = "Search or select...",
+  className = "min-w-[120px]",
+  allowClear = true,
+}) => {
+  return (
+    <div className={`inline-block ${className} search-select-container`}>
+      <style>{`
+        .search-select-container .ant-select-selector {
+          background-color: #f9fafb !important;
+          border-color: #e5e7eb !important;
+          border-radius: 0.5rem !important;
+          height: 34px !important;
+          min-height: 34px !important;
+          display: flex !important;
+          align-items: center !important;
+        }
+        .search-select-container .ant-select-selection-item,
+        .search-select-container .ant-select-selection-placeholder {
+          font-size: 0.75rem !important;
+          color: #1f2937 !important;
+          line-height: 32px !important;
+        }
+      `}</style>
+      <Select
+        id={id}
+        showSearch
+        allowClear={allowClear}
+        value={value || undefined}
+        onChange={(val) => onChange(val ?? '')}
+        placeholder={placeholder}
+        optionFilterProp="label"
+        filterOption={(input, option) => {
+          const searchText = input.toLowerCase();
+          const label = String(option?.label ?? '').toLowerCase();
+          const val = String(option?.value ?? '').toLowerCase();
+          return label.includes(searchText) || val.includes(searchText);
+        }}
+        options={options}
+        className="w-full"
+        styles={{
+          popup: { root: { zIndex: 9999 } }
+        }}
+      />
+    </div>
+  );
+};
 
 export const Badge = ({ type }) => {
   const map = { debit: 'bg-red-100 text-red-600', credit: 'bg-green-100 text-green-600' };

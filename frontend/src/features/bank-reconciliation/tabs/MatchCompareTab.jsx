@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { reconciliationApi } from '../reconciliationApi';
 import toast from '../../../utils/toast';
+import DataTable from '../../../components/ui/DataTable';
+import TableSkeleton from '../../../components/ui/TableSkeleton';
 import {
   fmt,
   normalizeSearchValue,
+  matchesSearchQuery,
   formatBankAccountOptionLabel,
+  BankSelect,
   Badge,
   EmptyState,
   SummaryCard,
@@ -17,7 +21,7 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [matching, setMatching] = useState(false);
   const [manualMarking, setManualMarking] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('unmatched');
   const [selectedBank, setSelectedBank] = useState('all');
   const [compareSearch, setCompareSearch] = useState('');
@@ -210,39 +214,206 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
   const sageDisplayItems = statusFilter === 'matched' ? matchedItems.map((m) => m.sage).filter(Boolean)
     : statusFilter === 'unmatched' ? unmatchedSageItems : allSageItems;
 
-  const groupedSageDisplay = groupByCheckNo(sageDisplayItems);
-
   const filteredCompareBankItems = React.useMemo(() => {
-    const query = normalizeSearchValue(compareSearch).trim();
-    if (!query) return uniqueBankDisplayItems;
-    return uniqueBankDisplayItems.filter((t) => (
-      normalizeSearchValue(t?.description).includes(query)
-      || normalizeSearchValue(t?.check_number || t?.reference).includes(query)
-      || normalizeSearchValue(t?.type || t?.transaction_type).includes(query)
-      || normalizeSearchValue(t?.account_number || t?.account || selectedGroup?.account).includes(query)
-      || normalizeSearchValue(t?.date).includes(query)
-      || normalizeSearchValue(t?.amount).includes(query)
-      || normalizeSearchValue(t?.is_matched ? 'matched' : 'unmatched').includes(query)
-    ));
-  }, [uniqueBankDisplayItems, compareSearch, selectedGroup]);
+    if (!compareSearch.trim()) return uniqueBankDisplayItems;
+    return uniqueBankDisplayItems.filter((t) => matchesSearchQuery(t, compareSearch));
+  }, [uniqueBankDisplayItems, compareSearch]);
 
-  const filteredGroupedSageDisplay = React.useMemo(() => {
-    const query = normalizeSearchValue(compareSearch).trim();
-    if (!query) return groupedSageDisplay;
-    return groupedSageDisplay.filter((g) => {
-      if (normalizeSearchValue(g.checkNumber).includes(query) || normalizeSearchValue(g.totalAmount).includes(query)) return true;
-      return g.items.some((item) => (
-        normalizeSearchValue(item?.description).includes(query)
-        || normalizeSearchValue(item?.check_number || item?.reference).includes(query)
-        || normalizeSearchValue(item?.type || item?.transaction_type).includes(query)
-        || normalizeSearchValue(item?.account || item?.account_number || selectedGroup?.account).includes(query)
-        || normalizeSearchValue(item?.date).includes(query)
-        || normalizeSearchValue(item?.amount).includes(query)
-        || normalizeSearchValue(item?.bank).includes(query)
-        || normalizeSearchValue(item?.is_matched ? 'matched' : 'unmatched').includes(query)
-      ));
+  const filteredSageDisplayItems = React.useMemo(() => {
+    if (!compareSearch.trim()) return sageDisplayItems;
+    return sageDisplayItems.filter((t) => matchesSearchQuery(t, compareSearch));
+  }, [sageDisplayItems, compareSearch]);
+
+  const groupedSageDisplay = React.useMemo(() => {
+    return groupByCheckNo(filteredSageDisplayItems);
+  }, [filteredSageDisplayItems]);
+
+  const [bankSortCol, setBankSortCol] = useState(null);
+  const [bankSortDir, setBankSortDir] = useState('asc');
+  const [bankCurrentPage, setBankCurrentPage] = useState(1);
+  const [bankItemsPerPage, setBankItemsPerPage] = useState(15);
+
+  const [sageSortCol, setSageSortCol] = useState(null);
+  const [sageSortDir, setSageSortDir] = useState('asc');
+  const [sageCurrentPage, setSageCurrentPage] = useState(1);
+  const [sageItemsPerPage, setSageItemsPerPage] = useState(15);
+
+  const sortedCompareBankItems = React.useMemo(() => {
+    if (!bankSortCol) return filteredCompareBankItems;
+    return [...filteredCompareBankItems].sort((a, b) => {
+      let aVal = a[bankSortCol];
+      let bVal = b[bankSortCol];
+      if (bankSortCol === 'check_number') {
+        aVal = a.check_number || a.reference || '';
+        bVal = b.check_number || b.reference || '';
+      } else if (bankSortCol === 'type') {
+        aVal = a.type || a.transaction_type || '';
+        bVal = b.type || b.transaction_type || '';
+      }
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return bankSortDir === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return bankSortDir === 'asc'
+        ? String(aVal ?? '').localeCompare(String(bVal ?? ''), undefined, { numeric: true, sensitivity: 'base' })
+        : String(bVal ?? '').localeCompare(String(aVal ?? ''), undefined, { numeric: true, sensitivity: 'base' });
     });
-  }, [groupedSageDisplay, compareSearch, selectedGroup]);
+  }, [filteredCompareBankItems, bankSortCol, bankSortDir]);
+
+  const bankColumns = React.useMemo(() => [
+    {
+      header: 'Check No',
+      accessor: 'check_number',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.check_number || row?.reference || ''),
+      render: (val, row) => <span className="font-mono text-xs text-gray-700 truncate block">{row?.check_number || row?.reference || '-'}</span>,
+    },
+    {
+      header: 'Date',
+      accessor: 'date',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-gray-500 text-xs whitespace-nowrap">{val || '-'}</span>,
+    },
+    {
+      header: 'Description',
+      accessor: 'description',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="text-gray-700 text-xs truncate block max-w-[160px]" title={val}>{val || '-'}</span>,
+    },
+    {
+      header: 'Type',
+      accessor: 'type',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.type || row?.transaction_type || ''),
+      render: (val, row) => <Badge type={val || row?.transaction_type} />,
+    },
+    {
+      header: 'Amount',
+      accessor: 'amount',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => fmt(row?.amount),
+      render: (val, row) => (
+        <div className="text-right">
+          <div className={`font-semibold text-xs ${statusFilter === 'unmatched' ? 'text-amber-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-800'}`}>{fmt(val)}</div>
+          <div className={`text-[10px] uppercase font-semibold mt-0.5 ${statusFilter === 'all' ? (row?.is_matched ? 'text-green-600' : 'text-amber-600') : statusFilter === 'matched' ? 'text-green-600' : 'text-amber-600'}`}>
+            {statusFilter === 'all' ? (row?.is_matched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
+          </div>
+        </div>
+      ),
+    },
+  ], [statusFilter]);
+
+  const groupedSageDisplayWithId = React.useMemo(() => {
+    const list = groupedSageDisplay.map((g) => ({
+      ...g,
+      id: g.groupKey,
+    }));
+    if (!sageSortCol) return list;
+    return [...list].sort((a, b) => {
+      let aVal = a[sageSortCol];
+      let bVal = b[sageSortCol];
+      if (sageSortCol === 'date') {
+        aVal = a.items?.[0]?.date || '';
+        bVal = b.items?.[0]?.date || '';
+      } else if (sageSortCol === 'description') {
+        aVal = a.items?.length > 1 ? `${a.items.length} transactions` : (a.items?.[0]?.description || '');
+        bVal = b.items?.length > 1 ? `${b.items.length} transactions` : (b.items?.[0]?.description || '');
+      } else if (sageSortCol === 'type') {
+        aVal = a.items?.[0]?.type || a.items?.[0]?.transaction_type || '';
+        bVal = b.items?.[0]?.type || b.items?.[0]?.transaction_type || '';
+      }
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sageSortDir === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return sageSortDir === 'asc'
+        ? String(aVal ?? '').localeCompare(String(bVal ?? ''), undefined, { numeric: true, sensitivity: 'base' })
+        : String(bVal ?? '').localeCompare(String(aVal ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [groupedSageDisplay, sageSortCol, sageSortDir]);
+
+  const selectedSageGroupIds = React.useMemo(() => {
+    return groupedSageDisplayWithId
+      .filter((g) => g.items.length > 0 && g.items.every((item) => selectedSageIds.includes(item.id)))
+      .map((g) => g.id);
+  }, [groupedSageDisplayWithId, selectedSageIds]);
+
+  const handleSageGroupSelectionChange = (newSelectedGroupIds) => {
+    const allSelectedTransactionIds = [];
+    groupedSageDisplayWithId.forEach((g) => {
+      if (newSelectedGroupIds.includes(g.id)) {
+        g.items.forEach((item) => allSelectedTransactionIds.push(item.id));
+      }
+    });
+    setSelectedSageIds(allSelectedTransactionIds);
+  };
+
+  const sageColumns = React.useMemo(() => [
+    {
+      header: 'Check No',
+      accessor: 'checkNumber',
+      sortable: true,
+      filterable: true,
+      render: (val) => <span className="font-mono text-xs text-gray-700 truncate block">{val || '-'}</span>,
+    },
+    {
+      header: 'Date',
+      accessor: 'date',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.items?.[0]?.date || ''),
+      render: (val, row) => <span className="text-gray-500 text-xs whitespace-nowrap">{row?.items?.[0]?.date || '-'}</span>,
+    },
+    {
+      header: 'Description',
+      accessor: 'description',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.items?.[0]?.description || ''),
+      render: (val, row) => (
+        <span className="text-gray-700 text-xs truncate block max-w-[160px]" title={row?.items?.[0]?.description || ''}>
+          {row?.items?.[0]?.description || '-'}
+        </span>
+      ),
+    },
+    {
+      header: 'Type',
+      accessor: 'type',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => String(row?.items?.[0]?.type || row?.items?.[0]?.transaction_type || ''),
+      render: (val, row) => <Badge type={row?.items?.[0]?.type || row?.items?.[0]?.transaction_type} />,
+    },
+    {
+      header: 'Amount',
+      accessor: 'totalAmount',
+      sortable: true,
+      filterable: true,
+      getFilterValue: (row) => fmt(row?.totalAmount),
+      render: (val, row) => {
+        const groupMatched = row?.items?.every((item) => item?.is_matched);
+        const count = row?.items?.length || 1;
+        return (
+          <div className="text-right flex flex-col items-end">
+            <div className={`font-semibold text-xs ${statusFilter === 'unmatched' ? 'text-red-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-800'}`}>{fmt(val)}</div>
+            <div className="flex items-center gap-1 mt-0.5">
+              {count > 1 && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">
+                  +{count - 1}
+                </span>
+              )}
+              <span className={`text-[10px] uppercase font-semibold ${statusFilter === 'all' ? (groupMatched ? 'text-green-600' : 'text-red-600') : statusFilter === 'matched' ? 'text-green-600' : 'text-red-600'}`}>
+                {statusFilter === 'all' ? (groupMatched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+  ], [statusFilter]);
 
   React.useEffect(() => {
     setSelectedBankIds([]);
@@ -286,50 +457,50 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col space-y-3 h-full min-h-0 overflow-hidden">
       {/* Action bar */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4">
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
-            <div className="flex items-center gap-2 w-full">
-              <label htmlFor="bank-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">Bank:</label>
-              <div className="relative flex-1">
-                <select id="bank-filter" value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)}
-                  className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 pr-8 transition-colors cursor-pointer">
-                  <option value="all">All Banks</option>
-                  {bankOptions.map((bankOption) => <option key={bankOption.value} value={bankOption.value}>{bankOption.label}</option>)}
-                </select>
-              </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+            <div className="flex items-center gap-2 min-w-[180px]">
+              <label htmlFor="bank-filter" className="text-xs font-semibold text-gray-700 whitespace-nowrap">Bank:</label>
+              <BankSelect
+                id="bank-filter"
+                value={selectedBank}
+                onChange={setSelectedBank}
+                options={bankOptions}
+                allOptionLabel="All Banks"
+                allOptionValue="all"
+                className="w-40"
+              />
             </div>
-            <div className="flex items-center gap-2 w-full">
-              <label htmlFor="status-filter" className="text-sm font-semibold text-gray-700 whitespace-nowrap">Show:</label>
-              <div className="relative flex-1">
-                <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-                  className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] block w-full p-2.5 pr-3 transition-colors cursor-pointer">
-                  <option value="matched">Matched</option>
-                  <option value="unmatched">Unmatched</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
+            <div className="flex items-center gap-2 min-w-[140px]">
+              <label htmlFor="status-filter" className="text-xs font-semibold text-gray-700 whitespace-nowrap">Show:</label>
+              <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                className="appearance-none bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2 pr-3 transition-colors cursor-pointer min-w-[90px]">
+                <option value="matched">Matched</option>
+                <option value="unmatched">Unmatched</option>
+                <option value="all">All</option>
+              </select>
             </div>
-            <div className="w-full">
+            <div className="w-full sm:w-56">
               <input type="text" value={compareSearch} onChange={(e) => setCompareSearch(e.target.value)}
-                placeholder="Search match and compare"
-                className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2.5" />
+                placeholder="Search match & compare"
+                className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-xs rounded-lg focus:ring-[#1e9bd8] focus:border-[#1e9bd8] p-2" />
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:max-w-xl lg:ml-auto">
+          <div className="flex items-center gap-2 shrink-0">
             <button onClick={handleMatch} disabled={matching}
-              className="flex items-center justify-center gap-2 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-60 w-full">
+              className="flex items-center justify-center gap-1.5 bg-[#1e9bd8] hover:bg-[#1887c0] text-white px-3.5 py-2 rounded-lg font-medium text-xs transition-all disabled:opacity-60 cursor-pointer">
               {matching
-                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Matching</>
-                : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> Run Matching</>
+                ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Matching</>
+                : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> Run Matching</>
               }
             </button>
             <button onClick={handleManualMarkMatched} disabled={manualMarking || (selectedBankIds.length === 0 && selectedSageIds.length !== 2) || (selectedBankIds.length > 0 && !selectedSageIds.length)}
-              className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-60 w-full">
+              className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 py-2 rounded-lg font-medium text-xs transition-all disabled:opacity-60 cursor-pointer">
               {manualMarking
-                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Marking…</>
+                ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Marking…</>
                 : <>Mark as Matched</>
               }
             </button>
@@ -337,11 +508,16 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
         </div>
       </div>
 
-      {loading && <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-[#1e9bd8] border-t-transparent rounded-full animate-spin" /></div>}
+      {loading && (
+        <div className="grid grid-cols-2 gap-4">
+          <TableSkeleton rowCount={8} columnCount={5} />
+          <TableSkeleton rowCount={8} columnCount={5} />
+        </div>
+      )}
 
       {!loading && results && (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <SummaryCard label="Matched" value={summaryMatchedCount} color="text-green-600" />
             <SummaryCard label="Unmatched Bank" value={summaryUnmatchedBankCount} color="text-amber-600" />
             <SummaryCard label="Unmatched Sage" value={summaryUnmatchedSageCount} color="text-red-600" />
@@ -356,141 +532,90 @@ const MatchCompareTab = ({ onGoToUnmatched }) => {
               {(statusFilter === 'matched' && matchedItems.length > 0)
                 || (statusFilter === 'unmatched' && (unmatchedBankItems.length > 0 || unmatchedSageItems.length > 0))
                 || (statusFilter === 'all' && (allBankItems.length > 0 || allSageItems.length > 0)) ? (
-                <div className="grid grid-cols-2 gap-4 items-start">
+                <div className="grid grid-cols-2 gap-4 items-start flex-1 min-h-0">
                   {/* LEFT — Bank Statement */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-                    <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-amber-50/60">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col p-3 space-y-2 flex-1 min-h-0">
+                    <div className="flex items-center gap-2 bg-amber-50/60 p-2 rounded-xl border border-amber-100 shrink-0">
                       <span className="w-2 h-2 rounded-full bg-amber-500 inline-block flex-shrink-0" />
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Bank Statement</span>
+                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Bank Statement</span>
                       <span className="ml-auto text-xs text-amber-600 font-semibold">{filteredCompareBankItems.length} items</span>
                     </div>
-                    <div className="overflow-auto flex-1" style={{ maxHeight: 'calc(100vh - 260px)' }}>
-                      {filteredCompareBankItems.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
-                          <span className="text-3xl mb-2">—</span>No bank transactions found.
-                        </div>
-                      ) : (
-                        <table className="w-full table-fixed text-sm">
-                          <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0 z-10">
-                            <tr>
-                              {statusFilter === 'unmatched' && <th className="text-left px-4 py-3 w-10"></th>}
-                              <th className="text-left px-4 py-3 w-1/4">Check No</th>
-                              <th className="text-left px-4 py-3 w-1/4">Date</th>
-                              <th className="text-left px-4 py-3 w-1/3">Description</th>
-                              <th className="text-left px-4 py-3 w-1/6">Type</th>
-                              <th className="text-right px-4 py-3 w-1/4">Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                            {filteredCompareBankItems.map((t, idx) => (
-                              <tr key={`bank-${t?.id ?? idx}`}
-                                className={`transition-colors ${statusFilter === 'unmatched' ? 'hover:bg-amber-50/40' : statusFilter === 'matched' ? 'hover:bg-green-50/40' : 'hover:bg-gray-50'}`}>
-                                {statusFilter === 'unmatched' && (
-                                  <td className="px-4 py-3">
-                                    <input type="checkbox" checked={selectedBankIds.includes(t?.id)}
-                                      onChange={() => t?.id && toggleSelection(t.id, selectedBankIds, setSelectedBankIds)}
-                                      className="w-4 h-4 accent-[#1e9bd8]" />
-                                  </td>
-                                )}
-                                <td className="px-4 py-3 text-gray-700 font-mono text-xs truncate">{t?.check_number || t?.reference || ''}</td>
-                                <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{t?.date || ''}</td>
-                                <td className="px-4 py-3 text-gray-700 truncate text-xs" title={t?.description}>{t?.description || ''}</td>
-                                <td className="px-4 py-3"><Badge type={t?.type || t?.transaction_type} /></td>
-                                <td className="px-4 py-3 text-right text-xs">
-                                  <div className={`font-semibold ${statusFilter === 'unmatched' ? 'text-amber-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-800'}`}>{fmt(t?.amount)}</div>
-                                  <div className={`text-[10px] uppercase font-semibold mt-0.5 ${statusFilter === 'all' ? (t?.is_matched ? 'text-green-600' : 'text-amber-600') : statusFilter === 'matched' ? 'text-green-600' : 'text-amber-600'}`}>
-                                    {statusFilter === 'all' ? (t?.is_matched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
+                    <DataTable
+                      columns={bankColumns}
+                      data={sortedCompareBankItems}
+                      selectable={statusFilter === 'unmatched'}
+                      selectedRows={selectedBankIds}
+                      onSelectionChange={setSelectedBankIds}
+                      isClientSide={true}
+                      enableColumnFilters={true}
+                      sortColumn={bankSortCol}
+                      sortDirection={bankSortDir}
+                      onSort={(col, dir) => { setBankSortCol(col); setBankSortDir(dir); }}
+                      currentPage={bankCurrentPage}
+                      itemsPerPage={bankItemsPerPage}
+                      onPageChange={setBankCurrentPage}
+                      onItemsPerPageChange={setBankItemsPerPage}
+                      maxHeight="calc(100vh - 365px)"
+                      stickyHeader={true}
+                      expandable={false}
+                    />
                   </div>
 
                   {/* RIGHT — Sage Transactions */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-                    <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-red-50/60">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col p-3 space-y-2 flex-1 min-h-0">
+                    <div className="flex items-center gap-2 bg-red-50/60 p-2 rounded-xl border border-red-100 shrink-0">
                       <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sage Transactions</span>
-                      <span className="ml-auto text-xs text-red-600 font-semibold">{filteredGroupedSageDisplay.length} groups</span>
+                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Sage Transactions</span>
+                      <span className="ml-auto text-xs text-red-600 font-semibold">{groupedSageDisplay.length} groups</span>
                     </div>
-                    <div className="overflow-auto flex-1" style={{ maxHeight: 'calc(100vh - 260px)' }}>
-                      {filteredGroupedSageDisplay.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm">
-                          <span className="text-3xl mb-2">—</span>No Sage transactions found.
+                    <DataTable
+                      columns={sageColumns}
+                      data={groupedSageDisplayWithId}
+                      selectable={statusFilter === 'unmatched'}
+                      selectedRows={selectedSageGroupIds}
+                      onSelectionChange={handleSageGroupSelectionChange}
+                      isClientSide={true}
+                      enableColumnFilters={true}
+                      sortColumn={sageSortCol}
+                      sortDirection={sageSortDir}
+                      onSort={(col, dir) => { setSageSortCol(col); setSageSortDir(dir); }}
+                      currentPage={sageCurrentPage}
+                      itemsPerPage={sageItemsPerPage}
+                      onPageChange={setSageCurrentPage}
+                      onItemsPerPageChange={setSageItemsPerPage}
+                      maxHeight="calc(100vh - 365px)"
+                      stickyHeader={true}
+                      expandable={true}
+                      renderExpandedRow={(groupRow) => (
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-gray-500 mb-1">
+                            Group Details ({groupRow?.items?.length || 0} transactions)
+                          </div>
+                          <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            {(groupRow?.items || []).map((subItem, sIdx) => (
+                              <div key={subItem.id || sIdx} className="p-2.5 flex items-center justify-between text-xs hover:bg-gray-50">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-mono text-gray-500">{subItem.date || '-'}</span>
+                                  <span className="text-gray-800 font-medium">{subItem.description || subItem.vendor || subItem.customer || '-'}</span>
+                                  <span className="text-gray-400 text-[11px] font-mono">{subItem.doc_number || subItem.check_no || subItem.reference || ''}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <Badge type={subItem.type || subItem.transaction_type} />
+                                  <span className="font-semibold text-gray-800">{fmt(subItem.amount)}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ) : (
-                        <table className="w-full table-fixed text-sm">
-                          <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0 z-10">
-                            <tr>
-                              {statusFilter === 'unmatched' && <th className="text-left px-4 py-3 w-10"></th>}
-                              <th className="text-left px-4 py-3 w-1/4">Check No</th>
-                              <th className="text-left px-4 py-3 w-1/4">Date</th>
-                              <th className="text-left px-4 py-3 w-1/3">Description</th>
-                              <th className="text-left px-4 py-3 w-1/6">Type</th>
-                              <th className="text-right px-4 py-3 w-1/4">Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                            {filteredGroupedSageDisplay.map((g, idx) => {
-                              const t = g.items[0];
-                              const groupMatched = g.items.every((item) => item?.is_matched);
-                              const isExpanded = expandedSageGroups.includes(g.groupKey);
-                              return (
-                                <React.Fragment key={`sage-${g.groupKey}-${idx}`}>
-                                  <tr className={`transition-colors ${statusFilter === 'unmatched' ? 'hover:bg-red-50/40' : statusFilter === 'matched' ? 'hover:bg-green-50/40' : 'hover:bg-gray-50'}`}>
-                                    {statusFilter === 'unmatched' && (
-                                      <td className="px-4 py-3">
-                                        <input type="checkbox" checked={isGroupSelected(g.items, selectedSageIds)}
-                                          onChange={() => toggleGroupSelection(g.items, selectedSageIds, setSelectedSageIds)}
-                                          className="w-4 h-4 accent-[#1e9bd8]" />
-                                      </td>
-                                    )}
-                                    <td className="px-4 py-3 text-gray-700 font-mono text-xs truncate">{g.checkNumber}</td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{t?.date || ''}</td>
-                                    <td className="px-4 py-3 text-gray-700 truncate text-xs" title={g.items.length > 1 ? `${g.items.length} transactions` : (t?.description || '')}>
-                                      {g.items.length > 1 ? `${g.items.length} transactions` : (t?.description || '')}
-                                    </td>
-                                    <td className="px-4 py-3"><Badge type={t?.type || t?.transaction_type} /></td>
-                                    <td className="px-4 py-3 text-right text-xs">
-                                      <div className={`font-semibold ${statusFilter === 'unmatched' ? 'text-red-700' : statusFilter === 'matched' ? 'text-green-700' : 'text-gray-800'}`}>{fmt(g.totalAmount)}</div>
-                                      {g.items.length > 1 && (
-                                        <button onClick={() => toggleExpandedSageGroup(g.groupKey)} className="block ml-auto text-[10px] text-[#1e9bd8] hover:underline mt-0.5">
-                                          {isExpanded ? 'Hide' : `+${g.items.length}`}
-                                        </button>
-                                      )}
-                                      <div className={`text-[10px] uppercase font-semibold mt-0.5 ${statusFilter === 'all' ? (groupMatched ? 'text-green-600' : 'text-red-600') : statusFilter === 'matched' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {statusFilter === 'all' ? (groupMatched ? 'Matched' : 'Unmatched') : statusFilter === 'matched' ? 'Matched' : 'Unmatched'}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                  {isExpanded && g.items.length > 1 && g.items.map((entry) => (
-                                    <tr key={`sage-entry-${entry.id}`} className="bg-red-50/20">
-                                      {statusFilter === 'unmatched' && <td className="px-4 py-2" />}
-                                      <td className="px-4 py-2 text-gray-400 font-mono text-xs truncate">{entry.check_number || ''}</td>
-                                      <td className="px-4 py-2 text-gray-500 text-xs">{entry.date || ''}</td>
-                                      <td className="px-4 py-2 text-gray-600 truncate text-xs" title={entry.description}>{entry.description || ''}</td>
-                                      <td className="px-4 py-2"><Badge type={entry.type || entry.transaction_type} /></td>
-                                      <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(entry.amount)}</td>
-                                    </tr>
-                                  ))}
-                                </React.Fragment>
-                              );
-                            })}
-                          </tbody>
-                        </table>
                       )}
-                    </div>
+                    />
                   </div>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-8 text-center text-gray-400 text-sm space-y-3">
                   <div>No records found for this filter combination.</div>
                   <button onClick={onGoToUnmatched}
-                    className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors">
+                    className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer">
                     Go to Unmatched
                   </button>
                 </div>

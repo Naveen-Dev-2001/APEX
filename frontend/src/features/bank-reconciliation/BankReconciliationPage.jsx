@@ -57,7 +57,7 @@ const BankReconciliationPage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#f5f6fa] flex flex-col">
+    <div className="h-screen bg-[#f5f6fa] flex flex-col overflow-hidden">
       {/* Header */}
       <header className="fixed top-0 left-0 w-full h-[60px] bg-white border-b border-[#e8e8e8] shadow-sm flex items-center px-6 justify-between z-[2000]">
         {/* Logo */}
@@ -107,7 +107,7 @@ const BankReconciliationPage = () => {
                     </span>
                     <button
                       onClick={handleLogout}
-                      className="text-[13px] text-[#ff5a5f] hover:text-red-600 font-semibold transition-colors shrink-0"
+                      className="text-[13px] text-[#ff5a5f] hover:text-red-600 font-semibold transition-colors shrink-0 cursor-pointer"
                     >
                       Logout
                     </button>
@@ -131,7 +131,7 @@ const BankReconciliationPage = () => {
                       navigate('/module-select');
                       setIsDropdownOpen(false);
                     }}
-                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5"
+                    className="flex items-center space-x-3 w-full group transition-all duration-200 py-0.5 cursor-pointer"
                   >
                     <div className="p-1 rounded-lg text-[#3ba5d8]">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -150,10 +150,10 @@ const BankReconciliationPage = () => {
       </header>
 
       {/* Body */}
-      <div className="flex flex-1 pt-[60px]">
+      <div className="flex flex-1 pt-[60px] overflow-hidden">
         {/* Main */}
-        <main className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 p-3 pt-2 overflow-hidden flex flex-col min-h-0">
+          <div className="w-full flex-1 flex flex-col min-h-0 space-y-3">
             {/* Mobile Navigation */}
             <nav className="lg:hidden mb-4 bg-white border border-[#e8e8e8] shadow-sm overflow-x-auto">
               <div className="flex items-center min-w-max">
