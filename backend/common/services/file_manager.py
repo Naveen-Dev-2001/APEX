@@ -115,6 +115,15 @@ def move_invoice_file(current_path: str, target_category: str) -> Optional[str]:
                     break
         
         target_blob_client = container_client.get_blob_client(target_blob)
+        if target_blob_client.exists() and source_blob != target_blob:
+            from datetime import datetime
+            base, ext = os.path.splitext(filename)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_filename = f"{base}_{timestamp}{ext}"
+            new_relative_path = os.path.join(target_dir, unique_filename)
+            new_abs_path = os.path.abspath(new_relative_path)
+            target_blob = get_blob_name_from_path(new_relative_path)
+            target_blob_client = container_client.get_blob_client(target_blob)
         
         if source_blob_client.exists():
             data = source_blob_client.download_blob().readall()
