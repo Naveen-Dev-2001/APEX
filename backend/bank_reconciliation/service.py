@@ -192,22 +192,15 @@ class BankReconciliationService:
         bank_type = self._normalize_text(bank_txn.transaction_type)
         sage_type = self._normalize_text(sage_txn.transaction_type)
         
+        # ACH matching rule: For ACH, only amount match is required (already checked above)
+        if self._is_ach_transaction(bank_txn, sage_txn):
+            return True
+
         bank_date = self._normalize_date(bank_txn.date)
         sage_date = self._normalize_date(sage_txn.entry_date or sage_txn.date)
         
         if not bank_date or not sage_date or bank_date != sage_date:
             return False
-
-        # ACH matching rule
-        if self._is_ach_transaction(bank_txn, sage_txn):
-            # For incoming ACH credits, Amount and Date match is sufficient.
-            if bank_type == "credit" and sage_type == "credit":
-                return True
-                
-            # For ACH debits, require description match
-            bank_desc = self._normalize_text(bank_txn.description)
-            sage_desc = self._normalize_text(sage_txn.description)
-            return bool(bank_desc and sage_desc and bank_desc == sage_desc)
 
         # Debit matching rule: check check_number match
         if bank_type == "debit":
