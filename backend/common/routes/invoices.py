@@ -1964,20 +1964,10 @@ async def get_invoice_pdf_link(
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    invoice = None
     if is_archived:
         invoice = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
-        if not invoice:
-            invoice = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
-        if not invoice:
-            invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     else:
-        # Check by DeletedInvoice.id first if no active invoice found (since UI passes archive_id)
         invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        if not invoice:
-            invoice = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
-        if not invoice:
-            invoice = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
 
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -1997,21 +1987,10 @@ async def get_invoice_pdf(
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    invoice = None
     if is_archived:
         invoice = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
-        if not invoice:
-            invoice = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
-        if not invoice:
-            invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     else:
-        # Check active invoices first
         invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        if not invoice:
-            # Check archive by archive ID first, then by original_invoice_id
-            invoice = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
-        if not invoice:
-            invoice = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
 
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
