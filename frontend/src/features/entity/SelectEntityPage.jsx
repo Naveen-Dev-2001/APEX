@@ -121,6 +121,12 @@ const SelectEntityPage = () => {
     const rawEntity = entityData.find((item) => item.entity_id === entity.entityId);
     if (rawEntity) {
       useInvoiceStore.getState().setEntityMaster(rawEntity);
+    } else if (getERPSystem() === 'Zoho' && entity.entityId === 'DEFAULT') {
+      useInvoiceStore.getState().setEntityMaster({
+        entity_id: 'DEFAULT',
+        entity_name: 'Consolidated Analytics',
+        id: 0
+      });
     }
 
     let targetRoute = "/dashboard";
@@ -261,50 +267,66 @@ const SelectEntityPage = () => {
             </div>
           )}
 
-          <div className="relative w-full text-left mt-6" ref={entityContainerRef}>
-            <label className="text-[12px] text-gray-500 mb-1 block font-medium">Select Entity</label>
-            <button
-              ref={entityButtonRef}
-              type="button"
-              className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#1e9bd8] hover:opacity-85 active:opacity-75 text-white font-medium transition-all focus:outline-none"
-              onClick={() => setIsSelectOpen(!isSelectOpen)}
-            >
-              <span>{selectedEntity}</span>
-              <svg
-                className={`w-4 h-4 transition-transform duration-200 ${isSelectOpen ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          {getERPSystem() === 'Zoho' && sessionStorage.getItem('access_token') !== 'mock-access-token' ? (
+            <div className="mt-8">
+              <button
+                type="button"
+                className="w-full flex justify-center items-center h-[40px] px-4 rounded-md text-[15px] bg-[#1e9bd8] hover:opacity-85 active:opacity-75 text-white font-medium transition-all focus:outline-none"
+                onClick={() => handleSelectEntity({
+                  entityId: 'DEFAULT',
+                  name: 'Consolidated Analytics',
+                  displayName: 'DEFAULT - Consolidated Analytics'
+                })}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                Proceed
+              </button>
+            </div>
+          ) : (
+            <div className="relative w-full text-left mt-6" ref={entityContainerRef}>
+              <label className="text-[12px] text-gray-500 mb-1 block font-medium">Select Entity</label>
+              <button
+                ref={entityButtonRef}
+                type="button"
+                className="w-full flex justify-between items-center h-[40px] px-4 rounded-md text-[15px] bg-[#1e9bd8] hover:opacity-85 active:opacity-75 text-white font-medium transition-all focus:outline-none"
+                onClick={() => setIsSelectOpen(!isSelectOpen)}
+              >
+                <span>{selectedEntity}</span>
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${isSelectOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-            {isSelectOpen && (
-              <div 
-                className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 overflow-y-auto"
-                style={{ maxHeight: maxEntityDropdownHeight }}
-              >
-                <ul className="py-1">
-                  {entities.map((entity) => (
-                    <li key={entity.id}>
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-                        onClick={() => handleSelectEntity(entity)}
-                      >
-                        {entity.displayName}
-                      </button>
-                    </li>
-                  ))}
-                  {entities.length === 0 && (
-                    <li className="px-4 py-2 text-sm text-gray-500 italic text-center disabled">
-                      No entities found.
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
+              {isSelectOpen && (
+                <div 
+                  className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 overflow-y-auto"
+                  style={{ maxHeight: maxEntityDropdownHeight }}
+                >
+                  <ul className="py-1">
+                    {entities.map((entity) => (
+                      <li key={entity.id}>
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                          onClick={() => handleSelectEntity(entity)}
+                        >
+                          {entity.displayName}
+                        </button>
+                      </li>
+                    ))}
+                    {entities.length === 0 && (
+                      <li className="px-4 py-2 text-sm text-gray-500 italic text-center disabled">
+                        No entities found.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

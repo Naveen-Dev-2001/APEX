@@ -162,3 +162,18 @@ export const delegateInvoice = (invoiceId, payload) =>
 
 export const saveCustomInvoiceWorkflow = (invoiceId, payload) =>
     API.put(`/workflow/custom/${invoiceId}`, payload).then(res => res.data);
+
+export const uploadInvoiceAttachments = (invoiceId, formData) =>
+    API.post(`/invoices/${invoiceId}/attachments`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+    }).then(res => res.data);
+
+export const deleteInvoiceAttachment = (invoiceId, blobName) =>
+    API.delete(`/invoices/${invoiceId}/attachments`, {
+        params: { blob_name: blobName }
+    }).then(res => res.data);
+
+export const getInvoiceAttachmentLink = (invoiceId, blobName) =>
+    API.get(`/invoices/${invoiceId}/attachments/link`, {
+        params: { blob_name: blobName }
+    }).then(res => res.data);

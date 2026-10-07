@@ -18,7 +18,11 @@ print(f"Loading .env from: {env_path}")
 load_dotenv(dotenv_path=env_path, override=True)
 
 
+# Reload trigger: 1
 app = FastAPI(title="Accounts Payable API", version="1.0.0")
+
+# Store strong references to background tasks to prevent garbage collection
+background_tasks = set()
 
 # Register Trace Middleware
 app.add_middleware(TraceMiddleware)

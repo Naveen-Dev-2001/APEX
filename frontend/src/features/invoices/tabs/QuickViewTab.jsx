@@ -898,8 +898,9 @@ const QuickViewTab = ({ isAllFields = false, showOnlyHeader = false }) => {
         return hasMismatch;
     }, [quickViewFormData, lineItems]);
 
-    // Label for the GST system row
-    const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
+    // Label for the GST/VAT system row
+    const isZoho = getERPSystem() === "Zoho";
+    const gstTaxLabel = entityMaster?.gst_applicable === true ? (isZoho ? "Total VAT" : "Total GST") : "Total Tax";
 
     const { user, activeRole } = useAuthStore();
     const userRole = (activeRole || user?.role || "").toLowerCase();

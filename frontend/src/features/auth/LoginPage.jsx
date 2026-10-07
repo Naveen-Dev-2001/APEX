@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../../layout/AuthLayout';
 import CustomInput from '../../shared/components/CustomInput';
@@ -22,6 +22,16 @@ const LoginPage = () => {
     const [error, setError] = useState('');
     const [showAlert, setShowAlert] = useState(false);
     const [alertMessage, setAlertMessage] = useState('');
+
+    useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const errorParam = queryParams.get('error');
+        if (errorParam) {
+            toast.error(errorParam);
+            // Remove the error parameter from the URL without triggering a remount
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -118,7 +128,9 @@ const LoginPage = () => {
                     value={email}
                     onChange={(e) => {
                         setEmail(e.target.value);
-                        setError('');
+                        if (document.activeElement === e.target) {
+                            setError('');
+                        }
                     }}
                     required
                     icon={
@@ -133,7 +145,9 @@ const LoginPage = () => {
                     value={password}
                     onChange={(e) => {
                         setPassword(e.target.value);
-                        setError('');
+                        if (document.activeElement === e.target) {
+                            setError('');
+                        }
                     }}
                     required
                     icon={

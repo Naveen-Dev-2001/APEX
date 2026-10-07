@@ -7,6 +7,7 @@ const useAdminStore = create((set, get) => ({
     roles: [],
     statuses: [],
     navigation: [],
+    reminderDays: 3,
     loading: false,
     error: null,
     totalUsers: 0,
@@ -40,6 +41,7 @@ const useAdminStore = create((set, get) => ({
                 roles: data.roles || [], 
                 statuses: data.statuses || [],
                 navigation: data.navigation || [],
+                reminderDays: data.reminder_days !== undefined ? data.reminder_days : 3,
                 loading: false
             });
         } catch (error) {
@@ -55,7 +57,8 @@ const useAdminStore = create((set, get) => ({
             set({ 
                 roles: newSettings.roles, 
                 statuses: newSettings.statuses,
-                navigation: newSettings.navigation 
+                navigation: newSettings.navigation,
+                reminderDays: newSettings.reminder_days !== undefined ? newSettings.reminder_days : get().reminderDays
             });
             toast.success('Settings saved successfully');
             return true;
@@ -144,6 +147,17 @@ const useAdminStore = create((set, get) => ({
             roles,
             statuses,
             navigation: newNavigation
+        };
+        return await get().updateSettings(newSettings);
+    },
+
+    updateReminderDays: async (days) => {
+        const { roles, statuses, navigation } = get();
+        const newSettings = {
+            roles,
+            statuses,
+            navigation,
+            reminder_days: days
         };
         return await get().updateSettings(newSettings);
     },

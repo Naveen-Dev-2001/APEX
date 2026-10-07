@@ -15,7 +15,8 @@ DEFAULT_SETTINGS = {
         {"label": "Master Data", "path": "/master-data", "roles": ["admin"]},
         {"label": "Settings", "path": "/settings", "roles": ["admin"]},
         {"label": "Admin", "path": "/admin", "roles": ["admin"]}
-    ]
+    ],
+    "reminder_days": 3
 }
 
 def get_app_settings(db: Session = None):

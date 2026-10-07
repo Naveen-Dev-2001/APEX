@@ -96,6 +96,7 @@ def create_tables(engine_obj, base_obj):
             _add_column_if_not_exists(conn, "customer_master", "billing_address", "NVARCHAR(MAX) NULL")
             _add_column_if_not_exists(conn, "customer_master", "billing_street2", "NVARCHAR(255) NULL")
             _add_column_if_not_exists(conn, "customer_master", "billing_city", "NVARCHAR(100) NULL")
+            _add_column_if_not_exists(conn, "invoices", "attachments", "NVARCHAR(MAX) NULL")
 
             # Explicitly commit the changes
             conn.commit()

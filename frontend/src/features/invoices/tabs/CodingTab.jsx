@@ -901,7 +901,7 @@ const CodingTab = ({ isActive = false }) => {
                                     {lineItems.map((row, index) => {
                                         const isSelected = selectedIds.has(row.id);
                                         const isSystem = !!row.isSystemRow;
-                                        const gstTaxLabel = entityMaster?.gst_applicable === true ? "Total GST" : "Total Tax";
+                                        const gstTaxLabel = entityMaster?.gst_applicable === true ? (isZoho ? "Total VAT" : "Total GST") : "Total Tax";
                                         const rowLabel = row.type === "GST" ? gstTaxLabel : row.description;
 
                                         return (

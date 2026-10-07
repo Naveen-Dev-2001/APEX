@@ -81,7 +81,7 @@ const LineItemsTable = () => {
         { id: 3, description: "Extra kmtr - 999*13", lineType: "Expense", quantity: 0, unitPrice: 0, netAmount: 0, glCode: "", lob: "", department: "", customer: "", item: "" },
         { id: 4, description: "INNOVA-4TRIP", lineType: "Expense", quantity: 0, unitPrice: 0, netAmount: 0, glCode: "", lob: "", department: "", customer: "", item: "" },
         { id: 5, description: "SMALLCAR-1TRIP", lineType: "Expense", quantity: 0, unitPrice: 0, netAmount: 0, glCode: "", lob: "", department: "", customer: "", item: "" },
-        { id: 6, description: "Total GST (Ineligible)", lineType: "Expense", quantity: 1, unitPrice: 31, netAmount: 31, glCode: "", lob: "", department: "", customer: "", item: "" },
+        { id: 6, description: getERPSystem() === "Zoho" ? "Total VAT (Ineligible)" : "Total GST (Ineligible)", lineType: "Expense", quantity: 1, unitPrice: 31, netAmount: 31, glCode: "", lob: "", department: "", customer: "", item: "" },
     ]);
 
     const [selectedRows, setSelectedRows] = useState(new Set(rows.map((r) => r.id)));

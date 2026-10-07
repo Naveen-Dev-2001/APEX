@@ -94,7 +94,8 @@ def ensure_container_and_folders() -> None:
             f"posted_to_{TOOL}_files",
             "archived_files",
             "non_invoice",
-            "create_reports"
+            "create_reports",
+            "attachments"
         ]
         
         prefix = f"{AZURE_BLOB_FOLDER}/{TOOL}" if AZURE_BLOB_FOLDER else TOOL

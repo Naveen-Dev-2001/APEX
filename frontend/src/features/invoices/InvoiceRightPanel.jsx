@@ -11,6 +11,7 @@ const WorkflowTab = React.memo(lazy(() => import("./tabs/WorkflowTab")));
 const AuditTrailTab = React.memo(lazy(() => import("./tabs/AuditTrailTab")));
 const AllFieldsTab = React.memo(lazy(() => import("./tabs/AllFieldsTab")));
 const CodingTab = React.memo(lazy(() => import("./tabs/CodingTab")));
+const AttachmentsTab = React.memo(lazy(() => import("./tabs/AttachmentsTab")));
 
 const TAB_COMPONENTS = {
     "Quick View": QuickViewTab,
@@ -18,6 +19,7 @@ const TAB_COMPONENTS = {
     "GL Summary": GLSummaryTab,
     "Workflow": WorkflowTab,
     "Audit Trail": AuditTrailTab,
+    "Attachments": AttachmentsTab,
     "Coding": CodingTab,
 };
 

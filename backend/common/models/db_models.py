@@ -143,6 +143,7 @@ class Invoice(Base):
     original_items = Column(Text, nullable=True)  # JSON (array)
     approver_breakdown = Column(Text, nullable=True)  # JSON
     gl_summary = Column(Text, nullable=True)  # JSON (array)
+    attachments = Column(Text, nullable=True)  # JSON (array of attachment metadata)
     # Bill number returned by Sage Intacct
     sage_bill_number = Column(String(200), nullable=True, index=True)
 
