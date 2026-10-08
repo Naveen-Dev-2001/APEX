@@ -102,10 +102,32 @@ const FilterPopover = ({ col, data, activeFilters, onApply, onClose, anchorPos }
         return () => { isMounted = false; };
     }, [col, data, debouncedSearch]);
 
-    // Values visible after searching - since we search on server, we just use allValues
+    // Values visible after searching
     const visibleValues = useMemo(() => {
-        return allValues;
-    }, [allValues]);
+        if (!search || !search.trim()) return allValues;
+        const q = search.trim().toLowerCase();
+        const cleanQ = q.replace(/[\$,\s]/g, '');
+
+        return allValues.filter(val => {
+            const rawStr = String(val ?? '').toLowerCase();
+            const cleanRaw = rawStr.replace(/[\$,\s]/g, '');
+
+            let labelStr = '';
+            try {
+                const rendered = col.filterRender ? col.filterRender(val) : val;
+                if (typeof rendered === 'string' || typeof rendered === 'number') {
+                    labelStr = String(rendered).toLowerCase();
+                }
+            } catch (e) {}
+            const cleanLabel = labelStr.replace(/[\$,\s]/g, '');
+
+            return (
+                rawStr.includes(q) ||
+                labelStr.includes(q) ||
+                (cleanQ !== '' && (cleanRaw.includes(cleanQ) || cleanLabel.includes(cleanQ)))
+            );
+        });
+    }, [allValues, search, col]);
 
     // Close on outside click
     useEffect(() => {

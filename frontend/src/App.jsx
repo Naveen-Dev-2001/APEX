@@ -13,6 +13,8 @@ import TestDatePicker from './pages/TestDatePicker';
 import ToastProvider from './components/ToastProvider';
 import ChangePasswordFirstTimePage from './features/auth/ChangePasswordFirstTimePage';
 import SSOCallback from './features/auth/SSOCallback';
+import ModuleSelectionPage from './features/auth/ModuleSelectionPage';
+import BankReconciliationPage from './features/bank-reconciliation/BankReconciliationPage';
 
 import { ConfigProvider } from 'antd';
 import Invoice from './features/invoices/Invoice';
@@ -20,8 +22,10 @@ import CodingPage from './features/invoices/CodingPage';
 import ApprovalsPage from './features/invoices/ApprovalsPage';
 
 import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
+import { getERPSystem } from './utils/envHelper';
 
 function App() {
+  const isSage = getERPSystem() === 'Sage';
 
   return (
     <ConfigProvider
@@ -45,8 +49,10 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/module-select" element={isSage ? <ModuleSelectionPage /> : <DashboardPage />} />
             <Route path="/select-entity" element={<SelectEntityPage />} />
             <Route path="/change-password-first-time" element={<ChangePasswordFirstTimePage />} />
+            {isSage && <Route path="/bank-reconciliation" element={<BankReconciliationPage />} />}
 
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />

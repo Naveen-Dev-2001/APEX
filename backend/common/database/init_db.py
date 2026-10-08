@@ -98,6 +98,138 @@ def create_tables(engine_obj, base_obj):
             _add_column_if_not_exists(conn, "customer_master", "billing_city", "NVARCHAR(100) NULL")
             _add_column_if_not_exists(conn, "invoices", "attachments", "NVARCHAR(MAX) NULL")
 
+                        # Check bank_statements columns
+            _add_column_if_not_exists(
+                conn,
+                "bank_statements",
+                "account_number",
+                "NVARCHAR(100) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_statements",
+                "statement_month",
+                "NVARCHAR(7) NULL"
+            )
+
+            # Check bank_accounts columns
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "bank_id",
+                "NVARCHAR(100) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "bank_name",
+                "NVARCHAR(255) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "account_number",
+                "NVARCHAR(100) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "account_name",
+                "NVARCHAR(255) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "gl_account",
+                "NVARCHAR(100) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "gl_account_title",
+                "NVARCHAR(255) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "currency_code",
+                "NVARCHAR(10) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "is_active",
+                "BIT NOT NULL DEFAULT 1"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "source",
+                "NVARCHAR(50) NOT NULL DEFAULT 'upload'"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "created_at",
+                "DATETIME NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "bank_accounts",
+                "updated_at",
+                "DATETIME NULL"
+            )
+
+            # Check sage_gl_transaction_cache columns
+            _add_column_if_not_exists(
+                conn,
+                "sage_gl_transaction_cache",
+                "entry_date",
+                "DATE NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "sage_gl_transaction_cache",
+                "doc_number",
+                "NVARCHAR(100) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "sage_gl_transaction_cache",
+                "vendor",
+                "NVARCHAR(200) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "sage_gl_transaction_cache",
+                "customer",
+                "NVARCHAR(200) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "sage_gl_transaction_cache",
+                "record_type",
+                "NVARCHAR(100) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "sage_gl_transaction_cache",
+                "cleared",
+                "NVARCHAR(50) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "sage_gl_transaction_cache",
+                "tr_type",
+                "NVARCHAR(50) NULL"
+            )
+            _add_column_if_not_exists(
+                conn,
+                "sage_gl_transaction_cache",
+                "bank",
+                "NVARCHAR(100) NULL"
+            )
+
             # Explicitly commit the changes
             conn.commit()
             print("SUCCESS: Database schema migrations completed successfully")
