@@ -93,6 +93,8 @@ const LoginPage = () => {
                             useInvoiceStore.getState().setEntityMaster(rawEntity);
 
                             navigate('/dashboard');
+                        } else if (getERPSystem() === 'Sage') {
+                            navigate('/module-select');
                         } else {
                             navigate('/select-entity');
                         }

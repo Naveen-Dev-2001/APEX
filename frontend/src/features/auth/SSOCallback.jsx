@@ -92,8 +92,10 @@ export default function SSOCallback() {
                     useInvoiceStore.getState().setEntityMaster(rawEntity);
 
                     navigate('/dashboard', { replace: true });
-                } else {
+                } else if (getERPSystem() === 'Sage') {
                     navigate('/module-select', { replace: true });
+                } else {
+                    navigate('/select-entity', { replace: true });
                 }
 
             } catch (err) {
