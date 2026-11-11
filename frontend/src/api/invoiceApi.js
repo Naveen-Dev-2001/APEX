@@ -64,8 +64,11 @@ export const fetchEntityMaster = () =>
         return res.data;
     })
 
-export const getInvoicePdf = (invoiceId) =>
-    API.get(`/invoices/${invoiceId}/file`, { responseType: 'blob' }).then(res => {
+export const getInvoicePdf = (invoiceId, isArchived = false) =>
+    API.get(`/invoices/${invoiceId}/file`, {
+        params: isArchived ? { is_archived: true } : undefined,
+        responseType: 'blob'
+    }).then(res => {
         return res.data;
     });
 

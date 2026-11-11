@@ -1960,18 +1960,17 @@ async def get_raw_invoice(invoice_id: int, db: Session = Depends(get_db)):
 @router.get("/{invoice_id}/pdf-link")
 async def get_invoice_pdf_link(
     invoice_id: int,
+    is_archived: bool = Query(False),
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if is_archived:
+        invoice = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
+    else:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+
     if not invoice:
-        archived = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
-        if not archived:
-             archived = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
-        if archived:
-            invoice = archived
-        else:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+        raise HTTPException(status_code=404, detail="Invoice not found")
 
     from common.services.azure_blob import get_pdf_link, get_blob_name_from_path
     blob_name = get_blob_name_from_path(invoice.file_path)
@@ -1984,21 +1983,17 @@ async def get_invoice_pdf_link(
 @router.get("/{invoice_id}/file")
 async def get_invoice_pdf(
     invoice_id: int,
+    is_archived: bool = Query(False),
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if is_archived:
+        invoice = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
+    else:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+
     if not invoice:
-        # Check archive if not found in active invoices
-        archived = db.query(DeletedInvoice).filter(DeletedInvoice.original_invoice_id == invoice_id).first()
-        if not archived:
-             # Also try searching by archive ID if passed directly
-             archived = db.query(DeletedInvoice).filter(DeletedInvoice.id == invoice_id).first()
-        
-        if archived:
-            invoice = archived
-        else:
-            raise HTTPException(status_code=404, detail="Invoice not found")
+        raise HTTPException(status_code=404, detail="Invoice not found")
 
     file_path = invoice.file_path
     
